@@ -1,18 +1,6 @@
 import type { ActionChain, ExpressionContext } from '@shenbi/schema';
 import type { PageRuntime, StateAction } from '../types/contracts';
-
-function setByPath(target: Record<string, any>, path: string, value: any) {
-  const keys = path.split('.');
-  let cursor: Record<string, any> = target;
-  for (let i = 0; i < keys.length - 1; i += 1) {
-    const key = keys[i]!;
-    if (!cursor[key] || typeof cursor[key] !== 'object') {
-      cursor[key] = {};
-    }
-    cursor = cursor[key];
-  }
-  cursor[keys[keys.length - 1]!] = value;
-}
+import { setByPathMutable } from '../utils/set-by-path';
 
 export interface MockRuntime extends PageRuntime {
   __executedActions: Array<{ actions: ActionChain; eventData?: any }>;
@@ -31,7 +19,7 @@ export function createMockRuntime(
     __refs: {},
     dispatch(action: StateAction) {
       if (action.type === 'SET') {
-        setByPath(runtime.state, action.key, action.value);
+        setByPathMutable(runtime.state, action.key, action.value);
       } else if (action.type === 'MERGE') {
         runtime.state = { ...runtime.state, ...action.data };
       } else if (action.type === 'RESET') {
