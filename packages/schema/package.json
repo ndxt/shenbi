@@ -1,0 +1,19 @@
+{
+  "name": "@shenbi/schema",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./types/index.ts",
+  "types": "./types/index.ts",
+  "exports": {
+    ".": "./types/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "test": "echo \"No tests for @shenbi/schema\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.3"
+  }
+}

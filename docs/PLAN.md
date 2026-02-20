@@ -1,13 +1,13 @@
-# Shenbi 阶段 1 任务看板（仅计划，不执行代码）
+# Shenbi 阶段 1 任务看板
 
-状态说明：`TODO` 未开始，`BLOCKED` 依赖未满足，`READY` 可立即开工。当前全部为 `TODO/READY`。  
+状态说明：`TODO` 未开始，`BLOCKED` 依赖未满足，`READY` 可立即开工，`DONE` 已完成。  
 负责人默认：`A`（编译/运行时）、`B`（渲染/预览）、`AB`（联合）。
 
 | ID | 任务 | 主要文件 | 负责人 | 依赖 | 预估 | 状态 | 验收标准 |
 |---|---|---|---|---|---|---|---|
-| M0-1 | 基线检查（workspace/test 命令） | `pnpm-workspace.yaml` `package.json` `tsconfig*.json` | AB | 无 | 0.5h | TODO/READY | 安装与测试命令可执行 |
-| M0-2 | 冻结接口契约文档 | `docs/DESIGN.md`（提炼） `packages/engine/src/types/*`（若有） | AB | M0-1 | 1h | TODO/READY | `CompiledNode/PageRuntime/ComponentResolver` 字段不再变动 |
-| M0-3 | 产出 mock 契约样例 | `packages/engine/src/__mocks__/compiled-node.ts` `runtime.ts` | AB | M0-2 | 1h | TODO/READY | A/B 可独立联调 mock |
+| M0-1 | 基线检查（workspace/test 命令） | `pnpm-workspace.yaml` `package.json` `tsconfig*.json` | AB | 无 | 0.5h | DONE | 安装与测试命令可执行（安装后） |
+| M0-2 | 冻结接口契约文档 | `docs/DESIGN.md`（提炼） `packages/engine/src/types/*`（若有） | AB | M0-1 | 1h | DONE | `CompiledNode/PageRuntime/ComponentResolver` 字段不再变动 |
+| M0-3 | 产出 mock 契约样例 | `packages/engine/src/__mocks__/compiled-node.ts` `runtime.ts` | AB | M0-2 | 1h | DONE | A/B 可独立联调 mock |
 | A1 | 表达式编译器 | `packages/engine/src/compiler/expression.ts` `expression.test.ts` | A | M0-2 | 4h | TODO/READY | `{{}}` 编译、deps 提取、异常处理测试通过 |
 | A2 | Schema 编译器 | `packages/engine/src/compiler/schema.ts` `schema.test.ts` | A | A1 | 5h | TODO/READY | `SchemaNode -> CompiledNode` 完整转换 |
 | A3 | State 管理 | `packages/engine/src/runtime/state.ts` `state.test.ts` | A | M0-2 | 4h | TODO/READY | `SET/MERGE/RESET` 与路径写入通过 |
