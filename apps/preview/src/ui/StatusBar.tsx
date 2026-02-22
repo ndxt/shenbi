@@ -2,7 +2,7 @@ import React from 'react';
 
 export function StatusBar() {
   return (
-    <div className="h-[22px] bg-blue-600 flex items-center justify-between px-3 text-[12px] text-white shrink-0">
+    <div className="h-[22px] bg-bg-status-bar border-t border-border-ide flex items-center justify-between px-3 text-[12px] text-white shrink-0">
       <div className="flex items-center gap-4">
         <span>Ready</span>
         <span>Errors: 0</span>
