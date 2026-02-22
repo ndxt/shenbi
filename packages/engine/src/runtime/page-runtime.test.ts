@@ -156,6 +156,47 @@ describe('runtime/page-runtime', () => {
       String(message).startsWith('unmount'),
     );
     expect(unmountCalls).toHaveLength(1);
+    expect(info).toHaveBeenCalledWith('unmount-a');
+    expect(info).not.toHaveBeenCalledWith('unmount-b');
+  });
+
+  it('onUnmount 中 callMethod 会使用首次挂载页面的方法定义', async () => {
+    const info = vi.fn();
+    const pageA: PageSchema = {
+      id: 'a',
+      body: { component: 'Container' },
+      methods: {
+        cleanup: {
+          body: [{ type: 'message', level: 'info', content: 'cleanup-a' }],
+        },
+      },
+      lifecycle: {
+        onUnmount: [{ type: 'callMethod', name: 'cleanup' }],
+      },
+    };
+    const pageB: PageSchema = {
+      id: 'b',
+      body: { component: 'Container' },
+      methods: {
+        cleanup: {
+          body: [{ type: 'message', level: 'info', content: 'cleanup-b' }],
+        },
+      },
+    };
+
+    const harness = renderPageRuntimeHook(pageA, {
+      message: { info },
+    });
+    await harness.mount();
+    await harness.rerender(pageB, {
+      message: { info },
+    });
+
+    await harness.unmount();
+    await harness.flush();
+
+    expect(info).toHaveBeenCalledWith('cleanup-a');
+    expect(info).not.toHaveBeenCalledWith('cleanup-b');
   });
 
   it('datasource 会使用 runtime 注入的 params/computed 作为表达式上下文', async () => {

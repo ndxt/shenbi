@@ -53,6 +53,7 @@ export function usePageRuntime(
   const computed = useComputed(page.computed, state);
 
   const pageRef = useRef(page);
+  const mountedPageRef = useRef(page);
   const paramsRef = useRef<Record<string, any>>(mergeRuntimeParams(page, options));
   const adaptersRef = useRef<RuntimeAdapters>(options);
   const stateRef = useRef<Record<string, any>>(state);
@@ -120,16 +121,25 @@ export function usePageRuntime(
   useWatchers(page.watchers, state, executeWithExtra);
 
   useEffect(() => {
+    const mountedPage = mountedPageRef.current;
+    const executeLifecycle = (actions: ActionChain) =>
+      executeActions(actions, getContext(), dispatch, {
+        methods: mountedPage.methods ?? {},
+        dataSources: mountedPage.dataSources ?? {},
+        refs: refsRef.current,
+        ...adaptersRef.current,
+      });
+
     // 业务约束：生命周期 onLoad/onMount 只在首次挂载触发一次。
-    if (pageRef.current.lifecycle?.onLoad) {
-      void executeWithExtra(pageRef.current.lifecycle.onLoad);
+    if (mountedPage.lifecycle?.onLoad) {
+      void executeLifecycle(mountedPage.lifecycle.onLoad);
     }
-    if (pageRef.current.lifecycle?.onMount) {
-      void executeWithExtra(pageRef.current.lifecycle.onMount);
+    if (mountedPage.lifecycle?.onMount) {
+      void executeLifecycle(mountedPage.lifecycle.onMount);
     }
     return () => {
-      if (pageRef.current.lifecycle?.onUnmount) {
-        void executeWithExtra(pageRef.current.lifecycle.onUnmount);
+      if (mountedPage.lifecycle?.onUnmount) {
+        void executeLifecycle(mountedPage.lifecycle.onUnmount);
       }
     };
   }, []);
