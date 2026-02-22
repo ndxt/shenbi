@@ -23,8 +23,8 @@
 | B6 | Demo Schema 6 场景 | `apps/preview/src/schemas/demo.json` | B | B5 | 3h | DONE | Button/Input/Select/Card/Tag-loop/Alert-if 可交互 |
 | I1 | 引擎导出整合 | `packages/engine/src/index.ts` `package.json` | AB | A1-7 B1-4 | 2h | DONE | 对外 API 稳定可引用 |
 | I2 | Preview 接入真实全链路 | `apps/preview/src/*` | AB | I1 B6 | 4h | DONE | 编译+运行时+渲染联通 |
-| I3 | 集成回归修复 | 相关改动文件 | AB | I2 | 6h | READY | 文档列出的全流程回归通过 |
-| Q1 | 性能与门禁 | `packages/engine/*test*` `apps/preview` | AB | I3 | 3h | TODO/BLOCKED | 200 节点编译 <50ms、渲染流畅 |
+| I3 | 集成回归修复 | 相关改动文件 | AB | I2 | 6h | DONE | 文档列出的全流程回归通过 |
+| Q1 | 性能与门禁 | `packages/engine/*test*` `apps/preview` | AB | I3 | 3h | TODO/READY | 200 节点编译 <50ms、渲染流畅 |
 | Q2 | 阶段1验收记录 | `docs/` 下验收文档 | AB | Q1 | 1h | TODO/BLOCKED | 验收项逐条勾选可追溯 |
 
 ## 建议执行顺序（开工序）

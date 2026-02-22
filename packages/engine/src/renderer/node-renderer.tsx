@@ -161,7 +161,7 @@ export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactEl
   }
 
   // ref 绑定 (React 19: ref 是普通 prop)
-  if (node.id) {
+  if (node.id && Comp !== Fragment) {
     resolvedProps.ref = (el: any) => {
       if (el) runtime.registerRef(node.id!, el);
     };

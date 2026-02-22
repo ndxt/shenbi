@@ -362,4 +362,19 @@ describe('NodeRenderer', () => {
     renderWithContext(node);
     expect(screen.getByText('test')).toBeTruthy();
   });
+
+  it('__fragment: 不注入 ref', () => {
+    const node: CompiledNode = {
+      id: 'frag',
+      Component: null,
+      componentType: '__fragment',
+      staticProps: {},
+      dynamicProps: {},
+      childrenFn: expr('fragment', () => 'fragment'),
+      allDeps: [],
+    };
+    const { runtime } = renderWithContext(node);
+    expect(screen.getByText('fragment')).toBeTruthy();
+    expect(runtime.__refs.frag).toBeUndefined();
+  });
 });
