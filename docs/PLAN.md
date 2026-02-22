@@ -25,7 +25,7 @@
 | I2 | Preview 接入真实全链路 | `apps/preview/src/*` | AB | I1 B6 | 4h | DONE | 编译+运行时+渲染联通 |
 | I3 | 集成回归修复 | 相关改动文件 | AB | I2 | 6h | DONE | 文档列出的全流程回归通过 |
 | Q1 | 性能与门禁 | `packages/engine/*test*` `apps/preview` | AB | I3 | 3h | DONE | 200 节点编译 <50ms、渲染流畅 |
-| Q2 | 阶段1验收记录 | `docs/` 下验收文档 | AB | Q1 | 1h | TODO/READY | 验收项逐条勾选可追溯 |
+| Q2 | 阶段1验收记录 | `docs/PHASE1_ACCEPTANCE.md` | AB | Q1 | 1h | DONE | 验收项逐条勾选可追溯 |
 
 ## 建议执行顺序（开工序）
 
