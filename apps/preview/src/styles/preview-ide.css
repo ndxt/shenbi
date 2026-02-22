@@ -1,11 +1,92 @@
 @import "tailwindcss";
 
 @theme {
-  --color-activity-bar: #09090b;
-  --color-sidebar: #18181b;
-  --color-editor: #09090b;
-  --color-panel-header: #18181b;
-  --color-border-base: #27272a;
+  /* Semantic Backgrounds */
+  --color-bg-activity-bar: var(--bg-activity-bar);
+  --color-bg-sidebar: var(--bg-sidebar);
+  --color-bg-editor: var(--bg-editor);
+  --color-bg-canvas: var(--bg-canvas);
+  --color-bg-panel: var(--bg-panel);
+  --color-bg-status-bar: var(--bg-status-bar);
+  
+  /* Semantic Borders */
+  --color-border-ide: var(--border-ide);
+  
+  /* Semantic Text */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+
+  /* Semantic Grid */
+  --color-grid-line: var(--grid-line);
+
+  /* Shared Typography */
+  --font-inter: "Inter", sans-serif;
+}
+
+:root, .theme-dark {
+  /* Default Dark Theme Values */
+  --bg-activity-bar: #09090b;
+  --bg-sidebar: #09090b;
+  --bg-editor: #0c0c0e;
+  --bg-canvas: #09090b;
+  --bg-panel: #09090b;
+  --bg-status-bar: #2563eb;
+  --border-ide: #27272a;
+  --grid-line: #18181b;
+  
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+}
+
+.theme-light {
+  --bg-activity-bar: #f4f4f5;
+  --bg-sidebar: #ffffff;
+  --bg-editor: #ffffff;
+  --bg-canvas: #f1f5f9;
+  --bg-panel: #ffffff;
+  --bg-status-bar: #3b82f6;
+  --border-ide: #e2e8f0;
+  --grid-line: #cbd5e1;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+}
+
+/* Cursor Dark Theme */
+.theme-cursor {
+  --bg-activity-bar: #1e1e24;
+  --bg-sidebar: #1e1e24;
+  --bg-editor: #18181A;
+  --bg-canvas: #121214;
+  --bg-panel: #1e1e24;
+  --bg-status-bar: #427ceb;
+  --border-ide: #2b2d31;
+  --grid-line: #22252a;
+  
+  --text-primary: #e4e4e7;
+  --text-secondary: #8b8f98;
+}
+
+/* WebStorm Dark Theme */
+.theme-webstorm-dark {
+  /* JetBrains New UI Dark Theme styles */
+  --bg-activity-bar: #2b2d30;
+  --bg-sidebar: #2b2d30;
+  --bg-editor: #1e1f22;
+  --bg-canvas: #1e1f22;
+  --bg-panel: #2b2d30;
+  --bg-status-bar: #2b2d30;
+  --border-ide: #393b40;
+  --grid-line: #2b2d30;
+  
+  --text-primary: #dfe1e5;
+  --text-secondary: #868a91;
+}
+
+/* Base Body Styles */
+body {
+  color: var(--text-primary);
+  background-color: var(--bg-canvas);
 }
 
 /* Scrollbar Styles */
@@ -40,8 +121,9 @@
 .canvas-grid {
   background-size: 20px 20px;
   background-image: 
-    linear-gradient(to right, #27272a 1px, transparent 1px),
-    linear-gradient(to bottom, #27272a 1px, transparent 1px);
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-attachment: local;
 }
 
 .stage-viewport {
