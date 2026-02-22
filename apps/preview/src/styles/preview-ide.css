@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --color-activity-bar: #09090b;
+  --color-sidebar: #18181b;
+  --color-editor: #09090b;
+  --color-panel-header: #18181b;
+  --color-border-base: #27272a;
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+.ide-text-xs {
+  font-size: 11px;
+}
+
+.ide-text-sm {
+  font-size: 13px;
+}
+
+/* Use a line-based grid (Figma/Editor style) */
+.canvas-grid {
+  background-size: 20px 20px;
+  background-image: 
+    linear-gradient(to right, #27272a 1px, transparent 1px),
+    linear-gradient(to bottom, #27272a 1px, transparent 1px);
+}
+
+.stage-viewport {
+  background-color: #ffffff;
+  box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.6), 0 0 1px 1px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hide scrollbar for the canvas but allow scrolling */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
