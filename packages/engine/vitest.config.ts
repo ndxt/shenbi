@@ -5,5 +5,6 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     reporters: ['verbose'],
-  },
+    globals: true
+  }
 });

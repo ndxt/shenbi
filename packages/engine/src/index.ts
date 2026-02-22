@@ -1,4 +1,5 @@
 export * from './types/contracts';
+export * from './utils';
 export * from './resolver';
 export * from './compiler/expression';
 export * from './compiler/schema';
@@ -10,4 +11,3 @@ export * from './runtime/datasource';
 export * from './renderer/node-renderer';
 export * from './renderer/shenbi-page';
 export * from './renderer/builtins';
-export * from './__mocks__';

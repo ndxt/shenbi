@@ -1,9 +1,5 @@
-import type { ExpressionContext } from '@shenbi/schema';
-import type { CompiledExpression, CompiledNode } from '../types/contracts';
-
-function expr(raw: string, fn: (ctx: ExpressionContext) => any, deps: string[] = []): CompiledExpression {
-  return { raw, fn, deps };
-}
+import type { CompiledNode } from '../types/contracts';
+import { createCompiledExpr as expr } from '../utils/create-compiled-expr';
 
 export const mockCompiledButtonNode: CompiledNode = {
   id: 'btn_submit',
