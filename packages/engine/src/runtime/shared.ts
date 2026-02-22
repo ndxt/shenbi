@@ -2,6 +2,16 @@ export function isObject(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+export function toExpressionDataSources<T extends { data: any }>(
+  dsState: Record<string, T>,
+): Record<string, any> {
+  const output: Record<string, any> = {};
+  for (const [name, item] of Object.entries(dsState)) {
+    output[name] = item?.data;
+  }
+  return output;
+}
+
 export function getStatePathValue(state: Record<string, any>, path: string): any {
   const normalized = path.startsWith('state.') ? path.slice('state.'.length) : path;
   const parts = normalized.split('.').filter(Boolean);

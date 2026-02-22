@@ -1,32 +1,11 @@
 import type { PageSchema } from '@shenbi/schema';
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef } from 'react';
 import type { StateAction } from '../types/contracts';
-import { isObject } from './shared';
+import { setByPathImmutable } from '../utils/set-by-path';
 
 export interface PageStateController {
   state: Record<string, any>;
   dispatch: (action: StateAction) => void;
-}
-
-function setByPathImmutable(source: Record<string, any>, path: string, value: any): Record<string, any> {
-  const keys = path.split('.').filter(Boolean);
-  if (keys.length === 0) {
-    return source;
-  }
-
-  if (keys.length === 1) {
-    const key = keys[0]!;
-    return { ...source, [key]: value };
-  }
-
-  const [head, ...rest] = keys;
-  const current = source[head!] as unknown;
-  const base = isObject(current) ? current : {};
-
-  return {
-    ...source,
-    [head!]: setByPathImmutable(base, rest.join('.'), value),
-  };
 }
 
 export function createInitialState(page: PageSchema): Record<string, any> {

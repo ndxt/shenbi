@@ -3,7 +3,13 @@ import type { DataSourceDef, ExpressionContext } from '@shenbi/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { compileJSFunction } from '../compiler/expression';
 import { resolveValue } from './action-executor';
-import { appendQuery, clearTimerRecord, getStatePathValue, safeJsonSnapshot } from './shared';
+import {
+  appendQuery,
+  clearTimerRecord,
+  getStatePathValue,
+  safeJsonSnapshot,
+  toExpressionDataSources,
+} from './shared';
 
 interface DataSourceRuntimeState {
   data: any;
@@ -23,16 +29,11 @@ function createExpressionContext(
   dsState: Record<string, DataSourceRuntimeState>,
   runtimeContext?: Partial<DataSourceRuntimeContext>,
 ): ExpressionContext {
-  const ds: Record<string, any> = {};
-  for (const [name, item] of Object.entries(dsState)) {
-    ds[name] = item.data;
-  }
-
   return {
     state,
     params: runtimeContext?.params ?? {},
     computed: runtimeContext?.computed ?? {},
-    ds,
+    ds: toExpressionDataSources(dsState),
     utils: {},
     refs: runtimeContext?.refs ?? {},
   };

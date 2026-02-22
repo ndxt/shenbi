@@ -4,7 +4,7 @@ import type { PageRuntime } from '../types/contracts';
 import { executeActions, type ExecutorOptions } from './action-executor';
 import { useComputed } from './computed';
 import { useDataSources } from './datasource';
-import { isObject } from './shared';
+import { isObject, toExpressionDataSources } from './shared';
 import { usePageState } from './state';
 import { useWatchers } from './watcher';
 
@@ -19,14 +19,6 @@ type RuntimeContextExtras = Pick<ExpressionContext, 'params' | 'computed' | 'ref
 
 export interface UsePageRuntimeOptions extends RuntimeAdapters {
   params?: Record<string, any>;
-}
-
-function toExpressionDataSources(dsState: Record<string, DataSourceRuntimeState>): Record<string, any> {
-  const output: Record<string, any> = {};
-  for (const [name, item] of Object.entries(dsState)) {
-    output[name] = item?.data;
-  }
-  return output;
 }
 
 function readDialogPayloads(state: Record<string, any>): Record<string, any> {

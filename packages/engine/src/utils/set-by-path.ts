@@ -2,25 +2,32 @@
  * 不可变路径设置：返回新对象，不修改原对象。
  * 支持 'a.b.c' 路径写入。
  */
+function isRecord(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 export function setByPathImmutable(
   target: Record<string, any>,
   path: string,
   value: any,
 ): Record<string, any> {
-  const keys = path.split('.');
-  const result = { ...target };
+  const keys = path.split('.').filter(Boolean);
+  if (keys.length === 0) {
+    return target;
+  }
+
   if (keys.length === 1) {
-    result[keys[0]!] = value;
-    return result;
+    return { ...target, [keys[0]!]: value };
   }
-  let cursor: Record<string, any> = result;
-  for (let i = 0; i < keys.length - 1; i += 1) {
-    const key = keys[i]!;
-    cursor[key] = { ...cursor[key] };
-    cursor = cursor[key];
-  }
-  cursor[keys[keys.length - 1]!] = value;
-  return result;
+
+  const [head, ...rest] = keys;
+  const nextValue = target[head!] as unknown;
+  const nestedTarget = isRecord(nextValue) ? nextValue : {};
+
+  return {
+    ...target,
+    [head!]: setByPathImmutable(nestedTarget, rest.join('.'), value),
+  };
 }
 
 /**
@@ -32,11 +39,15 @@ export function setByPathMutable(
   path: string,
   value: any,
 ): void {
-  const keys = path.split('.');
+  const keys = path.split('.').filter(Boolean);
+  if (keys.length === 0) {
+    return;
+  }
+
   let cursor: Record<string, any> = target;
   for (let i = 0; i < keys.length - 1; i += 1) {
     const key = keys[i]!;
-    if (!cursor[key] || typeof cursor[key] !== 'object') {
+    if (!isRecord(cursor[key])) {
       cursor[key] = {};
     }
     cursor = cursor[key];
