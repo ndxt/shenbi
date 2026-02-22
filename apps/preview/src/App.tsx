@@ -10,6 +10,8 @@ import {
 import { demoPageSchema } from './demo-schema';
 import type { CompiledNode } from '@shenbi/engine';
 
+import { AppShell } from './ui/AppShell';
+
 const resolver = antdResolver(antd);
 resolver.register('Container', Container);
 
@@ -38,7 +40,7 @@ export function App() {
   );
 
   return (
-    <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}>
+    <AppShell>
       <ShenbiPage
         schema={demoPageSchema}
         resolver={resolver}
@@ -46,6 +48,6 @@ export function App() {
         compiledBody={compiledBody}
         {...dialogProps}
       />
-    </div>
+    </AppShell>
   );
 }
