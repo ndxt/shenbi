@@ -4,50 +4,131 @@ import { Sidebar } from './Sidebar';
 import { WorkbenchToolbar } from './WorkbenchToolbar';
 import { EditorTabs } from './EditorTabs';
 import { Inspector } from './Inspector';
+import { AIPanel } from './AIPanel';
 import { Console } from './Console';
 import { StatusBar } from './StatusBar';
 import '../styles/preview-ide.css';
+import { useResize } from '../hooks/useResize';
+
+import { TitleBar } from './TitleBar';
 
 interface AppShellProps {
   children: React.ReactNode;
 }
 
+export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
+
 export function AppShell({ children }: AppShellProps) {
+  const [theme, setTheme] = React.useState<ThemeMode>('dark');
+  
+  // Panel Visibility State
+  const [showSidebar, setShowSidebar] = React.useState(true);
+  const [showInspector, setShowInspector] = React.useState(true);
+  const [showConsole, setShowConsole] = React.useState(true);
+  const [showAIPanel, setShowAIPanel] = React.useState(false);
+
+  // Panel Size State
+  const { size: sidebarSize, startResize: startSidebarResize } = useResize(256, 160, 600);
+  const { size: inspectorSize, startResize: startInspectorResize } = useResize(256, 160, 600);
+  const { size: aiPanelSize, startResize: startAIPanelResize } = useResize(300, 200, 800);
+  const { size: consoleSize, startResize: startConsoleResize } = useResize(192, 100, 800);
+
+  const toggleTheme = (newTheme: ThemeMode) => {
+    setTheme(newTheme);
+  };
+
+  React.useEffect(() => {
+    document.documentElement.classList.remove(
+      'theme-light', 
+      'theme-dark', 
+      'theme-cursor', 
+      'theme-webstorm-light', 
+      'theme-webstorm-dark'
+    );
+    document.documentElement.classList.add(`theme-${theme}`);
+  }, [theme]);
+
   return (
-    <div className="h-screen w-screen flex flex-col bg-zinc-950 text-zinc-100 overflow-hidden">
+    <div className="h-screen w-screen flex flex-col bg-bg-canvas text-text-primary overflow-hidden font-inter">
+      <TitleBar 
+        theme={theme} 
+        onToggleTheme={toggleTheme}
+        showSidebar={showSidebar}
+        onToggleSidebar={() => setShowSidebar(!showSidebar)}
+        showInspector={showInspector}
+        onToggleInspector={() => setShowInspector(!showInspector)}
+        showConsole={showConsole}
+        onToggleConsole={() => setShowConsole(!showConsole)}
+        showAIPanel={showAIPanel}
+        onToggleAIPanel={() => setShowAIPanel(!showAIPanel)}
+      />
+      
       {/* Main Container */}
       <div className="flex-1 flex overflow-hidden">
         <ActivityBar />
-        <Sidebar />
         
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {showSidebar && (
+          <div style={{ width: sidebarSize }} className="relative shrink-0 flex flex-col h-full">
+            <Sidebar />
+            <div 
+              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+              onMouseDown={(e) => startSidebarResize(e, 'horizontal', false)}
+            />
+          </div>
+        )}
+        
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <EditorTabs />
           <WorkbenchToolbar />
           
           <div className="flex-1 flex overflow-hidden">
             {/* Editor/Canvas Area Container */}
-            <div className="flex-1 flex flex-col overflow-hidden relative bg-zinc-950">
-              <main className="flex-1 overflow-auto p-12 flex justify-center items-start scrollbar-hide relative">
-                {/* Grid Background - Isolated to this main area */}
-                <div className="absolute inset-0 pointer-events-none canvas-grid opacity-100" />
+            <div className="flex-1 flex flex-col overflow-hidden relative bg-bg-canvas">
+              <main className="flex-1 overflow-auto p-12 flex justify-center items-start scrollbar-hide relative canvas-grid">
                 {/* The Stage / Viewport */}
-                <div className="relative z-10 stage-viewport min-h-[600px] w-full max-w-[1200px] rounded-sm overflow-hidden border border-zinc-800">
-                  <div className="bg-zinc-50 min-h-full">
+                <div className="relative z-10 stage-viewport min-h-[600px] w-full max-w-[1200px] rounded-sm overflow-hidden border border-border-ide">
+                  <div className="bg-white min-h-full">
                     {children}
                   </div>
                   
                   {/* Viewport Meta Info (Figma Style) */}
-                  <div className="absolute -top-6 left-0 text-[10px] text-zinc-500 font-mono flex gap-3">
+                  <div className="absolute -top-6 left-0 text-[10px] text-text-secondary font-mono flex gap-3">
                     <span>1200 x 800</span>
                     <span>100%</span>
                   </div>
                 </div>
               </main>
               
-              <Console />
+              {showConsole && (
+                <div style={{ height: consoleSize }} className="relative shrink-0 flex flex-col w-full">
+                  <div 
+                    className="absolute top-0 left-0 right-0 h-1 -mt-[2px] cursor-row-resize hover:bg-blue-500 z-20 transition-colors"
+                    onMouseDown={(e) => startConsoleResize(e, 'vertical', true)}
+                  />
+                  <Console />
+                </div>
+              )}
             </div>
 
-            <Inspector />
+            {showAIPanel && (
+              <div style={{ width: aiPanelSize }} className="relative shrink-0 flex flex-col h-full border-r border-border-ide">
+                <div 
+                  className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+                  onMouseDown={(e) => startAIPanelResize(e, 'horizontal', true)}
+                />
+                <AIPanel />
+              </div>
+            )}
+
+            {showInspector && (
+              <div style={{ width: inspectorSize }} className="relative shrink-0 flex flex-col h-full">
+                <div 
+                  className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+                  onMouseDown={(e) => startInspectorResize(e, 'horizontal', true)}
+                />
+                <Inspector />
+              </div>
+            )}
           </div>
         </div>
       </div>
