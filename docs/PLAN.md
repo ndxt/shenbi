@@ -24,8 +24,8 @@
 | I1 | 引擎导出整合 | `packages/engine/src/index.ts` `package.json` | AB | A1-7 B1-4 | 2h | DONE | 对外 API 稳定可引用 |
 | I2 | Preview 接入真实全链路 | `apps/preview/src/*` | AB | I1 B6 | 4h | DONE | 编译+运行时+渲染联通 |
 | I3 | 集成回归修复 | 相关改动文件 | AB | I2 | 6h | DONE | 文档列出的全流程回归通过 |
-| Q1 | 性能与门禁 | `packages/engine/*test*` `apps/preview` | AB | I3 | 3h | TODO/READY | 200 节点编译 <50ms、渲染流畅 |
-| Q2 | 阶段1验收记录 | `docs/` 下验收文档 | AB | Q1 | 1h | TODO/BLOCKED | 验收项逐条勾选可追溯 |
+| Q1 | 性能与门禁 | `packages/engine/*test*` `apps/preview` | AB | I3 | 3h | DONE | 200 节点编译 <50ms、渲染流畅 |
+| Q2 | 阶段1验收记录 | `docs/` 下验收文档 | AB | Q1 | 1h | TODO/READY | 验收项逐条勾选可追溯 |
 
 ## 建议执行顺序（开工序）
 
@@ -38,3 +38,13 @@
 1. `I3`：补齐“文档列出的全流程回归”自动化检查（重点覆盖 watcher/computed/datasource 在 preview 端到端行为）。
 2. `Q1`：加入性能基线脚本（200 节点编译耗时与渲染压力）。
 3. `Q2`：产出阶段 1 验收记录文档，逐条链接到测试与构建产物。
+
+### Q1 结果（已落地）
+
+- 引擎性能基线脚本：`pnpm --filter @shenbi/engine perf`
+- 工作区性能门禁：`pnpm test:gate`
+- 基线文件：`packages/engine/src/perf/perf-baseline.perf.ts`
+- 默认阈值（可通过环境变量覆盖）：
+  - `SHENBI_PERF_COMPILE_MS=50`
+  - `SHENBI_PERF_RENDER_MS=70`
+  - `SHENBI_PERF_NODE_COUNT=200`

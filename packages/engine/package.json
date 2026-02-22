@@ -12,7 +12,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "perf": "vitest run --config vitest.perf.config.ts"
   },
   "dependencies": {
     "@shenbi/schema": "workspace:*"
