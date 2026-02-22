@@ -135,7 +135,9 @@ export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactEl
   if (node.events) {
     for (const [eventName, chain] of Object.entries(node.events)) {
       resolvedProps[eventName] = (...args: any[]) => {
-        runtime.executeActions(chain, args[0]);
+        void runtime.executeActions(chain, args[0]).catch((error) => {
+          console.error('[shenbi] executeActions failed', error);
+        });
       };
     }
   }
@@ -163,7 +165,7 @@ export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactEl
   // ref 绑定 (React 19: ref 是普通 prop)
   if (node.id && Comp !== Fragment) {
     resolvedProps.ref = (el: any) => {
-      if (el) runtime.registerRef(node.id!, el);
+      runtime.registerRef(node.id!, el);
     };
   }
 

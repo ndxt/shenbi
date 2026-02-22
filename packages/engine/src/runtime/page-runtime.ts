@@ -15,6 +15,7 @@ interface DataSourceRuntimeState {
 }
 
 type RuntimeAdapters = Omit<Partial<ExecutorOptions>, 'methods' | 'dataSources' | 'refs'>;
+type RuntimeContextExtras = Pick<ExpressionContext, 'params' | 'computed' | 'refs'>;
 
 export interface UsePageRuntimeOptions extends RuntimeAdapters {
   params?: Record<string, any>;
@@ -33,6 +34,17 @@ function readDialogPayloads(state: Record<string, any>): Record<string, any> {
   return isObject(payloads) ? payloads : {};
 }
 
+function readPageParams(page: PageSchema): Record<string, any> {
+  return isObject(page.params) ? page.params : {};
+}
+
+function mergeRuntimeParams(page: PageSchema, options: UsePageRuntimeOptions): Record<string, any> {
+  return {
+    ...readPageParams(page),
+    ...(options.params ?? {}),
+  };
+}
+
 export function usePageRuntime(
   page: PageSchema,
   options: UsePageRuntimeOptions = {},
@@ -41,7 +53,7 @@ export function usePageRuntime(
   const computed = useComputed(page.computed, state);
 
   const pageRef = useRef(page);
-  const paramsRef = useRef<Record<string, any>>(options.params ?? {});
+  const paramsRef = useRef<Record<string, any>>(mergeRuntimeParams(page, options));
   const adaptersRef = useRef<RuntimeAdapters>(options);
   const stateRef = useRef<Record<string, any>>(state);
   const computedRef = useRef<Record<string, any>>(computed);
@@ -49,7 +61,7 @@ export function usePageRuntime(
   const dsStateRef = useRef<Record<string, DataSourceRuntimeState>>({});
 
   pageRef.current = page;
-  paramsRef.current = options.params ?? {};
+  paramsRef.current = mergeRuntimeParams(page, options);
   adaptersRef.current = options;
   stateRef.current = state;
   computedRef.current = computed;
@@ -67,13 +79,22 @@ export function usePageRuntime(
     [],
   );
 
+  const getDataSourceRuntimeContext = useCallback(
+    (): RuntimeContextExtras => ({
+      params: paramsRef.current,
+      computed: computedRef.current,
+      refs: refsRef.current,
+    }),
+    [],
+  );
+
   const runActionChain = useCallback(
-    async (actions: ActionChain, extra?: Record<string, any>, eventData?: any) => {
+    (actions: ActionChain, extra?: Record<string, any>, eventData?: any) => {
       const contextExtra = eventData === undefined
         ? extra
         : { ...(extra ?? {}), event: eventData };
 
-      await executeActions(actions, getContext(contextExtra), dispatch, {
+      return executeActions(actions, getContext(contextExtra), dispatch, {
         methods: pageRef.current.methods ?? {},
         dataSources: pageRef.current.dataSources ?? {},
         refs: refsRef.current,
@@ -84,30 +105,34 @@ export function usePageRuntime(
   );
 
   const executeWithExtra = useCallback(
-    async (actions: ActionChain, extra?: Record<string, any>) => {
-      await runActionChain(actions, extra);
-    },
+    (actions: ActionChain, extra?: Record<string, any>) => runActionChain(actions, extra),
     [runActionChain],
   );
 
-  const dsState = useDataSources(page.dataSources, state, executeWithExtra);
+  const dsState = useDataSources(
+    page.dataSources,
+    state,
+    executeWithExtra,
+    getDataSourceRuntimeContext,
+  );
   dsStateRef.current = dsState as Record<string, DataSourceRuntimeState>;
 
   useWatchers(page.watchers, state, executeWithExtra);
 
   useEffect(() => {
-    if (page.lifecycle?.onLoad) {
-      void executeWithExtra(page.lifecycle.onLoad);
+    // 业务约束：生命周期 onLoad/onMount 只在首次挂载触发一次。
+    if (pageRef.current.lifecycle?.onLoad) {
+      void executeWithExtra(pageRef.current.lifecycle.onLoad);
     }
-    if (page.lifecycle?.onMount) {
-      void executeWithExtra(page.lifecycle.onMount);
+    if (pageRef.current.lifecycle?.onMount) {
+      void executeWithExtra(pageRef.current.lifecycle.onMount);
     }
     return () => {
-      if (page.lifecycle?.onUnmount) {
-        void executeWithExtra(page.lifecycle.onUnmount);
+      if (pageRef.current.lifecycle?.onUnmount) {
+        void executeWithExtra(pageRef.current.lifecycle.onUnmount);
       }
     };
-  }, [executeWithExtra, page]);
+  }, []);
 
   const dialogPayloads = useMemo(() => readDialogPayloads(state), [state]);
 

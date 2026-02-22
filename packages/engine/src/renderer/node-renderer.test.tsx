@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
@@ -6,6 +6,10 @@ import type { CompiledNode } from '../types/contracts';
 import { expr, renderWithContext } from '../test-utils';
 
 describe('NodeRenderer', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('静态渲染: Button 文本 props + children 正确渲染', () => {
     const node: CompiledNode = {
       Component: 'button',
@@ -219,6 +223,32 @@ describe('NodeRenderer', () => {
     expect(runtime.__executedActions[0]!.actions).toBe(chain);
   });
 
+  it('事件绑定: executeActions reject 会被捕获避免未处理异常', async () => {
+    const chain = [{ type: 'callMethod' as const, name: 'handleReject' }];
+    const executeError = new Error('boom');
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const node: CompiledNode = {
+      Component: 'button',
+      componentType: 'Button',
+      staticProps: {},
+      dynamicProps: {},
+      events: { onClick: chain },
+      childrenFn: expr('ClickReject', () => 'ClickReject'),
+      allDeps: [],
+    };
+
+    const { runtime } = renderWithContext(node);
+    runtime.executeActions = vi.fn(async () => {
+      throw executeError;
+    });
+
+    await userEvent.click(screen.getByText('ClickReject'));
+    await Promise.resolve();
+
+    expect(errorSpy).toHaveBeenCalledWith('[shenbi] executeActions failed', executeError);
+  });
+
   it('嵌套: Container > Card > Button 递归正确', () => {
     const button: CompiledNode = {
       Component: 'button',
@@ -376,5 +406,22 @@ describe('NodeRenderer', () => {
     const { runtime } = renderWithContext(node);
     expect(screen.getByText('fragment')).toBeTruthy();
     expect(runtime.__refs.frag).toBeUndefined();
+  });
+
+  it('ref: 组件卸载时会清理 runtime refs', () => {
+    const node: CompiledNode = {
+      id: 'inputRef',
+      Component: 'input',
+      componentType: 'Input',
+      staticProps: { value: 'x', readOnly: true },
+      dynamicProps: {},
+      allDeps: [],
+    };
+
+    const view = renderWithContext(node);
+    expect(view.runtime.__refs.inputRef).toBeTruthy();
+
+    view.unmount();
+    expect(view.runtime.__refs.inputRef).toBeUndefined();
   });
 });

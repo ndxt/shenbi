@@ -41,6 +41,10 @@ export function createMockRuntime(
       };
     },
     registerRef(id: string, ref: any) {
+      if (ref == null) {
+        delete runtime.__refs[id];
+        return;
+      }
       runtime.__refs[id] = ref;
     },
     ...overrides

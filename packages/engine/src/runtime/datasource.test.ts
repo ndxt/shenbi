@@ -22,6 +22,7 @@ function renderDataSourceHook(
   dataSources: PageSchema['dataSources'],
   state: Record<string, any>,
   executeActions: (actions: any, extra?: any) => Promise<void>,
+  getRuntimeContext?: () => { params?: Record<string, any>; computed?: Record<string, any>; refs?: Record<string, any> },
 ) {
   let latest: Record<string, any> = {};
 
@@ -29,8 +30,9 @@ function renderDataSourceHook(
     defs: PageSchema['dataSources'];
     runtimeState: Record<string, any>;
     onExecute: (actions: any, extra?: any) => Promise<void>;
+    getContext?: () => { params?: Record<string, any>; computed?: Record<string, any>; refs?: Record<string, any> };
   }) {
-    latest = useDataSources(props.defs, props.runtimeState, props.onExecute);
+    latest = useDataSources(props.defs, props.runtimeState, props.onExecute, props.getContext);
     return null;
   }
 
@@ -39,12 +41,23 @@ function renderDataSourceHook(
 
   const render = async (defs: PageSchema['dataSources'], runtimeState: Record<string, any>) => {
     await act(async () => {
+      const harnessProps: {
+        defs: PageSchema['dataSources'];
+        runtimeState: Record<string, any>;
+        onExecute: (actions: any, extra?: any) => Promise<void>;
+        getContext?: () => { params?: Record<string, any>; computed?: Record<string, any>; refs?: Record<string, any> };
+      } = {
+        defs,
+        runtimeState,
+        onExecute: executeActions,
+      };
+
+      if (getRuntimeContext) {
+        harnessProps.getContext = getRuntimeContext;
+      }
+
       root.render(
-        createElement(Harness, {
-          defs,
-          runtimeState,
-          onExecute: executeActions,
-        }),
+        createElement(Harness, harnessProps),
       );
     });
   };
@@ -145,6 +158,42 @@ describe('runtime/datasource', () => {
     await harness.flush();
 
     expect(fetchMock.mock.calls[0]?.[0]).toContain('/api/users?q=test&page=2');
+    await harness.unmount();
+  });
+
+  it('datasource 表达式可访问 params/computed/refs 上下文', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createResponse({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const defs: PageSchema['dataSources'] = {
+      users: {
+        auto: true,
+        api: {
+          method: 'GET',
+          url: '/api/users',
+          params: {
+            q: '{{params.keyword}}',
+            total: '{{computed.total}}',
+            form: '{{refs.formRef.id}}',
+          },
+        },
+      },
+    };
+
+    const harness = renderDataSourceHook(
+      defs,
+      {},
+      vi.fn(async () => {}),
+      () => ({
+        params: { keyword: 'from-params' },
+        computed: { total: 3 },
+        refs: { formRef: { id: 'FORM-1' } },
+      }),
+    );
+    await harness.mount();
+    await harness.flush();
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('/api/users?q=from-params&total=3&form=FORM-1');
     await harness.unmount();
   });
 

@@ -1,6 +1,6 @@
 import type { ActionChain, PageSchema } from '@shenbi/schema';
 import type { DataSourceDef, ExpressionContext } from '@shenbi/schema';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { compileJSFunction } from '../compiler/expression';
 import { resolveValue } from './action-executor';
 import { appendQuery, clearTimerRecord, getStatePathValue, safeJsonSnapshot } from './shared';
@@ -10,6 +10,8 @@ interface DataSourceRuntimeState {
   loading: boolean;
   error: any;
 }
+
+type DataSourceRuntimeContext = Pick<ExpressionContext, 'params' | 'computed' | 'refs'>;
 const EMPTY_DS_ENTRY: DataSourceRuntimeState = {
   data: null,
   loading: false,
@@ -19,6 +21,7 @@ const EMPTY_DS_ENTRY: DataSourceRuntimeState = {
 function createExpressionContext(
   state: Record<string, any>,
   dsState: Record<string, DataSourceRuntimeState>,
+  runtimeContext?: Partial<DataSourceRuntimeContext>,
 ): ExpressionContext {
   const ds: Record<string, any> = {};
   for (const [name, item] of Object.entries(dsState)) {
@@ -27,11 +30,11 @@ function createExpressionContext(
 
   return {
     state,
-    params: {},
-    computed: {},
+    params: runtimeContext?.params ?? {},
+    computed: runtimeContext?.computed ?? {},
     ds,
     utils: {},
-    refs: {},
+    refs: runtimeContext?.refs ?? {},
   };
 }
 
@@ -61,6 +64,7 @@ export function useDataSources(
   dataSources: PageSchema['dataSources'],
   state: Record<string, any>,
   executeActions: (actions: ActionChain, extra?: Record<string, any>) => Promise<void>,
+  getRuntimeContext?: () => Partial<DataSourceRuntimeContext>,
 ): Record<string, any> {
   const [dsState, setDsState] = useState<Record<string, DataSourceRuntimeState>>(() =>
     createInitialDsState(dataSources),
@@ -100,7 +104,7 @@ export function useDataSources(
 
       setDsState((prev) => patchEntry(prev, name, { loading: true, error: null }));
 
-      const ctx = createExpressionContext(state, dsStateRef.current);
+      const ctx = createExpressionContext(state, dsStateRef.current, getRuntimeContext?.());
       const method = def.api.method ?? 'GET';
       const url = String(resolveValue(def.api.url, ctx) ?? '');
       const headers = resolveValue(def.api.headers ?? {}, ctx) as HeadersInit;
@@ -178,7 +182,7 @@ export function useDataSources(
         }
       }
     },
-    [executeActions, state],
+    [executeActions, getRuntimeContext, state],
   );
 
   useEffect(() => {
@@ -242,5 +246,5 @@ export function useDataSources(
     };
   }, []);
 
-  return useMemo(() => dsState, [dsState]);
+  return dsState;
 }
