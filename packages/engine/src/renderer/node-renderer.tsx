@@ -82,12 +82,6 @@ export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactEl
   const { runtime, resolver } = useShenbi();
   const ctx: ExpressionContext = runtime.getContext(extraContext);
 
-  // Step 1: if 条件
-  if (node.ifFn) {
-    const ifResult = evalExpr(node.ifFn, ctx);
-    if (!ifResult) return null;
-  }
-
   // Step 2: 权限检查
   if (node.permission) {
     // 阶段 1 简单实现：检查 state.__permissions 中是否包含该权限
@@ -108,10 +102,19 @@ export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactEl
         [node.loop!.indexKey]: index,
       };
       const itemCtx: ExpressionContext = runtime.getContext(loopCtx);
+      if (node.ifFn && !evalExpr(node.ifFn, itemCtx)) {
+        return null;
+      }
       const key = evalExpr(node.loop!.keyFn, itemCtx) ?? index;
       return renderChild(node.loop!.body, key, loopCtx);
     });
     return createElement(Fragment, null, ...elements);
+  }
+
+  // Step 1: if 条件（非 loop 节点）
+  if (node.ifFn) {
+    const ifResult = evalExpr(node.ifFn, ctx);
+    if (!ifResult) return null;
   }
 
   // Resolve component
@@ -191,7 +194,7 @@ export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactEl
   }
 
   // Step 11: children
-  let children: ReactNode = undefined;
+  let children: ReactNode = resolvedProps.children;
   if (node.childrenFn) {
     children = evalExpr(node.childrenFn, ctx);
   } else if (node.compiledChildren && node.compiledChildren.length > 0) {

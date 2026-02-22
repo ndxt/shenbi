@@ -190,6 +190,18 @@ describe('NodeRenderer', () => {
     expect(screen.getByText('Hello World')).toBeTruthy();
   });
 
+  it('静态 children: staticProps.children 会被渲染', () => {
+    const node: CompiledNode = {
+      Component: 'span',
+      componentType: 'Text',
+      staticProps: { children: '静态文本' },
+      dynamicProps: {},
+      allDeps: [],
+    };
+    renderWithContext(node);
+    expect(screen.getByText('静态文本')).toBeTruthy();
+  });
+
   it('事件绑定: onClick 触发 executeActions', async () => {
     const chain = [{ type: 'callMethod' as const, name: 'handleSubmit' }];
     const node: CompiledNode = {
@@ -263,6 +275,39 @@ describe('NodeRenderer', () => {
     };
     renderWithContext(node, { __permissions: ['user'] });
     expect(screen.queryByText('secret')).toBeNull();
+  });
+
+  it('loop + if(在 loop 节点上): 循环内条件过滤', () => {
+    const node: CompiledNode = {
+      Component: 'div',
+      componentType: 'Container',
+      staticProps: {},
+      dynamicProps: {},
+      ifFn: expr('{{item.visible}}', (ctx) => ctx.item?.visible),
+      loop: {
+        dataFn: expr('{{state.items}}', (ctx) => ctx.state.items),
+        itemKey: 'item',
+        indexKey: 'index',
+        keyFn: expr('{{index}}', (ctx) => ctx.index),
+        body: {
+          Component: 'span',
+          componentType: 'Tag',
+          staticProps: {},
+          dynamicProps: {},
+          childrenFn: expr('{{item.name}}', (ctx) => ctx.item?.name),
+          allDeps: [],
+        },
+      },
+      allDeps: ['state.items'],
+    };
+    renderWithContext(node, {
+      items: [
+        { name: 'Show', visible: true },
+        { name: 'Hide', visible: false },
+      ],
+    });
+    expect(screen.getByText('Show')).toBeTruthy();
+    expect(screen.queryByText('Hide')).toBeNull();
   });
 
   it('permission: 有权限则正常渲染', () => {
