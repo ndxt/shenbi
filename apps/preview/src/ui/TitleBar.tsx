@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Palette, Check, PanelLeft, PanelBottom, PanelRight, Command, Sparkles } from 'lucide-react';
+import { Palette, Check, PanelLeft, PanelBottom, PanelRight, Command, Sparkles, Maximize, Minimize } from 'lucide-react';
 import { ThemeMode } from './AppShell';
 
 interface TitleBarProps {
@@ -13,6 +13,8 @@ interface TitleBarProps {
   onToggleConsole: () => void;
   showAIPanel: boolean;
   onToggleAIPanel: () => void;
+  isMaximized: boolean;
+  onToggleMaximize: () => void;
 }
 
 export function TitleBar({ 
@@ -25,7 +27,9 @@ export function TitleBar({
   showConsole,
   onToggleConsole,
   showAIPanel,
-  onToggleAIPanel
+  onToggleAIPanel,
+  isMaximized,
+  onToggleMaximize
 }: TitleBarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -92,6 +96,14 @@ export function TitleBar({
             <Sparkles size={14} />
           </button>
         </div>
+
+        <button 
+          onClick={onToggleMaximize}
+          className={`p-1.5 rounded transition-colors mr-2 ${isMaximized ? 'bg-bg-panel text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-panel'}`}
+          title={isMaximized ? "Restore Layout" : "Maximize Center Area"}
+        >
+          {isMaximized ? <Minimize size={16} /> : <Maximize size={16} />}
+        </button>
 
         <div className="w-[1px] h-4 bg-border-ide mx-1" />
 

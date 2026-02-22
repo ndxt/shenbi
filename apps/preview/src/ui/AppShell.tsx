@@ -27,6 +27,36 @@ export function AppShell({ children }: AppShellProps) {
   const [showConsole, setShowConsole] = React.useState(true);
   const [showAIPanel, setShowAIPanel] = React.useState(false);
 
+  const [isMaximized, setIsMaximized] = React.useState(false);
+  const [previousPanelState, setPreviousPanelState] = React.useState({
+    sidebar: true,
+    inspector: true,
+    console: true,
+    aiPanel: false,
+  });
+
+  const toggleMaximize = () => {
+    if (isMaximized) {
+      setShowSidebar(previousPanelState.sidebar);
+      setShowInspector(previousPanelState.inspector);
+      setShowConsole(previousPanelState.console);
+      setShowAIPanel(previousPanelState.aiPanel);
+      setIsMaximized(false);
+    } else {
+      setPreviousPanelState({
+        sidebar: showSidebar,
+        inspector: showInspector,
+        console: showConsole,
+        aiPanel: showAIPanel,
+      });
+      setShowSidebar(false);
+      setShowInspector(false);
+      setShowConsole(false);
+      setShowAIPanel(false);
+      setIsMaximized(true);
+    }
+  };
+
   // Panel Size State
   const { size: sidebarSize, startResize: startSidebarResize } = useResize(256, 160, 600);
   const { size: inspectorSize, startResize: startInspectorResize } = useResize(256, 160, 600);
@@ -54,13 +84,15 @@ export function AppShell({ children }: AppShellProps) {
         theme={theme} 
         onToggleTheme={toggleTheme}
         showSidebar={showSidebar}
-        onToggleSidebar={() => setShowSidebar(!showSidebar)}
+        onToggleSidebar={() => { setShowSidebar(!showSidebar); setIsMaximized(false); }}
         showInspector={showInspector}
-        onToggleInspector={() => setShowInspector(!showInspector)}
+        onToggleInspector={() => { setShowInspector(!showInspector); setIsMaximized(false); }}
         showConsole={showConsole}
-        onToggleConsole={() => setShowConsole(!showConsole)}
+        onToggleConsole={() => { setShowConsole(!showConsole); setIsMaximized(false); }}
         showAIPanel={showAIPanel}
-        onToggleAIPanel={() => setShowAIPanel(!showAIPanel)}
+        onToggleAIPanel={() => { setShowAIPanel(!showAIPanel); setIsMaximized(false); }}
+        isMaximized={isMaximized}
+        onToggleMaximize={toggleMaximize}
       />
       
       {/* Main Container */}
