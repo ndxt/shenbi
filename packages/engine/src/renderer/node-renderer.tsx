@@ -6,6 +6,8 @@ import {
   Component,
   createContext,
   useContext,
+  useEffect,
+  useRef,
 } from 'react';
 import type { ExpressionContext } from '@shenbi/schema';
 import type {
@@ -14,6 +16,7 @@ import type {
   ShenbiContextValue,
   CompiledExpression,
 } from '../types/contracts';
+import { setByPathMutable } from '../utils';
 
 // ===== Context =====
 
@@ -57,11 +60,62 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 }
 
+interface FormRuntimeBinderProps {
+  Comp: any;
+  resolvedProps: Record<string, any>;
+  children: ReactNode;
+  nodeId?: string;
+  runtime: ShenbiContextValue['runtime'];
+}
+
+function FormRuntimeBinder({
+  Comp,
+  resolvedProps,
+  children,
+  nodeId,
+  runtime,
+}: FormRuntimeBinderProps): ReactElement {
+  const useFormFn = (Comp as { useForm?: () => any[] }).useForm;
+  const providedForm = resolvedProps.form;
+  const generatedForm = useFormFn ? useFormFn()[0] : undefined;
+  const form = providedForm ?? generatedForm;
+  const prevInitialValuesRef = useRef<any>(undefined);
+  const initialValues = resolvedProps.initialValues;
+
+  useEffect(() => {
+    if (!nodeId || !form) {
+      return;
+    }
+    runtime.registerRef(nodeId, form);
+    return () => {
+      runtime.registerRef(nodeId, null);
+    };
+  }, [form, nodeId, runtime]);
+
+  useEffect(() => {
+    if (!form?.setFieldsValue) {
+      return;
+    }
+    if (initialValues == null) {
+      prevInitialValuesRef.current = initialValues;
+      return;
+    }
+    if (Object.is(prevInitialValuesRef.current, initialValues)) {
+      return;
+    }
+    form.setFieldsValue(initialValues);
+    prevInitialValuesRef.current = initialValues;
+  }, [form, initialValues]);
+
+  return createElement(Comp, { ...resolvedProps, form }, children);
+}
+
 // ===== NodeRenderer =====
 
 export interface NodeRendererProps {
   node: CompiledNode;
   extraContext?: Record<string, any> | undefined;
+  [key: string]: any;
 }
 
 function evalExpr(compiled: CompiledExpression | undefined, ctx: ExpressionContext): any {
@@ -78,7 +132,7 @@ function renderChild(
   return createElement(NodeRenderer, { key, node: child, extraContext: extra });
 }
 
-export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactElement | null {
+export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRendererProps): ReactElement | null {
   const { runtime, resolver } = useShenbi();
   const ctx: ExpressionContext = runtime.getContext(extraContext);
 
@@ -130,15 +184,30 @@ export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactEl
   for (const [key, expr] of Object.entries(node.dynamicProps)) {
     resolvedProps[key] = evalExpr(expr, ctx);
   }
+  Object.assign(resolvedProps, injectedProps);
 
   // Step 6: 绑定 events
   if (node.events) {
     for (const [eventName, chain] of Object.entries(node.events)) {
-      resolvedProps[eventName] = (...args: any[]) => {
-        void runtime.executeActions(chain, args[0]).catch((error) => {
+      const handler = (...args: any[]) => {
+        const eventData = args.length > 1 ? args : args[0];
+        void runtime.executeActions(chain, eventData, extraContext).catch((error) => {
           console.error('[shenbi] executeActions failed', error);
         });
       };
+      if (eventName.includes('.')) {
+        setByPathMutable(resolvedProps, eventName, handler);
+      } else {
+        const existing = resolvedProps[eventName];
+        if (typeof existing === 'function') {
+          resolvedProps[eventName] = (...args: any[]) => {
+            existing(...args);
+            handler(...args);
+          };
+        } else {
+          resolvedProps[eventName] = handler;
+        }
+      }
     }
   }
 
@@ -163,7 +232,7 @@ export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactEl
   }
 
   // ref 绑定 (React 19: ref 是普通 prop)
-  if (node.id && Comp !== Fragment) {
+  if (node.id && Comp !== Fragment && node.componentType !== 'Form') {
     resolvedProps.ref = (el: any) => {
       runtime.registerRef(node.id!, el);
     };
@@ -182,14 +251,49 @@ export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactEl
 
   // Step 10: columns
   if (node.compiledColumns) {
+    const rowKey = resolvedProps.rowKey ?? 'key';
+    const editingKey = resolvedProps.editable?.editingKey;
+
+    const resolveRowId = (record: any, index: number) => {
+      if (typeof rowKey === 'function') {
+        return rowKey(record, index);
+      }
+      return record?.[rowKey];
+    };
+
     resolvedProps.columns = node.compiledColumns
       .filter((col) => !col.ifFn || evalExpr(col.ifFn, ctx))
       .map((col: CompiledColumn) => {
         const colConfig: Record<string, any> = { ...col.config };
-        if (col.compiledRender) {
+        if (col.dynamicConfig) {
+          for (const [key, expr] of Object.entries(col.dynamicConfig)) {
+            colConfig[key] = evalExpr(expr, ctx);
+          }
+        }
+        if (col.compiledRender || col.compiledEditRender) {
           const renderNode = col.compiledRender;
+          const editRenderNode = col.compiledEditRender;
           colConfig.render = (text: any, record: any, index: number) =>
-            renderChild(renderNode, `col_${index}`, { ...extraContext, text, record, index });
+          {
+            const rowId = resolveRowId(record, index);
+            const useEditRender = editRenderNode != null
+              && editingKey != null
+              && Object.is(rowId, editingKey);
+            const renderTarget = useEditRender
+              ? editRenderNode
+              : renderNode;
+
+            if (!renderTarget) {
+              return text;
+            }
+
+            return renderChild(renderTarget, `col_${index}`, {
+              ...extraContext,
+              text,
+              record,
+              index,
+            });
+          };
         }
         return colConfig;
       });
@@ -206,7 +310,25 @@ export function NodeRenderer({ node, extraContext }: NodeRendererProps): ReactEl
   }
 
   // Step 12: 错误边界
-  let element = createElement(Comp, resolvedProps, children);
+  let element = node.componentType === 'Form'
+    ? createElement(
+        FormRuntimeBinder,
+        node.id
+          ? {
+              Comp,
+              resolvedProps,
+              children,
+              nodeId: node.id,
+              runtime,
+            }
+          : {
+              Comp,
+              resolvedProps,
+              children,
+              runtime,
+            },
+      )
+    : createElement(Comp, resolvedProps, children);
   if (node.errorBoundary) {
     element = createElement(
       ErrorBoundary,

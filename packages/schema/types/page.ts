@@ -33,6 +33,12 @@ export interface LifecycleDef {
   onUnmount?: ActionChain;
 }
 
+export interface SyncToUrlDef {
+  stateKey: string;
+  queryKey?: string;
+  transform?: 'string' | 'number' | 'boolean' | 'json';
+}
+
 export interface PageSchema {
   id?: string;
   name?: string;
@@ -44,6 +50,7 @@ export interface PageSchema {
   dataSources?: Record<string, DataSourceDef>;
   body: SchemaNode | SchemaNode[];
   dialogs?: SchemaNode[];
+  syncToUrl?: SyncToUrlDef[];
   templates?: Record<string, SchemaNode>;
   lifecycle?: LifecycleDef;
 }

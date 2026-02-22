@@ -9,6 +9,8 @@
     "test": "pnpm -r run test",
     "perf": "pnpm --filter @shenbi/engine perf",
     "test:gate": "pnpm test && pnpm perf",
+    "test:phase1.5": "pnpm --filter @shenbi/engine test && pnpm --filter @shenbi/preview test && pnpm --filter @shenbi/preview test:e2e",
+    "test:phase1.5:gate": "pnpm test:phase1.5 && pnpm perf",
     "test:engine": "pnpm --filter @shenbi/engine test",
     "dev:preview": "pnpm --filter @shenbi/preview dev"
   },

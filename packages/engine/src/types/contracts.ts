@@ -14,7 +14,8 @@ export interface CompiledExpression {
 }
 
 export interface CompiledColumn {
-  config: Omit<ColumnSchema, 'render' | 'editRender'>;
+  config: Record<string, any>;
+  dynamicConfig?: Record<string, CompiledExpression>;
   compiledRender?: CompiledNode;
   renderParams?: string[];
   compiledEditRender?: CompiledNode;
@@ -61,7 +62,7 @@ export type StateAction =
 export interface PageRuntime {
   state: Record<string, any>;
   dispatch: (action: StateAction) => void;
-  executeActions: (actions: ActionChain, eventData?: any) => Promise<void>;
+  executeActions: (actions: ActionChain, eventData?: any, extraContext?: Record<string, any>) => Promise<void>;
   getContext: (extra?: Partial<ExpressionContext>) => ExpressionContext;
   computed: Record<string, any>;
   dialogPayloads: Record<string, any>;

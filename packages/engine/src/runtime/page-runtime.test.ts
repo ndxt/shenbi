@@ -67,6 +67,7 @@ function renderPageRuntimeHook(page: PageSchema, options: UsePageRuntimeOptions 
 describe('runtime/page-runtime', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    window.history.replaceState(null, '', '/');
   });
 
   it('params 会合并 page.params 与 options.params，且 options 优先', async () => {
@@ -282,6 +283,72 @@ describe('runtime/page-runtime', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toContain('/api/users?formId=FORM-42');
+
+    await harness.unmount();
+  });
+
+  it('syncToUrl: 首次挂载会从 URL 恢复状态', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/users?page=2&enabled=true&filters=%7B%22status%22%3A%22active%22%7D',
+    );
+
+    const page: PageSchema = {
+      body: { component: 'Container' },
+      state: {
+        pagination: { default: { current: 1, pageSize: 10 } },
+        enabled: { default: false },
+        filters: { default: null },
+      },
+      syncToUrl: [
+        { stateKey: 'pagination.current', queryKey: 'page', transform: 'number' },
+        { stateKey: 'enabled', transform: 'boolean' },
+        { stateKey: 'filters', transform: 'json' },
+      ],
+    };
+
+    const harness = renderPageRuntimeHook(page);
+    await harness.mount();
+    await harness.flush();
+
+    const runtime = harness.getLatest();
+    expect(runtime.state.pagination.current).toBe(2);
+    expect(runtime.state.enabled).toBe(true);
+    expect(runtime.state.filters).toEqual({ status: 'active' });
+
+    await harness.unmount();
+  });
+
+  it('syncToUrl: 状态变化会回写 URL，并在值为空时移除 query', async () => {
+    window.history.replaceState(null, '', '/users?page=1&keep=1');
+
+    const page: PageSchema = {
+      body: { component: 'Container' },
+      state: {
+        pagination: { default: { current: 1 } },
+      },
+      syncToUrl: [
+        { stateKey: 'pagination.current', queryKey: 'page', transform: 'number' },
+      ],
+    };
+
+    const harness = renderPageRuntimeHook(page);
+    await harness.mount();
+    await harness.flush();
+
+    await act(async () => {
+      harness.getLatest().dispatch({ type: 'SET', key: 'pagination.current', value: 3 });
+    });
+    await harness.flush();
+    expect(window.location.search).toContain('page=3');
+    expect(window.location.search).toContain('keep=1');
+
+    await act(async () => {
+      harness.getLatest().dispatch({ type: 'SET', key: 'pagination.current', value: null });
+    });
+    await harness.flush();
+    expect(window.location.search).toBe('?keep=1');
 
     await harness.unmount();
   });

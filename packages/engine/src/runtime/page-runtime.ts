@@ -6,6 +6,7 @@ import { useComputed } from './computed';
 import { useDataSources } from './datasource';
 import { isObject, toExpressionDataSources } from './shared';
 import { usePageState } from './state';
+import { useSyncToUrl } from './sync-url';
 import { useWatchers } from './watcher';
 
 interface DataSourceRuntimeState {
@@ -111,6 +112,7 @@ export function usePageRuntime(
   dsStateRef.current = dsState as Record<string, DataSourceRuntimeState>;
 
   useWatchers(page.watchers, state, executeWithExtra);
+  useSyncToUrl(page.syncToUrl, state, dispatch);
 
   useEffect(() => {
     const mountedPage = mountedPageRef.current;
@@ -142,8 +144,8 @@ export function usePageRuntime(
     () => ({
       state,
       dispatch,
-      executeActions: (actions: ActionChain, eventData?: any) =>
-        runActionChain(actions, undefined, eventData),
+      executeActions: (actions: ActionChain, eventData?: any, extraContext?: Record<string, any>) =>
+        runActionChain(actions, extraContext, eventData),
       getContext,
       computed,
       dialogPayloads,

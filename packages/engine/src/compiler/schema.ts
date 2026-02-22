@@ -23,6 +23,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return isObject(value) && !Array.isArray(value);
+}
+
 function isSchemaNode(value: unknown): value is SchemaNode {
   return isObject(value) && typeof value.component === 'string';
 }
@@ -64,6 +68,118 @@ function collectDeps(depsList: Array<string[] | undefined>): string[] {
     }
   }
   return [...output];
+}
+
+interface CompiledPropResult {
+  isStatic: boolean;
+  value: any;
+  deps: string[];
+}
+
+function compileFunctionToExpression(
+  rawValue: unknown,
+  compiledFn: (ctx: any, ...args: any[]) => any,
+): CompiledExpression {
+  const body = isJSFunctionDef(rawValue) ? rawValue.body ?? '' : '';
+  const deps = body ? extractDeps(body) : [];
+  return {
+    raw: '{{[JSFunction]}}',
+    deps,
+    fn: (ctx) => (...args: any[]) => compiledFn(ctx, ...args),
+  };
+}
+
+function resolveCompiledPropResult(
+  result: CompiledPropResult,
+  ctx: any,
+): any {
+  if (result.isStatic) {
+    return result.value;
+  }
+  return (result.value as CompiledExpression).fn(ctx);
+}
+
+function compilePropRuntimeValue(value: unknown): CompiledPropResult {
+  const compiled = compilePropValue(value);
+  if (isCompiledExpression(compiled)) {
+    return {
+      isStatic: false,
+      value: compiled,
+      deps: compiled.deps,
+    };
+  }
+
+  if (typeof compiled === 'function') {
+    const expression = compileFunctionToExpression(value, compiled);
+    return {
+      isStatic: false,
+      value: expression,
+      deps: expression.deps,
+    };
+  }
+
+  if (Array.isArray(value)) {
+    const items = value.map((item) => compilePropRuntimeValue(item));
+    const hasDynamic = items.some((item) => !item.isStatic);
+    if (!hasDynamic) {
+      return {
+        isStatic: true,
+        value,
+        deps: [],
+      };
+    }
+
+    const deps = collectDeps(items.map((item) => item.deps));
+    const expression: CompiledExpression = {
+      raw: '{{[Array]}}',
+      deps,
+      fn: (ctx) => items.map((item) => resolveCompiledPropResult(item, ctx)),
+    };
+    return {
+      isStatic: false,
+      value: expression,
+      deps,
+    };
+  }
+
+  if (isPlainObject(value)) {
+    const fields = Object.entries(value).map(([key, child]) => ({
+      key,
+      result: compilePropRuntimeValue(child),
+    }));
+    const hasDynamic = fields.some((entry) => !entry.result.isStatic);
+    if (!hasDynamic) {
+      return {
+        isStatic: true,
+        value,
+        deps: [],
+      };
+    }
+
+    const deps = collectDeps(fields.map((entry) => entry.result.deps));
+    const expression: CompiledExpression = {
+      raw: '{{[Object]}}',
+      deps,
+      fn: (ctx) => {
+        const output: Record<string, any> = {};
+        for (const entry of fields) {
+          output[entry.key] = resolveCompiledPropResult(entry.result, ctx);
+        }
+        return output;
+      },
+    };
+    return {
+      isStatic: false,
+      value: expression,
+      deps,
+    };
+  }
+
+  return {
+    isStatic: true,
+    value,
+    deps: [],
+  };
 }
 
 function compileAnyToExpression(value: PropValue | unknown): CompiledExpression {
@@ -112,7 +228,7 @@ function compileStyle(style: SchemaNode['style']): Record<string, any> | Compile
     return topLevelCompiled;
   }
 
-  if (!isObject(style) || Array.isArray(style)) {
+  if (!isPlainObject(style)) {
     return createStaticExpression(style);
   }
 
@@ -161,9 +277,25 @@ function compileColumns(columns: SchemaNode['columns'], resolver: ComponentResol
       ...config
     } = column as ColumnSchema & { renderParams?: string[]; editRenderParams?: string[] };
 
+    const staticConfig: Record<string, any> = {};
+    const dynamicConfig: Record<string, CompiledExpression> = {};
+
+    for (const [key, value] of Object.entries(config)) {
+      const result = compilePropRuntimeValue(value);
+      if (result.isStatic) {
+        staticConfig[key] = result.value;
+      } else {
+        dynamicConfig[key] = result.value as CompiledExpression;
+      }
+    }
+
     const compiled: CompiledColumn = {
-      config: config as Omit<ColumnSchema, 'render' | 'editRender'>,
+      config: staticConfig,
     };
+
+    if (Object.keys(dynamicConfig).length > 0) {
+      compiled.dynamicConfig = dynamicConfig;
+    }
 
     if (Array.isArray(editRules)) {
       compiled.editRules = editRules;
@@ -286,6 +418,9 @@ function collectColumnDeps(compiledColumns: CompiledColumn[] | undefined): strin
 
   const deps: string[] = [];
   for (const column of compiledColumns) {
+    if (column.dynamicConfig) {
+      deps.push(...collectDeps(Object.values(column.dynamicConfig).map((item) => item.deps)));
+    }
     if (column.ifFn) {
       deps.push(...column.ifFn.deps);
     }
@@ -329,26 +464,13 @@ function compileNode(node: SchemaNode, resolver: ComponentResolver): CompiledNod
   const propDeps: string[][] = [];
 
   for (const [key, value] of Object.entries(node.props ?? {})) {
-    const compiled = compilePropValue(value);
-    if (isCompiledExpression(compiled)) {
-      dynamicProps[key] = compiled;
-      propDeps.push(compiled.deps);
+    const result = compilePropRuntimeValue(value);
+    if (!result.isStatic) {
+      dynamicProps[key] = result.value as CompiledExpression;
+      propDeps.push(result.deps);
       continue;
     }
-
-    if (typeof compiled === 'function') {
-      const body = isJSFunctionDef(value) ? value.body ?? '' : '';
-      const deps = body ? extractDeps(body) : [];
-      dynamicProps[key] = {
-        raw: '{{[JSFunction]}}',
-        deps,
-        fn: (ctx) => (...args: any[]) => compiled(ctx, ...args),
-      };
-      propDeps.push(deps);
-      continue;
-    }
-
-    staticProps[key] = value;
+    staticProps[key] = result.value;
   }
 
   const ifFn = node.if !== undefined ? compileAnyToExpression(node.if) : undefined;

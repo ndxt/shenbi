@@ -9,6 +9,7 @@ export * from './runtime/computed';
 export * from './runtime/action-executor';
 export * from './runtime/watcher';
 export * from './runtime/datasource';
+export * from './runtime/sync-url';
 export * from './renderer/node-renderer';
 export * from './renderer/shenbi-page';
 export * from './renderer/builtins';

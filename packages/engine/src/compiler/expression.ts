@@ -43,6 +43,37 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
 }
 
+function shouldAutoReturn(body: string): boolean {
+  const trimmed = body.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (/\breturn\b/.test(trimmed)) {
+    return false;
+  }
+
+  const normalized = trimmed.replace(/;+\s*$/, '');
+  if (normalized.includes(';')) {
+    return false;
+  }
+  if (/\b(const|let|var|if|for|while|switch|try|catch|function|class)\b/.test(normalized)) {
+    return false;
+  }
+  return true;
+}
+
+function normalizeFunctionBody(body: string): string {
+  const trimmed = body.trim();
+  if (!trimmed) {
+    return body;
+  }
+  if (!shouldAutoReturn(trimmed)) {
+    return body;
+  }
+  const normalized = trimmed.replace(/;+\s*$/, '');
+  return `return (${normalized});`;
+}
+
 export function isExpression(value: unknown): value is string {
   return typeof value === 'string' && EXPRESSION_RE.test(value);
 }
@@ -148,7 +179,7 @@ export function compileJSFunction(
           const scope = ctx ?? {};
           return (function(__scope) {
             with (__scope) {
-              ${body}
+              ${normalizeFunctionBody(body)}
             }
           })(scope);
         } catch (_error) {

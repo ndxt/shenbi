@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import type { CompiledNode } from '../types/contracts';
 import { expr, renderWithContext } from '../test-utils';
+import { NodeRenderer, ShenbiContext } from './node-renderer';
 
 describe('NodeRenderer', () => {
   afterEach(() => {
@@ -223,6 +224,132 @@ describe('NodeRenderer', () => {
     expect(runtime.__executedActions[0]!.actions).toBe(chain);
   });
 
+  it('事件绑定: 会把 extraContext 透传给 executeActions', async () => {
+    const chain = [{ type: 'callMethod' as const, name: 'handleSubmit' }];
+    const node: CompiledNode = {
+      Component: 'button',
+      componentType: 'Button',
+      staticProps: {},
+      dynamicProps: {},
+      events: { onClick: chain },
+      childrenFn: expr('ClickWithCtx', () => 'ClickWithCtx'),
+      allDeps: [],
+    };
+    const { runtime } = renderWithContext(node, {}, { record: { id: 1 }, index: 0 });
+    await userEvent.click(screen.getByText('ClickWithCtx'));
+    expect(runtime.__executedActions).toHaveLength(1);
+    expect(runtime.__executedActions[0]?.extraContext).toEqual({ record: { id: 1 }, index: 0 });
+  });
+
+  it('注入 props: 透传到真实组件并与 schema 事件组合执行', async () => {
+    const injectedOnChange = vi.fn();
+    const chain = [{ type: 'callMethod' as const, name: 'handleChange' }];
+
+    const InputLike = (props: { value?: string; onChange?: (value: string) => void }) =>
+      createElement(
+        'button',
+        { onClick: () => props.onChange?.('next') },
+        props.value ?? '',
+      );
+
+    const node: CompiledNode = {
+      Component: InputLike,
+      componentType: 'Input',
+      staticProps: { value: 'schema-value' },
+      dynamicProps: {},
+      events: {
+        onChange: chain,
+      },
+      allDeps: [],
+    };
+
+    const view = renderWithContext(node);
+    render(
+      createElement(
+        ShenbiContext,
+        { value: { runtime: view.runtime, resolver: view.resolver } },
+        createElement(NodeRenderer, {
+          node,
+          value: 'injected-value',
+          onChange: injectedOnChange,
+        }),
+      ),
+    );
+
+    await userEvent.click(screen.getByText('injected-value'));
+    expect(injectedOnChange).toHaveBeenCalledWith('next');
+    expect(view.runtime.__executedActions).toHaveLength(1);
+    expect(view.runtime.__executedActions[0]?.actions).toBe(chain);
+    expect(view.runtime.__executedActions[0]?.eventData).toBe('next');
+  });
+
+  it('事件绑定: 支持路径事件（如 rowSelection.onChange）', async () => {
+    const chain = [{ type: 'callMethod' as const, name: 'handleSelect' }];
+    const TableLike = (props: { rowSelection?: { onChange?: (keys: number[]) => void } }) =>
+      createElement(
+        'button',
+        {
+          onClick: () => props.rowSelection?.onChange?.([1, 2]),
+        },
+        'trigger-select',
+      );
+
+    const node: CompiledNode = {
+      Component: TableLike,
+      componentType: 'Table',
+      staticProps: {
+        rowSelection: {},
+      },
+      dynamicProps: {},
+      events: {
+        'rowSelection.onChange': chain,
+      },
+      allDeps: [],
+    };
+
+    const { runtime } = renderWithContext(node);
+    await userEvent.click(screen.getByText('trigger-select'));
+    expect(runtime.__executedActions).toHaveLength(1);
+    expect(runtime.__executedActions[0]?.actions).toBe(chain);
+    expect(runtime.__executedActions[0]?.eventData).toEqual([1, 2]);
+  });
+
+  it('事件绑定: 多参数事件会注入 event 参数数组', async () => {
+    const chain = [{ type: 'callMethod' as const, name: 'handleTableChange' }];
+    const TableLike = (props: { onChange?: (...args: any[]) => void }) =>
+      createElement(
+        'button',
+        {
+          onClick: () => props.onChange?.(
+            { current: 2, pageSize: 20 },
+            { status: ['enabled'] },
+            { field: 'name', order: 'ascend' },
+          ),
+        },
+        'trigger-table-change',
+      );
+
+    const node: CompiledNode = {
+      Component: TableLike,
+      componentType: 'Table',
+      staticProps: {},
+      dynamicProps: {},
+      events: {
+        onChange: chain,
+      },
+      allDeps: [],
+    };
+
+    const { runtime } = renderWithContext(node);
+    await userEvent.click(screen.getByText('trigger-table-change'));
+    expect(runtime.__executedActions).toHaveLength(1);
+    expect(runtime.__executedActions[0]?.eventData).toEqual([
+      { current: 2, pageSize: 20 },
+      { status: ['enabled'] },
+      { field: 'name', order: 'ascend' },
+    ]);
+  });
+
   it('事件绑定: executeActions reject 会被捕获避免未处理异常', async () => {
     const chain = [{ type: 'callMethod' as const, name: 'handleReject' }];
     const executeError = new Error('boom');
@@ -391,6 +518,194 @@ describe('NodeRenderer', () => {
     };
     renderWithContext(node);
     expect(screen.getByText('test')).toBeTruthy();
+  });
+
+  it('columns: dynamicConfig 会在渲染时求值', () => {
+    const TableComp = (props: any) =>
+      createElement('div', { 'data-testid': 'sorter-type' }, typeof props.columns?.[0]?.sorter);
+
+    const node: CompiledNode = {
+      Component: TableComp,
+      componentType: 'Table',
+      staticProps: {},
+      dynamicProps: {},
+      compiledColumns: [
+        {
+          config: { title: 'Name', dataIndex: 'name' },
+          dynamicConfig: {
+            sorter: expr('{{state.enableSorter}}', (ctx) =>
+              ctx.state.enableSorter ? ((a: number, b: number) => a - b) : false),
+          },
+        },
+      ],
+      allDeps: [],
+    };
+
+    renderWithContext(node, { enableSorter: true });
+    expect(screen.getByTestId('sorter-type').textContent).toBe('function');
+  });
+
+  it('columns: editable 行命中 editingKey 时优先渲染 editRender', () => {
+    const TableComp = (props: any) => {
+      const row = { id: 1, name: 'Alice' };
+      const col = props.columns?.[0];
+      return createElement('div', null, col?.render?.('Alice', row, 0));
+    };
+
+    const node: CompiledNode = {
+      Component: TableComp,
+      componentType: 'Table',
+      staticProps: {
+        rowKey: 'id',
+        editable: { editingKey: 1 },
+      },
+      dynamicProps: {},
+      compiledColumns: [
+        {
+          config: { title: 'Name', dataIndex: 'name' },
+          compiledRender: {
+            Component: 'span',
+            componentType: 'Text',
+            staticProps: {},
+            dynamicProps: {},
+            childrenFn: expr('展示态', () => '展示态'),
+            allDeps: [],
+          },
+          compiledEditRender: {
+            Component: 'span',
+            componentType: 'Text',
+            staticProps: {},
+            dynamicProps: {},
+            childrenFn: expr('编辑态', () => '编辑态'),
+            allDeps: [],
+          },
+        },
+      ],
+      allDeps: [],
+    };
+
+    renderWithContext(node);
+    expect(screen.getByText('编辑态')).toBeTruthy();
+    expect(screen.queryByText('展示态')).toBeNull();
+  });
+
+  it('columns: 未命中 editingKey 时渲染普通 render', () => {
+    const TableComp = (props: any) => {
+      const row = { id: 2, name: 'Bob' };
+      const col = props.columns?.[0];
+      return createElement('div', null, col?.render?.('Bob', row, 0));
+    };
+
+    const node: CompiledNode = {
+      Component: TableComp,
+      componentType: 'Table',
+      staticProps: {
+        rowKey: 'id',
+        editable: { editingKey: 1 },
+      },
+      dynamicProps: {},
+      compiledColumns: [
+        {
+          config: { title: 'Name', dataIndex: 'name' },
+          compiledRender: {
+            Component: 'span',
+            componentType: 'Text',
+            staticProps: {},
+            dynamicProps: {},
+            childrenFn: expr('展示态', () => '展示态'),
+            allDeps: [],
+          },
+          compiledEditRender: {
+            Component: 'span',
+            componentType: 'Text',
+            staticProps: {},
+            dynamicProps: {},
+            childrenFn: expr('编辑态', () => '编辑态'),
+            allDeps: [],
+          },
+        },
+      ],
+      allDeps: [],
+    };
+
+    renderWithContext(node);
+    expect(screen.getByText('展示态')).toBeTruthy();
+    expect(screen.queryByText('编辑态')).toBeNull();
+  });
+
+  it('columns: 仅有 editRender 且未命中 editingKey 时回退为文本', () => {
+    const TableComp = (props: any) => {
+      const row = { id: 2, name: 'Charlie' };
+      const col = props.columns?.[0];
+      return createElement('div', null, col?.render?.('原始文本', row, 0));
+    };
+
+    const node: CompiledNode = {
+      Component: TableComp,
+      componentType: 'Table',
+      staticProps: {
+        rowKey: 'id',
+        editable: { editingKey: 1 },
+      },
+      dynamicProps: {},
+      compiledColumns: [
+        {
+          config: { title: 'Name', dataIndex: 'name' },
+          compiledEditRender: {
+            Component: 'span',
+            componentType: 'Text',
+            staticProps: {},
+            dynamicProps: {},
+            childrenFn: expr('编辑态', () => '编辑态'),
+            allDeps: [],
+          },
+        },
+      ],
+      allDeps: [],
+    };
+
+    renderWithContext(node);
+    expect(screen.getByText('原始文本')).toBeTruthy();
+  });
+
+  it('Form: 自动创建实例并注册 ref，initialValues 变化时调用 setFieldsValue', () => {
+    const formInstance = {
+      setFieldsValue: vi.fn(),
+      resetFields: vi.fn(),
+      getFieldsValue: vi.fn(),
+    };
+
+    const FormComp = (props: any) => createElement('form', { 'data-testid': 'form-root' }, props.children);
+    (FormComp as any).useForm = vi.fn(() => [formInstance]);
+
+    const node: CompiledNode = {
+      id: 'user-form',
+      Component: FormComp,
+      componentType: 'Form',
+      staticProps: {},
+      dynamicProps: {
+        initialValues: expr('{{state.formInitial}}', (ctx) => ctx.state.formInitial),
+      },
+      allDeps: ['state.formInitial'],
+    };
+
+    const view = renderWithContext(node, { formInitial: { name: 'Alice' } });
+    expect((FormComp as any).useForm).toHaveBeenCalledTimes(1);
+    expect(view.runtime.__refs['user-form']).toBe(formInstance);
+    expect(formInstance.setFieldsValue).toHaveBeenCalledWith({ name: 'Alice' });
+
+    view.runtime.state.formInitial = { name: 'Bob' };
+    view.rerender(
+      createElement(
+        ShenbiContext,
+        { value: { runtime: view.runtime, resolver: view.resolver } },
+        createElement(NodeRenderer, { node }),
+      ),
+    );
+    expect(formInstance.setFieldsValue).toHaveBeenLastCalledWith({ name: 'Bob' });
+
+    view.unmount();
+    expect(view.runtime.__refs['user-form']).toBeUndefined();
   });
 
   it('__fragment: 不注入 ref', () => {

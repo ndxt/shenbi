@@ -157,6 +157,12 @@ describe('compiler/expression', () => {
     expect(fn(createContext({ delta: 10 }), 5)).toBe(15);
   });
 
+  it('compileJSFunction 无显式 return 时会按表达式自动返回', () => {
+    const fn = compileJSFunction(['a', 'b'], 'a.value - b.value + state.delta');
+    const result = fn(createContext({ delta: 2 }), { value: 9 }, { value: 3 });
+    expect(result).toBe(8);
+  });
+
   it('compileJSFunction 语法错误时返回 undefined', () => {
     const fn = compileJSFunction(['v'], 'return v + ;');
     expect(fn(createContext(), 5)).toBeUndefined();

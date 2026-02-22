@@ -18,7 +18,12 @@ export interface CallMethodAction extends BaseAction {
 
 export interface FetchAction extends BaseAction {
   type: 'fetch';
-  datasource: string;
+  datasource?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  url?: PropValue;
+  headers?: Record<string, PropValue>;
+  params?: Record<string, PropValue>;
+  data?: PropValue;
   onSuccess?: ActionChain;
   onError?: ActionChain;
   onFinally?: ActionChain;
@@ -46,6 +51,7 @@ export interface NotificationAction extends BaseAction {
 
 export interface ConfirmAction extends BaseAction {
   type: 'confirm';
+  confirmType?: 'confirm' | 'info' | 'success' | 'warning' | 'error';
   title: PropValue;
   content?: PropValue;
   onOk?: ActionChain;
@@ -76,6 +82,7 @@ export interface ValidateAction extends BaseAction {
 export interface ResetFormAction extends BaseAction {
   type: 'resetForm';
   formRef: string;
+  fields?: string[];
 }
 
 export interface ConditionAction extends BaseAction {

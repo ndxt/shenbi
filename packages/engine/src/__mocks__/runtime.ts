@@ -3,7 +3,7 @@ import type { PageRuntime, StateAction } from '../types/contracts';
 import { setByPathMutable } from '../utils/set-by-path';
 
 export interface MockRuntime extends PageRuntime {
-  __executedActions: Array<{ actions: ActionChain; eventData?: any }>;
+  __executedActions: Array<{ actions: ActionChain; eventData?: any; extraContext?: Record<string, any> }>;
   __refs: Record<string, any>;
 }
 
@@ -26,8 +26,8 @@ export function createMockRuntime(
         runtime.state = { ...action.initial };
       }
     },
-    async executeActions(actions: ActionChain, eventData?: any) {
-      runtime.__executedActions.push({ actions, eventData });
+    async executeActions(actions: ActionChain, eventData?: any, extraContext?: Record<string, any>) {
+      runtime.__executedActions.push({ actions, eventData, extraContext });
     },
     getContext(extra?: Partial<ExpressionContext>): ExpressionContext {
       return {

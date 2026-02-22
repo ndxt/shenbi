@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as antd from 'antd';
 import {
   antdResolver,
@@ -7,44 +7,41 @@ import {
   ShenbiPage,
   usePageRuntime,
 } from '@shenbi/engine';
-import { demoPageSchema } from './demo-schema';
-import type { CompiledNode } from '@shenbi/engine';
+import { installMockFetch } from './mock/mock-fetch';
+import { userManagementSchema } from './schemas/user-management';
 
 const resolver = antdResolver(antd);
 resolver.register('Container', Container);
 
 export function App() {
-  const runtime = usePageRuntime(demoPageSchema, {
+  useEffect(() => {
+    const isTest = process.env.NODE_ENV === 'test';
+    const controller = installMockFetch({
+      minDelayMs: isTest ? 0 : 200,
+      maxDelayMs: isTest ? 0 : 500,
+    });
+    return () => {
+      controller.restore();
+    };
+  }, []);
+
+  const runtime = usePageRuntime(userManagementSchema, {
     message: antd.message,
     notification: antd.notification,
-    confirm: antd.Modal.confirm,
   });
 
   const compiledBody = useMemo(
-    () => compileSchema(demoPageSchema.body, resolver),
+    () => compileSchema(userManagementSchema.body, resolver),
     [],
   );
 
-  const compiledDialogs = useMemo<CompiledNode[] | undefined>(() => {
-    if (!demoPageSchema.dialogs || demoPageSchema.dialogs.length === 0) {
-      return undefined;
-    }
-    return compileSchema(demoPageSchema.dialogs, resolver) as CompiledNode[];
-  }, []);
-
-  const dialogProps = useMemo(
-    () => (compiledDialogs ? { compiledDialogs } : {}),
-    [compiledDialogs],
-  );
-
   return (
-    <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ padding: 24, maxWidth: 1120, margin: '0 auto' }}>
       <ShenbiPage
-        schema={demoPageSchema}
+        schema={userManagementSchema}
         resolver={resolver}
         runtime={runtime}
         compiledBody={compiledBody}
-        {...dialogProps}
       />
     </div>
   );

@@ -1,11 +1,81 @@
-import { createElement } from 'react';
+import {
+  Children,
+  cloneElement,
+  createContext,
+  createElement,
+  isValidElement,
+  useContext,
+  useRef,
+} from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 
+const { messageMock, notificationMock } = vi.hoisted(() => ({
+  messageMock: {
+    info: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+    loading: vi.fn(),
+  },
+  notificationMock: {
+    info: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+interface FormContextValue {
+  form: {
+    setFieldsValue: (next: Record<string, any>) => void;
+    getFieldsValue: () => Record<string, any>;
+    validateFields: () => Promise<Record<string, any>>;
+    resetFields: (fields?: string[]) => void;
+  };
+  onValuesChange?: (changed: Record<string, any>, all: Record<string, any>) => void;
+}
+
+function normalizeInputValue(eventOrValue: any): any {
+  if (eventOrValue?.target) {
+    return eventOrValue.target.value;
+  }
+  return eventOrValue;
+}
+
+function createMockFormStore() {
+  let store: Record<string, any> = {};
+  return {
+    setFieldsValue(next: Record<string, any>) {
+      store = { ...store, ...(next ?? {}) };
+    },
+    getFieldsValue() {
+      return { ...store };
+    },
+    async validateFields() {
+      if (!store.name || !store.email) {
+        throw new Error('validation failed');
+      }
+      return { ...store };
+    },
+    resetFields(fields?: string[]) {
+      if (!fields || fields.length === 0) {
+        store = {};
+        return;
+      }
+      store = { ...store };
+      for (const field of fields) {
+        delete store[field];
+      }
+    },
+  };
+}
+
 vi.mock('antd', async (importOriginal) => {
   const actual = await importOriginal<typeof import('antd')>();
+  const FormContext = createContext<FormContextValue | null>(null);
 
   const Button = (props: any) =>
     createElement(
@@ -34,119 +104,342 @@ vi.mock('antd', async (importOriginal) => {
         onChange: (event: any) => props.onChange?.(event.target.value),
       },
       [
-        createElement(
-          'option',
-          {
-            key: '__placeholder__',
-            value: '',
-          },
-          props.placeholder ?? '',
-        ),
+        createElement('option', { key: '__placeholder__', value: '' }, props.placeholder ?? ''),
         ...(props.options ?? []).map((option: any) =>
-          createElement(
-            'option',
-            {
-              key: String(option.value),
-              value: option.value,
-            },
-            option.label,
-          ),
+          createElement('option', { key: String(option.value), value: option.value }, option.label),
         ),
       ],
     );
 
+  const RangePicker = (props: any) =>
+    createElement('input', {
+      'aria-label': 'range-picker',
+      value: Array.isArray(props.value) ? props.value.join(' ~ ') : '',
+      onChange: (event: any) => {
+        const next = event.target.value ? [event.target.value, event.target.value] : [];
+        props.onChange?.(next, next);
+      },
+    });
+
+  const Form = (props: any) => {
+    const form = props.form ?? createMockFormStore();
+    return createElement(
+      FormContext.Provider,
+      { value: { form, onValuesChange: props.onValuesChange } },
+      createElement('form', null, props.children),
+    );
+  };
+  (Form as any).useForm = () => {
+    const formRef = useRef<ReturnType<typeof createMockFormStore> | null>(null);
+    if (!formRef.current) {
+      formRef.current = createMockFormStore();
+    }
+    return [formRef.current];
+  };
+
+  const FormItem = (props: any) => {
+    const ctx = useContext(FormContext);
+    const name = props.name as string | undefined;
+    let child = props.children;
+
+    if (ctx && name) {
+      const bindControl = (element: any) => {
+        const currentValues = ctx.form.getFieldsValue();
+        const originalOnChange = element.props?.onChange;
+        return cloneElement(element, {
+          value: currentValues[name] ?? element.props?.value ?? '',
+          onChange: (event: any) => {
+            const nextValue = normalizeInputValue(event);
+            ctx.form.setFieldsValue({ [name]: nextValue });
+            const allValues = ctx.form.getFieldsValue();
+            ctx.onValuesChange?.({ [name]: nextValue }, allValues);
+            originalOnChange?.(event);
+          },
+        });
+      };
+
+      if (isValidElement(child)) {
+        child = bindControl(child as any);
+      } else if (Array.isArray(child)) {
+        child = child.map((item) => (isValidElement(item) ? bindControl(item as any) : item));
+      }
+    }
+
+    return createElement(
+      'div',
+      null,
+      props.label ? createElement('span', null, props.label) : null,
+      child,
+    );
+  };
+  (Form as any).Item = FormItem;
+
   const Card = (props: any) =>
     createElement('section', null, [
       createElement('header', { key: 'title' }, props.title),
-      createElement('aside', { key: 'extra' }, props.extra),
       createElement('div', { key: 'body' }, props.children),
     ]);
 
-  const Tag = (props: any) =>
-    createElement(
-      'span',
-      { 'data-testid': 'tag', 'data-color': props.color ?? '' },
-      props.children,
-    );
+  const Space = (props: any) => createElement('div', null, props.children);
 
-  const Alert = (props: any) =>
-    createElement('div', { role: 'alert' }, props.message ?? '');
+  const Tag = (props: any) =>
+    createElement('span', { 'data-testid': 'tag', 'data-color': props.color ?? '' }, props.children);
+
+  const Alert = (props: any) => createElement('div', { role: 'alert' }, props.message ?? '');
+
+  const Popconfirm = (props: any) => {
+    const childElement = Children.toArray(props.children).find((item) => isValidElement(item)) as any;
+    if (!childElement) {
+      return null;
+    }
+    const originalOnClick = childElement.props?.onClick;
+    return cloneElement(childElement, {
+      onClick: (event: any) => {
+        props.onConfirm?.(event);
+        originalOnClick?.(event);
+      },
+    });
+  };
+
+  const Modal = (props: any) => {
+    if (!props.open) {
+      return null;
+    }
+    return createElement('div', { role: 'dialog' }, [
+      createElement('h2', { key: 'title' }, props.title),
+      createElement('div', { key: 'content' }, props.children),
+      createElement('div', { key: 'footer' }, props.footer),
+    ]);
+  };
+  (Modal as any).confirm = vi.fn();
+  (Modal as any).info = vi.fn();
+  (Modal as any).success = vi.fn();
+  (Modal as any).warning = vi.fn();
+  (Modal as any).error = vi.fn();
+
+  const resolveRowKey = (rowKey: any, record: Record<string, any>, index: number) => {
+    if (typeof rowKey === 'function') {
+      return rowKey(record, index);
+    }
+    if (typeof rowKey === 'string') {
+      return record[rowKey];
+    }
+    return record.key ?? index;
+  };
+
+  const Table = (props: any) => {
+    const rows = props.dataSource ?? [];
+    const columns = props.columns ?? [];
+
+    return createElement('div', null, [
+      ...rows.map((record: Record<string, any>, index: number) =>
+        createElement(
+          'div',
+          { key: resolveRowKey(props.rowKey, record, index) },
+          columns.map((col: any, colIndex: number) =>
+            createElement(
+              'span',
+              { key: `${col.key ?? col.dataIndex ?? colIndex}` },
+              col.render
+                ? col.render(record[col.dataIndex], record, index)
+                : String(record[col.dataIndex] ?? ''),
+            ),
+          ),
+        ),
+      ),
+      createElement(
+        'button',
+        {
+          key: 'change',
+          onClick: () => props.onChange?.(
+            { current: 2, pageSize: props.pagination?.pageSize ?? 10 },
+            {},
+            { field: 'name', order: 'ascend' },
+            {},
+          ),
+        },
+        '触发表格变化',
+      ),
+      createElement(
+        'button',
+        {
+          key: 'select',
+          onClick: () => {
+            const selectedKeys = rows.slice(0, 1).map((record: Record<string, any>, i: number) =>
+              resolveRowKey(props.rowKey, record, i),
+            );
+            props.rowSelection?.onChange?.(selectedKeys, rows.slice(0, 1), {});
+          },
+        },
+        '触发行选择',
+      ),
+    ]);
+  };
 
   return {
     ...actual,
     Button,
     Input,
     Select,
+    DatePicker: {
+      RangePicker,
+    },
+    Form,
     Card,
+    Space,
+    Table,
     Tag,
     Alert,
-    message: {
-      info: vi.fn(),
-      success: vi.fn(),
-      warning: vi.fn(),
-      error: vi.fn(),
-      loading: vi.fn(),
-    },
-    notification: {
-      info: vi.fn(),
-      success: vi.fn(),
-      warning: vi.fn(),
-      error: vi.fn(),
-    },
-    Modal: {
-      confirm: vi.fn(),
-    },
+    Popconfirm,
+    Modal,
+    message: messageMock,
+    notification: notificationMock,
   };
 });
 
 describe('preview/App integration', () => {
+  async function renderAppAndWaitFirstPage() {
+    render(createElement(App));
+    await waitFor(() => {
+      expect(screen.getByText('User 1')).toBeInTheDocument();
+    });
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState(null, '', '/');
   });
 
-  it('渲染标题、slot 与 loop+if 结果', () => {
-    render(createElement(App));
-
-    expect(screen.getByText('Shenbi 低代码引擎 Demo')).toBeInTheDocument();
-    expect(screen.getByText('更多')).toBeInTheDocument();
-    expect(screen.getByText('React')).toBeInTheDocument();
-    expect(screen.getByText('Vue')).toBeInTheDocument();
-    expect(screen.getByText('Svelte')).toBeInTheDocument();
-    expect(screen.queryByText('Angular')).toBeNull();
+  it('首屏渲染用户管理并自动拉取用户列表', async () => {
+    await renderAppAndWaitFirstPage();
+    expect(screen.getByText('用户管理')).toBeInTheDocument();
   });
 
-  it('输入关键词后 Alert 文案会实时更新', async () => {
+  it('查询关键词后可刷新列表', async () => {
     const user = userEvent.setup();
-    render(createElement(App));
+    await renderAppAndWaitFirstPage();
 
     const input = screen.getByPlaceholderText('搜索关键词...');
-    await user.type(input, 'abc');
+    await user.clear(input);
+    await user.type(input, 'User 2');
+    await user.click(screen.getByRole('button', { name: '查询' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('搜索: abc');
+    await waitFor(() => {
+      expect(screen.getByText('User 2')).toBeInTheDocument();
+    });
   });
 
-  it('选择城市会更新 Select 值', async () => {
+  it('表格 onChange 会更新分页状态并反映到页面', async () => {
     const user = userEvent.setup();
-    render(createElement(App));
+    await renderAppAndWaitFirstPage();
 
-    const select = screen.getByLabelText('选择城市') as HTMLSelectElement;
-    await user.selectOptions(select, 'shanghai');
+    await user.click(screen.getByRole('button', { name: '触发表格变化' }));
 
-    expect(select.value).toBe('shanghai');
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('当前页: 2');
+    });
   });
 
-  it('点击提交会触发 message.success 且按钮进入 loading', async () => {
+  it('点击新增用户可打开弹窗并取消关闭', async () => {
     const user = userEvent.setup();
-    render(createElement(App));
+    await renderAppAndWaitFirstPage();
 
-    const submitButton = screen.getByRole('button', { name: '提交' });
-    await user.click(submitButton);
+    await user.click(screen.getByRole('button', { name: '新增用户' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText('新增用户')).toBeInTheDocument();
 
-    await waitFor(async () => {
-      const antd = await import('antd');
-      expect(antd.message.success).toHaveBeenCalledWith('提交成功');
+    await user.click(screen.getByRole('button', { name: '取消' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+
+  it('行选择会更新已选提示', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.click(screen.getByRole('button', { name: '触发行选择' }));
+
+    await waitFor(() => {
+      const alerts = screen.getAllByRole('alert');
+      expect(alerts.some((alert) => alert.textContent?.includes('已选择 1 项'))).toBe(true);
+    });
+  });
+
+  it('状态筛选会同步 URL 并过滤列表', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    const statusSelect = screen.getByLabelText('选择状态');
+    await user.selectOptions(statusSelect, 'disabled');
+
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get('status')).toBe('disabled');
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('User 1')).toBeNull();
+      expect(screen.getByText('User 2')).toBeInTheDocument();
+    });
+  });
+
+  it('重置可清空筛选并回到第 1 页', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    const input = screen.getByPlaceholderText('搜索关键词...');
+    await user.clear(input);
+    await user.type(input, 'User 20');
+    await user.click(screen.getByRole('button', { name: '查询' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('User 20')).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: '提交' })).toHaveAttribute('data-loading', 'true');
+    await user.click(screen.getByRole('button', { name: '触发表格变化' }));
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('当前页: 2');
+    });
+
+    await user.click(screen.getByRole('button', { name: '重置' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('User 1')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('当前页: 1');
+    });
+  });
+
+  it('syncToUrl: 关键词与分页状态会同步到 URL', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    const input = screen.getByPlaceholderText('搜索关键词...');
+    await user.clear(input);
+    await user.type(input, 'User 3');
+
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get('keyword')).toBe('User 3');
+    });
+
+    await user.click(screen.getByRole('button', { name: '触发表格变化' }));
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get('page')).toBe('2');
+    });
+  });
+
+  it('syncToUrl: 首次加载会从 URL 恢复查询条件', async () => {
+    window.history.replaceState(null, '', '/?keyword=User+2&page=1');
+    render(createElement(App));
+
+    const input = screen.getByPlaceholderText('搜索关键词...') as HTMLInputElement;
+    await waitFor(() => {
+      expect(input.value).toBe('User 2');
+    });
+    await waitFor(() => {
+      expect(screen.getByText('User 2')).toBeInTheDocument();
+    });
   });
 });

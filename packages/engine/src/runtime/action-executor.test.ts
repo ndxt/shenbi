@@ -192,6 +192,81 @@ describe('runtime/action-executor', () => {
     expect(dispatch).toHaveBeenNthCalledWith(2, { type: 'SET', key: 'done', value: true });
   });
 
+  it('fetch 支持直接 url + params（无 datasource）', async () => {
+    const fetcher = vi.fn().mockResolvedValue(createResponse({ ok: true }));
+    const dispatch = vi.fn();
+    const action: ActionChain = [
+      {
+        type: 'fetch',
+        url: '/api/users',
+        params: {
+          keyword: '{{state.keyword}}',
+          page: '{{state.page}}',
+        },
+      },
+    ];
+
+    await executeActions(action, createCtx({ keyword: 'tom', page: 2 }), dispatch, createOptions({ fetcher }));
+
+    const [calledUrl, calledInit] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(calledUrl).toContain('/api/users?');
+    const queryString = calledUrl.split('?')[1] ?? '';
+    const query = new URLSearchParams(queryString);
+    expect(query.get('keyword')).toBe('tom');
+    expect(query.get('page')).toBe('2');
+    expect(calledInit.method).toBe('GET');
+  });
+
+  it('fetch 支持 datasource 配置与 action 参数覆盖', async () => {
+    const fetcher = vi.fn().mockResolvedValue(createResponse({ ok: true }));
+    const action: ActionChain = [
+      {
+        type: 'fetch',
+        datasource: 'saveUser',
+        method: 'POST',
+        url: '/api/users/override',
+        headers: {
+          'x-action': 'yes',
+        },
+        data: {
+          name: '{{state.name}}',
+        },
+      },
+    ];
+
+    await executeActions(
+      action,
+      createCtx({ name: 'Amy' }),
+      vi.fn(),
+      createOptions({
+        fetcher,
+        dataSources: {
+          saveUser: {
+            api: {
+              method: 'PUT',
+              url: '/api/users/from-ds',
+              headers: {
+                'x-ds': '1',
+              },
+              data: {
+                from: 'datasource',
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const [calledUrl, calledInit] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(calledUrl).toBe('/api/users/override');
+    expect(calledInit.method).toBe('POST');
+    expect(calledInit.headers).toEqual({
+      'x-ds': '1',
+      'x-action': 'yes',
+    });
+    expect(calledInit.body).toBe(JSON.stringify({ name: 'Amy' }));
+  });
+
   it('fetch 失败会执行 onError 和 onFinally', async () => {
     const dispatch = vi.fn();
     const fetcher = vi.fn().mockResolvedValue(createResponse({ error: 'bad' }, false, 500));
@@ -230,19 +305,32 @@ describe('runtime/action-executor', () => {
     const dispatch = vi.fn();
     const action: ActionChain = [
       { type: 'modal', id: 'user', open: true, payload: '{{state.id}}' },
-      { type: 'drawer', id: 'detail', open: false, payload: { p: '{{state.id}}' } },
+      { type: 'drawer', id: 'detail', open: true, payload: { p: '{{state.id}}' } },
     ];
 
     await executeActions(action, createCtx({ id: 99 }), dispatch, createOptions());
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET', key: '__dialog_user', value: true });
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET', key: '__dialogPayloads.user', value: 99 });
-    expect(dispatch).toHaveBeenCalledWith({ type: 'SET', key: '__drawer_detail', value: false });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET', key: '__drawer_detail', value: true });
     expect(dispatch).toHaveBeenCalledWith({
       type: 'SET',
       key: '__dialogPayloads.detail',
       value: { p: 99 },
     });
+  });
+
+  it('modal close 会清空 payload', async () => {
+    const dispatch = vi.fn();
+    const action: ActionChain = [
+      { type: 'modal', id: 'user', open: true, payload: '{{state.id}}' },
+      { type: 'modal', id: 'user', open: false },
+    ];
+
+    await executeActions(action, createCtx({ id: 99 }), dispatch, createOptions());
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET', key: '__dialog_user', value: false });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET', key: '__dialogPayloads.user', value: null });
   });
 
   it('validate 校验通过执行 onSuccess', async () => {
@@ -286,6 +374,69 @@ describe('runtime/action-executor', () => {
     );
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET', key: 'valid', value: false });
+  });
+
+  it('validate 在 ref 不存在时抛错', async () => {
+    await expect(
+      executeActions(
+        [{ type: 'validate', formRef: 'missing' }],
+        createCtx(),
+        vi.fn(),
+        createOptions(),
+      ),
+    ).rejects.toThrow('missing');
+  });
+
+  it('resetForm 支持按字段重置', async () => {
+    const resetFields = vi.fn();
+    const action: ActionChain = [
+      {
+        type: 'resetForm',
+        formRef: 'formRef',
+        fields: ['name', 'status'],
+      },
+    ];
+
+    await executeActions(
+      action,
+      createCtx(),
+      vi.fn(),
+      createOptions({
+        refs: { formRef: { resetFields } },
+      }),
+    );
+
+    expect(resetFields).toHaveBeenCalledWith(['name', 'status']);
+  });
+
+  it('confirm 会传递 confirmType 并执行 onOk/onCancel', async () => {
+    const dispatch = vi.fn();
+    const confirm = vi.fn();
+    const action: ActionChain = [
+      {
+        type: 'confirm',
+        confirmType: 'warning',
+        title: '确认',
+        content: '是否继续',
+        onOk: [{ type: 'setState', key: 'result', value: 'ok' }],
+        onCancel: [{ type: 'setState', key: 'result', value: 'cancel' }],
+      },
+    ];
+
+    await executeActions(action, createCtx(), dispatch, createOptions({ confirm }));
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    const config = confirm.mock.calls[0]![0] as {
+      type: 'warning';
+      onOk?: () => Promise<void>;
+      onCancel?: () => Promise<void>;
+    };
+    expect(config.type).toBe('warning');
+    await config.onOk?.();
+    await config.onCancel?.();
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET', key: 'result', value: 'ok' });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET', key: 'result', value: 'cancel' });
   });
 
   it('debounce 连续调用只执行最后一次', async () => {

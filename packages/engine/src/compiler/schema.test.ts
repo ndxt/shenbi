@@ -93,6 +93,56 @@ describe('compiler/schema', () => {
     expect(compiled.dynamicProps.disabled?.fn(createCtx({ disabled: false }))).toBe(false);
   });
 
+  it('嵌套对象 props 会被整体编译为动态表达式', () => {
+    const resolver = createResolver({ Table: 'table' });
+    const schema: SchemaNode = {
+      component: 'Table',
+      props: {
+        pagination: {
+          current: '{{state.page}}',
+          pageSize: 10,
+          showTotal: {
+            type: 'JSFunction',
+            params: ['total'],
+            body: 'total + state.offset',
+          } as any,
+        },
+      },
+    };
+
+    const compiled = compileSchema(schema, resolver);
+    if (Array.isArray(compiled)) {
+      throw new Error('预期编译结果为单节点');
+    }
+
+    const pagination = compiled.dynamicProps.pagination?.fn(createCtx({ page: 2, offset: 1 }));
+    expect(pagination?.current).toBe(2);
+    expect(pagination?.pageSize).toBe(10);
+    expect(typeof pagination?.showTotal).toBe('function');
+    expect(pagination?.showTotal(20)).toBe(21);
+  });
+
+  it('全静态嵌套对象 props 保持在 staticProps', () => {
+    const resolver = createResolver({ Table: 'table' });
+    const schema: SchemaNode = {
+      component: 'Table',
+      props: {
+        pagination: {
+          current: 1,
+          pageSize: 10,
+        },
+      },
+    };
+
+    const compiled = compileSchema(schema, resolver);
+    if (Array.isArray(compiled)) {
+      throw new Error('预期编译结果为单节点');
+    }
+
+    expect(compiled.staticProps.pagination).toEqual({ current: 1, pageSize: 10 });
+    expect(compiled.dynamicProps.pagination).toBeUndefined();
+  });
+
   it('嵌套 children 会递归编译子树', () => {
     const resolver = createResolver({ Container: 'div', Button: 'button' });
     const schema: SchemaNode = {

@@ -1,6 +1,7 @@
 import { createElement, useMemo, type ReactElement } from 'react';
 import type { PageSchema } from '@shenbi/schema';
 import type { ComponentResolver, PageRuntime, CompiledNode } from '../types/contracts';
+import { compileSchema } from '../compiler/schema';
 import { ShenbiContext, NodeRenderer } from './node-renderer';
 
 export interface ShenbiPageProps {
@@ -12,6 +13,7 @@ export interface ShenbiPageProps {
 }
 
 export function ShenbiPage({
+  schema,
   resolver,
   runtime,
   compiledBody,
@@ -28,9 +30,21 @@ export function ShenbiPage({
       )
     : createElement(NodeRenderer, { node: compiledBody });
 
-  const dialogElements = compiledDialogs?.map((dialog, i) => {
+  const resolvedDialogs = useMemo<CompiledNode[] | undefined>(() => {
+    if (compiledDialogs && compiledDialogs.length > 0) {
+      return compiledDialogs;
+    }
+    if (!schema.dialogs || schema.dialogs.length === 0) {
+      return undefined;
+    }
+    return compileSchema(schema.dialogs, resolver) as CompiledNode[];
+  }, [compiledDialogs, resolver, schema.dialogs]);
+
+  const dialogElements = resolvedDialogs?.map((dialog, i) => {
     const dialogId = dialog.id ?? `dialog_${i}`;
-    const isOpen = runtime.state[`__dialog_${dialogId}`] === true;
+    const isDrawer = dialog.componentType === 'Drawer';
+    const visibleKey = isDrawer ? `__drawer_${dialogId}` : `__dialog_${dialogId}`;
+    const isOpen = runtime.state[visibleKey] === true;
     const payload = runtime.dialogPayloads[dialogId];
 
     if (!isOpen) return null;
@@ -38,7 +52,7 @@ export function ShenbiPage({
     return createElement(NodeRenderer, {
       key: dialogId,
       node: dialog,
-      extraContext: { dialogPayload: payload },
+      extraContext: { dialogPayload: payload, dialogId },
     });
   });
 

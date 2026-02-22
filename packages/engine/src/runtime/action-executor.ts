@@ -30,8 +30,11 @@ interface NotificationAdapter {
   error?: (config: { message: any; description?: any }) => void;
 }
 
+type ConfirmType = 'confirm' | 'info' | 'success' | 'warning' | 'error';
+
 interface ConfirmAdapter {
   (config: {
+    type: ConfirmType;
     title: any;
     content?: any;
     onOk?: () => Promise<void>;
@@ -186,18 +189,57 @@ function setOverlayState(
 ) {
   const visibleKey = type === 'modal' ? `__dialog_${id}` : `__drawer_${id}`;
   dispatch({ type: 'SET', key: visibleKey, value: open });
-
-  if (payload !== undefined) {
-    dispatch({
-      type: 'SET',
-      key: `__dialogPayloads.${id}`,
-      value: resolveValue(payload, ctx),
-    });
-  }
+  dispatch({
+    type: 'SET',
+    key: `__dialogPayloads.${id}`,
+    value: open && payload !== undefined ? resolveValue(payload, ctx) : null,
+  });
 }
 
 function resolveFormRef(actionFormRef: string, options: ExecutorOptions, ctx: ExpressionContext): any {
   return options.refs[actionFormRef] ?? ctx.refs?.[actionFormRef];
+}
+
+function resolveFetchConfig(
+  action: Extract<ActionChain[number], { type: 'fetch' }>,
+  ctx: ExpressionContext,
+  options: ExecutorOptions,
+): {
+  dataSourceDef: DataSourceDef | undefined;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  url: string;
+  headers: HeadersInit;
+  data: unknown;
+} {
+  const dataSourceDef = action.datasource ? options.dataSources[action.datasource] : undefined;
+  if (action.datasource && !dataSourceDef) {
+    throw new Error(`DataSource "${action.datasource}" not found`);
+  }
+
+  const method = (action.method ?? dataSourceDef?.api.method ?? 'GET').toUpperCase() as
+    'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  const headers = {
+    ...resolveValue(dataSourceDef?.api.headers ?? {}, ctx),
+    ...resolveValue(action.headers ?? {}, ctx),
+  } as HeadersInit;
+  const params = {
+    ...resolveValue(dataSourceDef?.api.params ?? {}, ctx),
+    ...resolveValue(action.params ?? {}, ctx),
+  };
+  const data = action.data !== undefined
+    ? resolveValue(action.data, ctx)
+    : resolveValue(dataSourceDef?.api.data, ctx);
+  const rawUrl = action.url !== undefined
+    ? resolveValue(action.url, ctx)
+    : resolveValue(dataSourceDef?.api.url, ctx);
+
+  if (rawUrl == null) {
+    throw new Error('Fetch action requires `datasource` or `url`');
+  }
+
+  const resolvedUrl = String(rawUrl);
+  const url = method === 'GET' ? appendQuery(resolvedUrl, params) : resolvedUrl;
+  return { dataSourceDef, method, url, headers, data };
 }
 
 export async function executeActions(
@@ -227,17 +269,7 @@ export async function executeActions(
         break;
       }
       case 'fetch': {
-        const ds = options.dataSources[action.datasource];
-        if (!ds) {
-          throw new Error(`DataSource "${action.datasource}" not found`);
-        }
-
-        const method = ds.api.method ?? 'GET';
-        const headers = resolveValue(ds.api.headers ?? {}, ctx);
-        const params = resolveValue(ds.api.params ?? {}, ctx);
-        const data = resolveValue(ds.api.data, ctx);
-        const resolvedUrl = String(resolveValue(ds.api.url, ctx));
-        const url = method === 'GET' ? appendQuery(resolvedUrl, params) : resolvedUrl;
+        const { dataSourceDef, method, url, headers, data } = resolveFetchConfig(action, ctx, options);
         const fetcher = getFetcher(options);
 
         let responseData: any;
@@ -265,16 +297,16 @@ export async function executeActions(
 
           const successCtx: ExpressionContext = { ...ctx, response: responseData };
           await executeIfPresent(action.onSuccess, successCtx, dispatch, options);
-          await executeIfPresent(ds.onSuccess, successCtx, dispatch, options);
+          await executeIfPresent(dataSourceDef?.onSuccess, successCtx, dispatch, options);
         } catch (error) {
           fetchError = error;
           const errorCtx: ExpressionContext = { ...ctx, error };
           await executeIfPresent(action.onError, errorCtx, dispatch, options);
-          await executeIfPresent(ds.onError, errorCtx, dispatch, options);
+          await executeIfPresent(dataSourceDef?.onError, errorCtx, dispatch, options);
         } finally {
           const finalCtx: ExpressionContext = { ...ctx, response: responseData, error: fetchError };
           await executeIfPresent(action.onFinally, finalCtx, dispatch, options);
-          await executeIfPresent(ds.onFinally, finalCtx, dispatch, options);
+          await executeIfPresent(dataSourceDef?.onFinally, finalCtx, dispatch, options);
         }
         break;
       }
@@ -319,6 +351,7 @@ export async function executeActions(
         break;
       }
       case 'confirm': {
+        const confirmType: ConfirmType = action.confirmType ?? 'confirm';
         const title = resolveValue(action.title, ctx);
         const content = resolveValue(action.content, ctx);
         const onOk = action.onOk
@@ -333,7 +366,7 @@ export async function executeActions(
           : undefined;
 
         if (options.confirm) {
-          const confirmConfig: Parameters<ConfirmAdapter>[0] = { title, content };
+          const confirmConfig: Parameters<ConfirmAdapter>[0] = { type: confirmType, title, content };
           if (onOk) {
             confirmConfig.onOk = onOk;
           }
@@ -352,7 +385,8 @@ export async function executeActions(
         if (onCancel) {
           antdConfirmConfig.onCancel = onCancel;
         }
-        mod?.Modal?.confirm?.(antdConfirmConfig);
+        const modalFn = mod?.Modal?.[confirmType] ?? mod?.Modal?.confirm;
+        modalFn?.(antdConfirmConfig);
         break;
       }
       case 'modal': {
@@ -371,17 +405,17 @@ export async function executeActions(
 
         try {
           const validateResult = await form.validateFields();
-          const successCtx: ExpressionContext = { ...ctx, validateResult };
+          const successCtx: ExpressionContext = { ...ctx, validateResult, values: validateResult };
           await executeIfPresent(action.onSuccess, successCtx, dispatch, options);
         } catch (error) {
-          const errorCtx: ExpressionContext = { ...ctx, error };
+          const errorCtx: ExpressionContext = { ...ctx, error, errorInfo: error };
           await executeIfPresent(action.onError, errorCtx, dispatch, options);
         }
         break;
       }
       case 'resetForm': {
         const form = resolveFormRef(action.formRef, options, ctx);
-        form?.resetFields?.();
+        form?.resetFields?.(action.fields);
         break;
       }
       case 'condition': {
