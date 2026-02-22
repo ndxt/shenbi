@@ -4,6 +4,7 @@ export * from './resolver';
 export * from './compiler/expression';
 export * from './compiler/schema';
 export * from './runtime/state';
+export * from './runtime/page-runtime';
 export * from './runtime/computed';
 export * from './runtime/action-executor';
 export * from './runtime/watcher';

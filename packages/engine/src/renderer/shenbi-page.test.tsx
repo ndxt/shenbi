@@ -28,14 +28,19 @@ function renderPage(
 ) {
   const runtime = createMockRuntime(overrides.state);
   const resolver = createMockResolver();
+  const pageProps = {
+    schema: mockPageSchema,
+    resolver,
+    runtime,
+    compiledBody: overrides.compiledBody ?? makeSimpleBody('默认内容'),
+  };
+
+  if (overrides.compiledDialogs) {
+    Object.assign(pageProps, { compiledDialogs: overrides.compiledDialogs });
+  }
+
   return render(
-    createElement(ShenbiPage, {
-      schema: mockPageSchema,
-      resolver,
-      runtime,
-      compiledBody: overrides.compiledBody ?? makeSimpleBody('默认内容'),
-      compiledDialogs: overrides.compiledDialogs,
-    }),
+    createElement(ShenbiPage, pageProps),
   );
 }
 

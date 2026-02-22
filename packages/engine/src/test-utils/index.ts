@@ -1,8 +1,9 @@
 import { createElement } from 'react';
 import { render } from '@testing-library/react';
-import type { CompiledNode } from '../types/contracts';
+import type { RenderResult } from '@testing-library/react';
+import type { CompiledNode, ComponentResolver } from '../types/contracts';
 import { ShenbiContext, NodeRenderer } from '../renderer/node-renderer';
-import { createMockRuntime } from '../__mocks__/runtime';
+import { createMockRuntime, type MockRuntime } from '../__mocks__/runtime';
 import { createMockResolver } from '../__mocks__/resolver';
 
 // Re-export expr from utils for test convenience
@@ -17,7 +18,7 @@ export function renderWithContext(
   state: Record<string, any> = {},
   extraContext?: Record<string, any>,
   components: Record<string, any> = {},
-) {
+): RenderResult & { runtime: MockRuntime; resolver: ComponentResolver } {
   const runtime = createMockRuntime(state);
   const resolver = createMockResolver(components);
   return {
