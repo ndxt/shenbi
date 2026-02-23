@@ -13,6 +13,7 @@
 | `docs/active/contract-freeze-v1.md` | 核心接口冻结与变更规则 | 生效中 |
 | `docs/active/component-contract-spec-v1.md` | 组件契约 v1 草案与落地建议 | 草案 |
 | `docs/active/phase-2-plan.md` | 阶段 2 剩余工作计划 | 执行中 |
+| `docs/active/phase-2-parallel-delivery-playbook.md` | 并行分支交付边界、接口冻结与合并门禁 | 执行中 |
 | `docs/active/ui-guidelines.md` | 预览端 UI 风格与实现规范 | 生效中 |
 | `docs/active/code-review-playbook.md` | Code Review 流程与输出标准 | 生效中 |
 
