@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { createUsersRepo } from './users-repo';
 
 describe('preview/mock/users-repo', () => {
+  function compareText(left: string, right: string): number {
+    return left.localeCompare(right, 'en', {
+      numeric: true,
+      sensitivity: 'base',
+    });
+  }
+
   it('默认返回分页结果与总数', () => {
     const repo = createUsersRepo(50);
     const result = repo.list({ page: 1, pageSize: 10 });
@@ -55,8 +62,31 @@ describe('preview/mock/users-repo', () => {
     expect(descFirst).toBeDefined();
     expect(descSecond).toBeDefined();
 
-    expect((ascFirst as { email: string }).email <= (ascSecond as { email: string }).email).toBe(true);
-    expect((descFirst as { email: string }).email >= (descSecond as { email: string }).email).toBe(true);
+    expect(compareText((ascFirst as { email: string }).email, (ascSecond as { email: string }).email) <= 0)
+      .toBe(true);
+    expect(compareText((descFirst as { email: string }).email, (descSecond as { email: string }).email) >= 0)
+      .toBe(true);
+  });
+
+  it('ID 排序按数值而非字符串', () => {
+    const repo = createUsersRepo(12);
+    const asc = repo.list({
+      page: 1,
+      pageSize: 12,
+      sortField: 'id',
+      sortOrder: 'ascend',
+    });
+    const desc = repo.list({
+      page: 1,
+      pageSize: 12,
+      sortField: 'id',
+      sortOrder: 'descend',
+    });
+
+    expect(asc.list[0]?.id).toBe(1);
+    expect(asc.list[1]?.id).toBe(2);
+    expect(desc.list[0]?.id).toBe(12);
+    expect(desc.list[1]?.id).toBe(11);
   });
 
   it('支持 create / update / remove', () => {

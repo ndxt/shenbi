@@ -8,7 +8,12 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:html": "playwright test --reporter=list,html",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:crud": "playwright test e2e/crud.spec.ts",
+    "test:e2e:report": "node scripts/show-playwright-report.cjs",
+    "test:e2e:install": "playwright install"
   },
   "dependencies": {
     "@shenbi/engine": "workspace:*",

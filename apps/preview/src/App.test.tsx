@@ -1,4 +1,5 @@
 import {
+  act,
   Children,
   cloneElement,
   createContext,
@@ -395,6 +396,12 @@ describe('preview/App integration', () => {
 
     await waitFor(() => {
       expect(screen.getByText('User 20')).toBeInTheDocument();
+    });
+    // 等待 keyword watcher 的 debounce 落稳，避免与分页变更断言产生竞态。
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 350);
+      });
     });
 
     await user.click(screen.getByRole('button', { name: '触发表格变化' }));

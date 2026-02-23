@@ -1,28 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { AppShell } from './AppShell';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import React from 'react';
-
-// Mock lucide-react to avoid issues in test environment
-vi.mock('lucide-react', () => ({
-  FileText: () => <div data-testid="icon-filetext" />,
-  Search: () => <div data-testid="icon-search" />,
-  Database: () => <div data-testid="icon-database" />,
-  BugPlay: () => <div data-testid="icon-bug" />,
-  Package: () => <div data-testid="icon-package" />,
-  Settings: () => <div data-testid="icon-settings" />,
-  ChevronRight: () => <div data-testid="icon-chevron-right" />,
-  ChevronDown: () => <div data-testid="icon-chevron-down" />,
-  MoreHorizontal: () => <div data-testid="icon-more" />,
-  MousePointer2: () => <div data-testid="icon-select" />,
-  Hand: () => <div data-testid="icon-pan" />,
-  Monitor: () => <div data-testid="icon-desktop" />,
-  Tablet: () => <div data-testid="icon-tablet" />,
-  Smartphone: () => <div data-testid="icon-mobile" />,
-  Play: () => <div data-testid="icon-run" />,
-  Code2: () => <div data-testid="icon-code" />,
-  Share2: () => <div data-testid="icon-share" />,
-}));
 
 describe('AppShell', () => {
   it('renders all main shell regions', () => {
@@ -38,5 +17,17 @@ describe('AppShell', () => {
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('Run')).toBeInTheDocument();
     expect(screen.getByTestId('test-content')).toBeInTheDocument();
+  });
+
+  it('卸载时会清理挂载的主题 class', () => {
+    const { unmount } = render(
+      <AppShell>
+        <div>Theme Content</div>
+      </AppShell>,
+    );
+
+    expect(document.documentElement.classList.contains('theme-dark')).toBe(true);
+    unmount();
+    expect(document.documentElement.classList.contains('theme-dark')).toBe(false);
   });
 });
