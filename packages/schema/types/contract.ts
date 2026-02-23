@@ -26,6 +26,8 @@ export interface ContractProp {
   enum?: unknown[];
   description?: string;
   allowExpression?: boolean;
+  deprecated?: boolean;
+  deprecatedMessage?: string;
 }
 
 export interface ContractEvent {
