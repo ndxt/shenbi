@@ -12,8 +12,8 @@ describe('AppShell', () => {
     );
 
     // Verify regions by presence of characteristic text or roles
-    expect(screen.getByText('Explorer')).toBeInTheDocument();
-    expect(screen.getByText('Inspector')).toBeInTheDocument();
+    expect(screen.getByText('Components')).toBeInTheDocument();
+    expect(screen.getByText('Props')).toBeInTheDocument();
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('Run')).toBeInTheDocument();
     expect(screen.getByTestId('test-content')).toBeInTheDocument();

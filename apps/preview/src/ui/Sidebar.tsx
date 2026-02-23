@@ -1,45 +1,56 @@
-import React from 'react';
-import { ChevronRight, ChevronDown, MoreHorizontal } from 'lucide-react';
+import React, { useState } from 'react';
+import { ComponentPanel } from '../panels/ComponentPanel';
+import { SchemaTree } from '../panels/SchemaTree';
+import { PagePanel } from '../panels/PagePanel';
 
 export function Sidebar() {
+  const [activeTab, setActiveTab] = useState<'components' | 'outline' | 'data'>('components');
+
   return (
     <div className="w-full h-full bg-bg-sidebar border-r border-border-ide flex flex-col shrink-0 overflow-hidden">
-      <div className="h-9 px-4 flex items-center justify-between border-b border-border-ide">
-        <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Explorer</span>
-        <MoreHorizontal size={16} className="text-text-secondary cursor-pointer" />
+      <div className="h-9 flex items-center border-b border-border-ide shrink-0 bg-bg-panel px-1">
+        <TabItem 
+          label="Components" 
+          active={activeTab === 'components'} 
+          onClick={() => setActiveTab('components')} 
+        />
+        <TabItem 
+          label="Outline" 
+          active={activeTab === 'outline'} 
+          onClick={() => setActiveTab('outline')} 
+        />
+        <TabItem 
+          label="Data" 
+          active={activeTab === 'data'} 
+          onClick={() => setActiveTab('data')} 
+        />
       </div>
       
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-2 py-1">
-          <div className="flex items-center h-6 hover:bg-bg-activity-bar cursor-pointer text-text-primary text-[13px] px-1 group">
-            <ChevronDown size={14} className="mr-1 text-text-secondary" />
-            <span className="font-semibold uppercase text-[11px] text-text-secondary">Shenbi Project</span>
-          </div>
-          
-          {/* Mock Tree Items */}
-          <div className="ml-2">
-            <TreeItem label="src" isFolder isOpen />
-            <div className="ml-4">
-              <TreeItem label="App.tsx" />
-              <TreeItem label="main.tsx" />
-              <TreeItem label="styles" isFolder />
-            </div>
-          </div>
+      <div className="flex-1 overflow-hidden">
+        <div style={{ display: activeTab === 'components' ? 'block' : 'none', height: '100%' }}>
+          <ComponentPanel />
+        </div>
+        <div style={{ display: activeTab === 'outline' ? 'block' : 'none', height: '100%' }}>
+          <SchemaTree />
+        </div>
+        <div style={{ display: activeTab === 'data' ? 'block' : 'none', height: '100%' }}>
+          <PagePanel />
         </div>
       </div>
     </div>
   );
 }
 
-function TreeItem({ label, isFolder = false, isOpen = false }: { label: string, isFolder?: boolean, isOpen?: boolean }) {
+function TabItem({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
   return (
-    <div className="flex items-center h-[22px] px-2 hover:bg-bg-activity-bar/50 cursor-pointer text-text-primary text-[13px] group whitespace-nowrap overflow-hidden">
-      {isFolder ? (
-        isOpen ? <ChevronDown size={14} className="mr-1 text-text-secondary" /> : <ChevronRight size={14} className="mr-1 text-text-secondary" />
-      ) : (
-        <div className="w-[18px]" />
-      )}
-      <span className="truncate">{label}</span>
+    <div 
+      onClick={onClick}
+      className={`
+        flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-wider cursor-pointer border-b-2 transition-colors mx-0.5
+        ${active ? 'border-blue-500 text-text-primary bg-bg-sidebar' : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}
+      `}
+    >
+      {label}
     </div>
   );
 }
