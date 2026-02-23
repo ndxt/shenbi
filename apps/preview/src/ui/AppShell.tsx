@@ -14,6 +14,7 @@ import { TitleBar } from './TitleBar';
 
 interface AppShellProps {
   children: React.ReactNode;
+  toolbarExtra?: React.ReactNode;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -26,7 +27,7 @@ const THEME_CLASSES = [
   'theme-webstorm-dark',
 ] as const;
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, toolbarExtra }: AppShellProps) {
   const [theme, setTheme] = React.useState<ThemeMode>('dark');
   
   // Panel Visibility State
@@ -118,7 +119,7 @@ export function AppShell({ children }: AppShellProps) {
         
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <EditorTabs />
-          <WorkbenchToolbar />
+          <WorkbenchToolbar extra={toolbarExtra} />
           
           <div className="flex-1 flex overflow-hidden">
             {/* Editor/Canvas Area Container */}
