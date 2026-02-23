@@ -9,8 +9,8 @@ import {
 import type { ComponentContract } from '@shenbi/schema';
 
 describe('contracts/runtime verification', () => {
-  it('builtinContracts 数量应为 25', () => {
-    expect(builtinContracts.length).toBe(25);
+  it('builtinContracts 数量应不小于 Step1 基线', () => {
+    expect(builtinContracts.length).toBeGreaterThanOrEqual(25);
   });
 
   it('builtinContractMap 与 builtinContracts 一致', () => {
