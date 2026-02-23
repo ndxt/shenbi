@@ -10,6 +10,8 @@ import {
 import { installMockFetch } from './mock/mock-fetch';
 import { userManagementSchema } from './schemas/user-management';
 
+import { AppShell } from './ui/AppShell';
+
 const resolver = antdResolver(antd);
 resolver.register('Container', Container);
 
@@ -36,13 +38,13 @@ export function App() {
   );
 
   return (
-    <div style={{ padding: 24, maxWidth: 1120, margin: '0 auto' }}>
+    <AppShell>
       <ShenbiPage
         schema={userManagementSchema}
         resolver={resolver}
         runtime={runtime}
         compiledBody={compiledBody}
       />
-    </div>
+    </AppShell>
   );
 }
