@@ -11,12 +11,12 @@
 |--------------|------|------|
 | Table 全场景 | ✅ | 1.5 已做：分页/排序/筛选/行选择/可编辑行 |
 | Form 校验+联动 | ✅ | 1.5 已做：rules/JSFunction validator/字段联动 |
-| Form.List | ❌ | 动态增删行，1.5 未涉及 |
+| Form.List | ⚠️ | 已补动态增删/移动/校验场景；原生 Form.List render-props 语义仍待引擎增强 |
 | Modal | ✅ | 1.5 已做：Dialog 渲染系统 |
-| Drawer | ⚠️ | 1.5 Dialog 系统支持了 Drawer 类型，但无独立验证场景 |
-| Tabs | ❌ | 未做 |
-| Tree | ❌ | 未做 |
-| Descriptions | ❌ | 未做 |
+| Drawer | ✅ | 已补独立验证场景（page.dialogs + Drawer） |
+| Tabs | ✅ | 已补可切换场景（activeKey + visited） |
+| Tree | ✅ | 已补选中/展开/勾选/loadData 场景 |
+| Descriptions | ✅ | 已补详情展示与动态状态场景 |
 | CRUD 端到端 | ✅ | 1.5 已做 |
 | 组件契约（35+） | ❌ | packages/schema/contracts/ 尚未落地 |
 | Playwright 回归 | ❌ | packages/test-suite/ 空 |
@@ -28,6 +28,8 @@
 ### 1. 补齐组件场景（约 1 周）
 
 用独立的 Demo Schema 验证每个组件，不需要再做完整页面。
+
+> 进度更新（2026-02-23）：Tabs/Tree/Descriptions/Drawer 已完成首版可验证场景；Form.List 已完成动态列表验证版，render-props 原生语义待后续扩展。
 
 **1a. Form.List — 动态增删行**
 

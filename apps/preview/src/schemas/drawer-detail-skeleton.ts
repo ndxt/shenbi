@@ -2,24 +2,32 @@ import type { PageSchema } from '@shenbi/schema';
 
 export const drawerDetailSkeletonSchema: PageSchema = {
   id: 'drawer-detail-skeleton',
-  name: 'Drawer 详情骨架',
+  name: 'Drawer 详情页',
   state: {
-    drawerOpen: { default: false },
-    detail: {
+    orders: {
       default: {
-        id: 'ORD-2026-0001',
-        customer: 'Shenbi Demo Inc.',
-        amount: '¥12,800.00',
-        status: 'processing',
+        list: [
+          { id: 'ORD-2026-0001', customer: 'Shenbi Demo Inc.', amount: '¥12,800.00', status: 'processing' },
+          { id: 'ORD-2026-0002', customer: 'Oceanic Tech', amount: '¥7,300.00', status: 'done' },
+          { id: 'ORD-2026-0003', customer: 'Nova Studio', amount: '¥2,050.00', status: 'pending' },
+        ],
       },
     },
   },
   methods: {
     openDrawer: {
-      body: [{ type: 'setState', key: 'drawerOpen', value: true }],
+      params: ['record'],
+      body: [
+        {
+          type: 'drawer',
+          id: 'orderDetailDrawer',
+          open: true,
+          payload: '{{params.record}}',
+        },
+      ],
     },
     closeDrawer: {
-      body: [{ type: 'setState', key: 'drawerOpen', value: false }],
+      body: [{ type: 'drawer', id: 'orderDetailDrawer', open: false }],
     },
   },
   body: {
@@ -28,57 +36,59 @@ export const drawerDetailSkeletonSchema: PageSchema = {
     children: [
       {
         component: 'Card',
-        props: { title: 'Drawer 场景（最小骨架）' },
+        props: { title: 'Drawer 场景（独立验证）' },
         children: [
           {
-            component: 'Space',
-            children: [
-              {
-                component: 'Button',
-                props: { type: 'primary' },
-                children: '打开侧边详情',
-                events: {
-                  onClick: [{ type: 'callMethod', name: 'openDrawer' }],
-                },
-              },
-            ],
+            component: 'Alert',
+            props: {
+              type: 'info',
+              showIcon: true,
+              message: '点击“查看详情”后以 page.dialogs 的 Drawer 展示详情。',
+            },
           },
-        ],
-      },
-      {
-        component: 'Drawer',
-        props: {
-          title: '订单详情',
-          width: 420,
-          open: '{{state.drawerOpen}}',
-        },
-        events: {
-          onClose: [{ type: 'callMethod', name: 'closeDrawer' }],
-        },
-        children: [
           {
-            component: 'Descriptions',
-            props: { column: 1, bordered: true },
+            component: 'Container',
+            loop: {
+              data: '{{state.orders.list}}',
+              key: '{{item.id}}',
+            },
+            props: { direction: 'column', gap: 8 },
             children: [
               {
-                component: 'Descriptions.Item',
-                props: { label: '订单号' },
-                children: '{{state.detail.id}}',
-              },
-              {
-                component: 'Descriptions.Item',
-                props: { label: '客户' },
-                children: '{{state.detail.customer}}',
-              },
-              {
-                component: 'Descriptions.Item',
-                props: { label: '金额' },
-                children: '{{state.detail.amount}}',
-              },
-              {
-                component: 'Descriptions.Item',
-                props: { label: '状态' },
-                children: '{{state.detail.status}}',
+                component: 'Card',
+                props: { size: 'small' },
+                children: [
+                  {
+                    component: 'Space',
+                    props: {
+                      style: { width: '100%', justifyContent: 'space-between' },
+                    },
+                    children: [
+                      {
+                        component: 'Alert',
+                        props: {
+                          type: 'success',
+                          showIcon: true,
+                          message: '{{item.id + " / " + item.customer + " / " + item.amount}}',
+                        },
+                      },
+                      {
+                        component: 'Button',
+                        props: { type: 'primary' },
+                        children: '查看详情',
+                        events: {
+                          onClick: [
+                            {
+                              type: 'callMethod',
+                              name: 'openDrawer',
+                              params: { record: '{{item}}' },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                ],
               },
             ],
           },
@@ -86,4 +96,56 @@ export const drawerDetailSkeletonSchema: PageSchema = {
       },
     ],
   },
+  dialogs: [
+    {
+      id: 'orderDetailDrawer',
+      component: 'Drawer',
+      props: {
+        open: true,
+        width: 460,
+        placement: 'right',
+        title: '{{"订单详情 - " + (dialogPayload?.id ?? "")}}',
+      },
+      events: {
+        onClose: [{ type: 'callMethod', name: 'closeDrawer' }],
+      },
+      children: [
+        {
+          component: 'Descriptions',
+          props: { column: 1, bordered: true },
+          children: [
+            {
+              component: 'Descriptions.Item',
+              props: { label: '订单号' },
+              children: '{{dialogPayload?.id ?? "-"}}',
+            },
+            {
+              component: 'Descriptions.Item',
+              props: { label: '客户' },
+              children: '{{dialogPayload?.customer ?? "-"}}',
+            },
+            {
+              component: 'Descriptions.Item',
+              props: { label: '金额' },
+              children: '{{dialogPayload?.amount ?? "-"}}',
+            },
+            {
+              component: 'Descriptions.Item',
+              props: { label: '状态' },
+              children: [
+                {
+                  component: 'Tag',
+                  props: {
+                    color:
+                      '{{dialogPayload?.status === "done" ? "green" : dialogPayload?.status === "processing" ? "blue" : "default"}}',
+                  },
+                  children: '{{dialogPayload?.status ?? "-"}}',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
 };

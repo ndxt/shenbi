@@ -2,7 +2,7 @@ import type { PageSchema } from '@shenbi/schema';
 
 export const descriptionsSkeletonSchema: PageSchema = {
   id: 'descriptions-skeleton',
-  name: 'Descriptions 骨架',
+  name: 'Descriptions 详情页',
   state: {
     detail: {
       default: {
@@ -11,7 +11,20 @@ export const descriptionsSkeletonSchema: PageSchema = {
         email: 'alice@shenbi.dev',
         status: 'enabled',
         role: 'admin',
+        department: 'Finance',
+        updatedAt: '2026-02-23 10:20:00',
       },
+    },
+  },
+  methods: {
+    toggleStatus: {
+      body: [
+        {
+          type: 'setState',
+          key: 'detail.status',
+          value: '{{state.detail.status === "enabled" ? "disabled" : "enabled"}}',
+        },
+      ],
     },
   },
   body: {
@@ -20,8 +33,21 @@ export const descriptionsSkeletonSchema: PageSchema = {
     children: [
       {
         component: 'Card',
-        props: { title: 'Descriptions 场景（最小骨架）' },
+        props: { title: 'Descriptions 场景（详情展示）' },
         children: [
+          {
+            component: 'Space',
+            children: [
+              {
+                component: 'Button',
+                props: { type: 'primary' },
+                children: '切换状态',
+                events: {
+                  onClick: [{ type: 'callMethod', name: 'toggleStatus' }],
+                },
+              },
+            ],
+          },
           {
             component: 'Descriptions',
             props: {
@@ -51,6 +77,16 @@ export const descriptionsSkeletonSchema: PageSchema = {
               },
               {
                 component: 'Descriptions.Item',
+                props: { label: '部门' },
+                children: '{{state.detail.department}}',
+              },
+              {
+                component: 'Descriptions.Item',
+                props: { label: '更新时间' },
+                children: '{{state.detail.updatedAt}}',
+              },
+              {
+                component: 'Descriptions.Item',
                 props: { label: '状态' },
                 children: [
                   {
@@ -63,6 +99,14 @@ export const descriptionsSkeletonSchema: PageSchema = {
                 ],
               },
             ],
+          },
+          {
+            component: 'Alert',
+            props: {
+              type: 'info',
+              showIcon: true,
+              message: '{{"当前状态: " + state.detail.status}}',
+            },
           },
         ],
       },
