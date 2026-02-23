@@ -3,7 +3,7 @@
 版本：`v1.0.0`  
 冻结日期：`2026-02-20`
 
-本文档对应 `docs/DESIGN.md` 第五节，作为并行开发的契约基线。
+本文档对应 `docs/active/architecture-design.md` 第五节，作为并行开发的契约基线。
 
 ## Source Of Truth
 
@@ -36,7 +36,7 @@
 ## 变更规则
 
 1. 任何契约变更必须同时更新：
-`docs/CONTRACTS.md`、`packages/engine/src/types/contracts.ts`、`PLAN.md`（若影响任务依赖）。
+`docs/active/contract-freeze-v1.md`、`packages/engine/src/types/contracts.ts`、`docs/active/phase-2-plan.md`（若影响任务依赖）。
 2. 契约变更必须附带兼容策略（例如新增字段默认值、旧字段废弃期）。
 3. 并行阶段内禁止破坏性改动（重命名、删除、语义反转）。
 
