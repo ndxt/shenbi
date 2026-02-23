@@ -18,6 +18,14 @@ interface AppShellProps {
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
 
+const THEME_CLASSES = [
+  'theme-light',
+  'theme-dark',
+  'theme-cursor',
+  'theme-webstorm-light',
+  'theme-webstorm-dark',
+] as const;
+
 export function AppShell({ children }: AppShellProps) {
   const [theme, setTheme] = React.useState<ThemeMode>('dark');
   
@@ -68,14 +76,13 @@ export function AppShell({ children }: AppShellProps) {
   };
 
   React.useEffect(() => {
-    document.documentElement.classList.remove(
-      'theme-light', 
-      'theme-dark', 
-      'theme-cursor', 
-      'theme-webstorm-light', 
-      'theme-webstorm-dark'
-    );
-    document.documentElement.classList.add(`theme-${theme}`);
+    const root = document.documentElement;
+    root.classList.remove(...THEME_CLASSES);
+    const activeThemeClass = `theme-${theme}`;
+    root.classList.add(activeThemeClass);
+    return () => {
+      root.classList.remove(activeThemeClass);
+    };
   }, [theme]);
 
   return (

@@ -86,6 +86,14 @@ export const userManagementSchema: PageSchema = {
         },
       ],
     },
+    closeUserDialog: {
+      body: [
+        { type: 'modal', id: 'userDialog', open: false },
+        { type: 'resetForm', formRef: 'user-dialog-form' },
+        { type: 'setState', key: 'dialogMode', value: null },
+        { type: 'setState', key: 'currentRecord', value: null },
+      ],
+    },
   },
   dataSources: {
     userList: {
@@ -149,12 +157,7 @@ export const userManagementSchema: PageSchema = {
         title: '{{state.dialogMode === "edit" ? "编辑用户" : "新增用户"}}',
       },
       events: {
-        onCancel: [
-          { type: 'modal', id: 'userDialog', open: false },
-          { type: 'resetForm', formRef: 'user-dialog-form' },
-          { type: 'setState', key: 'dialogMode', value: null },
-          { type: 'setState', key: 'currentRecord', value: null },
-        ],
+        onCancel: [{ type: 'callMethod', name: 'closeUserDialog' }],
       },
       slots: {
         footer: {
@@ -167,12 +170,7 @@ export const userManagementSchema: PageSchema = {
               component: 'Button',
               children: '取消',
               events: {
-                onClick: [
-                  { type: 'modal', id: 'userDialog', open: false },
-                  { type: 'resetForm', formRef: 'user-dialog-form' },
-                  { type: 'setState', key: 'dialogMode', value: null },
-                  { type: 'setState', key: 'currentRecord', value: null },
-                ],
+                onClick: [{ type: 'callMethod', name: 'closeUserDialog' }],
               },
             },
             {
@@ -196,10 +194,7 @@ export const userManagementSchema: PageSchema = {
                             data: '{{values}}',
                             onSuccess: [
                               { type: 'message', level: 'success', content: '保存成功' },
-                              { type: 'modal', id: 'userDialog', open: false },
-                              { type: 'resetForm', formRef: 'user-dialog-form' },
-                              { type: 'setState', key: 'dialogMode', value: null },
-                              { type: 'setState', key: 'currentRecord', value: null },
+                              { type: 'callMethod', name: 'closeUserDialog' },
                               { type: 'callMethod', name: 'fetchUsers' },
                             ],
                             onError: [{ type: 'message', level: 'error', content: '保存失败' }],
@@ -212,10 +207,7 @@ export const userManagementSchema: PageSchema = {
                             data: '{{values}}',
                             onSuccess: [
                               { type: 'message', level: 'success', content: '新增成功' },
-                              { type: 'modal', id: 'userDialog', open: false },
-                              { type: 'resetForm', formRef: 'user-dialog-form' },
-                              { type: 'setState', key: 'dialogMode', value: null },
-                              { type: 'setState', key: 'currentRecord', value: null },
+                              { type: 'callMethod', name: 'closeUserDialog' },
                               { type: 'callMethod', name: 'fetchUsers' },
                             ],
                             onError: [{ type: 'message', level: 'error', content: '新增失败' }],

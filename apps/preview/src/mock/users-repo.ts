@@ -30,12 +30,20 @@ function normalizeText(value: unknown): string {
 }
 
 function compareValue(left: unknown, right: unknown): number {
+  if (typeof left === 'number' && typeof right === 'number') {
+    return left - right;
+  }
+
   const a = String(left ?? '');
   const b = String(right ?? '');
-  if (a === b) {
+  const result = a.localeCompare(b, 'en', {
+    numeric: true,
+    sensitivity: 'base',
+  });
+  if (result === 0) {
     return 0;
   }
-  return a > b ? 1 : -1;
+  return result > 0 ? 1 : -1;
 }
 
 function createSeedUser(index: number): UserRecord {
