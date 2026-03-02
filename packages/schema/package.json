@@ -1,14 +1,23 @@
 {
   "name": "@shenbi/schema",
   "version": "1.0.0",
-  "type": "module",
-  "main": "./types/index.ts",
-  "types": "./types/index.ts",
+  "type": "commonjs",
+  "main": "./dist/types/index.js",
+  "types": "./dist/types/index.d.ts",
   "exports": {
-    ".": "./types/index.ts"
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js",
+      "require": "./dist/types/index.js",
+      "default": "./dist/types/index.js"
+    }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "pnpm run clean && tsc -p tsconfig.json",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "test": "echo \"No tests for @shenbi/schema\""
   },

@@ -222,3 +222,12 @@ export const buttonContract: ComponentContractV1 = {
 1. `props/events` 是否采用 `Record` 结构（推荐）
 2. 第一批组件范围是否按上面的 12 个执行
 
+## 11. 包导出说明（2026-03-02）
+
+`@shenbi/schema` 现采用“构建产物导出”策略：
+
+1. 包正式导出统一指向 `dist/types/index.js + .d.ts`
+2. `build` 前会自动清理 `dist`，避免脏产物
+3. 发布包通过 `files: ["dist"]` 仅包含构建产物
+
+这样可以确保非源码直连环境可稳定消费运行时契约（例如 `builtinContracts`）。
