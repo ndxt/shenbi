@@ -346,6 +346,7 @@ export const userManagementSchema: PageSchema = {
                 props: { label: '关键词' },
                 children: [
                   {
+                    id: 'search-keyword-input',
                     component: 'Input',
                     props: {
                       placeholder: '搜索关键词...',
@@ -402,12 +403,14 @@ export const userManagementSchema: PageSchema = {
                     component: 'Space',
                     children: [
                       {
+                        id: 'search-submit-btn',
                         component: 'Button',
                         props: { type: 'primary' },
                         children: '查询',
                         events: { onClick: [{ type: 'callMethod', name: 'fetchUsers' }] },
                       },
                       {
+                        id: 'search-reset-btn',
                         component: 'Button',
                         children: '重置',
                         events: {
@@ -423,6 +426,7 @@ export const userManagementSchema: PageSchema = {
                         },
                       },
                       {
+                        id: 'search-create-btn',
                         component: 'Button',
                         props: { type: 'dashed' },
                         children: '新增用户',

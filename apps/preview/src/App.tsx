@@ -28,6 +28,8 @@ import {
   buildEditorTree,
   getDefaultSelectedNodeId,
   getSchemaNodeByTreeId,
+  getTreeIdBySchemaNodeId,
+  patchSchemaNodeEvents,
   patchSchemaNodeProps,
 } from './editor/schema-editor';
 
@@ -144,6 +146,20 @@ export function App() {
     }));
   };
 
+  const handlePatchEvents = (patch: Record<string, unknown>) => {
+    setScenarioSchemas((prev) => ({
+      ...prev,
+      [activeScenario]: patchSchemaNodeEvents(prev[activeScenario], selectedNodeId, patch),
+    }));
+  };
+
+  const handleCanvasSelectNode = (schemaNodeId: string) => {
+    const treeId = getTreeIdBySchemaNodeId(activeSchema, schemaNodeId);
+    if (treeId) {
+      setSelectedNodeId(treeId);
+    }
+  };
+
   return (
     <AppShell
       sidebarProps={{
@@ -154,10 +170,11 @@ export function App() {
       }}
       inspectorProps={{
         onPatchProps: handlePatchProps,
+        onPatchEvents: handlePatchEvents,
         ...(selectedNode ? { selectedNode } : {}),
         ...(selectedContract ? { contract: selectedContract } : {}),
       }}
-      onCanvasSelectNode={setSelectedNodeId}
+      onCanvasSelectNode={handleCanvasSelectNode}
       toolbarExtra={(
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-text-secondary">场景</span>

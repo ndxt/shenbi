@@ -1,4 +1,4 @@
-import type { PageSchema, PropValue, SchemaNode } from '@shenbi/schema';
+import type { ActionChain, PageSchema, PropValue, SchemaNode } from '@shenbi/schema';
 
 export interface EditorTreeNode {
   id: string;
@@ -43,6 +43,26 @@ function buildTreeNode(node: SchemaNode, path: string): EditorTreeNode {
     treeNode.children = children;
   }
   return treeNode;
+}
+
+function findTreePathBySchemaId(node: SchemaNode, path: string, schemaNodeId: string): string | undefined {
+  if (node.id === schemaNodeId) {
+    return path;
+  }
+  if (!Array.isArray(node.children)) {
+    return undefined;
+  }
+  for (let index = 0; index < node.children.length; index += 1) {
+    const child = node.children[index];
+    if (!isSchemaNode(child)) {
+      continue;
+    }
+    const matched = findTreePathBySchemaId(child, `${path}.children.${index}`, schemaNodeId);
+    if (matched) {
+      return matched;
+    }
+  }
+  return undefined;
 }
 
 export function buildEditorTree(schema: PageSchema): EditorTreeNode[] {
@@ -99,6 +119,48 @@ export function getSchemaNodeByTreeId(schema: PageSchema, treeId?: string): Sche
   return isSchemaNode(node) ? node : undefined;
 }
 
+export function getTreeIdBySchemaNodeId(
+  schema: PageSchema,
+  schemaNodeId: string | undefined,
+): string | undefined {
+  if (!schemaNodeId) {
+    return undefined;
+  }
+
+  if (Array.isArray(schema.body)) {
+    for (let index = 0; index < schema.body.length; index += 1) {
+      const node = schema.body[index];
+      if (!isSchemaNode(node)) {
+        continue;
+      }
+      const matched = findTreePathBySchemaId(node, `body.${index}`, schemaNodeId);
+      if (matched) {
+        return matched;
+      }
+    }
+  } else if (isSchemaNode(schema.body)) {
+    const matched = findTreePathBySchemaId(schema.body, 'body', schemaNodeId);
+    if (matched) {
+      return matched;
+    }
+  }
+
+  if (Array.isArray(schema.dialogs)) {
+    for (let index = 0; index < schema.dialogs.length; index += 1) {
+      const node = schema.dialogs[index];
+      if (!isSchemaNode(node)) {
+        continue;
+      }
+      const matched = findTreePathBySchemaId(node, `dialogs.${index}`, schemaNodeId);
+      if (matched) {
+        return matched;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 export function patchSchemaNodeProps(
   schema: PageSchema,
   treeId: string | undefined,
@@ -123,6 +185,35 @@ export function patchSchemaNodeProps(
     ...currentProps,
     ...(patch as Record<string, PropValue>),
   };
+
+  return nextSchema;
+}
+
+export function patchSchemaNodeEvents(
+  schema: PageSchema,
+  treeId: string | undefined,
+  patch: Record<string, unknown>,
+): PageSchema {
+  if (!treeId || Object.keys(patch).length === 0) {
+    return schema;
+  }
+
+  const nextSchema = deepCloneSchema(schema);
+  const node = getSchemaNodeByTreeId(nextSchema, treeId);
+  if (!node) {
+    return schema;
+  }
+
+  const currentEvents: Record<string, ActionChain> =
+    node.events && typeof node.events === 'object' && !Array.isArray(node.events)
+      ? (node.events as Record<string, ActionChain>)
+      : {};
+
+  const nextEvents: Record<string, ActionChain> = {
+    ...currentEvents,
+    ...(patch as Record<string, ActionChain>),
+  };
+  node.events = nextEvents;
 
   return nextSchema;
 }

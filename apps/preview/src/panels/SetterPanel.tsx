@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ComponentContract, ContractProp, SchemaNode } from '@shenbi/schema';
+import type { ActionChain, ComponentContract, ContractProp, SchemaNode } from '@shenbi/schema';
 import { Code, GripVertical, Link2, Plus } from 'lucide-react';
 
 export interface SetterPanelProps {
@@ -15,6 +15,7 @@ export function SetterPanel({
   selectedNode,
   contract,
   onPatchProps,
+  onPatchEvents,
   activeTab = 'props',
 }: SetterPanelProps) {
   if (activeTab === 'props') {
@@ -30,7 +31,12 @@ export function SetterPanel({
     return <StyleSetter />;
   }
   if (activeTab === 'events') {
-    return <EventSetter />;
+    return (
+      <EventSetter
+        {...(selectedNode ? { selectedNode } : {})}
+        {...(onPatchEvents ? { onPatchEvents } : {})}
+      />
+    );
   }
   if (activeTab === 'logic') {
     return <LogicSetter />;
@@ -54,7 +60,15 @@ function formatValue(value: unknown, fallback: unknown): string {
   }
 }
 
+function isExpressionLiteral(raw: string): boolean {
+  const trimmed = raw.trim();
+  return trimmed.startsWith('{{') && trimmed.endsWith('}}');
+}
+
 function parseValueByContractType(raw: string, contractProp: ContractProp): unknown {
+  if (contractProp.allowExpression && isExpressionLiteral(raw)) {
+    return raw;
+  }
   if (contractProp.type === 'boolean') {
     return raw.trim().toLowerCase() === 'true';
   }
@@ -194,30 +208,113 @@ function StyleSetter() {
   );
 }
 
-function EventSetter() {
+interface EventSetterProps {
+  selectedNode?: SchemaNode;
+  onPatchEvents?: (patch: Record<string, unknown>) => void;
+}
+
+function formatActions(actions: unknown): string {
+  if (!actions) {
+    return '[]';
+  }
+  try {
+    return JSON.stringify(actions, null, 2);
+  } catch {
+    return '[]';
+  }
+}
+
+function parseActionChain(raw: string): ActionChain {
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error('事件动作必须是数组');
+  }
+  return parsed as ActionChain;
+}
+
+function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [errorByEvent, setErrorByEvent] = useState<Record<string, string | undefined>>({});
+
+  useEffect(() => {
+    setDrafts({});
+    setErrorByEvent({});
+  }, [selectedNode?.id, selectedNode?.component]);
+
+  if (!selectedNode) {
+    return (
+      <div className="p-4 text-[12px] text-text-secondary">
+        请先在组件树或画布中选择一个节点。
+      </div>
+    );
+  }
+
+  const eventRecord = selectedNode.events ?? {};
+  const eventEntries = Object.entries(eventRecord).sort((a, b) => a[0].localeCompare(b[0]));
+
   return (
     <div className="flex flex-col gap-3 p-3 text-text-primary">
       <div className="flex justify-between items-center mb-2">
         <span className="text-[11px] font-bold text-text-secondary uppercase">已绑定事件</span>
-        <button className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-600 transition-colors">
+        <button
+          className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-600 transition-colors"
+          onClick={() => {
+            if (eventRecord.onClick) {
+              return;
+            }
+            onPatchEvents?.({ onClick: [] });
+          }}
+        >
           <Plus size={10} /> 新增
         </button>
       </div>
 
-      {['onClick', 'onMouseEnter'].map((eventName) => (
-        <div key={eventName} className="border border-border-ide rounded bg-bg-canvas overflow-hidden">
-          <div className="flex justify-between items-center bg-bg-activity-bar px-2 py-1.5 border-b border-border-ide">
-            <span className="text-[12px] font-semibold text-blue-400">{eventName}</span>
-            <span className="text-[10px] text-text-secondary">2个动作</span>
-          </div>
-          <div className="p-2 flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-[11px] bg-bg-sidebar p-1.5 rounded border border-border-ide border-dashed">
-              <GripVertical size={12} className="text-text-secondary cursor-grab" />
-              <div className="flex-1 truncate">打开弹窗 (submitDialog)</div>
+      {eventEntries.length === 0 ? (
+        <div className="text-[12px] text-text-secondary border border-dashed border-border-ide rounded p-3">
+          当前节点暂无事件。点击“新增”可先添加 `onClick`。
+        </div>
+      ) : null}
+
+      {eventEntries.map(([eventName, actions]) => {
+        const rawValue = drafts[eventName] ?? formatActions(actions);
+        const error = errorByEvent[eventName];
+        return (
+          <div key={eventName} className="border border-border-ide rounded bg-bg-canvas overflow-hidden">
+            <div className="flex justify-between items-center bg-bg-activity-bar px-2 py-1.5 border-b border-border-ide">
+              <span className="text-[12px] font-semibold text-blue-400">{eventName}</span>
+              <span className="text-[10px] text-text-secondary">
+                {Array.isArray(actions) ? `${actions.length}个动作` : '1个动作'}
+              </span>
+            </div>
+            <div className="p-2 flex flex-col gap-2">
+              <textarea
+                aria-label={`${eventName} actions`}
+                value={rawValue}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setDrafts((prev) => ({ ...prev, [eventName]: nextValue }));
+                }}
+                onBlur={(event) => {
+                  try {
+                    const nextChain = parseActionChain(event.target.value);
+                    onPatchEvents?.({ [eventName]: nextChain });
+                    setErrorByEvent((prev) => ({ ...prev, [eventName]: undefined }));
+                  } catch (error) {
+                    const message = error instanceof Error ? error.message : '事件 JSON 解析失败';
+                    setErrorByEvent((prev) => ({ ...prev, [eventName]: message }));
+                  }
+                }}
+                className="w-full min-h-[104px] bg-bg-sidebar border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500"
+              />
+              {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
+              <div className="flex items-center gap-2 text-[11px] text-text-secondary bg-bg-sidebar p-1.5 rounded border border-border-ide border-dashed">
+                <GripVertical size={12} className="text-text-secondary" />
+                <div className="flex-1 truncate">支持直接编辑 ActionChain JSON，失焦后自动回写。</div>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

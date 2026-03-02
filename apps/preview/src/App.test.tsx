@@ -9,7 +9,7 @@ import {
   useRef,
 } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 
@@ -79,48 +79,100 @@ vi.mock('antd', async (importOriginal) => {
   const FormContext = createContext<FormContextValue | null>(null);
 
   const Button = (props: any) =>
-    createElement(
-      'button',
-      {
-        onClick: props.onClick,
-        type: props.htmlType ?? 'button',
-        'data-loading': props.loading ? 'true' : 'false',
-      },
-      props.children,
-    );
+    {
+      const {
+        children,
+        onClick,
+        htmlType,
+        loading,
+        className,
+        style,
+        'data-shenbi-node-id': nodeId,
+      } = props;
+      return createElement(
+        'button',
+        {
+          onClick,
+          type: htmlType ?? 'button',
+          'data-loading': loading ? 'true' : 'false',
+          ...(className ? { className } : {}),
+          ...(style ? { style } : {}),
+          ...(nodeId ? { 'data-shenbi-node-id': nodeId } : {}),
+        },
+        children,
+      );
+    };
 
   const Input = (props: any) =>
-    createElement('input', {
-      placeholder: props.placeholder,
-      value: props.value ?? '',
-      onChange: props.onChange,
-    });
+    {
+      const {
+        placeholder,
+        value,
+        onChange,
+        className,
+        style,
+        'data-shenbi-node-id': nodeId,
+      } = props;
+      return createElement('input', {
+        placeholder,
+        value: value ?? '',
+        onChange,
+        ...(className ? { className } : {}),
+        ...(style ? { style } : {}),
+        ...(nodeId ? { 'data-shenbi-node-id': nodeId } : {}),
+      });
+    };
 
   const Select = (props: any) =>
-    createElement(
-      'select',
-      {
-        'aria-label': props.placeholder ?? 'select',
-        value: props.value ?? '',
-        onChange: (event: any) => props.onChange?.(event.target.value),
-      },
-      [
-        createElement('option', { key: '__placeholder__', value: '' }, props.placeholder ?? ''),
-        ...(props.options ?? []).map((option: any) =>
-          createElement('option', { key: String(option.value), value: option.value }, option.label),
-        ),
-      ],
-    );
+    {
+      const {
+        placeholder,
+        value,
+        onChange,
+        options,
+        className,
+        style,
+        'data-shenbi-node-id': nodeId,
+      } = props;
+      return createElement(
+        'select',
+        {
+          'aria-label': placeholder ?? 'select',
+          value: value ?? '',
+          onChange: (event: any) => onChange?.(event.target.value),
+          ...(className ? { className } : {}),
+          ...(style ? { style } : {}),
+          ...(nodeId ? { 'data-shenbi-node-id': nodeId } : {}),
+        },
+        [
+          createElement('option', { key: '__placeholder__', value: '' }, placeholder ?? ''),
+          ...((options ?? []).map((option: any) =>
+            createElement('option', { key: String(option.value), value: option.value }, option.label))),
+        ],
+      );
+    };
 
   const RangePicker = (props: any) =>
-    createElement('input', {
-      'aria-label': 'range-picker',
-      value: Array.isArray(props.value) ? props.value.join(' ~ ') : '',
-      onChange: (event: any) => {
-        const next = event.target.value ? [event.target.value, event.target.value] : [];
-        props.onChange?.(next, next);
-      },
-    });
+    {
+      const {
+        value,
+        onChange,
+        className,
+        style,
+        'data-shenbi-node-id': nodeId,
+      } = props;
+      return createElement('input', {
+        'aria-label': 'range-picker',
+        value: Array.isArray(value) ? value.join(' ~ ') : '',
+        onChange: (event: any) => {
+          const next = event.target.value ? [event.target.value, event.target.value] : [];
+          onChange?.(next, next);
+        },
+        ...(className ? { className } : {}),
+        ...(style ? { style } : {}),
+        ...(nodeId ? { 'data-shenbi-node-id': nodeId } : {}),
+      });
+    };
 
   const Form = (props: any) => {
     const form = props.form ?? createMockFormStore();
@@ -232,8 +284,9 @@ vi.mock('antd', async (importOriginal) => {
   const Table = (props: any) => {
     const rows = props.dataSource ?? [];
     const columns = props.columns ?? [];
+    const nodeId = props['data-shenbi-node-id'];
 
-    return createElement('div', null, [
+    return createElement('div', nodeId ? { 'data-shenbi-node-id': nodeId } : null, [
       ...rows.map((record: Record<string, any>, index: number) =>
         createElement(
           'div',
@@ -307,9 +360,16 @@ describe('preview/App integration', () => {
     });
   }
 
-  async function selectCardNodeInOutline(user: ReturnType<typeof userEvent.setup>) {
+  async function selectNodeInOutline(
+    user: ReturnType<typeof userEvent.setup>,
+    nodeName: string,
+  ) {
     await user.click(screen.getByText('Outline'));
-    await user.click(screen.getByText('user-management-card (Card)'));
+    await user.click(screen.getByText(nodeName));
+  }
+
+  async function selectCardNodeInOutline(user: ReturnType<typeof userEvent.setup>) {
+    await selectNodeInOutline(user, 'user-management-card (Card)');
     await waitFor(() => {
       expect(screen.getByLabelText('title')).toBeInTheDocument();
     });
@@ -509,6 +569,93 @@ describe('preview/App integration', () => {
     await user.selectOptions(scenarioSelect, 'user-management');
     await waitFor(() => {
       expect(screen.getByText('用户管理-隔离验证')).toBeInTheDocument();
+    });
+  });
+
+  it('编辑器：Events 支持 JSON 回写并驱动运行时', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.click(screen.getByRole('button', { name: '查询' }));
+    await user.click(screen.getByText('Events'));
+
+    const actionsEditor = await screen.findByLabelText('onClick actions');
+    fireEvent.change(actionsEditor, {
+      target: {
+        value: JSON.stringify(
+          [
+            { type: 'setState', key: 'keyword', value: 'User 3' },
+            { type: 'callMethod', name: 'fetchUsers' },
+          ],
+          null,
+          2,
+        ),
+      },
+    });
+    fireEvent.blur(actionsEditor);
+
+    const input = screen.getByPlaceholderText('搜索关键词...') as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, 'User 1');
+    await user.click(screen.getByRole('button', { name: '查询' }));
+
+    await waitFor(() => {
+      expect(input.value).toBe('User 3');
+      expect(screen.getByText('User 3')).toBeInTheDocument();
+    });
+  });
+
+  it('编辑器：Input onChange 事件支持回写', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await selectNodeInOutline(user, 'search-keyword-input (Input)');
+    await user.click(screen.getByText('Events'));
+
+    const actionsEditor = await screen.findByLabelText('onChange actions');
+    fireEvent.change(actionsEditor, {
+      target: {
+        value: JSON.stringify(
+          [{ type: 'setState', key: 'keyword', value: 'User 9' }],
+          null,
+          2,
+        ),
+      },
+    });
+    fireEvent.blur(actionsEditor);
+
+    const input = screen.getByPlaceholderText('搜索关键词...') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'anything' } });
+
+    await waitFor(() => {
+      expect(input.value).toBe('User 9');
+      expect(screen.getByText('User 9')).toBeInTheDocument();
+    });
+  });
+
+  it('编辑器：Table onChange 事件支持回写', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await selectNodeInOutline(user, 'user-table (Table)');
+    await user.click(screen.getByText('Events'));
+
+    const actionsEditor = await screen.findByLabelText('onChange actions');
+    fireEvent.change(actionsEditor, {
+      target: {
+        value: JSON.stringify(
+          [{ type: 'setState', key: 'pagination.current', value: 5 }],
+          null,
+          2,
+        ),
+      },
+    });
+    fireEvent.blur(actionsEditor);
+
+    await user.click(screen.getByRole('button', { name: '触发表格变化' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('当前页: 5');
     });
   });
 });
