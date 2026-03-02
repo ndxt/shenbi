@@ -43,7 +43,7 @@ export const drawerDetailSkeletonSchema: PageSchema = {
             props: {
               type: 'info',
               showIcon: true,
-              message: '点击“查看详情”后以 page.dialogs 的 Drawer 展示详情。',
+              title: '点击“查看详情”后以 page.dialogs 的 Drawer 展示详情。',
             },
           },
           {
@@ -69,7 +69,7 @@ export const drawerDetailSkeletonSchema: PageSchema = {
                         props: {
                           type: 'success',
                           showIcon: true,
-                          message: '{{item.id + " / " + item.customer + " / " + item.amount}}',
+                          title: '{{item.id + " / " + item.customer + " / " + item.amount}}',
                         },
                       },
                       {

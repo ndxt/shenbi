@@ -186,7 +186,8 @@ vi.mock('antd', async (importOriginal) => {
   const Tag = (props: any) =>
     createElement('span', { 'data-testid': 'tag', 'data-color': props.color ?? '' }, props.children);
 
-  const Alert = (props: any) => createElement('div', { role: 'alert' }, props.message ?? '');
+  const Alert = (props: any) =>
+    createElement('div', { role: 'alert' }, props.title ?? '');
 
   const Popconfirm = (props: any) => {
     const childElement = Children.toArray(props.children).find((item) => isValidElement(item)) as any;

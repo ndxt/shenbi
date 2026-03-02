@@ -24,6 +24,7 @@ describe('contracts/runtime verification', () => {
 
   it('getBuiltinContract 能正确查询', () => {
     expect(getBuiltinContract('Button')?.componentType).toBe('Button');
+    expect(getBuiltinContract('Container')?.componentType).toBe('Container');
     expect(getBuiltinContract('Layout')?.componentType).toBe('Layout');
     expect(getBuiltinContract('Layout.Header')?.componentType).toBe('Layout.Header');
     expect(getBuiltinContract('Form.Item')?.componentType).toBe('Form.Item');
@@ -35,7 +36,7 @@ describe('contracts/runtime verification', () => {
     for (const contract of builtinContracts) {
       expect(contract.componentType).toBeTruthy();
       expect(contract.version).toBe('1.0.0');
-      expect(contract.runtimeType).toMatch(/^antd\./);
+      expect(contract.runtimeType).toMatch(/^(antd|shenbi)\./);
     }
   });
 

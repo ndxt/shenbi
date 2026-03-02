@@ -44,7 +44,7 @@ export const tabsDetailSkeletonSchema: PageSchema = {
             props: {
               type: 'success',
               showIcon: true,
-              message: '{{"当前激活标签: " + state.activeTab}}',
+              title: '{{"当前激活标签: " + state.activeTab}}',
             },
           },
           {
@@ -52,7 +52,7 @@ export const tabsDetailSkeletonSchema: PageSchema = {
             props: {
               type: 'info',
               showIcon: true,
-              message: '{{"已访问标签: " + state.visitedTabs.join(", ")}}',
+              title: '{{"已访问标签: " + state.visitedTabs.join(", ")}}',
             },
           },
           {
@@ -88,7 +88,7 @@ export const tabsDetailSkeletonSchema: PageSchema = {
                 props: {
                   type: 'warning',
                   showIcon: true,
-                  message: '2026-02-22 10:31:22 更新了权限组',
+                  title: '2026-02-22 10:31:22 更新了权限组',
                 },
               },
             ],

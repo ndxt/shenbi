@@ -7,7 +7,7 @@ import type { PageSchema } from '@shenbi/schema';
  * 3. Select:  options 数据驱动 + onChange
  * 4. Card:    children 嵌套 + slots (title/extra)
  * 5. Tag+loop: 循环渲染 + if 条件过滤 + 表达式 color
- * 6. Alert+if: 条件渲染 + 动态 message
+ * 6. Alert+if: 条件渲染 + 动态 title
  */
 export const demoPageSchema: PageSchema = {
   id: 'demo_page',
@@ -128,7 +128,7 @@ export const demoPageSchema: PageSchema = {
               },
             ],
           },
-          // 场景 6 - Alert + if: 条件渲染 + 动态 message
+          // 场景 6 - Alert + if: 条件渲染 + 动态 title
           {
             id: 'alert_info',
             component: 'Alert',
@@ -136,7 +136,7 @@ export const demoPageSchema: PageSchema = {
             props: {
               type: 'info',
               showIcon: true,
-              message: '{{state.keyword ? "搜索: " + state.keyword : "请输入搜索关键词"}}',
+              title: '{{state.keyword ? "搜索: " + state.keyword : "请输入搜索关键词"}}',
             },
           },
           // 场景 1 - Button: 静态 props + 事件 + loading 表达式

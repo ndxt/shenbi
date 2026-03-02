@@ -92,7 +92,7 @@ const alertNode: CompiledNode = {
   componentType: 'Alert',
   staticProps: { type: 'info', showIcon: true },
   dynamicProps: {
-    message: expr(
+    title: expr(
       '{{state.keyword ? "搜索: " + state.keyword : "请输入搜索关键词"}}',
       (ctx) => ctx.state.keyword ? `搜索: ${ctx.state.keyword}` : '请输入搜索关键词',
       ['state.keyword'],

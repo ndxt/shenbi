@@ -8,6 +8,7 @@ import {
   layoutFooterContract,
   layoutSiderContract,
 } from './layout';
+import { containerContract, pageEmbedContract } from './container';
 
 import { rowContract, colContract } from './grid';
 
@@ -146,6 +147,7 @@ import {
 
 // ================== Re-exports ==================
 export * from './layout';
+export * from './container';
 export * from './grid';
 export * from './space';
 export * from './divider-flex';
@@ -181,6 +183,8 @@ export const builtinContracts: ComponentContract[] = [
   layoutContentContract,
   layoutFooterContract,
   layoutSiderContract,
+  containerContract,
+  pageEmbedContract,
   rowContract,
   colContract,
   spaceContract,

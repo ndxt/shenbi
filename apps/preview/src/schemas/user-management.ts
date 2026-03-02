@@ -440,7 +440,7 @@ export const userManagementSchema: PageSchema = {
             props: {
               type: 'info',
               showIcon: true,
-              message: '{{"已选择 " + computed.selectedCount + " 项"}}',
+              title: '{{"已选择 " + computed.selectedCount + " 项"}}',
             },
           },
           {
@@ -448,7 +448,7 @@ export const userManagementSchema: PageSchema = {
             props: {
               type: 'success',
               showIcon: true,
-              message: '{{"当前页: " + state.pagination.current + "，总计: " + state.total + " 条"}}',
+              title: '{{"当前页: " + state.pagination.current + "，总计: " + state.total + " 条"}}',
             },
           },
           {

@@ -58,7 +58,7 @@ export const nineGridSkeletonSchema: PageSchema = {
                 props: {
                   type: 'info',
                   showIcon: true,
-                  message: '使用 Row/Col 的 span=8 形成 3x3 常用看板布局。',
+                  title: '使用 Row/Col 的 span=8 形成 3x3 常用看板布局。',
                 },
               },
               {
@@ -125,7 +125,7 @@ export const nineGridSkeletonSchema: PageSchema = {
                 props: {
                   type: 'success',
                   showIcon: true,
-                  message: '{{"当前选中指标: " + state.activeGridId}}',
+                  title: '{{"当前选中指标: " + state.activeGridId}}',
                 },
               },
             ],

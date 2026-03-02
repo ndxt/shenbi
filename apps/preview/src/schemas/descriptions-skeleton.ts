@@ -105,7 +105,7 @@ export const descriptionsSkeletonSchema: PageSchema = {
             props: {
               type: 'info',
               showIcon: true,
-              message: '{{"当前状态: " + state.detail.status}}',
+              title: '{{"当前状态: " + state.detail.status}}',
             },
           },
         ],

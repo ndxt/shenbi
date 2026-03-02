@@ -7,8 +7,6 @@
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
-      "import": "./dist/types/index.js",
-      "require": "./dist/types/index.js",
       "default": "./dist/types/index.js"
     }
   },

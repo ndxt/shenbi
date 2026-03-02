@@ -81,7 +81,7 @@ export const treeManagementSkeletonSchema: PageSchema = {
             props: {
               type: 'info',
               showIcon: true,
-              message: '{{"当前选中节点数: " + (state.selectedKeys?.length ?? 0)}}',
+              title: '{{"当前选中节点数: " + (state.selectedKeys?.length ?? 0)}}',
             },
           },
           {
@@ -89,7 +89,7 @@ export const treeManagementSkeletonSchema: PageSchema = {
             props: {
               type: 'success',
               showIcon: true,
-              message: '{{"当前展开节点数: " + (state.expandedKeys?.length ?? 0)}}',
+              title: '{{"当前展开节点数: " + (state.expandedKeys?.length ?? 0)}}',
             },
           },
           {
@@ -97,7 +97,7 @@ export const treeManagementSkeletonSchema: PageSchema = {
             props: {
               type: 'warning',
               showIcon: true,
-              message: '{{"当前勾选节点数: " + (state.checkedKeys?.length ?? 0)}}',
+              title: '{{"当前勾选节点数: " + (state.checkedKeys?.length ?? 0)}}',
             },
           },
         ],

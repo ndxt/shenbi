@@ -97,7 +97,7 @@ export const formListSkeletonSchema: PageSchema = {
             props: {
               type: 'info',
               showIcon: true,
-              message: '在弹窗中维护联系方式：支持新增、删除、上下移动与逐行校验。',
+              title: '在弹窗中维护联系方式：支持新增、删除、上下移动与逐行校验。',
             },
           },
           {
@@ -118,7 +118,7 @@ export const formListSkeletonSchema: PageSchema = {
             props: {
               type: 'success',
               showIcon: true,
-              message: '{{"最近提交条数: " + (state.submittedContacts?.length ?? 0)}}',
+              title: '{{"最近提交条数: " + (state.submittedContacts?.length ?? 0)}}',
             },
           },
           {
@@ -127,7 +127,7 @@ export const formListSkeletonSchema: PageSchema = {
             props: {
               type: 'info',
               showIcon: true,
-              message:
+              title:
                 '{{"最近提交: " + state.submittedContacts.map((item) => item.name + "(" + item.phone + ")").join("，")}}',
             },
           },
@@ -284,7 +284,7 @@ export const formListSkeletonSchema: PageSchema = {
               props: {
                 type: 'warning',
                 showIcon: true,
-                message: '{{"当前草稿字段数: " + Object.keys(state.draftValues ?? {}).length}}',
+                title: '{{"当前草稿字段数: " + Object.keys(state.draftValues ?? {}).length}}',
               },
             },
           ],
