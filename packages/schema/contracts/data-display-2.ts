@@ -8,6 +8,7 @@ export const imageContract: ComponentContract = {
   componentType: 'Image',
   runtimeType: 'antd.Image',
   category: 'data-display',
+  icon: 'Image',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     alt: {
@@ -67,6 +68,7 @@ export const imagePreviewGroupContract: ComponentContract = {
   componentType: 'Image.PreviewGroup',
   runtimeType: 'antd.Image.PreviewGroup',
   category: 'data-display',
+  icon: 'Images',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     items: {
@@ -99,6 +101,7 @@ export const popoverContract: ComponentContract = {
   componentType: 'Popover',
   runtimeType: 'antd.Popover',
   category: 'data-display',
+  icon: 'MessageSquare',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     arrow: {
@@ -191,6 +194,7 @@ export const qrCodeContract: ComponentContract = {
   componentType: 'QRCode',
   runtimeType: 'antd.QRCode',
   category: 'data-display',
+  icon: 'QrCode',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     bgColor: {
@@ -266,6 +270,7 @@ export const segmentedContract: ComponentContract = {
   componentType: 'Segmented',
   runtimeType: 'antd.Segmented',
   category: 'data-display',
+  icon: 'RectangleEllipsis',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     block: {
@@ -326,6 +331,7 @@ export const statisticContract: ComponentContract = {
   componentType: 'Statistic',
   runtimeType: 'antd.Statistic',
   category: 'data-display',
+  icon: 'BarChart3',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     decimalSeparator: {
@@ -390,6 +396,7 @@ export const statisticCountdownContract: ComponentContract = {
   componentType: 'Statistic.Countdown',
   runtimeType: 'antd.Statistic.Countdown',
   category: 'data-display',
+  icon: 'Timer',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     format: {
@@ -443,6 +450,7 @@ export const tagContract: ComponentContract = {
   componentType: 'Tag',
   runtimeType: 'antd.Tag',
   category: 'data-display',
+  icon: 'Tag',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     bordered: {
@@ -489,6 +497,7 @@ export const checkableTagContract: ComponentContract = {
   componentType: 'Tag.CheckableTag',
   runtimeType: 'antd.Tag.CheckableTag',
   category: 'data-display',
+  icon: 'BadgeCheck',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     checked: {
@@ -515,6 +524,7 @@ export const timelineContract: ComponentContract = {
   componentType: 'Timeline',
   runtimeType: 'antd.Timeline',
   category: 'data-display',
+  icon: 'GitCommitVertical',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     items: {
@@ -557,6 +567,7 @@ export const timelineItemContract: ComponentContract = {
   componentType: 'Timeline.Item',
   runtimeType: 'antd.Timeline.Item',
   category: 'data-display',
+  icon: 'Circle',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     color: {
@@ -593,6 +604,7 @@ export const tooltipContract: ComponentContract = {
   componentType: 'Tooltip',
   runtimeType: 'antd.Tooltip',
   category: 'data-display',
+  icon: 'Info',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     arrow: {
@@ -686,6 +698,7 @@ export const tourContract: ComponentContract = {
   componentType: 'Tour',
   runtimeType: 'antd.Tour',
   category: 'data-display',
+  icon: 'MapPin',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     arrow: {

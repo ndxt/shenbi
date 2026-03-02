@@ -7,6 +7,7 @@ export const formItemContract: ComponentContract = {
   componentType: 'Form.Item',
   runtimeType: 'antd.Form.Item',
   category: 'data-entry',
+  icon: 'SquareDashedBottom',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     name: {

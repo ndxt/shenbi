@@ -8,6 +8,7 @@ export const radioContract: ComponentContract = {
   componentType: 'Radio',
   runtimeType: 'antd.Radio',
   category: 'data-entry',
+  icon: 'CircleDot',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     checked: {
@@ -50,6 +51,7 @@ export const radioGroupContract: ComponentContract = {
   componentType: 'Radio.Group',
   runtimeType: 'antd.Radio.Group',
   category: 'data-entry',
+  icon: 'CircleDot',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     buttonStyle: {
@@ -116,6 +118,7 @@ export const rateContract: ComponentContract = {
   componentType: 'Rate',
   runtimeType: 'antd.Rate',
   category: 'data-entry',
+  icon: 'Star',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     allowClear: {
@@ -183,6 +186,7 @@ export const sliderContract: ComponentContract = {
   componentType: 'Slider',
   runtimeType: 'antd.Slider',
   category: 'data-entry',
+  icon: 'SlidersHorizontal',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     defaultValue: {
@@ -281,6 +285,7 @@ export const switchContract: ComponentContract = {
   componentType: 'Switch',
   runtimeType: 'antd.Switch',
   category: 'data-entry',
+  icon: 'ToggleLeft',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     autoFocus: {
@@ -354,6 +359,7 @@ export const mentionsContract: ComponentContract = {
   componentType: 'Mentions',
   runtimeType: 'antd.Mentions',
   category: 'data-entry',
+  icon: 'AtSign',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     autoFocus: {

@@ -8,6 +8,7 @@ export const floatButtonContract: ComponentContract = {
   componentType: 'FloatButton',
   runtimeType: 'antd.FloatButton',
   category: 'general',
+  icon: 'CircleDot',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     icon: {
@@ -70,6 +71,7 @@ export const floatButtonGroupContract: ComponentContract = {
   componentType: 'FloatButton.Group',
   runtimeType: 'antd.FloatButton.Group',
   category: 'general',
+  icon: 'Layers',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     open: {
@@ -124,6 +126,7 @@ export const floatButtonBackTopContract: ComponentContract = {
   componentType: 'FloatButton.BackTop',
   runtimeType: 'antd.FloatButton.BackTop',
   category: 'general',
+  icon: 'ArrowUp',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     duration: {

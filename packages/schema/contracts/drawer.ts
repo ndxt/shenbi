@@ -8,6 +8,7 @@ export const drawerContract: ComponentContract = {
   componentType: 'Drawer',
   runtimeType: 'antd.Drawer',
   category: 'feedback',
+  icon: 'PanelRight',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     open: {

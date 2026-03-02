@@ -7,6 +7,7 @@ export const formContract: ComponentContract = {
   componentType: 'Form',
   runtimeType: 'antd.Form',
   category: 'data-entry',
+  icon: 'ClipboardList',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     layout: {

@@ -8,6 +8,7 @@ export const affixContract: ComponentContract = {
   componentType: 'Affix',
   runtimeType: 'antd.Affix',
   category: 'other',
+  icon: 'Pin',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     offsetBottom: {
@@ -50,6 +51,7 @@ export const appContract: ComponentContract = {
   componentType: 'App',
   runtimeType: 'antd.App',
   category: 'other',
+  icon: 'AppWindow',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     component: {
@@ -78,6 +80,7 @@ export const configProviderContract: ComponentContract = {
   componentType: 'ConfigProvider',
   runtimeType: 'antd.ConfigProvider',
   category: 'other',
+  icon: 'Settings',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     autoInsertSpaceInButton: {
@@ -214,6 +217,7 @@ export const backTopContract: ComponentContract = {
   componentType: 'BackTop',
   runtimeType: 'antd.BackTop',
   category: 'other',
+  icon: 'ArrowUp',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     duration: {

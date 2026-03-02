@@ -8,6 +8,7 @@ export const anchorContract: ComponentContract = {
   componentType: 'Anchor',
   runtimeType: 'antd.Anchor',
   category: 'navigation',
+  icon: 'Anchor',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     affix: {
@@ -83,6 +84,7 @@ export const breadcrumbContract: ComponentContract = {
   componentType: 'Breadcrumb',
   runtimeType: 'antd.Breadcrumb',
   category: 'navigation',
+  icon: 'ChevronRight',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     items: {
@@ -118,6 +120,7 @@ export const dropdownContract: ComponentContract = {
   componentType: 'Dropdown',
   runtimeType: 'antd.Dropdown',
   category: 'navigation',
+  icon: 'ChevronDown',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     menu: {
@@ -183,6 +186,7 @@ export const menuContract: ComponentContract = {
   componentType: 'Menu',
   runtimeType: 'antd.Menu',
   category: 'navigation',
+  icon: 'Menu',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     items: {
@@ -284,6 +288,7 @@ export const paginationContract: ComponentContract = {
   componentType: 'Pagination',
   runtimeType: 'antd.Pagination',
   category: 'navigation',
+  icon: 'MoreHorizontal',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     current: {
@@ -390,6 +395,7 @@ export const stepsContract: ComponentContract = {
   componentType: 'Steps',
   runtimeType: 'antd.Steps',
   category: 'navigation',
+  icon: 'ListOrdered',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     current: {

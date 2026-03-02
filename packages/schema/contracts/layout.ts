@@ -8,6 +8,7 @@ export const layoutContract: ComponentContract = {
   componentType: 'Layout',
   runtimeType: 'antd.Layout',
   category: 'layout',
+  icon: 'Layout',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     hasSider: {
@@ -41,6 +42,7 @@ export const layoutHeaderContract: ComponentContract = {
   componentType: 'Layout.Header',
   runtimeType: 'antd.Layout.Header',
   category: 'layout',
+  icon: 'PanelTop',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     className: {
@@ -65,6 +67,7 @@ export const layoutContentContract: ComponentContract = {
   componentType: 'Layout.Content',
   runtimeType: 'antd.Layout.Content',
   category: 'layout',
+  icon: 'LayoutDashboard',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     className: {
@@ -89,6 +92,7 @@ export const layoutFooterContract: ComponentContract = {
   componentType: 'Layout.Footer',
   runtimeType: 'antd.Layout.Footer',
   category: 'layout',
+  icon: 'PanelBottom',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     className: {
@@ -113,6 +117,7 @@ export const layoutSiderContract: ComponentContract = {
   componentType: 'Layout.Sider',
   runtimeType: 'antd.Layout.Sider',
   category: 'layout',
+  icon: 'PanelLeft',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     breakpoint: {

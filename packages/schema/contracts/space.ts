@@ -8,6 +8,7 @@ export const spaceContract: ComponentContract = {
   componentType: 'Space',
   runtimeType: 'antd.Space',
   category: 'layout',
+  icon: 'GripHorizontal',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     align: {
@@ -58,6 +59,7 @@ export const spaceCompactContract: ComponentContract = {
   componentType: 'Space.Compact',
   runtimeType: 'antd.Space.Compact',
   category: 'layout',
+  icon: 'Minimize2',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     block: {

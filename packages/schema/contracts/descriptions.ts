@@ -8,6 +8,7 @@ export const descriptionsContract: ComponentContract = {
   componentType: 'Descriptions',
   runtimeType: 'antd.Descriptions',
   category: 'data-display',
+  icon: 'AlignJustify',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     title: {
@@ -80,6 +81,7 @@ export const descriptionsItemContract: ComponentContract = {
   componentType: 'Descriptions.Item',
   runtimeType: 'antd.Descriptions.Item',
   category: 'data-display',
+  icon: 'Minus',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     label: {

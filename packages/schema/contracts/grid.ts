@@ -8,6 +8,7 @@ export const rowContract: ComponentContract = {
   componentType: 'Row',
   runtimeType: 'antd.Row',
   category: 'layout',
+  icon: 'Columns3',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     align: {
@@ -50,6 +51,7 @@ export const colContract: ComponentContract = {
   componentType: 'Col',
   runtimeType: 'antd.Col',
   category: 'layout',
+  icon: 'RectangleHorizontal',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     flex: {

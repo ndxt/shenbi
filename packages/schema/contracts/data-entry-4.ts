@@ -8,6 +8,7 @@ export const transferContract: ComponentContract = {
   componentType: 'Transfer',
   runtimeType: 'antd.Transfer',
   category: 'data-entry',
+  icon: 'ArrowLeftRight',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     dataSource: {
@@ -137,6 +138,7 @@ export const treeSelectContract: ComponentContract = {
   componentType: 'TreeSelect',
   runtimeType: 'antd.TreeSelect',
   category: 'data-entry',
+  icon: 'TreePine',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     allowClear: {
@@ -313,6 +315,7 @@ export const uploadContract: ComponentContract = {
   componentType: 'Upload',
   runtimeType: 'antd.Upload',
   category: 'data-entry',
+  icon: 'Upload',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     accept: {
@@ -445,6 +448,7 @@ export const uploadDraggerContract: ComponentContract = {
   componentType: 'Upload.Dragger',
   runtimeType: 'antd.Upload.Dragger',
   category: 'data-entry',
+  icon: 'UploadCloud',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     accept: {

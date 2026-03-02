@@ -8,6 +8,7 @@ export const tabsContract: ComponentContract = {
   componentType: 'Tabs',
   runtimeType: 'antd.Tabs',
   category: 'navigation',
+  icon: 'Columns2',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     activeKey: {
@@ -158,6 +159,7 @@ export const tabPaneContract: ComponentContract = {
   componentType: 'Tabs.TabPane',
   runtimeType: 'antd.Tabs.TabPane',
   category: 'navigation',
+  icon: 'Square',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     key: {

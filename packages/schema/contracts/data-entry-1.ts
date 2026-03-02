@@ -8,6 +8,7 @@ export const autoCompleteContract: ComponentContract = {
   componentType: 'AutoComplete',
   runtimeType: 'antd.AutoComplete',
   category: 'data-entry',
+  icon: 'TextSearch',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     allowClear: {
@@ -115,6 +116,7 @@ export const cascaderContract: ComponentContract = {
   componentType: 'Cascader',
   runtimeType: 'antd.Cascader',
   category: 'data-entry',
+  icon: 'ListTree',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     allowClear: {
@@ -237,6 +239,7 @@ export const checkboxContract: ComponentContract = {
   componentType: 'Checkbox',
   runtimeType: 'antd.Checkbox',
   category: 'data-entry',
+  icon: 'CheckSquare',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     checked: {
@@ -285,6 +288,7 @@ export const checkboxGroupContract: ComponentContract = {
   componentType: 'Checkbox.Group',
   runtimeType: 'antd.Checkbox.Group',
   category: 'data-entry',
+  icon: 'CheckSquare',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     defaultValue: {
@@ -331,6 +335,7 @@ export const colorPickerContract: ComponentContract = {
   componentType: 'ColorPicker',
   runtimeType: 'antd.ColorPicker',
   category: 'data-entry',
+  icon: 'Palette',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     allowClear: {

@@ -7,6 +7,7 @@ export const modalContract: ComponentContract = {
   componentType: 'Modal',
   runtimeType: 'antd.Modal',
   category: 'feedback',
+  icon: 'Layers2',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     open: {

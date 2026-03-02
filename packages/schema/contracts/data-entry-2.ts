@@ -8,6 +8,7 @@ export const datePickerContract: ComponentContract = {
   componentType: 'DatePicker',
   runtimeType: 'antd.DatePicker',
   category: 'data-entry',
+  icon: 'Calendar',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     allowClear: {
@@ -128,6 +129,7 @@ export const rangePickerContract: ComponentContract = {
   componentType: 'DatePicker.RangePicker',
   runtimeType: 'antd.DatePicker.RangePicker',
   category: 'data-entry',
+  icon: 'CalendarRange',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     allowClear: {
@@ -230,6 +232,7 @@ export const timePickerContract: ComponentContract = {
   componentType: 'TimePicker',
   runtimeType: 'antd.TimePicker',
   category: 'data-entry',
+  icon: 'Clock',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     allowClear: {
@@ -335,6 +338,7 @@ export const inputNumberContract: ComponentContract = {
   componentType: 'InputNumber',
   runtimeType: 'antd.InputNumber',
   category: 'data-entry',
+  icon: 'Hash',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     addonAfter: {

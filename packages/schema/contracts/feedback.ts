@@ -8,6 +8,7 @@ export const alertContract: ComponentContract = {
   componentType: 'Alert',
   runtimeType: 'antd.Alert',
   category: 'feedback',
+  icon: 'AlertCircle',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     action: {
@@ -88,6 +89,7 @@ export const popconfirmContract: ComponentContract = {
   componentType: 'Popconfirm',
   runtimeType: 'antd.Popconfirm',
   category: 'feedback',
+  icon: 'HelpCircle',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     cancelButtonProps: {
@@ -198,6 +200,7 @@ export const progressContract: ComponentContract = {
   componentType: 'Progress',
   runtimeType: 'antd.Progress',
   category: 'feedback',
+  icon: 'Percent',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     format: {
@@ -296,6 +299,7 @@ export const resultContract: ComponentContract = {
   componentType: 'Result',
   runtimeType: 'antd.Result',
   category: 'feedback',
+  icon: 'CircleCheck',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     extra: {
@@ -334,6 +338,7 @@ export const skeletonContract: ComponentContract = {
   componentType: 'Skeleton',
   runtimeType: 'antd.Skeleton',
   category: 'feedback',
+  icon: 'Scan',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     active: {
@@ -386,6 +391,7 @@ export const skeletonButtonContract: ComponentContract = {
   componentType: 'Skeleton.Button',
   runtimeType: 'antd.Skeleton.Button',
   category: 'feedback',
+  icon: 'Square',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     active: {
@@ -427,6 +433,7 @@ export const skeletonInputContract: ComponentContract = {
   componentType: 'Skeleton.Input',
   runtimeType: 'antd.Skeleton.Input',
   category: 'feedback',
+  icon: 'Minus',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     active: {
@@ -455,6 +462,7 @@ export const skeletonImageContract: ComponentContract = {
   componentType: 'Skeleton.Image',
   runtimeType: 'antd.Skeleton.Image',
   category: 'feedback',
+  icon: 'Image',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     active: {
@@ -481,6 +489,7 @@ export const spinContract: ComponentContract = {
   componentType: 'Spin',
   runtimeType: 'antd.Spin',
   category: 'feedback',
+  icon: 'Loader',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     delay: {
@@ -539,6 +548,7 @@ export const watermarkContract: ComponentContract = {
   componentType: 'Watermark',
   runtimeType: 'antd.Watermark',
   category: 'feedback',
+  icon: 'Droplets',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     content: {

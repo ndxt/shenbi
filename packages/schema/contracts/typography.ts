@@ -8,6 +8,7 @@ export const typographyTextContract: ComponentContract = {
   componentType: 'Typography.Text',
   runtimeType: 'antd.Typography.Text',
   category: 'general',
+  icon: 'Type',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     type: {
@@ -101,6 +102,7 @@ export const typographyTitleContract: ComponentContract = {
   componentType: 'Typography.Title',
   runtimeType: 'antd.Typography.Title',
   category: 'general',
+  icon: 'Heading',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     level: {
@@ -189,6 +191,7 @@ export const typographyParagraphContract: ComponentContract = {
   componentType: 'Typography.Paragraph',
   runtimeType: 'antd.Typography.Paragraph',
   category: 'general',
+  icon: 'AlignLeft',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     type: {

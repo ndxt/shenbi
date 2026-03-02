@@ -7,6 +7,7 @@ export const tableContract: ComponentContract = {
   componentType: 'Table',
   runtimeType: 'antd.Table',
   category: 'data-display',
+  icon: 'Table',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     rowKey: {

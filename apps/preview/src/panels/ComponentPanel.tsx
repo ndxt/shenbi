@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { Search, List, Box, Layout, Type, Image as ImageIcon } from 'lucide-react';
+import {
+  Search,
+  Box,
+  type LucideIcon,
+} from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import type { ComponentContract } from '@shenbi/schema';
 
 interface ComponentGroup {
@@ -15,13 +20,30 @@ interface ComponentItem {
   description?: string;
 }
 
+// 从契约的 icon 字段获取图标组件
+function getIconFromContract(iconName?: string): React.ReactNode {
+  if (!iconName) {
+    return <Box size={16} />;
+  }
+
+  // 动态获取 lucide-react 图标
+  const IconComponent = (LucideIcons as Record<string, LucideIcon>)[iconName];
+
+  if (!IconComponent) {
+    console.warn(`Icon "${iconName}" not found in lucide-react, using default Box icon`);
+    return <Box size={16} />;
+  }
+
+  return <IconComponent size={16} />;
+}
+
 const mockComponentGroups: ComponentGroup[] = [
   {
     id: 'basic',
     name: '基础组件',
     components: [
-      { id: 'Text', name: '文本', icon: <Type size={16} /> },
-      { id: 'Image', name: '图片', icon: <ImageIcon size={16} /> },
+      { id: 'Text', name: '文本', icon: <Box size={16} /> },
+      { id: 'Image', name: '图片', icon: <Box size={16} /> },
       { id: 'Button', name: '按钮', icon: <Box size={16} /> },
     ],
   },
@@ -29,17 +51,17 @@ const mockComponentGroups: ComponentGroup[] = [
     id: 'layout',
     name: '布局组件',
     components: [
-      { id: 'Container', name: '容器', icon: <Layout size={16} /> },
-      { id: 'Flex', name: '弹性布局', icon: <Layout size={16} /> },
-      { id: 'Grid', name: '网格布局', icon: <Layout size={16} /> },
-      { id: 'Divider', name: '分割线', icon: <span className="text-secondary">-</span> },
+      { id: 'Container', name: '容器', icon: <Box size={16} /> },
+      { id: 'Flex', name: '弹性布局', icon: <Box size={16} /> },
+      { id: 'Grid', name: '网格布局', icon: <Box size={16} /> },
+      { id: 'Divider', name: '分割线', icon: <Box size={16} /> },
     ],
   },
   {
     id: 'data',
     name: '数据展示',
     components: [
-      { id: 'List', name: '列表', icon: <List size={16} /> },
+      { id: 'List', name: '列表', icon: <Box size={16} /> },
       { id: 'Table', name: '表格', icon: <Box size={16} /> },
     ],
   },
@@ -71,22 +93,6 @@ function getCategoryName(category: string): string {
   }
 }
 
-function getIconByType(componentType: string): React.ReactNode {
-  if (componentType.includes('Layout') || componentType === 'Row' || componentType === 'Col') {
-    return <Layout size={16} />;
-  }
-  if (componentType.includes('Input') || componentType === 'Typography.Text') {
-    return <Type size={16} />;
-  }
-  if (componentType.includes('Image')) {
-    return <ImageIcon size={16} />;
-  }
-  if (componentType.includes('Table') || componentType.includes('List')) {
-    return <List size={16} />;
-  }
-  return <Box size={16} />;
-}
-
 export function ComponentPanel({ contracts, onInsert }: ComponentPanelProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -107,7 +113,7 @@ export function ComponentPanel({ contracts, onInsert }: ComponentPanelProps) {
           components: items.map((contract) => ({
             id: contract.componentType,
             name: contract.componentType,
-            icon: getIconByType(contract.componentType),
+            icon: getIconFromContract(contract.icon),
           })),
         }))
       : mockComponentGroups;

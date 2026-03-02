@@ -7,6 +7,7 @@ export const buttonContract: ComponentContract = {
   componentType: 'Button',
   runtimeType: 'antd.Button',
   category: 'general',
+  icon: 'MousePointerClick',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     type: {

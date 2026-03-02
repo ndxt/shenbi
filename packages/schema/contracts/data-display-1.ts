@@ -8,6 +8,7 @@ export const avatarContract: ComponentContract = {
   componentType: 'Avatar',
   runtimeType: 'antd.Avatar',
   category: 'data-display',
+  icon: 'User',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     alt: {
@@ -78,6 +79,7 @@ export const avatarGroupContract: ComponentContract = {
   componentType: 'Avatar.Group',
   runtimeType: 'antd.Avatar.Group',
   category: 'data-display',
+  icon: 'Users',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     maxCount: {
@@ -124,6 +126,7 @@ export const badgeContract: ComponentContract = {
   componentType: 'Badge',
   runtimeType: 'antd.Badge',
   category: 'data-display',
+  icon: 'BadgeInfo',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     color: {
@@ -200,6 +203,7 @@ export const badgeRibbonContract: ComponentContract = {
   componentType: 'Badge.Ribbon',
   runtimeType: 'antd.Badge.Ribbon',
   category: 'data-display',
+  icon: 'Ribbon',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     color: {
@@ -232,6 +236,7 @@ export const calendarContract: ComponentContract = {
   componentType: 'Calendar',
   runtimeType: 'antd.Calendar',
   category: 'data-display',
+  icon: 'Calendar',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     cellRender: {
@@ -304,6 +309,7 @@ export const carouselContract: ComponentContract = {
   componentType: 'Carousel',
   runtimeType: 'antd.Carousel',
   category: 'data-display',
+  icon: 'GalleryHorizontal',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     autoplay: {
@@ -382,6 +388,7 @@ export const collapseContract: ComponentContract = {
   componentType: 'Collapse',
   runtimeType: 'antd.Collapse',
   category: 'data-display',
+  icon: 'PanelTopClose',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     accordion: {
@@ -456,6 +463,7 @@ export const collapsePanelContract: ComponentContract = {
   componentType: 'Collapse.Panel',
   runtimeType: 'antd.Collapse.Panel',
   category: 'data-display',
+  icon: 'Square',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     collapsible: {
@@ -503,6 +511,7 @@ export const emptyContract: ComponentContract = {
   componentType: 'Empty',
   runtimeType: 'antd.Empty',
   category: 'data-display',
+  icon: 'Inbox',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     description: {

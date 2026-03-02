@@ -7,6 +7,7 @@ export const inputContract: ComponentContract = {
   componentType: 'Input',
   runtimeType: 'antd.Input',
   category: 'data-entry',
+  icon: 'TextCursorInput',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     value: { type: 'any', allowExpression: true },

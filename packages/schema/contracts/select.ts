@@ -7,6 +7,7 @@ export const selectContract: ComponentContract = {
   componentType: 'Select',
   runtimeType: 'antd.Select',
   category: 'data-entry',
+  icon: 'ListFilter',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     value: { type: 'any', allowExpression: true },

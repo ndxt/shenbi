@@ -8,6 +8,7 @@ export const dividerContract: ComponentContract = {
   componentType: 'Divider',
   runtimeType: 'antd.Divider',
   category: 'layout',
+  icon: 'Minus',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     dashed: {
@@ -63,6 +64,7 @@ export const flexContract: ComponentContract = {
   componentType: 'Flex',
   runtimeType: 'antd.Flex',
   category: 'layout',
+  icon: 'MoveHorizontal',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     vertical: {
@@ -119,6 +121,7 @@ export const masonryContract: ComponentContract = {
   componentType: 'Masonry',
   runtimeType: 'antd.Masonry',
   category: 'layout',
+  icon: 'LayoutGrid',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     columns: {
@@ -169,6 +172,7 @@ export const splitterContract: ComponentContract = {
   componentType: 'Splitter',
   runtimeType: 'antd.Splitter',
   category: 'layout',
+  icon: 'SplitSquareHorizontal',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     orientation: {
@@ -218,6 +222,7 @@ export const splitterPanelContract: ComponentContract = {
   componentType: 'Splitter.Panel',
   runtimeType: 'antd.Splitter.Panel',
   category: 'layout',
+  icon: 'Square',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     size: {

@@ -8,6 +8,7 @@ export const treeContract: ComponentContract = {
   componentType: 'Tree',
   runtimeType: 'antd.Tree',
   category: 'data-display',
+  icon: 'TreePine',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     treeData: {
@@ -236,6 +237,7 @@ export const treeNodeContract: ComponentContract = {
   componentType: 'Tree.TreeNode',
   runtimeType: 'antd.Tree.TreeNode',
   category: 'data-display',
+  icon: 'GitBranch',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     key: {
@@ -292,6 +294,7 @@ export const directoryTreeContract: ComponentContract = {
   componentType: 'Tree.DirectoryTree',
   runtimeType: 'antd.Tree.DirectoryTree',
   category: 'data-display',
+  icon: 'FolderTree',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     expandAction: {
