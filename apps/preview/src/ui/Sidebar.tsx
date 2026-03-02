@@ -1,9 +1,24 @@
 import React, { useState } from 'react';
 import { ComponentPanel } from '../panels/ComponentPanel';
-import { SchemaTree } from '../panels/SchemaTree';
+import { type SchemaNode as TreeSchemaNode, SchemaTree } from '../panels/SchemaTree';
 import { PagePanel } from '../panels/PagePanel';
+import type { ComponentContract } from '@shenbi/schema';
 
-export function Sidebar() {
+export interface SidebarProps {
+  contracts?: ComponentContract[];
+  treeNodes?: TreeSchemaNode[];
+  selectedNodeId?: string;
+  onSelectNode?: (nodeId: string) => void;
+  onInsertComponent?: (componentType: string) => void;
+}
+
+export function Sidebar({
+  contracts,
+  treeNodes,
+  selectedNodeId,
+  onSelectNode,
+  onInsertComponent,
+}: SidebarProps) {
   const [activeTab, setActiveTab] = useState<'components' | 'outline' | 'data'>('components');
 
   return (
@@ -28,10 +43,17 @@ export function Sidebar() {
       
       <div className="flex-1 overflow-hidden">
         <div style={{ display: activeTab === 'components' ? 'block' : 'none', height: '100%' }}>
-          <ComponentPanel />
+          <ComponentPanel
+            {...(contracts ? { contracts } : {})}
+            {...(onInsertComponent ? { onInsert: onInsertComponent } : {})}
+          />
         </div>
         <div style={{ display: activeTab === 'outline' ? 'block' : 'none', height: '100%' }}>
-          <SchemaTree />
+          <SchemaTree
+            {...(treeNodes ? { nodes: treeNodes } : {})}
+            {...(selectedNodeId ? { selectedNodeId } : {})}
+            {...(onSelectNode ? { onSelect: onSelectNode } : {})}
+          />
         </div>
         <div style={{ display: activeTab === 'data' ? 'block' : 'none', height: '100%' }}>
           <PagePanel />

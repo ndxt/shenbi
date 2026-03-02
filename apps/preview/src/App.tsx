@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as antd from 'antd';
-import type { PageSchema } from '@shenbi/schema';
+import {
+  builtinContracts,
+  getBuiltinContract,
+  type PageSchema,
+} from '@shenbi/schema';
 import {
   antdResolver,
   compileSchema,
@@ -20,6 +24,12 @@ import {
 } from './schemas';
 
 import { AppShell } from './ui/AppShell';
+import {
+  buildEditorTree,
+  getDefaultSelectedNodeId,
+  getSchemaNodeByTreeId,
+  patchSchemaNodeProps,
+} from './editor/schema-editor';
 
 const resolver = antdResolver(antd);
 resolver.register('Container', Container);
@@ -43,15 +53,24 @@ const scenarioOptions: { label: string; value: ScenarioKey }[] = [
   { label: '九宫格布局', value: 'nine-grid' },
 ];
 
-const scenarioSchemaMap: Record<ScenarioKey, PageSchema> = {
-  'user-management': userManagementSchema,
-  'form-list': formListSkeletonSchema,
-  'tabs-detail': tabsDetailSkeletonSchema,
-  'tree-management': treeManagementSkeletonSchema,
-  descriptions: descriptionsSkeletonSchema,
-  'drawer-detail': drawerDetailSkeletonSchema,
-  'nine-grid': nineGridSkeletonSchema,
-};
+function cloneSchema(schema: PageSchema): PageSchema {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(schema);
+  }
+  return JSON.parse(JSON.stringify(schema)) as PageSchema;
+}
+
+function createInitialScenarioState(): Record<ScenarioKey, PageSchema> {
+  return {
+    'user-management': cloneSchema(userManagementSchema),
+    'form-list': cloneSchema(formListSkeletonSchema),
+    'tabs-detail': cloneSchema(tabsDetailSkeletonSchema),
+    'tree-management': cloneSchema(treeManagementSkeletonSchema),
+    descriptions: cloneSchema(descriptionsSkeletonSchema),
+    'drawer-detail': cloneSchema(drawerDetailSkeletonSchema),
+    'nine-grid': cloneSchema(nineGridSkeletonSchema),
+  };
+}
 
 interface ScenarioRuntimeViewProps {
   schema: PageSchema;
@@ -91,10 +110,53 @@ function ScenarioRuntimeView({ schema }: ScenarioRuntimeViewProps) {
 
 export function App() {
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
-  const activeSchema = scenarioSchemaMap[activeScenario];
+  const [scenarioSchemas, setScenarioSchemas] = useState<Record<ScenarioKey, PageSchema>>(
+    () => createInitialScenarioState(),
+  );
+  const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
+  const activeSchema = scenarioSchemas[activeScenario];
+
+  const treeNodes = useMemo(() => buildEditorTree(activeSchema), [activeSchema]);
+
+  useEffect(() => {
+    setSelectedNodeId((prev) => {
+      if (prev && getSchemaNodeByTreeId(activeSchema, prev)) {
+        return prev;
+      }
+      return getDefaultSelectedNodeId(treeNodes);
+    });
+  }, [activeSchema, treeNodes]);
+
+  const selectedNode = useMemo(
+    () => getSchemaNodeByTreeId(activeSchema, selectedNodeId),
+    [activeSchema, selectedNodeId],
+  );
+
+  const selectedContract = useMemo(
+    () => (selectedNode ? getBuiltinContract(selectedNode.component) : undefined),
+    [selectedNode],
+  );
+
+  const handlePatchProps = (patch: Record<string, unknown>) => {
+    setScenarioSchemas((prev) => ({
+      ...prev,
+      [activeScenario]: patchSchemaNodeProps(prev[activeScenario], selectedNodeId, patch),
+    }));
+  };
 
   return (
     <AppShell
+      sidebarProps={{
+        contracts: builtinContracts,
+        treeNodes,
+        onSelectNode: setSelectedNodeId,
+        ...(selectedNodeId ? { selectedNodeId } : {}),
+      }}
+      inspectorProps={{
+        onPatchProps: handlePatchProps,
+        ...(selectedNode ? { selectedNode } : {}),
+        ...(selectedContract ? { contract: selectedContract } : {}),
+      }}
       toolbarExtra={(
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-text-secondary">场景</span>

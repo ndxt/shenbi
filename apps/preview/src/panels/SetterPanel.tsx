@@ -1,26 +1,30 @@
-import React, { useState } from 'react';
-import { Type, Code, Link2, Plus, GripVertical } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import type { ComponentContract, ContractProp, SchemaNode } from '@shenbi/schema';
+import { Code, GripVertical, Link2, Plus } from 'lucide-react';
 
 export interface SetterPanelProps {
-  selectedNode?: any;
-  contract?: any;
-  onPatchProps?: (patch: any) => void;
-  onPatchStyle?: (patch: any) => void;
-  onPatchEvents?: (patch: any) => void;
+  selectedNode?: SchemaNode;
+  contract?: ComponentContract;
+  onPatchProps?: (patch: Record<string, unknown>) => void;
+  onPatchStyle?: (patch: Record<string, unknown>) => void;
+  onPatchEvents?: (patch: Record<string, unknown>) => void;
   activeTab?: 'props' | 'style' | 'events' | 'logic';
 }
 
-export function SetterPanel({ 
-  selectedNode, 
-  contract, 
-  onPatchProps, 
-  onPatchStyle, 
-  onPatchEvents,
-  activeTab = 'props'
+export function SetterPanel({
+  selectedNode,
+  contract,
+  onPatchProps,
+  activeTab = 'props',
 }: SetterPanelProps) {
-  
   if (activeTab === 'props') {
-    return <PropsSetter />;
+    return (
+      <PropsSetter
+        {...(selectedNode ? { selectedNode } : {})}
+        {...(contract ? { contract } : {})}
+        {...(onPatchProps ? { onPatchProps } : {})}
+      />
+    );
   }
   if (activeTab === 'style') {
     return <StyleSetter />;
@@ -31,26 +35,135 @@ export function SetterPanel({
   if (activeTab === 'logic') {
     return <LogicSetter />;
   }
-  
+
   return null;
 }
 
-// 属性设置器 (Props Setter)
-function PropsSetter() {
+function formatValue(value: unknown, fallback: unknown): string {
+  const candidate = value ?? fallback;
+  if (candidate === undefined) {
+    return '';
+  }
+  if (typeof candidate === 'string') {
+    return candidate;
+  }
+  try {
+    return JSON.stringify(candidate);
+  } catch {
+    return String(candidate);
+  }
+}
+
+function parseValueByContractType(raw: string, contractProp: ContractProp): unknown {
+  if (contractProp.type === 'boolean') {
+    return raw.trim().toLowerCase() === 'true';
+  }
+  if (contractProp.type === 'number') {
+    const parsed = Number(raw);
+    return Number.isNaN(parsed) ? raw : parsed;
+  }
+  if (contractProp.type === 'object' || contractProp.type === 'array' || contractProp.type === 'any') {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return trimmed;
+    }
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
+}
+
+interface PropsSetterProps {
+  selectedNode?: SchemaNode;
+  contract?: ComponentContract;
+  onPatchProps?: (patch: Record<string, unknown>) => void;
+}
+
+function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps) {
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const propsRecord = contract?.props ?? {};
+
+  useEffect(() => {
+    setDrafts({});
+  }, [selectedNode?.id, contract?.componentType]);
+
+  const sortedPropEntries = useMemo(
+    () =>
+      Object.entries(propsRecord).sort((a, b) => {
+        const aRequired = a[1].required ? 0 : 1;
+        const bRequired = b[1].required ? 0 : 1;
+        if (aRequired !== bRequired) {
+          return aRequired - bRequired;
+        }
+        return a[0].localeCompare(b[0]);
+      }),
+    [propsRecord],
+  );
+
+  if (!selectedNode) {
+    return (
+      <div className="p-4 text-[12px] text-text-secondary">
+        请先在组件树中选择一个节点。
+      </div>
+    );
+  }
+
+  if (!contract) {
+    return (
+      <div className="p-4 text-[12px] text-text-secondary">
+        当前组件 `{selectedNode.component}` 暂无契约，请先补充 contracts。
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 p-3 text-text-primary">
-      <SetterGroup title="基础属性">
-        <PropertyField label="标题" value="默认按钮" />
-        <PropertyField label="类型" value="primary" type="select" options={['primary', 'default', 'dashed', 'link', 'text']} />
-        <PropertyField label="图标" value="Plus" type="select" options={['None', 'Plus', 'Edit', 'Delete']} />
+      <SetterGroup title="当前节点">
+        <div className="text-[12px] text-text-secondary break-all">
+          <div>组件：{selectedNode.component}</div>
+          {selectedNode.id ? <div>ID：{selectedNode.id}</div> : null}
+        </div>
       </SetterGroup>
 
-      <SetterGroup title="状态">
-        <PropertyField label="禁用" value="false" type="switch" />
-        <PropertyField label="加载中" value="false" type="switch" />
-        <PropertyField label="隐藏" value="false" type="switch" />
+      <SetterGroup title="契约属性">
+        {sortedPropEntries.length === 0 ? (
+          <div className="text-[12px] text-text-secondary">该组件未声明 props。</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {sortedPropEntries.map(([propName, propMeta]) => {
+              const rawValue = drafts[propName] ?? formatValue(selectedNode.props?.[propName], propMeta.default);
+              const enumOptions = Array.isArray(propMeta.enum)
+                ? propMeta.enum.map((item) => String(item))
+                : [];
+
+              return (
+                <PropertyField
+                  key={propName}
+                  label={propName}
+                  value={rawValue}
+                  isExpression={Boolean(propMeta.allowExpression)}
+                  type={enumOptions.length > 0 ? 'select' : 'input'}
+                  options={enumOptions}
+                  {...(propMeta.description ? { description: propMeta.description } : {})}
+                  {...(propMeta.required ? { required: true } : {})}
+                  onChange={(next) => {
+                    setDrafts((prev) => ({ ...prev, [propName]: next }));
+                  }}
+                  onCommit={(next) => {
+                    onPatchProps?.({
+                      [propName]: parseValueByContractType(next, propMeta),
+                    });
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
       </SetterGroup>
-      
+
       <SetterGroup title="高级属性">
         <div className="text-[12px] text-text-secondary border border-dashed border-border-ide p-3 rounded text-center flex items-center justify-center gap-2 cursor-pointer hover:bg-bg-activity-bar transition-colors">
           <Code size={14} />
@@ -61,7 +174,6 @@ function PropsSetter() {
   );
 }
 
-// 样式设置器 (Style Setter)
 function StyleSetter() {
   return (
     <div className="flex flex-col gap-4 p-3 text-text-primary">
@@ -78,17 +190,10 @@ function StyleSetter() {
         <PropertyField label="边框" value="1px solid #1677ff" />
         <PropertyField label="圆角 (Radius)" value="6px" />
       </SetterGroup>
-      
-      <SetterGroup title="自定义 CSS">
-        <div className="bg-[#1e1e1e] rounded p-2 border border-border-ide font-mono text-[11px] text-[#d4d4d4] h-20 overflow-y-auto">
-          {'.container {\n  opacity: 0.8;\n  transition: all 0.3s;\n}'}
-        </div>
-      </SetterGroup>
     </div>
   );
 }
 
-// 事件设置器 (Event Setter)
 function EventSetter() {
   return (
     <div className="flex flex-col gap-3 p-3 text-text-primary">
@@ -110,129 +215,125 @@ function EventSetter() {
               <GripVertical size={12} className="text-text-secondary cursor-grab" />
               <div className="flex-1 truncate">打开弹窗 (submitDialog)</div>
             </div>
-            <div className="flex items-center gap-2 text-[11px] bg-bg-sidebar p-1.5 rounded border border-border-ide border-dashed">
-              <GripVertical size={12} className="text-text-secondary cursor-grab" />
-              <div className="flex-1 truncate text-green-400">Fetch API (updateUser)</div>
-            </div>
           </div>
         </div>
       ))}
-      
-      <div className="mt-4 border border-dashed border-border-ide rounded p-4 flex flex-col items-center justify-center text-text-secondary gap-2 cursor-pointer hover:bg-bg-activity-bar transition-colors">
-        <Plus size={16} />
-        <span className="text-[12px]">添加事件监听</span>
-      </div>
     </div>
   );
 }
 
-// 统一逻辑设置器 (Logic Setter)
 function LogicSetter() {
   return (
     <div className="flex flex-col gap-4 p-3 text-text-primary">
       <SetterGroup title="条件渲染 (Condition)">
-        <PropertyField 
-          label="是否渲染 (x-if)" 
-          value="!!user.permissions.includes('admin')" 
-          isExpression 
-        />
+        <PropertyField label="是否渲染 (x-if)" value="!!state.visible" isExpression />
       </SetterGroup>
 
       <SetterGroup title="列表循环 (Loop)">
-        <PropertyField 
-          label="循环数据 (x-for)" 
-          value="pageState.userList" 
-          isExpression 
-        />
+        <PropertyField label="循环数据 (x-for)" value="state.list" isExpression />
         <PropertyField label="项别名 (item)" value="item" />
         <PropertyField label="索引别名 (index)" value="index" />
-        <PropertyField label="绑定键 (Key)" value="item.id" isExpression />
-      </SetterGroup>
-
-      <SetterGroup title="国际化 (i18n)">
-        <div className="flex items-center gap-2 mb-2">
-          <input 
-            type="checkbox" 
-            checked 
-            readOnly
-            className="rounded border-border-ide text-blue-500 focus:ring-blue-500 bg-bg-canvas"
-          />
-          <span className="text-[12px]">启用国际化静态分析</span>
-        </div>
-        <PropertyField label="翻译键空间" value="components.button" />
       </SetterGroup>
     </div>
   );
 }
 
-// --- Helper Components ---
-
-function SetterGroup({ title, children }: { title: string, children: React.ReactNode }) {
+function SetterGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[11px] font-bold text-text-secondary uppercase mb-2">
-        {title}
-      </h3>
-      <div className="flex flex-col gap-2">
-        {children}
-      </div>
+      <h3 className="text-[11px] font-bold text-text-secondary uppercase mb-2">{title}</h3>
+      <div className="flex flex-col gap-2">{children}</div>
     </div>
   );
 }
 
-function PropertyField({ 
-  label, 
-  value, 
-  type = 'input', 
-  options = [], 
+interface PropertyFieldProps {
+  label: string;
+  value: string;
+  type?: 'input' | 'select';
+  options?: string[];
+  isColor?: boolean;
+  isExpression?: boolean;
+  required?: boolean;
+  description?: string;
+  onChange?: (next: string) => void;
+  onCommit?: (next: string) => void;
+}
+
+function PropertyField({
+  label,
+  value,
+  type = 'input',
+  options = [],
   isColor = false,
-  isExpression = false
-}: { 
-  label: string, 
-  value: string, 
-  type?: 'input' | 'select' | 'switch', 
-  options?: string[],
-  isColor?: boolean,
-  isExpression?: boolean
-}) {
+  isExpression = false,
+  required = false,
+  description,
+  onChange,
+  onCommit,
+}: PropertyFieldProps) {
+  const inputId = `setter-${label}`;
   return (
     <div className="flex flex-col">
-      <label className="text-[10px] text-text-secondary uppercase block mb-1 flex justify-between items-center whitespace-nowrap overflow-hidden">
-        <span className="truncate">{label}</span>
-        {isExpression && (
-          <div className="bg-yellow-500/20 text-yellow-500 rounded px-1 flex items-center gap-0.5 ml-2 shrink-0 cursor-pointer" title="表达式绑定" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+      <label
+        htmlFor={inputId}
+        className="text-[10px] text-text-secondary uppercase block mb-1 flex justify-between items-center whitespace-nowrap overflow-hidden"
+      >
+        <span className="truncate">
+          {label}
+          {required ? ' *' : ''}
+        </span>
+        {isExpression ? (
+          <span className="bg-yellow-500/20 text-yellow-500 rounded px-1 flex items-center gap-0.5 ml-2 shrink-0">
             <Link2 size={10} />
             <span className="text-[9px]">表达式</span>
-          </div>
-        )}
+          </span>
+        ) : null}
       </label>
       <div className="flex items-center gap-2 group relative">
-        {isColor && <div className="w-4 h-4 rounded-sm border border-border-ide shrink-0" style={{ backgroundColor: value }} />}
-        
-        {type === 'input' && (
-          <input 
-            readOnly 
-            value={value} 
-            className={`flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-blue-500 w-full min-w-0 ${isExpression ? 'font-mono text-yellow-400 border-yellow-500/50 bg-yellow-500/5' : ''}`} 
+        {isColor ? (
+          <div
+            className="w-4 h-4 rounded-sm border border-border-ide shrink-0"
+            style={{ backgroundColor: value }}
           />
-        )}
-        
-        {type === 'select' && (
-          <select 
-            disabled
-            value={value} 
+        ) : null}
+
+        {type === 'input' ? (
+          <input
+            id={inputId}
+            aria-label={label}
+            value={value}
+            onChange={(event) => onChange?.(event.target.value)}
+            onBlur={(event) => onCommit?.(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                onCommit?.((event.target as HTMLInputElement).value);
+              }
+            }}
+            className={`flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-blue-500 w-full min-w-0 ${
+              isExpression ? 'font-mono text-yellow-400 border-yellow-500/50 bg-yellow-500/5' : ''
+            }`}
+          />
+        ) : (
+          <select
+            id={inputId}
+            aria-label={label}
+            value={value}
+            onChange={(event) => {
+              onChange?.(event.target.value);
+              onCommit?.(event.target.value);
+            }}
             className="flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-blue-500 appearance-none w-full min-w-0"
           >
-            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {options.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
           </select>
         )}
-        
-        {type === 'switch' && (
-          <div className="w-8 h-4 bg-bg-activity-bar rounded-full border border-border-ide relative shrink-0">
-            <div className={`absolute top-[1px] ${value === 'true' ? 'right-[1px] bg-blue-500' : 'left-[1px] bg-text-secondary'} w-[12px] h-[12px] rounded-full transition-all`} />
-          </div>
-        )}
       </div>
+      {description ? <span className="text-[10px] text-text-secondary mt-1">{description}</span> : null}
     </div>
   );
 }

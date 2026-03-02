@@ -1,9 +1,26 @@
 import React, { useState } from 'react';
 import { SetterPanel } from '../panels/SetterPanel';
 import { ActionPanel } from '../panels/ActionPanel';
+import type { ComponentContract, SchemaNode } from '@shenbi/schema';
 
-export function Inspector() {
-  const [activeTab, setActiveTab] = useState<'props' | 'style' | 'events' | 'logic' | 'actions'>('props');
+type InspectorTab = 'props' | 'style' | 'events' | 'logic' | 'actions';
+
+export interface InspectorProps {
+  selectedNode?: SchemaNode;
+  contract?: ComponentContract;
+  onPatchProps?: (patch: Record<string, unknown>) => void;
+  onPatchStyle?: (patch: Record<string, unknown>) => void;
+  onPatchEvents?: (patch: Record<string, unknown>) => void;
+}
+
+export function Inspector({
+  selectedNode,
+  contract,
+  onPatchProps,
+  onPatchStyle,
+  onPatchEvents,
+}: InspectorProps) {
+  const [activeTab, setActiveTab] = useState<InspectorTab>('props');
 
   return (
     <div className="w-full h-full bg-bg-panel border-l border-border-ide flex flex-col shrink-0 overflow-hidden">
@@ -20,7 +37,14 @@ export function Inspector() {
           <ActionPanel />
         ) : (
           <div className="flex-1 overflow-y-auto w-full">
-            <SetterPanel activeTab={activeTab as any} />
+            <SetterPanel
+              activeTab={activeTab}
+              {...(selectedNode ? { selectedNode } : {})}
+              {...(contract ? { contract } : {})}
+              {...(onPatchProps ? { onPatchProps } : {})}
+              {...(onPatchStyle ? { onPatchStyle } : {})}
+              {...(onPatchEvents ? { onPatchEvents } : {})}
+            />
           </div>
         )}
       </div>

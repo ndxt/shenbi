@@ -306,6 +306,14 @@ describe('preview/App integration', () => {
     });
   }
 
+  async function selectCardNodeInOutline(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByText('Outline'));
+    await user.click(screen.getByText('user-management-card (Card)'));
+    await waitFor(() => {
+      expect(screen.getByLabelText('title')).toBeInTheDocument();
+    });
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.replaceState(null, '', '/');
@@ -447,6 +455,59 @@ describe('preview/App integration', () => {
     });
     await waitFor(() => {
       expect(screen.getByText('User 2')).toBeInTheDocument();
+    });
+  });
+
+  it('编辑器：选中节点后右侧按契约展示属性', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await selectCardNodeInOutline(user);
+
+    expect(screen.getByText('契约属性')).toBeInTheDocument();
+    expect(screen.getByLabelText('title')).toHaveValue('用户管理');
+  });
+
+  it('编辑器：修改 props 会回写场景并刷新渲染', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await selectCardNodeInOutline(user);
+
+    const titleInput = screen.getByLabelText('title');
+    await user.clear(titleInput);
+    await user.type(titleInput, '用户管理-测试改名');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByText('用户管理-测试改名')).toBeInTheDocument();
+    });
+  });
+
+  it('编辑器：切换场景后状态隔离，不串改动', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await selectCardNodeInOutline(user);
+
+    const titleInput = screen.getByLabelText('title');
+    await user.clear(titleInput);
+    await user.type(titleInput, '用户管理-隔离验证');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByText('用户管理-隔离验证')).toBeInTheDocument();
+    });
+
+    const scenarioSelect = screen.getByLabelText('场景切换');
+    await user.selectOptions(scenarioSelect, 'form-list');
+    await waitFor(() => {
+      expect(screen.queryByText('用户管理-隔离验证')).toBeNull();
+    });
+
+    await user.selectOptions(scenarioSelect, 'user-management');
+    await waitFor(() => {
+      expect(screen.getByText('用户管理-隔离验证')).toBeInTheDocument();
     });
   });
 });

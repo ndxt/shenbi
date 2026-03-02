@@ -61,8 +61,22 @@ export interface SchemaTreeProps {
 }
 
 export function SchemaTree({ nodes = mockSchemaTree, selectedNodeId, onSelect }: SchemaTreeProps) {
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set(['root', 'header', 'main', 'grid-1']));
-  const internalSelectedId = selectedNodeId || 'main'; // Mock default selection
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const internalSelectedId = selectedNodeId ?? nodes[0]?.id;
+
+  React.useEffect(() => {
+    const nextKeys = new Set<string>();
+    const walk = (currentNodes: SchemaNode[]) => {
+      for (const node of currentNodes) {
+        if (node.children && node.children.length > 0) {
+          nextKeys.add(node.id);
+          walk(node.children);
+        }
+      }
+    };
+    walk(nodes);
+    setExpandedKeys(nextKeys);
+  }, [nodes]);
 
   const toggleExpand = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();

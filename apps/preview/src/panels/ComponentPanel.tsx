@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, List, Box, Layout, Type, Image as ImageIcon } from 'lucide-react';
+import type { ComponentContract } from '@shenbi/schema';
 
 interface ComponentGroup {
   id: string;
@@ -45,21 +46,82 @@ const mockComponentGroups: ComponentGroup[] = [
 ];
 
 export interface ComponentPanelProps {
-  // Mocking the contract
-  contracts?: any[];
+  contracts?: ComponentContract[];
   onInsert?: (componentType: string) => void;
 }
 
-export function ComponentPanel({ onInsert }: ComponentPanelProps) {
+function getCategoryName(category: string): string {
+  switch (category) {
+    case 'general':
+      return '通用组件';
+    case 'layout':
+      return '布局组件';
+    case 'navigation':
+      return '导航组件';
+    case 'data-entry':
+      return '数据录入';
+    case 'data-display':
+      return '数据展示';
+    case 'feedback':
+      return '反馈组件';
+    case 'other':
+      return '其他';
+    default:
+      return '未分类';
+  }
+}
+
+function getIconByType(componentType: string): React.ReactNode {
+  if (componentType.includes('Layout') || componentType === 'Row' || componentType === 'Col') {
+    return <Layout size={16} />;
+  }
+  if (componentType.includes('Input') || componentType === 'Typography.Text') {
+    return <Type size={16} />;
+  }
+  if (componentType.includes('Image')) {
+    return <ImageIcon size={16} />;
+  }
+  if (componentType.includes('Table') || componentType.includes('List')) {
+    return <List size={16} />;
+  }
+  return <Box size={16} />;
+}
+
+export function ComponentPanel({ contracts, onInsert }: ComponentPanelProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredGroups = mockComponentGroups.map(group => ({
-    ...group,
-    components: group.components.filter(c => 
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      c.id.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  })).filter(group => group.components.length > 0);
+  const sourceGroups: ComponentGroup[] =
+    contracts && contracts.length > 0
+      ? Object.entries(
+          contracts.reduce<Record<string, ComponentContract[]>>((acc, contract) => {
+            const category = contract.category ?? 'other';
+            if (!acc[category]) {
+              acc[category] = [];
+            }
+            acc[category].push(contract);
+            return acc;
+          }, {}),
+        ).map(([category, items]) => ({
+          id: category,
+          name: getCategoryName(category),
+          components: items.map((contract) => ({
+            id: contract.componentType,
+            name: contract.componentType,
+            icon: getIconByType(contract.componentType),
+          })),
+        }))
+      : mockComponentGroups;
+
+  const filteredGroups = sourceGroups
+    .map((group) => ({
+      ...group,
+      components: group.components.filter(
+        (c) =>
+          c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.id.toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
+    }))
+    .filter((group) => group.components.length > 0);
 
   return (
     <div className="flex flex-col h-full bg-bg-sidebar text-text-primary">

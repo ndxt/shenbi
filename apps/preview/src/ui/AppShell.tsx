@@ -11,10 +11,14 @@ import '../styles/preview-ide.css';
 import { useResize } from '../hooks/useResize';
 
 import { TitleBar } from './TitleBar';
+import type { SidebarProps } from './Sidebar';
+import type { InspectorProps } from './Inspector';
 
 interface AppShellProps {
   children: React.ReactNode;
   toolbarExtra?: React.ReactNode;
+  sidebarProps?: SidebarProps;
+  inspectorProps?: InspectorProps;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -27,7 +31,7 @@ const THEME_CLASSES = [
   'theme-webstorm-dark',
 ] as const;
 
-export function AppShell({ children, toolbarExtra }: AppShellProps) {
+export function AppShell({ children, toolbarExtra, sidebarProps, inspectorProps }: AppShellProps) {
   const [theme, setTheme] = React.useState<ThemeMode>('dark');
   
   // Panel Visibility State
@@ -109,7 +113,7 @@ export function AppShell({ children, toolbarExtra }: AppShellProps) {
         
         {showSidebar && (
           <div style={{ width: sidebarSize }} className="relative shrink-0 flex flex-col h-full">
-            <Sidebar />
+            <Sidebar {...sidebarProps} />
             <div 
               className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
               onMouseDown={(e) => startSidebarResize(e, 'horizontal', false)}
@@ -166,7 +170,7 @@ export function AppShell({ children, toolbarExtra }: AppShellProps) {
                   className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
                   onMouseDown={(e) => startInspectorResize(e, 'horizontal', true)}
                 />
-                <Inspector />
+                <Inspector {...inspectorProps} />
               </div>
             )}
           </div>
