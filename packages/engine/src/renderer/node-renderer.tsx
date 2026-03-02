@@ -223,6 +223,11 @@ export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRende
       : node.className;
   }
 
+  // 为编辑器画布提供可点击选中能力
+  if (node.id && Comp !== Fragment) {
+    resolvedProps['data-shenbi-node-id'] = node.id;
+  }
+
   // Step 8: show 条件
   if (node.showFn) {
     const showResult = evalExpr(node.showFn, ctx);

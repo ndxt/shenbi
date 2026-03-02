@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { AppShell } from './AppShell';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 
 describe('AppShell', () => {
@@ -29,5 +29,17 @@ describe('AppShell', () => {
     expect(document.documentElement.classList.contains('theme-dark')).toBe(true);
     unmount();
     expect(document.documentElement.classList.contains('theme-dark')).toBe(false);
+  });
+
+  it('点击画布节点会触发 onCanvasSelectNode', () => {
+    const onCanvasSelectNode = vi.fn();
+    render(
+      <AppShell onCanvasSelectNode={onCanvasSelectNode}>
+        <div data-shenbi-node-id="node-1">Canvas Node</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByText('Canvas Node'));
+    expect(onCanvasSelectNode).toHaveBeenCalledWith('node-1');
   });
 });

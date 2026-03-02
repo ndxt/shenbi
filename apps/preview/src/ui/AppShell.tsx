@@ -19,6 +19,7 @@ interface AppShellProps {
   toolbarExtra?: React.ReactNode;
   sidebarProps?: SidebarProps;
   inspectorProps?: InspectorProps;
+  onCanvasSelectNode?: (nodeId: string) => void;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -31,7 +32,13 @@ const THEME_CLASSES = [
   'theme-webstorm-dark',
 ] as const;
 
-export function AppShell({ children, toolbarExtra, sidebarProps, inspectorProps }: AppShellProps) {
+export function AppShell({
+  children,
+  toolbarExtra,
+  sidebarProps,
+  inspectorProps,
+  onCanvasSelectNode,
+}: AppShellProps) {
   const [theme, setTheme] = React.useState<ThemeMode>('dark');
   
   // Panel Visibility State
@@ -78,6 +85,29 @@ export function AppShell({ children, toolbarExtra, sidebarProps, inspectorProps 
 
   const toggleTheme = (newTheme: ThemeMode) => {
     setTheme(newTheme);
+  };
+
+  const handleCanvasClickCapture = (event: React.MouseEvent<HTMLElement>) => {
+    if (!onCanvasSelectNode) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const hit = target.closest('[data-shenbi-node-id]');
+    if (!hit) {
+      return;
+    }
+    const nodeId = hit.getAttribute('data-shenbi-node-id');
+    if (!nodeId) {
+      return;
+    }
+    onCanvasSelectNode(nodeId);
+    if (!showInspector) {
+      setShowInspector(true);
+      setIsMaximized(false);
+    }
   };
 
   React.useEffect(() => {
@@ -131,7 +161,7 @@ export function AppShell({ children, toolbarExtra, sidebarProps, inspectorProps 
               <main className="flex-1 overflow-auto p-12 flex justify-center items-start scrollbar-hide relative canvas-grid">
                 {/* The Stage / Viewport */}
                 <div className="relative z-10 stage-viewport min-h-[600px] w-full max-w-[1200px] rounded-sm overflow-hidden border border-border-ide">
-                  <div className="bg-white min-h-full">
+                  <div className="bg-white min-h-full" onClickCapture={handleCanvasClickCapture}>
                     {children}
                   </div>
                   

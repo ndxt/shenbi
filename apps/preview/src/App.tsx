@@ -157,6 +157,7 @@ export function App() {
         ...(selectedNode ? { selectedNode } : {}),
         ...(selectedContract ? { contract: selectedContract } : {}),
       }}
+      onCanvasSelectNode={setSelectedNodeId}
       toolbarExtra={(
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-text-secondary">场景</span>

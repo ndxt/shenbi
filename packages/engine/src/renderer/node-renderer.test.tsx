@@ -13,6 +13,7 @@ describe('NodeRenderer', () => {
 
   it('静态渲染: Button 文本 props + children 正确渲染', () => {
     const node: CompiledNode = {
+      id: 'btn_1',
       Component: 'button',
       componentType: 'Button',
       staticProps: { type: 'button' },
@@ -21,7 +22,9 @@ describe('NodeRenderer', () => {
       allDeps: [],
     };
     renderWithContext(node);
-    expect(screen.getByText('Submit')).toBeTruthy();
+    const button = screen.getByText('Submit');
+    expect(button).toBeTruthy();
+    expect(button.getAttribute('data-shenbi-node-id')).toBe('btn_1');
   });
 
   it('动态 props: 表达式 prop 正确求值', () => {
