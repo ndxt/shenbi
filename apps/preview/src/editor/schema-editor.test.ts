@@ -3,6 +3,7 @@ import type { PageSchema } from '@shenbi/schema';
 import {
   getSchemaNodeByTreeId,
   getTreeIdBySchemaNodeId,
+  patchSchemaNodeColumns,
   patchSchemaNodeEvents,
   patchSchemaNodeLogic,
   patchSchemaNodeStyle,
@@ -84,5 +85,29 @@ describe('schema-editor/patchSchemaNodeEvents', () => {
     expect(node?.if).toBe('{{false}}');
     expect(node?.show).toBe('{{state.visible}}');
     expect(node?.loop).toEqual({ data: '{{state.list}}', itemKey: 'item', indexKey: 'index' });
+  });
+
+  it('能回写 columns，且支持清空 columns', () => {
+    const schema: PageSchema = {
+      id: 'table-page',
+      name: 'table-page',
+      body: {
+        id: 'table-node',
+        component: 'Table',
+        columns: [{ title: '姓名', dataIndex: 'name' }],
+      },
+    };
+
+    const updated = patchSchemaNodeColumns(schema, 'body', [
+      { title: '姓名', dataIndex: 'name', width: 180 },
+      { title: '邮箱', dataIndex: 'email' },
+    ]);
+    expect(getSchemaNodeByTreeId(updated, 'body')?.columns).toEqual([
+      { title: '姓名', dataIndex: 'name', width: 180 },
+      { title: '邮箱', dataIndex: 'email' },
+    ]);
+
+    const cleared = patchSchemaNodeColumns(updated, 'body', null);
+    expect(getSchemaNodeByTreeId(cleared, 'body')?.columns).toBeUndefined();
   });
 });

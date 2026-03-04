@@ -9,6 +9,7 @@ export interface InspectorProps {
   selectedNode?: SchemaNode;
   contract?: ComponentContract;
   onPatchProps?: (patch: Record<string, unknown>) => void;
+  onPatchColumns?: (columns: unknown[]) => void;
   onPatchStyle?: (patch: Record<string, unknown>) => void;
   onPatchEvents?: (patch: Record<string, unknown>) => void;
   onPatchLogic?: (patch: Record<string, unknown>) => void;
@@ -18,6 +19,7 @@ export function Inspector({
   selectedNode,
   contract,
   onPatchProps,
+  onPatchColumns,
   onPatchStyle,
   onPatchEvents,
   onPatchLogic,
@@ -44,6 +46,7 @@ export function Inspector({
               {...(selectedNode ? { selectedNode } : {})}
               {...(contract ? { contract } : {})}
               {...(onPatchProps ? { onPatchProps } : {})}
+              {...(onPatchColumns ? { onPatchColumns } : {})}
               {...(onPatchStyle ? { onPatchStyle } : {})}
               {...(onPatchEvents ? { onPatchEvents } : {})}
               {...(onPatchLogic ? { onPatchLogic } : {})}

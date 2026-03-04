@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ActionChain, ComponentContract, ContractProp, SchemaNode } from '@shenbi/schema';
+import type { ActionChain, ColumnSchema, ComponentContract, ContractProp, SchemaNode } from '@shenbi/schema';
 import { Code, GripVertical, Link2, Plus } from 'lucide-react';
 
 export interface SetterPanelProps {
   selectedNode?: SchemaNode;
   contract?: ComponentContract;
   onPatchProps?: (patch: Record<string, unknown>) => void;
+  onPatchColumns?: (columns: unknown[]) => void;
   onPatchStyle?: (patch: Record<string, unknown>) => void;
   onPatchEvents?: (patch: Record<string, unknown>) => void;
   onPatchLogic?: (patch: Record<string, unknown>) => void;
@@ -16,6 +17,7 @@ export function SetterPanel({
   selectedNode,
   contract,
   onPatchProps,
+  onPatchColumns,
   onPatchStyle,
   onPatchEvents,
   onPatchLogic,
@@ -27,6 +29,7 @@ export function SetterPanel({
         {...(selectedNode ? { selectedNode } : {})}
         {...(contract ? { contract } : {})}
         {...(onPatchProps ? { onPatchProps } : {})}
+        {...(onPatchColumns ? { onPatchColumns } : {})}
       />
     );
   }
@@ -165,6 +168,13 @@ function resolvePropControlType(contractProp: ContractProp, currentValue: unknow
   return 'input';
 }
 
+function getNodePropCurrentValue(node: SchemaNode, propName: string, fallback: unknown): unknown {
+  if (node.component === 'Table' && propName === 'columns') {
+    return node.columns ?? node.props?.columns ?? fallback;
+  }
+  return node.props?.[propName] ?? fallback;
+}
+
 function isStructuredContractType(contractProp: ContractProp): boolean {
   return (
     contractProp.type === 'object'
@@ -192,9 +202,10 @@ interface PropsSetterProps {
   selectedNode?: SchemaNode;
   contract?: ComponentContract;
   onPatchProps?: (patch: Record<string, unknown>) => void;
+  onPatchColumns?: (columns: unknown[]) => void;
 }
 
-function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps) {
+function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: PropsSetterProps) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [showPropsJson, setShowPropsJson] = useState(false);
@@ -209,9 +220,15 @@ function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps)
   }, [selectedNode?.id, contract?.componentType]);
 
   useEffect(() => {
-    setPropsJsonDraft(formatJsonValue(selectedNode?.props ?? {}));
+    const propsForJson: Record<string, unknown> = {
+      ...(selectedNode?.props ?? {}),
+    };
+    if (selectedNode?.component === 'Table' && Array.isArray(selectedNode.columns)) {
+      propsForJson.columns = selectedNode.columns;
+    }
+    setPropsJsonDraft(formatJsonValue(propsForJson));
     setPropsJsonError(undefined);
-  }, [selectedNode?.id, selectedNode?.props, contract?.componentType]);
+  }, [selectedNode?.id, selectedNode?.props, selectedNode?.columns, contract?.componentType]);
 
   const sortedPropEntries = useMemo(
     () =>
@@ -239,6 +256,33 @@ function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps)
     }
     return { basic, structured };
   }, [sortedPropEntries]);
+
+  const commitPropChange = (propName: string, propMeta: ContractProp, next: unknown) => {
+    if (!selectedNode) {
+      return;
+    }
+    try {
+      const parsed = parseValueByContractType(next, propMeta);
+      if (selectedNode.component === 'Table' && propName === 'columns') {
+        if (!Array.isArray(parsed)) {
+          throw new Error('columns 必须是数组 JSON');
+        }
+        if (onPatchColumns) {
+          onPatchColumns(parsed as unknown[]);
+        } else {
+          onPatchProps?.({ columns: parsed });
+        }
+      } else {
+        onPatchProps?.({
+          [propName]: parsed,
+        });
+      }
+      setErrors((prev) => ({ ...prev, [propName]: undefined }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '属性解析失败';
+      setErrors((prev) => ({ ...prev, [propName]: message }));
+    }
+  };
 
   if (!selectedNode) {
     return (
@@ -280,17 +324,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps)
                 onChangeDraft={(propName, next) => {
                   setDrafts((prev) => ({ ...prev, [propName]: next }));
                 }}
-                onCommit={(propName, propMeta, next) => {
-                  try {
-                    onPatchProps?.({
-                      [propName]: parseValueByContractType(next, propMeta),
-                    });
-                    setErrors((prev) => ({ ...prev, [propName]: undefined }));
-                  } catch (err) {
-                    const message = err instanceof Error ? err.message : '属性解析失败';
-                    setErrors((prev) => ({ ...prev, [propName]: message }));
-                  }
-                }}
+                onCommit={commitPropChange}
               />
             ) : null}
 
@@ -304,17 +338,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps)
                 onChangeDraft={(propName, next) => {
                   setDrafts((prev) => ({ ...prev, [propName]: next }));
                 }}
-                onCommit={(propName, propMeta, next) => {
-                  try {
-                    onPatchProps?.({
-                      [propName]: parseValueByContractType(next, propMeta),
-                    });
-                    setErrors((prev) => ({ ...prev, [propName]: undefined }));
-                  } catch (err) {
-                    const message = err instanceof Error ? err.message : '属性解析失败';
-                    setErrors((prev) => ({ ...prev, [propName]: message }));
-                  }
-                }}
+                onCommit={commitPropChange}
               />
             ) : null}
           </div>
@@ -339,7 +363,19 @@ function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps)
               onBlur={(event) => {
                 try {
                   const patch = parsePropsPatch(event.target.value);
-                  onPatchProps?.(patch);
+                  if (selectedNode.component === 'Table' && Object.prototype.hasOwnProperty.call(patch, 'columns')) {
+                    const columnsValue = patch.columns;
+                    if (!Array.isArray(columnsValue)) {
+                      throw new Error('props.columns 必须是数组 JSON');
+                    }
+                    if (onPatchColumns) {
+                      onPatchColumns(columnsValue as unknown[]);
+                      delete patch.columns;
+                    }
+                  }
+                  if (Object.keys(patch).length > 0) {
+                    onPatchProps?.(patch);
+                  }
                   setPropsJsonError(undefined);
                 } catch (err) {
                   const message = err instanceof Error ? err.message : 'props JSON 解析失败';
@@ -383,7 +419,22 @@ function PropsGroup({
       <div className="text-[11px] font-semibold text-text-secondary">{title}</div>
       <div className="flex flex-col gap-2">
         {entries.map(([propName, propMeta]) => {
-          const currentValue = selectedNode.props?.[propName] ?? propMeta.default;
+          const currentValue = getNodePropCurrentValue(selectedNode, propName, propMeta.default);
+          const isTableColumnsField = selectedNode.component === 'Table' && propName === 'columns';
+          if (isTableColumnsField) {
+            const nextColumns = Array.isArray(currentValue) ? currentValue : [];
+            const error = errors[propName];
+            return (
+              <div key={propName} className="flex flex-col gap-1">
+                <TableColumnsField
+                  label={propName}
+                  columns={nextColumns as ColumnSchema[]}
+                  onChange={(columns) => onCommit(propName, propMeta, columns)}
+                />
+                {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
+              </div>
+            );
+          }
           const controlType = resolvePropControlType(propMeta, currentValue);
           const rawValue = drafts[propName] ?? formatValue(currentValue, propMeta.default);
           const enumOptions = Array.isArray(propMeta.enum)
@@ -409,6 +460,183 @@ function PropsGroup({
                 onCommit={(next) => onCommit(propName, propMeta, next)}
               />
               {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function updateColumnAt(
+  columns: ColumnSchema[],
+  index: number,
+  updater: (column: ColumnSchema) => ColumnSchema,
+): ColumnSchema[] {
+  return columns.map((column, i) => (i === index ? updater(column) : column));
+}
+
+function parseWidthValue(raw: string): number | string | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const numeric = Number(trimmed);
+  if (!Number.isNaN(numeric) && trimmed === String(numeric)) {
+    return numeric;
+  }
+  return trimmed;
+}
+
+function toEditableColumn(column: ColumnSchema): ColumnSchema {
+  return isRecord(column) ? { ...column } : {};
+}
+
+function TableColumnsField({
+  label,
+  columns,
+  onChange,
+}: {
+  label: string;
+  columns: ColumnSchema[];
+  onChange: (columns: ColumnSchema[]) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded border border-border-ide p-2 bg-bg-canvas">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase text-text-secondary">{label}</span>
+        <button
+          type="button"
+          className="text-[11px] text-blue-400 hover:text-blue-300"
+          onClick={() => {
+            const nextIndex = columns.length + 1;
+            onChange([
+              ...columns,
+              { title: `列${nextIndex}`, dataIndex: `field${nextIndex}` },
+            ]);
+          }}
+        >
+          新增列
+        </button>
+      </div>
+
+      {columns.length === 0 ? (
+        <div className="text-[11px] text-text-secondary">暂无列，点击“新增列”创建。</div>
+      ) : null}
+
+      <div className="flex flex-col gap-2">
+        {columns.map((column, index) => {
+          const editable = toEditableColumn(column);
+          const title = typeof editable.title === 'string' ? editable.title : '';
+          const dataIndex = typeof editable.dataIndex === 'string' ? editable.dataIndex : '';
+          const key = typeof editable.key === 'string' ? editable.key : '';
+          const width = editable.width == null ? '' : String(editable.width);
+          const align = editable.align === 'left' || editable.align === 'center' || editable.align === 'right'
+            ? editable.align
+            : '';
+
+          return (
+            <div key={`col-${index}`} className="rounded border border-border-ide p-2 bg-bg-sidebar">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] text-text-secondary">列 {index + 1}</span>
+                <button
+                  type="button"
+                  className="text-[11px] text-red-400 hover:text-red-300"
+                  onClick={() => {
+                    onChange(columns.filter((_, i) => i !== index));
+                  }}
+                >
+                  删除
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  aria-label={`列${index + 1} 标题`}
+                  className="bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px]"
+                  placeholder="标题"
+                  value={title}
+                  onChange={(event) => {
+                    onChange(updateColumnAt(columns, index, (prev) => ({
+                      ...toEditableColumn(prev),
+                      title: event.target.value,
+                    })));
+                  }}
+                />
+                <input
+                  aria-label={`列${index + 1} 字段`}
+                  className="bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px]"
+                  placeholder="dataIndex"
+                  value={dataIndex}
+                  onChange={(event) => {
+                    onChange(updateColumnAt(columns, index, (prev) => ({
+                      ...toEditableColumn(prev),
+                      dataIndex: event.target.value,
+                    })));
+                  }}
+                />
+                <input
+                  aria-label={`列${index + 1} key`}
+                  className="bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px]"
+                  placeholder="key"
+                  value={key}
+                  onChange={(event) => {
+                    onChange(updateColumnAt(columns, index, (prev) => {
+                      const next = { ...toEditableColumn(prev) };
+                      const nextKey = event.target.value.trim();
+                      if (!nextKey) {
+                        delete next.key;
+                      } else {
+                        next.key = nextKey;
+                      }
+                      return next;
+                    }));
+                  }}
+                />
+                <input
+                  aria-label={`列${index + 1} 宽度`}
+                  className="bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px]"
+                  placeholder="width"
+                  value={width}
+                  onChange={(event) => {
+                    const parsedWidth = parseWidthValue(event.target.value);
+                    onChange(updateColumnAt(columns, index, (prev) => {
+                      const next = { ...toEditableColumn(prev) };
+                      if (parsedWidth === undefined) {
+                        delete next.width;
+                      } else {
+                        next.width = parsedWidth;
+                      }
+                      return next;
+                    }));
+                  }}
+                />
+                <select
+                  aria-label={`列${index + 1} 对齐`}
+                  className="bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] col-span-2"
+                  value={align}
+                  onChange={(event) => {
+                    const nextAlign = event.target.value;
+                    onChange(updateColumnAt(columns, index, (prev) => {
+                      const next = { ...toEditableColumn(prev) };
+                      if (!nextAlign) {
+                        delete next.align;
+                      } else {
+                        next.align = nextAlign as 'left' | 'center' | 'right';
+                      }
+                      return next;
+                    }));
+                  }}
+                >
+                  <option value="">默认对齐</option>
+                  <option value="left">left</option>
+                  <option value="center">center</option>
+                  <option value="right">right</option>
+                </select>
+              </div>
             </div>
           );
         })}

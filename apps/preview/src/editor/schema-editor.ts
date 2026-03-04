@@ -276,6 +276,34 @@ export function patchSchemaNodeLogic(
   return nextSchema;
 }
 
+export function patchSchemaNodeColumns(
+  schema: PageSchema,
+  treeId: string | undefined,
+  columns: unknown,
+): PageSchema {
+  if (!treeId) {
+    return schema;
+  }
+
+  const nextSchema = deepCloneSchema(schema);
+  const node = getSchemaNodeByTreeId(nextSchema, treeId);
+  if (!node) {
+    return schema;
+  }
+
+  if (columns == null) {
+    delete node.columns;
+    return nextSchema;
+  }
+
+  if (!Array.isArray(columns)) {
+    return schema;
+  }
+
+  node.columns = columns as NonNullable<SchemaNode['columns']>;
+  return nextSchema;
+}
+
 export function getDefaultSelectedNodeId(treeNodes: EditorTreeNode[]): string | undefined {
   return treeNodes[0]?.id;
 }

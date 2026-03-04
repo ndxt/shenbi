@@ -29,6 +29,7 @@ import {
   getDefaultSelectedNodeId,
   getSchemaNodeByTreeId,
   getTreeIdBySchemaNodeId,
+  patchSchemaNodeColumns,
   patchSchemaNodeEvents,
   patchSchemaNodeLogic,
   patchSchemaNodeProps,
@@ -155,6 +156,13 @@ export function App() {
     }));
   };
 
+  const handlePatchColumns = (columns: unknown[]) => {
+    setScenarioSchemas((prev) => ({
+      ...prev,
+      [activeScenario]: patchSchemaNodeColumns(prev[activeScenario], selectedNodeId, columns),
+    }));
+  };
+
   const handlePatchStyle = (patch: Record<string, unknown>) => {
     setScenarioSchemas((prev) => ({
       ...prev,
@@ -186,6 +194,7 @@ export function App() {
       }}
       inspectorProps={{
         onPatchProps: handlePatchProps,
+        onPatchColumns: handlePatchColumns,
         onPatchStyle: handlePatchStyle,
         onPatchEvents: handlePatchEvents,
         onPatchLogic: handlePatchLogic,

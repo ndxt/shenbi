@@ -179,4 +179,67 @@ describe('SetterPanel/Props contract-driven controls', () => {
     expect(onPatchProps).not.toHaveBeenCalled();
     expect(screen.getByText('props 必须是对象 JSON')).toBeInTheDocument();
   });
+
+  it('Table.columns 可视化编辑会回写 onPatchColumns', () => {
+    const onPatchColumns = vi.fn();
+    const selectedNode: SchemaNode = {
+      id: 'table-3',
+      component: 'Table',
+      columns: [
+        { title: '姓名', dataIndex: 'name' },
+      ],
+    };
+
+    render(
+      <SetterPanel
+        selectedNode={selectedNode}
+        contract={tableContract}
+        onPatchColumns={onPatchColumns}
+        activeTab="props"
+      />,
+    );
+
+    const titleInput = screen.getByLabelText('列1 标题');
+    fireEvent.change(titleInput, { target: { value: '用户名' } });
+
+    expect(onPatchColumns).toHaveBeenCalled();
+    const lastCall = onPatchColumns.mock.calls.at(-1)?.[0] as Array<Record<string, unknown>>;
+    expect(lastCall[0]?.title).toBe('用户名');
+  });
+
+  it('Table props JSON 中的 columns 会拆分为 onPatchColumns 回写', () => {
+    const onPatchProps = vi.fn();
+    const onPatchColumns = vi.fn();
+    const selectedNode: SchemaNode = {
+      id: 'table-4',
+      component: 'Table',
+      props: { bordered: true },
+      columns: [{ title: '姓名', dataIndex: 'name' }],
+    };
+
+    render(
+      <SetterPanel
+        selectedNode={selectedNode}
+        contract={tableContract}
+        onPatchProps={onPatchProps}
+        onPatchColumns={onPatchColumns}
+        activeTab="props"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '打开 JSON 视图' }));
+    const editor = screen.getByLabelText('props json');
+    fireEvent.change(editor, {
+      target: {
+        value: JSON.stringify({
+          bordered: false,
+          columns: [{ title: '邮箱', dataIndex: 'email' }],
+        }),
+      },
+    });
+    fireEvent.blur(editor);
+
+    expect(onPatchColumns).toHaveBeenCalledWith([{ title: '邮箱', dataIndex: 'email' }]);
+    expect(onPatchProps).toHaveBeenCalledWith({ bordered: false });
+  });
 });
