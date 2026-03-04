@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronRight, ChevronDown, Layout, Type, Box, Image as ImageIcon, EyeOff } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
+import type { ComponentContract } from '@shenbi/schema';
 
 export interface SchemaNode {
   id: string;
@@ -58,9 +60,10 @@ export interface SchemaTreeProps {
   nodes?: SchemaNode[];
   selectedNodeId?: string;
   onSelect?: (nodeId: string) => void;
+  contracts?: ComponentContract[];
 }
 
-export function SchemaTree({ nodes = mockSchemaTree, selectedNodeId, onSelect }: SchemaTreeProps) {
+export function SchemaTree({ nodes = mockSchemaTree, selectedNodeId, onSelect, contracts = [] }: SchemaTreeProps) {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const internalSelectedId = selectedNodeId ?? nodes[0]?.id;
 
@@ -89,15 +92,27 @@ export function SchemaTree({ nodes = mockSchemaTree, selectedNodeId, onSelect }:
     setExpandedKeys(newKeys);
   };
 
-  const getIconForType = (type: string) => {
-    switch (type) {
-      case 'Page':
-      case 'Container': return <Layout size={14} />;
-      case 'Text': return <Type size={14} />;
-      case 'Image': return <ImageIcon size={14} />;
-      case 'Grid': return <Box size={14} />;
-      default: return <Box size={14} />;
+  const getIconFromContract = (componentType: string) => {
+    // 快速特判：如果是 Page 或 Container，使用通用图标
+    if (componentType === 'Page' || componentType === 'Container') {
+      return <Layout size={14} strokeWidth={1.5} />;
     }
+
+    // 查找组件契约
+    const contract = contracts.find((c: ComponentContract) => c.componentType === componentType);
+    if (!contract || !contract.icon) {
+      // 兜底图标
+      if (componentType === 'Text') return <Type size={14} strokeWidth={1.5} />;
+      if (componentType === 'Image') return <ImageIcon size={14} strokeWidth={1.5} />;
+      if (componentType === 'Grid') return <Box size={14} strokeWidth={1.5} />;
+      return <Box size={14} strokeWidth={1.5} />;
+    }
+
+    const IconComponent = (LucideIcons as any)[contract.icon];
+    if (!IconComponent) {
+      return <Box size={14} strokeWidth={1.5} />;
+    }
+    return <IconComponent size={14} strokeWidth={1.5} />;
   };
 
   const renderNode = (node: SchemaNode, depth: number = 0) => {
@@ -108,26 +123,25 @@ export function SchemaTree({ nodes = mockSchemaTree, selectedNodeId, onSelect }:
     return (
       <div key={node.id}>
         <div 
-          className={`flex items-center h-[26px] cursor-pointer text-[13px] group relative
-            ${isSelected ? 'bg-blue-500/20 text-blue-500' : 'text-text-primary hover:bg-bg-activity-bar'}
+          className={`flex items-center h-[28px] cursor-pointer text-[12px] group relative transition-colors rounded-sm mx-1
+            ${isSelected ? 'bg-blue-500/10 text-blue-500' : 'text-text-primary/90 hover:bg-text-primary/5'}
             ${node.isHidden ? 'opacity-50' : ''}
           `}
-          style={{ paddingLeft: `${depth * 14 + 10}px` }}
+          style={{ paddingLeft: `${depth * 14 + 6}px` }}
           onClick={() => onSelect?.(node.id)}
         >
-          {/* Collapse/Expand Icon */}
           <div 
-            className="w-4 h-4 flex items-center justify-center -ml-1 mr-1 text-text-secondary"
+            className="w-4 h-4 flex items-center justify-center -ml-1 mr-1 text-text-secondary/70 hover:text-text-primary transition-colors"
             onClick={(e) => hasChildren ? toggleExpand(node.id, e) : undefined}
           >
             {hasChildren && (
-              isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+              isExpanded ? <ChevronDown size={14} strokeWidth={1.5} /> : <ChevronRight size={14} strokeWidth={1.5} />
             )}
           </div>
           
           {/* Type Icon */}
           <div className={`mr-2 flex items-center justify-center ${isSelected ? 'text-blue-500' : 'text-text-secondary'}`}>
-            {getIconForType(node.type)}
+            {getIconFromContract(node.type)}
           </div>
           
           {/* Label */}
@@ -137,8 +151,8 @@ export function SchemaTree({ nodes = mockSchemaTree, selectedNodeId, onSelect }:
           
           {/* Right Actions (Hidden state, etc.) */}
           {node.isHidden && (
-            <div className="mr-2 text-text-secondary" title="已隐藏">
-              <EyeOff size={12} />
+            <div className="mr-2 text-text-secondary/60" title="已隐藏">
+              <EyeOff size={12} strokeWidth={1.5} />
             </div>
           )}
         </div>

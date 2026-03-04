@@ -53,6 +53,7 @@ export function Sidebar({
             {...(treeNodes ? { nodes: treeNodes } : {})}
             {...(selectedNodeId ? { selectedNodeId } : {})}
             {...(onSelectNode ? { onSelect: onSelectNode } : {})}
+            {...(contracts ? { contracts } : {})}
           />
         </div>
         <div style={{ display: activeTab === 'data' ? 'block' : 'none', height: '100%' }}>
