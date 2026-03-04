@@ -144,6 +144,7 @@ function parseValueByContractType(raw: unknown, contractProp: ContractProp): unk
 
 type PropControlType = 'input' | 'select' | 'number' | 'checkbox' | 'textarea';
 type PropEntry = [string, ContractProp];
+type RuleObject = Record<string, unknown>;
 
 function resolvePropControlType(contractProp: ContractProp, currentValue: unknown): PropControlType {
   if (
@@ -175,6 +176,29 @@ function getNodePropCurrentValue(node: SchemaNode, propName: string, fallback: u
   return node.props?.[propName] ?? fallback;
 }
 
+function formatFormItemName(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).join('.');
+  }
+  return formatValue(value, '');
+}
+
+function parseFormItemName(raw: string, previousValue: unknown): string | string[] {
+  if (isExpressionLiteral(raw)) {
+    return raw;
+  }
+  if (Array.isArray(previousValue)) {
+    return raw
+      .split('.')
+      .map((token) => token.trim())
+      .filter((token) => token.length > 0);
+  }
+  return raw;
+}
+
 function isStructuredContractType(contractProp: ContractProp): boolean {
   return (
     contractProp.type === 'object'
@@ -196,6 +220,43 @@ function parsePropsPatch(raw: string): Record<string, unknown> {
     throw new Error('props 必须是对象 JSON');
   }
   return parsed as Record<string, unknown>;
+}
+
+function normalizeRules(value: unknown): RuleObject[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is RuleObject => isRecord(item)).map((item) => ({ ...item }));
+}
+
+function hasRequiredRule(rulesValue: unknown): boolean {
+  return normalizeRules(rulesValue).some((rule) => rule.required === true);
+}
+
+function updateRulesRequired(rulesValue: unknown, required: boolean): RuleObject[] {
+  const rules = normalizeRules(rulesValue);
+  if (required) {
+    if (rules.some((rule) => rule.required === true)) {
+      return rules;
+    }
+    return [{ required: true, message: '该字段为必填项' }, ...rules];
+  }
+
+  const nextRules: RuleObject[] = [];
+  for (const rule of rules) {
+    if (rule.required === true) {
+      const nextRule = { ...rule };
+      delete nextRule.required;
+      const keys = Object.keys(nextRule);
+      if (keys.length === 0 || (keys.length === 1 && keys[0] === 'message')) {
+        continue;
+      }
+      nextRules.push(nextRule);
+      continue;
+    }
+    nextRules.push(rule);
+  }
+  return nextRules;
 }
 
 interface PropsSetterProps {
@@ -247,7 +308,17 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
     const basic: PropEntry[] = [];
     const structured: PropEntry[] = [];
     for (const entry of sortedPropEntries) {
-      const [, propMeta] = entry;
+      const [propName, propMeta] = entry;
+      if (selectedNode?.component === 'Form.Item' && propName === 'required') {
+        continue;
+      }
+      if (
+        selectedNode?.component === 'Form.Item'
+        && (propName === 'label' || propName === 'name' || propName === 'rules')
+      ) {
+        basic.push(entry);
+        continue;
+      }
       if (isStructuredContractType(propMeta)) {
         structured.push(entry);
       } else {
@@ -255,7 +326,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
       }
     }
     return { basic, structured };
-  }, [sortedPropEntries]);
+  }, [selectedNode?.component, sortedPropEntries]);
 
   const commitPropChange = (propName: string, propMeta: ContractProp, next: unknown) => {
     if (!selectedNode) {
@@ -420,6 +491,54 @@ function PropsGroup({
       <div className="flex flex-col gap-2">
         {entries.map(([propName, propMeta]) => {
           const currentValue = getNodePropCurrentValue(selectedNode, propName, propMeta.default);
+          const isFormItemRulesField = (
+            selectedNode.component === 'Form.Item'
+            && propName === 'rules'
+            && !(typeof currentValue === 'string' && isExpressionLiteral(currentValue))
+          );
+          if (isFormItemRulesField) {
+            const error = errors[propName];
+            return (
+              <div key={propName} className="flex flex-col gap-1">
+                <FormItemRulesField
+                  rulesValue={currentValue}
+                  onChange={(nextRules) => onCommit(propName, propMeta, nextRules)}
+                />
+                {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
+              </div>
+            );
+          }
+
+          const isFormItemNameField = selectedNode.component === 'Form.Item' && propName === 'name';
+          if (isFormItemNameField) {
+            const rawName = drafts[propName] ?? formatFormItemName(currentValue);
+            const error = errors[propName];
+            return (
+              <div key={propName} className="flex flex-col gap-1">
+                <PropertyField
+                  label={propName}
+                  value={rawName}
+                  isExpression={Boolean(propMeta.allowExpression)}
+                  controlType="input"
+                  {...(propMeta.description ? { description: propMeta.description } : {})}
+                  {...(propMeta.required ? { required: true } : {})}
+                  onChange={(next) => {
+                    if (typeof next === 'string') {
+                      onChangeDraft(propName, next);
+                    }
+                  }}
+                  onCommit={(next) => {
+                    const nextName = typeof next === 'string'
+                      ? parseFormItemName(next, currentValue)
+                      : next;
+                    onCommit(propName, propMeta, nextName);
+                  }}
+                />
+                {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
+              </div>
+            );
+          }
+
           const isTableColumnsField = selectedNode.component === 'Table' && propName === 'columns';
           if (isTableColumnsField) {
             const nextColumns = Array.isArray(currentValue) ? currentValue : [];
@@ -464,6 +583,34 @@ function PropsGroup({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function FormItemRulesField({
+  rulesValue,
+  onChange,
+}: {
+  rulesValue: unknown;
+  onChange: (nextRules: RuleObject[]) => void;
+}) {
+  const required = hasRequiredRule(rulesValue);
+  return (
+    <div className="flex flex-col gap-2 rounded border border-border-ide p-2 bg-bg-canvas">
+      <div className="text-[10px] uppercase text-text-secondary">rules.required</div>
+      <label className="flex items-center gap-2 text-[12px] text-text-primary">
+        <input
+          aria-label="rules.required"
+          type="checkbox"
+          checked={required}
+          onChange={(event) => {
+            const nextRules = updateRulesRequired(rulesValue, event.target.checked);
+            onChange(nextRules);
+          }}
+          className="size-4 accent-blue-500"
+        />
+        必填校验
+      </label>
     </div>
   );
 }

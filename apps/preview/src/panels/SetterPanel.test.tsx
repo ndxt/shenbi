@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { SchemaNode } from '@shenbi/schema';
-import { buttonContract, tableContract } from '@shenbi/schema';
+import { buttonContract, formItemContract, tableContract } from '@shenbi/schema';
 import { SetterPanel } from './SetterPanel';
 
 describe('SetterPanel/Props contract-driven controls', () => {
@@ -241,5 +241,72 @@ describe('SetterPanel/Props contract-driven controls', () => {
 
     expect(onPatchColumns).toHaveBeenCalledWith([{ title: '邮箱', dataIndex: 'email' }]);
     expect(onPatchProps).toHaveBeenCalledWith({ bordered: false });
+  });
+
+  it('Form.Item 的 rules.required 可开启必填规则', () => {
+    const onPatchProps = vi.fn();
+    const selectedNode: SchemaNode = {
+      id: 'form-item-1',
+      component: 'Form.Item',
+      props: {
+        label: '姓名',
+        name: 'name',
+        rules: [{ min: 2, message: '至少 2 个字符' }],
+      },
+    };
+
+    render(
+      <SetterPanel
+        selectedNode={selectedNode}
+        contract={formItemContract}
+        onPatchProps={onPatchProps}
+        activeTab="props"
+      />,
+    );
+
+    const requiredCheckbox = screen.getByLabelText('rules.required') as HTMLInputElement;
+    expect(requiredCheckbox.checked).toBe(false);
+
+    fireEvent.click(requiredCheckbox);
+
+    expect(onPatchProps).toHaveBeenCalled();
+    const lastPatch = onPatchProps.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    const rules = lastPatch.rules as Array<Record<string, unknown>>;
+    expect(Array.isArray(rules)).toBe(true);
+    expect(rules[0]?.required).toBe(true);
+  });
+
+  it('Form.Item 的 rules.required 关闭时会移除必填规则', () => {
+    const onPatchProps = vi.fn();
+    const selectedNode: SchemaNode = {
+      id: 'form-item-2',
+      component: 'Form.Item',
+      props: {
+        label: '邮箱',
+        name: 'email',
+        rules: [
+          { required: true, message: '请输入邮箱' },
+          { pattern: '^[^@]+@[^@]+$', message: '格式错误' },
+        ],
+      },
+    };
+
+    render(
+      <SetterPanel
+        selectedNode={selectedNode}
+        contract={formItemContract}
+        onPatchProps={onPatchProps}
+        activeTab="props"
+      />,
+    );
+
+    const requiredCheckbox = screen.getByLabelText('rules.required') as HTMLInputElement;
+    expect(requiredCheckbox.checked).toBe(true);
+
+    fireEvent.click(requiredCheckbox);
+
+    expect(onPatchProps).toHaveBeenCalled();
+    const lastPatch = onPatchProps.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(lastPatch.rules).toEqual([{ pattern: '^[^@]+@[^@]+$', message: '格式错误' }]);
   });
 });
