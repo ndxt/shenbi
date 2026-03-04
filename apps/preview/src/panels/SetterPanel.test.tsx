@@ -309,4 +309,37 @@ describe('SetterPanel/Props contract-driven controls', () => {
     const lastPatch = onPatchProps.mock.calls.at(-1)?.[0] as Record<string, unknown>;
     expect(lastPatch.rules).toEqual([{ pattern: '^[^@]+@[^@]+$', message: '格式错误' }]);
   });
+
+  it('Form.Item 可编辑 rules.required.message 并回写', () => {
+    const onPatchProps = vi.fn();
+    const selectedNode: SchemaNode = {
+      id: 'form-item-3',
+      component: 'Form.Item',
+      props: {
+        label: '手机号',
+        name: 'phone',
+        rules: [{ required: true, message: '请输入手机号' }],
+      },
+    };
+
+    render(
+      <SetterPanel
+        selectedNode={selectedNode}
+        contract={formItemContract}
+        onPatchProps={onPatchProps}
+        activeTab="props"
+      />,
+    );
+
+    const messageInput = screen.getByLabelText('rules.required.message') as HTMLInputElement;
+    expect(messageInput.disabled).toBe(false);
+    expect(messageInput.value).toBe('请输入手机号');
+
+    fireEvent.change(messageInput, { target: { value: '手机号不能为空' } });
+    fireEvent.blur(messageInput);
+
+    expect(onPatchProps).toHaveBeenCalled();
+    const lastPatch = onPatchProps.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(lastPatch.rules).toEqual([{ required: true, message: '手机号不能为空' }]);
+  });
 });

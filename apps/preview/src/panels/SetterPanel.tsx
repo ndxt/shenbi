@@ -233,13 +233,19 @@ function hasRequiredRule(rulesValue: unknown): boolean {
   return normalizeRules(rulesValue).some((rule) => rule.required === true);
 }
 
-function updateRulesRequired(rulesValue: unknown, required: boolean): RuleObject[] {
+function getRequiredRuleMessage(rulesValue: unknown): string {
+  const requiredRule = normalizeRules(rulesValue).find((rule) => rule.required === true);
+  return typeof requiredRule?.message === 'string' ? requiredRule.message : '';
+}
+
+function updateRulesRequired(rulesValue: unknown, required: boolean, requiredMessage?: string): RuleObject[] {
   const rules = normalizeRules(rulesValue);
   if (required) {
     if (rules.some((rule) => rule.required === true)) {
       return rules;
     }
-    return [{ required: true, message: '该字段为必填项' }, ...rules];
+    const message = requiredMessage?.trim() || '该字段为必填项';
+    return [{ required: true, message }, ...rules];
   }
 
   const nextRules: RuleObject[] = [];
@@ -257,6 +263,22 @@ function updateRulesRequired(rulesValue: unknown, required: boolean): RuleObject
     nextRules.push(rule);
   }
   return nextRules;
+}
+
+function updateRulesRequiredMessage(rulesValue: unknown, message: string): RuleObject[] {
+  const rules = normalizeRules(rulesValue);
+  const trimmed = message.trim();
+  return rules.map((rule) => {
+    if (rule.required !== true) {
+      return rule;
+    }
+    if (!trimmed) {
+      const next = { ...rule };
+      delete next.message;
+      return next;
+    }
+    return { ...rule, message: trimmed };
+  });
 }
 
 interface PropsSetterProps {
@@ -595,6 +617,12 @@ function FormItemRulesField({
   onChange: (nextRules: RuleObject[]) => void;
 }) {
   const required = hasRequiredRule(rulesValue);
+  const [messageDraft, setMessageDraft] = useState('');
+
+  useEffect(() => {
+    setMessageDraft(getRequiredRuleMessage(rulesValue));
+  }, [rulesValue]);
+
   return (
     <div className="flex flex-col gap-2 rounded border border-border-ide p-2 bg-bg-canvas">
       <div className="text-[10px] uppercase text-text-secondary">rules.required</div>
@@ -604,13 +632,28 @@ function FormItemRulesField({
           type="checkbox"
           checked={required}
           onChange={(event) => {
-            const nextRules = updateRulesRequired(rulesValue, event.target.checked);
+            const nextRules = updateRulesRequired(rulesValue, event.target.checked, messageDraft);
             onChange(nextRules);
           }}
           className="size-4 accent-blue-500"
         />
         必填校验
       </label>
+      <input
+        aria-label="rules.required.message"
+        className="bg-bg-sidebar border border-border-ide rounded px-2 py-1 text-[11px] text-text-primary disabled:opacity-50"
+        placeholder="请输入必填提示文案"
+        value={messageDraft}
+        disabled={!required}
+        onChange={(event) => setMessageDraft(event.target.value)}
+        onBlur={(event) => {
+          if (!required) {
+            return;
+          }
+          const nextRules = updateRulesRequiredMessage(rulesValue, event.target.value);
+          onChange(nextRules);
+        }}
+      />
     </div>
   );
 }
