@@ -78,29 +78,90 @@ function isExpressionLiteral(raw: string): boolean {
   return trimmed.startsWith('{{') && trimmed.endsWith('}}');
 }
 
-function parseValueByContractType(raw: string, contractProp: ContractProp): unknown {
-  if (contractProp.allowExpression && isExpressionLiteral(raw)) {
+function parseValueByContractType(raw: unknown, contractProp: ContractProp): unknown {
+  if (typeof raw === 'string' && contractProp.allowExpression && isExpressionLiteral(raw)) {
     return raw;
   }
   if (contractProp.type === 'boolean') {
-    return raw.trim().toLowerCase() === 'true';
+    if (typeof raw === 'boolean') {
+      return raw;
+    }
+    if (typeof raw === 'string') {
+      return raw.trim().toLowerCase() === 'true';
+    }
+    return Boolean(raw);
   }
   if (contractProp.type === 'number') {
-    const parsed = Number(raw);
-    return Number.isNaN(parsed) ? raw : parsed;
+    if (typeof raw === 'number') {
+      return raw;
+    }
+    if (typeof raw === 'string') {
+      const parsed = Number(raw);
+      return Number.isNaN(parsed) ? raw : parsed;
+    }
+    return raw;
   }
-  if (contractProp.type === 'object' || contractProp.type === 'array' || contractProp.type === 'any') {
+  if (contractProp.type === 'object' || contractProp.type === 'array') {
+    if (typeof raw !== 'string') {
+      return raw;
+    }
     const trimmed = raw.trim();
     if (!trimmed) {
       return trimmed;
     }
+    let parsed: unknown;
     try {
-      return JSON.parse(trimmed);
+      parsed = JSON.parse(trimmed) as unknown;
     } catch {
-      return raw;
+      throw new Error(contractProp.type === 'array' ? '属性值必须是数组 JSON' : '属性值必须是对象 JSON');
+    }
+    if (contractProp.type === 'array' && !Array.isArray(parsed)) {
+      throw new Error('属性值必须是数组 JSON');
+    }
+    if (contractProp.type === 'object' && (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))) {
+      throw new Error('属性值必须是对象 JSON');
+    }
+    return parsed;
+  }
+  if (contractProp.type === 'any' && typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return raw;
+      }
     }
   }
   return raw;
+}
+
+type PropControlType = 'input' | 'select' | 'number' | 'checkbox' | 'textarea';
+
+function resolvePropControlType(contractProp: ContractProp, currentValue: unknown): PropControlType {
+  if (
+    contractProp.allowExpression
+    && typeof currentValue === 'string'
+    && isExpressionLiteral(currentValue)
+  ) {
+    return 'input';
+  }
+  if (contractProp.type === 'enum' && Array.isArray(contractProp.enum) && contractProp.enum.length > 0) {
+    return 'select';
+  }
+  if (contractProp.type === 'boolean') {
+    return 'checkbox';
+  }
+  if (contractProp.type === 'number') {
+    return 'number';
+  }
+  if (contractProp.type === 'object' || contractProp.type === 'array') {
+    return 'textarea';
+  }
+  return 'input';
 }
 
 interface PropsSetterProps {
@@ -111,10 +172,12 @@ interface PropsSetterProps {
 
 function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const propsRecord = contract?.props ?? {};
 
   useEffect(() => {
     setDrafts({});
+    setErrors({});
   }, [selectedNode?.id, contract?.componentType]);
 
   const sortedPropEntries = useMemo(
@@ -161,30 +224,43 @@ function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps)
         ) : (
           <div className="flex flex-col gap-2">
             {sortedPropEntries.map(([propName, propMeta]) => {
-              const rawValue = drafts[propName] ?? formatValue(selectedNode.props?.[propName], propMeta.default);
+              const currentValue = selectedNode.props?.[propName] ?? propMeta.default;
+              const controlType = resolvePropControlType(propMeta, currentValue);
+              const rawValue = drafts[propName] ?? formatValue(currentValue, propMeta.default);
               const enumOptions = Array.isArray(propMeta.enum)
                 ? propMeta.enum.map((item) => String(item))
                 : [];
+              const error = errors[propName];
 
               return (
-                <PropertyField
-                  key={propName}
-                  label={propName}
-                  value={rawValue}
-                  isExpression={Boolean(propMeta.allowExpression)}
-                  type={enumOptions.length > 0 ? 'select' : 'input'}
-                  options={enumOptions}
-                  {...(propMeta.description ? { description: propMeta.description } : {})}
-                  {...(propMeta.required ? { required: true } : {})}
-                  onChange={(next) => {
-                    setDrafts((prev) => ({ ...prev, [propName]: next }));
-                  }}
-                  onCommit={(next) => {
-                    onPatchProps?.({
-                      [propName]: parseValueByContractType(next, propMeta),
-                    });
-                  }}
-                />
+                <div key={propName} className="flex flex-col gap-1">
+                  <PropertyField
+                    label={propName}
+                    value={controlType === 'checkbox' ? Boolean(currentValue) : rawValue}
+                    isExpression={Boolean(propMeta.allowExpression)}
+                    controlType={controlType}
+                    options={enumOptions}
+                    {...(propMeta.description ? { description: propMeta.description } : {})}
+                    {...(propMeta.required ? { required: true } : {})}
+                    onChange={(next) => {
+                      if (typeof next === 'string') {
+                        setDrafts((prev) => ({ ...prev, [propName]: next }));
+                      }
+                    }}
+                    onCommit={(next) => {
+                      try {
+                        onPatchProps?.({
+                          [propName]: parseValueByContractType(next, propMeta),
+                        });
+                        setErrors((prev) => ({ ...prev, [propName]: undefined }));
+                      } catch (err) {
+                        const message = err instanceof Error ? err.message : '属性解析失败';
+                        setErrors((prev) => ({ ...prev, [propName]: message }));
+                      }
+                    }}
+                  />
+                  {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
+                </div>
               );
             })}
           </div>
@@ -488,21 +564,21 @@ function SetterGroup({ title, children }: { title: string; children: React.React
 
 interface PropertyFieldProps {
   label: string;
-  value: string;
-  type?: 'input' | 'select';
+  value: string | boolean;
+  controlType?: PropControlType;
   options?: string[];
   isColor?: boolean;
   isExpression?: boolean;
   required?: boolean;
   description?: string;
-  onChange?: (next: string) => void;
-  onCommit?: (next: string) => void;
+  onChange?: (next: unknown) => void;
+  onCommit?: (next: unknown) => void;
 }
 
 function PropertyField({
   label,
   value,
-  type = 'input',
+  controlType = 'input',
   options = [],
   isColor = false,
   isExpression = false,
@@ -512,6 +588,10 @@ function PropertyField({
   onCommit,
 }: PropertyFieldProps) {
   const inputId = `setter-${label}`;
+  const displayValue = typeof value === 'boolean' ? String(value) : value;
+  const selectOptions = options.includes(displayValue) || !displayValue
+    ? options
+    : [displayValue, ...options];
   return (
     <div className="flex flex-col">
       <label
@@ -533,15 +613,29 @@ function PropertyField({
         {isColor ? (
           <div
             className="w-4 h-4 rounded-sm border border-border-ide shrink-0"
-            style={{ backgroundColor: value }}
+            style={{ backgroundColor: displayValue }}
           />
         ) : null}
 
-        {type === 'input' ? (
+        {controlType === 'checkbox' ? (
           <input
             id={inputId}
             aria-label={label}
-            value={value}
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={(event) => {
+              onChange?.(event.target.checked);
+              onCommit?.(event.target.checked);
+            }}
+            className="size-4 accent-blue-500"
+          />
+        ) : null}
+
+        {controlType === 'input' ? (
+          <input
+            id={inputId}
+            aria-label={label}
+            value={displayValue}
             onChange={(event) => onChange?.(event.target.value)}
             onBlur={(event) => onCommit?.(event.target.value)}
             onKeyDown={(event) => {
@@ -553,24 +647,53 @@ function PropertyField({
               isExpression ? 'font-mono text-yellow-400 border-yellow-500/50 bg-yellow-500/5' : ''
             }`}
           />
-        ) : (
+        ) : null}
+
+        {controlType === 'number' ? (
+          <input
+            id={inputId}
+            aria-label={label}
+            type="number"
+            value={displayValue}
+            onChange={(event) => onChange?.(event.target.value)}
+            onBlur={(event) => onCommit?.(event.target.value)}
+            className={`flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-blue-500 w-full min-w-0 ${
+              isExpression ? 'font-mono text-yellow-400 border-yellow-500/50 bg-yellow-500/5' : ''
+            }`}
+          />
+        ) : null}
+
+        {controlType === 'select' ? (
           <select
             id={inputId}
             aria-label={label}
-            value={value}
+            value={displayValue}
             onChange={(event) => {
               onChange?.(event.target.value);
               onCommit?.(event.target.value);
             }}
             className="flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-blue-500 appearance-none w-full min-w-0"
           >
-            {options.map((opt) => (
+            {selectOptions.map((opt) => (
               <option key={opt} value={opt}>
                 {opt}
               </option>
             ))}
           </select>
-        )}
+        ) : null}
+
+        {controlType === 'textarea' ? (
+          <textarea
+            id={inputId}
+            aria-label={label}
+            value={displayValue}
+            onChange={(event) => onChange?.(event.target.value)}
+            onBlur={(event) => onCommit?.(event.target.value)}
+            className={`flex-1 min-h-[88px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500 w-full min-w-0 ${
+              isExpression ? 'text-yellow-400 border-yellow-500/50 bg-yellow-500/5' : ''
+            }`}
+          />
+        ) : null}
       </div>
       {description ? <span className="text-[10px] text-text-secondary mt-1">{description}</span> : null}
     </div>
