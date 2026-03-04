@@ -11,6 +11,7 @@ import type { ComponentContract } from '@shenbi/schema';
 
 // 组件元数据：说明文字
 const COMPONENT_METADATA: Record<string, string> = {
+  // Layout & General
   'Layout': '页面整体布局容器，支持顶部、底部、侧边栏等区域。',
   'Layout.Header': '页面顶部导航栏，常用于 Logo、菜单、用户信息。',
   'Layout.Content': '页面主要内容区域，自动填充剩余空间。',
@@ -39,6 +40,22 @@ const COMPONENT_METADATA: Record<string, string> = {
   'Col': '栅格列，必须嵌套在 Row 内使用，比例分配容器宽度。',
   'Flex': '弹性布局，用于控制子元素的对齐方式、间距、换行。',
   'Divider': '分割线，用于分隔段落或内容。',
+  
+  // Navigation
+  'Anchor': '锚点组件，用于跳转到页面指定位置。',
+  'Breadcrumb': '面包屑组件，显示当前页面在系统层级结构中的位置。',
+  'Dropdown': '下拉菜单，向下弹出的列表。',
+  'Menu': '导航菜单，为页面和功能提供导航的菜单列表。',
+  'Pagination': '分页器，采用分页的形式分隔长列表。',
+  'Steps': '步骤条，引导用户按照流程完成任务的导航条。',
+  
+  // Data Entry
+  'Button': '按钮组件，用于触发业务逻辑或响应用户点击。',
+  'Input': '输入框组件。',
+  'Select': '选择器组件。',
+  'Table': '表格组件，展示行列数据。',
+  'Form': '表单容器。',
+  'Form.Item': '表单项，包含标签和输入控件。'
 };
 
 interface ComponentItem {
