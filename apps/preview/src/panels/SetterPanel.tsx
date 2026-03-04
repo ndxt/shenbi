@@ -81,6 +81,17 @@ function isExpressionLiteral(raw: string): boolean {
   return trimmed.startsWith('{{') && trimmed.endsWith('}}');
 }
 
+function isSameValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) {
+    return true;
+  }
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
+}
+
 function parseValueByContractType(raw: unknown, contractProp: ContractProp): unknown {
   if (typeof raw === 'string' && contractProp.allowExpression && isExpressionLiteral(raw)) {
     return raw;
@@ -513,6 +524,7 @@ function PropsGroup({
       <div className="flex flex-col gap-2">
         {entries.map(([propName, propMeta]) => {
           const currentValue = getNodePropCurrentValue(selectedNode, propName, propMeta.default);
+          const canReset = propMeta.default !== undefined && !isSameValue(currentValue, propMeta.default);
           const isFormItemRulesField = (
             selectedNode.component === 'Form.Item'
             && propName === 'rules'
@@ -542,6 +554,8 @@ function PropsGroup({
                   value={rawName}
                   isExpression={Boolean(propMeta.allowExpression)}
                   controlType="input"
+                  canReset={canReset}
+                  onReset={() => onCommit(propName, propMeta, propMeta.default)}
                   {...(propMeta.description ? { description: propMeta.description } : {})}
                   {...(propMeta.required ? { required: true } : {})}
                   onChange={(next) => {
@@ -590,6 +604,8 @@ function PropsGroup({
                 value={controlType === 'checkbox' ? Boolean(currentValue) : rawValue}
                 isExpression={Boolean(propMeta.allowExpression)}
                 controlType={controlType}
+                canReset={canReset}
+                onReset={() => onCommit(propName, propMeta, propMeta.default)}
                 options={enumOptions}
                 {...(propMeta.description ? { description: propMeta.description } : {})}
                 {...(propMeta.required ? { required: true } : {})}
@@ -1129,6 +1145,8 @@ interface PropertyFieldProps {
   isExpression?: boolean;
   required?: boolean;
   description?: string;
+  canReset?: boolean;
+  onReset?: () => void;
   onChange?: (next: unknown) => void;
   onCommit?: (next: unknown) => void;
 }
@@ -1142,6 +1160,8 @@ function PropertyField({
   isExpression = false,
   required = false,
   description,
+  canReset = false,
+  onReset,
   onChange,
   onCommit,
 }: PropertyFieldProps) {
@@ -1165,6 +1185,16 @@ function PropertyField({
             <Link2 size={10} />
             <span className="text-[9px]">表达式</span>
           </span>
+        ) : null}
+        {canReset ? (
+          <button
+            type="button"
+            aria-label={`${label}-reset`}
+            onClick={onReset}
+            className="ml-2 rounded border border-border-ide px-1.5 py-0.5 text-[9px] text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar"
+          >
+            重置
+          </button>
         ) : null}
       </label>
       <div className="flex items-center gap-2 group relative">

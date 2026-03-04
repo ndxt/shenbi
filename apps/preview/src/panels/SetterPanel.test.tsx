@@ -55,6 +55,28 @@ describe('SetterPanel/Props contract-driven controls', () => {
     expect(onPatchProps).toHaveBeenCalledWith({ type: 'link' });
   });
 
+  it('属性值偏离默认值时可一键重置为默认值', () => {
+    const onPatchProps = vi.fn();
+    const selectedNode: SchemaNode = {
+      id: 'btn-2-reset',
+      component: 'Button',
+      props: { type: 'link' },
+      children: '提交',
+    };
+
+    render(
+      <SetterPanel
+        selectedNode={selectedNode}
+        contract={buttonContract}
+        onPatchProps={onPatchProps}
+        activeTab="props"
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('type-reset'));
+    expect(onPatchProps).toHaveBeenCalledWith({ type: 'default' });
+  });
+
   it('object 属性使用 JSON textarea，非法 JSON 不回写', () => {
     const onPatchProps = vi.fn();
     const selectedNode: SchemaNode = {
