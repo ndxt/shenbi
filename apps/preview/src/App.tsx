@@ -30,7 +30,9 @@ import {
   getSchemaNodeByTreeId,
   getTreeIdBySchemaNodeId,
   patchSchemaNodeEvents,
+  patchSchemaNodeLogic,
   patchSchemaNodeProps,
+  patchSchemaNodeStyle,
 } from './editor/schema-editor';
 
 const resolver = antdResolver(antd);
@@ -153,6 +155,20 @@ export function App() {
     }));
   };
 
+  const handlePatchStyle = (patch: Record<string, unknown>) => {
+    setScenarioSchemas((prev) => ({
+      ...prev,
+      [activeScenario]: patchSchemaNodeStyle(prev[activeScenario], selectedNodeId, patch),
+    }));
+  };
+
+  const handlePatchLogic = (patch: Record<string, unknown>) => {
+    setScenarioSchemas((prev) => ({
+      ...prev,
+      [activeScenario]: patchSchemaNodeLogic(prev[activeScenario], selectedNodeId, patch),
+    }));
+  };
+
   const handleCanvasSelectNode = (schemaNodeId: string) => {
     const treeId = getTreeIdBySchemaNodeId(activeSchema, schemaNodeId);
     if (treeId) {
@@ -170,7 +186,9 @@ export function App() {
       }}
       inspectorProps={{
         onPatchProps: handlePatchProps,
+        onPatchStyle: handlePatchStyle,
         onPatchEvents: handlePatchEvents,
+        onPatchLogic: handlePatchLogic,
         ...(selectedNode ? { selectedNode } : {}),
         ...(selectedContract ? { contract: selectedContract } : {}),
       }}

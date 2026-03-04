@@ -218,6 +218,64 @@ export function patchSchemaNodeEvents(
   return nextSchema;
 }
 
+export function patchSchemaNodeStyle(
+  schema: PageSchema,
+  treeId: string | undefined,
+  patch: Record<string, unknown>,
+): PageSchema {
+  if (!treeId || Object.keys(patch).length === 0) {
+    return schema;
+  }
+
+  const nextSchema = deepCloneSchema(schema);
+  const node = getSchemaNodeByTreeId(nextSchema, treeId);
+  if (!node) {
+    return schema;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'style')) {
+    const nextStyle = patch.style;
+    if (nextStyle == null) {
+      delete node.style;
+    } else {
+      node.style = nextStyle as SchemaNode['style'];
+    }
+  }
+
+  return nextSchema;
+}
+
+export function patchSchemaNodeLogic(
+  schema: PageSchema,
+  treeId: string | undefined,
+  patch: Record<string, unknown>,
+): PageSchema {
+  if (!treeId || Object.keys(patch).length === 0) {
+    return schema;
+  }
+
+  const nextSchema = deepCloneSchema(schema);
+  const node = getSchemaNodeByTreeId(nextSchema, treeId);
+  if (!node) {
+    return schema;
+  }
+
+  const keys: Array<'if' | 'show' | 'loop'> = ['if', 'show', 'loop'];
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(patch, key)) {
+      continue;
+    }
+    const value = patch[key];
+    if (value == null) {
+      delete node[key];
+      continue;
+    }
+    (node as Record<string, unknown>)[key] = value;
+  }
+
+  return nextSchema;
+}
+
 export function getDefaultSelectedNodeId(treeNodes: EditorTreeNode[]): string | undefined {
   return treeNodes[0]?.id;
 }

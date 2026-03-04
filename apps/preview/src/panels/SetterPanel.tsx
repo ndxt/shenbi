@@ -8,6 +8,7 @@ export interface SetterPanelProps {
   onPatchProps?: (patch: Record<string, unknown>) => void;
   onPatchStyle?: (patch: Record<string, unknown>) => void;
   onPatchEvents?: (patch: Record<string, unknown>) => void;
+  onPatchLogic?: (patch: Record<string, unknown>) => void;
   activeTab?: 'props' | 'style' | 'events' | 'logic';
 }
 
@@ -15,7 +16,9 @@ export function SetterPanel({
   selectedNode,
   contract,
   onPatchProps,
+  onPatchStyle,
   onPatchEvents,
+  onPatchLogic,
   activeTab = 'props',
 }: SetterPanelProps) {
   if (activeTab === 'props') {
@@ -28,7 +31,12 @@ export function SetterPanel({
     );
   }
   if (activeTab === 'style') {
-    return <StyleSetter />;
+    return (
+      <StyleSetter
+        {...(selectedNode ? { selectedNode } : {})}
+        {...(onPatchStyle ? { onPatchStyle } : {})}
+      />
+    );
   }
   if (activeTab === 'events') {
     return (
@@ -39,7 +47,12 @@ export function SetterPanel({
     );
   }
   if (activeTab === 'logic') {
-    return <LogicSetter />;
+    return (
+      <LogicSetter
+        {...(selectedNode ? { selectedNode } : {})}
+        {...(onPatchLogic ? { onPatchLogic } : {})}
+      />
+    );
   }
 
   return null;
@@ -188,21 +201,80 @@ function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps)
   );
 }
 
-function StyleSetter() {
+interface StyleSetterProps {
+  selectedNode?: SchemaNode;
+  onPatchStyle?: (patch: Record<string, unknown>) => void;
+}
+
+function formatJsonValue(value: unknown): string {
+  if (value == null) {
+    return '{}';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return '{}';
+  }
+}
+
+function parseStyleValue(raw: string): unknown {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (isExpressionLiteral(trimmed)) {
+    return trimmed;
+  }
+  const parsed = JSON.parse(trimmed) as unknown;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('style 必须是对象 JSON 或表达式字符串');
+  }
+  return parsed;
+}
+
+function StyleSetter({ selectedNode, onPatchStyle }: StyleSetterProps) {
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    setDraft(formatJsonValue(selectedNode?.style));
+    setError(undefined);
+  }, [selectedNode?.id, selectedNode?.style]);
+
+  if (!selectedNode) {
+    return (
+      <div className="p-4 text-[12px] text-text-secondary">
+        请先在组件树或画布中选择一个节点。
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 p-3 text-text-primary">
-      <SetterGroup title="布局 (Layout)">
-        <PropertyField label="宽度 (Width)" value="100%" />
-        <PropertyField label="高度 (Height)" value="auto" />
-        <PropertyField label="内边距 (Padding)" value="16px 24px" />
-        <PropertyField label="外边距 (Margin)" value="0px" />
-      </SetterGroup>
-
-      <SetterGroup title="外观 (Appearance)">
-        <PropertyField label="背景色" value="#1677ff" isColor />
-        <PropertyField label="文字颜色" value="#ffffff" isColor />
-        <PropertyField label="边框" value="1px solid #1677ff" />
-        <PropertyField label="圆角 (Radius)" value="6px" />
+      <SetterGroup title="Style JSON">
+        <textarea
+          aria-label="style json"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={(event) => {
+            try {
+              const nextStyle = parseStyleValue(event.target.value);
+              onPatchStyle?.({ style: nextStyle });
+              setError(undefined);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : 'style JSON 解析失败';
+              setError(message);
+            }
+          }}
+          className="w-full min-h-[140px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500"
+        />
+        {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
+        <div className="text-[11px] text-text-secondary">
+          支持对象 JSON（如 <code>{'{ "display": "none" }'}</code>）或表达式字符串（如 <code>{'{{state.dynamicStyle}}'}</code>）。
+        </div>
       </SetterGroup>
     </div>
   );
@@ -319,17 +391,87 @@ function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
   );
 }
 
-function LogicSetter() {
+interface LogicSetterProps {
+  selectedNode?: SchemaNode;
+  onPatchLogic?: (patch: Record<string, unknown>) => void;
+}
+
+function parseLogicPatch(raw: string): Record<string, unknown> {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return {};
+  }
+  const parsed = JSON.parse(trimmed) as unknown;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('logic 必须是对象 JSON');
+  }
+  const source = parsed as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const key of ['if', 'show', 'loop']) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      result[key] = source[key];
+    }
+  }
+  return result;
+}
+
+function formatLogicValue(node: SchemaNode | undefined): string {
+  if (!node) {
+    return '{}';
+  }
+  const payload: Record<string, unknown> = {};
+  if (node.if !== undefined) {
+    payload.if = node.if;
+  }
+  if (node.show !== undefined) {
+    payload.show = node.show;
+  }
+  if (node.loop !== undefined) {
+    payload.loop = node.loop;
+  }
+  return JSON.stringify(payload, null, 2);
+}
+
+function LogicSetter({ selectedNode, onPatchLogic }: LogicSetterProps) {
+  const [draft, setDraft] = useState('{}');
+  const [error, setError] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    setDraft(formatLogicValue(selectedNode));
+    setError(undefined);
+  }, [selectedNode?.id, selectedNode?.if, selectedNode?.show, selectedNode?.loop]);
+
+  if (!selectedNode) {
+    return (
+      <div className="p-4 text-[12px] text-text-secondary">
+        请先在组件树或画布中选择一个节点。
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 p-3 text-text-primary">
-      <SetterGroup title="条件渲染 (Condition)">
-        <PropertyField label="是否渲染 (x-if)" value="!!state.visible" isExpression />
-      </SetterGroup>
-
-      <SetterGroup title="列表循环 (Loop)">
-        <PropertyField label="循环数据 (x-for)" value="state.list" isExpression />
-        <PropertyField label="项别名 (item)" value="item" />
-        <PropertyField label="索引别名 (index)" value="index" />
+      <SetterGroup title="Logic JSON">
+        <textarea
+          aria-label="logic json"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={(event) => {
+            try {
+              const patch = parseLogicPatch(event.target.value);
+              onPatchLogic?.(patch);
+              setError(undefined);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : 'logic JSON 解析失败';
+              setError(message);
+            }
+          }}
+          className="w-full min-h-[140px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500"
+        />
+        {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
+        <div className="text-[11px] text-text-secondary">
+          可编辑字段：`if` / `show` / `loop`。删除逻辑可把字段设置为 `null`。
+        </div>
       </SetterGroup>
     </div>
   );

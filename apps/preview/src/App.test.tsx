@@ -658,4 +658,48 @@ describe('preview/App integration', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('当前页: 5');
     });
   });
+
+  it('编辑器：Style 支持 JSON 回写', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await selectNodeInOutline(user, 'search-submit-btn (Button)');
+    await user.click(screen.getByText('Style'));
+
+    const styleEditor = await screen.findByLabelText('style json');
+    fireEvent.change(styleEditor, {
+      target: {
+        value: JSON.stringify({ display: 'none' }, null, 2),
+      },
+    });
+    fireEvent.blur(styleEditor);
+
+    await waitFor(() => {
+      const submitButton = document.querySelector('[data-shenbi-node-id="search-submit-btn"]') as HTMLButtonElement | null;
+      if (!submitButton) {
+        throw new Error('search-submit-btn not found');
+      }
+      expect(submitButton.style.display).toBe('none');
+    });
+  });
+
+  it('编辑器：Logic 支持 JSON 回写', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await selectNodeInOutline(user, 'search-submit-btn (Button)');
+    await user.click(screen.getByText('Logic'));
+
+    const logicEditor = await screen.findByLabelText('logic json');
+    fireEvent.change(logicEditor, {
+      target: {
+        value: JSON.stringify({ if: '{{false}}' }, null, 2),
+      },
+    });
+    fireEvent.blur(logicEditor);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: '查询' })).toBeNull();
+    });
+  });
 });

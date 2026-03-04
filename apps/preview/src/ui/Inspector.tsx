@@ -11,6 +11,7 @@ export interface InspectorProps {
   onPatchProps?: (patch: Record<string, unknown>) => void;
   onPatchStyle?: (patch: Record<string, unknown>) => void;
   onPatchEvents?: (patch: Record<string, unknown>) => void;
+  onPatchLogic?: (patch: Record<string, unknown>) => void;
 }
 
 export function Inspector({
@@ -19,6 +20,7 @@ export function Inspector({
   onPatchProps,
   onPatchStyle,
   onPatchEvents,
+  onPatchLogic,
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>('props');
 
@@ -44,6 +46,7 @@ export function Inspector({
               {...(onPatchProps ? { onPatchProps } : {})}
               {...(onPatchStyle ? { onPatchStyle } : {})}
               {...(onPatchEvents ? { onPatchEvents } : {})}
+              {...(onPatchLogic ? { onPatchLogic } : {})}
             />
           </div>
         )}

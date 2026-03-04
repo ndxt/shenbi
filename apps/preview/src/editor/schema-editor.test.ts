@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { PageSchema } from '@shenbi/schema';
-import { getSchemaNodeByTreeId, getTreeIdBySchemaNodeId, patchSchemaNodeEvents } from './schema-editor';
+import {
+  getSchemaNodeByTreeId,
+  getTreeIdBySchemaNodeId,
+  patchSchemaNodeEvents,
+  patchSchemaNodeLogic,
+  patchSchemaNodeStyle,
+} from './schema-editor';
 
 function createSchema(): PageSchema {
   return {
@@ -54,5 +60,29 @@ describe('schema-editor/patchSchemaNodeEvents', () => {
     const schema = createSchema();
     expect(getTreeIdBySchemaNodeId(schema, 'submit-btn')).toBe('body.children.0');
     expect(getTreeIdBySchemaNodeId(schema, 'missing-id')).toBeUndefined();
+  });
+
+  it('能回写 style，且支持清空 style', () => {
+    const schema = createSchema();
+    const withStyle = patchSchemaNodeStyle(schema, 'body.children.0', {
+      style: { display: 'none' },
+    });
+    expect(getSchemaNodeByTreeId(withStyle, 'body.children.0')?.style).toEqual({ display: 'none' });
+
+    const cleared = patchSchemaNodeStyle(withStyle, 'body.children.0', { style: null });
+    expect(getSchemaNodeByTreeId(cleared, 'body.children.0')?.style).toBeUndefined();
+  });
+
+  it('能回写 logic 字段 if/show/loop', () => {
+    const schema = createSchema();
+    const next = patchSchemaNodeLogic(schema, 'body.children.0', {
+      if: '{{false}}',
+      show: '{{state.visible}}',
+      loop: { data: '{{state.list}}', itemKey: 'item', indexKey: 'index' },
+    });
+    const node = getSchemaNodeByTreeId(next, 'body.children.0');
+    expect(node?.if).toBe('{{false}}');
+    expect(node?.show).toBe('{{state.visible}}');
+    expect(node?.loop).toEqual({ data: '{{state.list}}', itemKey: 'item', indexKey: 'index' });
   });
 });
