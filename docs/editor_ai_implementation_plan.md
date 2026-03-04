@@ -328,6 +328,8 @@ export class EventBus<T extends Record<string, unknown>> {
 export interface EditorStateSnapshot {
   schema: PageSchema;
   selectedNodeId?: string;
+  canUndo: boolean;   // 由 History 同步写入
+  canRedo: boolean;   // 由 History 同步写入
 }
 
 export class EditorState {
@@ -341,6 +343,9 @@ export class EditorState {
   getSelectedNodeId(): string | undefined;
   setSelectedNodeId(id: string | undefined): void;
 
+  // History 状态（由 CommandManager 在 execute/undo/redo 后同步）
+  setHistoryFlags(canUndo: boolean, canRedo: boolean): void;
+
   // 快照
   getSnapshot(): EditorStateSnapshot;
   restoreSnapshot(snapshot: EditorStateSnapshot): void;
@@ -350,14 +355,17 @@ export class EditorState {
 }
 ```
 
-每次 `setSchema` / `setSelectedNodeId` 时自动通知所有 subscriber。
+每次 `setSchema` / `setSelectedNodeId` / `setHistoryFlags` 时自动通知所有 subscriber。
+
+> **设计说明**：`canUndo` / `canRedo` 作为 `EditorStateSnapshot` 的派生字段，而非让 UI 层直接持有 `History` 实例。这样 UI 组件（如撤销/重做按钮）只需订阅 snapshot 即可感知 undo/redo 可用状态，保持"单一数据源 -> 订阅快照"的简洁模式。`CommandManager` 在每次 `execute()`/`undo()`/`redo()` 后调用 `state.setHistoryFlags()` 同步状态。
 
 **测试用例**：
-- 初始状态正确
+- 初始状态正确（canUndo=false, canRedo=false）
 - setSchema 触发 subscriber
 - setSelectedNodeId 触发 subscriber
+- setHistoryFlags 触发 subscriber
 - unsubscribe 后不再通知
-- getSnapshot / restoreSnapshot 往返正确
+- getSnapshot / restoreSnapshot 往返正确（含 canUndo/canRedo）
 
 ---
 
@@ -452,7 +460,7 @@ export class CommandManager {
 
 `schema.replace` 命令约束：
 - 入参必须通过最小结构校验（`id`/`name`/`body`）。
-- 校验失败或执行异常时返回失败结果，不写入 history。
+- 校验失败或执行异常时抛出错误，不写入 history。
 - 成功执行后才写入 history 并发出 `command:executed` 事件。
 
 **测试用例**：
@@ -781,7 +789,8 @@ export interface ExecuteResult {
 
 `replaceSchema` 执行规则：
 - 内部统一映射到 `commands.execute('schema.replace', { schema })`。
-- 若 schema 校验失败，返回失败结果并保留当前状态（不改 schema，不写 history）。
+- `commands.execute()` 抛出的错误由 bridge adapter 捕获并转换为 `ExecuteResult.error`。
+- 校验与错误处理规则见上文 3.3 `src/command.ts` 小节中的 `schema.replace` 约束。
 
 ### 4.2 适配策略
 
@@ -852,22 +861,52 @@ export default {
 #### [NEW] `src/context/EditorProvider.tsx`
 
 ```tsx
-import { createContext, useContext } from 'react';
-import type { CommandManager, EditorEventMap, EditorState, EventBus } from '@shenbi/editor-core';
+import { createContext, useContext, useMemo } from 'react';
+import type {
+  CommandManager, EditorEventMap, EditorState, EditorStateSnapshot,
+  EventBus, History,
+} from '@shenbi/editor-core';
+import type { PageSchema } from '@shenbi/schema';
 
+/**
+ * Phase 2 Context —— API 形状对齐 PluginContext，降低 Phase 3 迁移成本。
+ *
+ * UI 组件优先使用 executeCommand() / subscribe() / 只读属性，
+ * Phase 3 切换 provider 实现时零改动。
+ * commands / eventBus / history 仅作为 Phase 2 临时逃生口，Phase 3 移除。
+ */
 export interface EditorCoreContextValue {
-  state: EditorState;
+  // ── 对齐 PluginContext 的稳定 API ──
+  readonly schema: PageSchema;
+  readonly selectedNodeId: string | undefined;
+  executeCommand(commandId: string, args?: unknown): void;
+  subscribe(listener: (snapshot: EditorStateSnapshot) => void): () => void;
+
+  // ── Phase 2 临时保留，Phase 3 移除 ──
+  /** @deprecated Phase 3 后由 PluginContext 内部托管，届时删除 */
   commands: CommandManager;
+  /** @deprecated Phase 3 后由 PluginContext.onEvent() 替代 */
   eventBus: EventBus<EditorEventMap>;
+  /** @deprecated Phase 3 后由快照的 canUndo/canRedo 替代直接访问 */
+  history: History<EditorStateSnapshot>;
 }
 
 const EditorContext = createContext<EditorCoreContextValue | null>(null);
 
 export function EditorProvider({ editor, children }) {
+  const value: EditorCoreContextValue = useMemo(() => ({
+    get schema() { return editor.state.getSchema(); },
+    get selectedNodeId() { return editor.state.getSelectedNodeId(); },
+    executeCommand: (id, args) => editor.commands.execute(id, args),
+    subscribe: (listener) => editor.state.subscribe(listener),
+    // Phase 2 临时逃生口
+    commands: editor.commands,
+    eventBus: editor.eventBus,
+    history: editor.history,
+  }), [editor]);
+
   return (
-    <EditorContext.Provider
-      value={{ state: editor.state, commands: editor.commands, eventBus: editor.eventBus }}
-    >
+    <EditorContext.Provider value={value}>
       {children}
     </EditorContext.Provider>
   );
@@ -880,7 +919,7 @@ export function useEditorContext(): EditorCoreContextValue {
 }
 ```
 
-> 迁移策略：Phase 2 先使用 `EditorCoreContextValue`（不依赖 `plugin.ts`）。Phase 3 插件系统稳定后，再将 provider 内部实现切换为 `PluginContext`。
+> **迁移策略**：Phase 2 先使用 `EditorCoreContextValue`（不依赖 `plugin.ts`）。UI 组件优先调用 `executeCommand()` / `subscribe()` / 只读属性；Phase 3 插件系统稳定后，将 provider 内部实现切换为 `PluginContext`，移除标记 `@deprecated` 的字段，UI 代码无需改动。
 
 #### [NEW] `src/hooks/useEditor.ts`
 
@@ -888,8 +927,13 @@ export function useEditorContext(): EditorCoreContextValue {
 /** 获取 EditorState 的响应式 hook，state 变化自动 re-render */
 export function useEditorState() {
   const ctx = useEditorContext();
-  const [snapshot, setSnapshot] = useState(ctx.state.getSnapshot());
-  useEffect(() => ctx.state.subscribe(setSnapshot), [ctx.state]);
+  const [snapshot, setSnapshot] = useState<EditorStateSnapshot>({
+    schema: ctx.schema,
+    selectedNodeId: ctx.selectedNodeId,
+    canUndo: false,
+    canRedo: false,
+  });
+  useEffect(() => ctx.subscribe(setSnapshot), [ctx]);
   return snapshot;
 }
 ```
@@ -965,8 +1009,8 @@ export function useContributions<T>(slot: string): T[] { ... }
 **SetterPanel.tsx**：
 ```diff
 -onPatchProps?.({ title: 'hello' });
-+const { commands } = useEditorContext();
-+commands.execute('node.patchProps', { title: 'hello' });
++const { executeCommand } = useEditorContext();
++executeCommand('node.patchProps', { title: 'hello' });
 ```
 
 ### 6.2 内置插件
