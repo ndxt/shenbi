@@ -75,7 +75,7 @@ graph LR
 | [Sidebar.tsx](file:///c:/Users/zk/Code/lowcode/shenbi-codes/shenbi/apps/preview/src/ui/Sidebar.tsx) L27-41 | 3 个 Tab 固定写死 | `useContributions('sidebar')` |
 | [ActivityBar.tsx](file:///c:/Users/zk/Code/lowcode/shenbi-codes/shenbi/apps/preview/src/ui/ActivityBar.tsx) L25-29 | 6 个图标固定写死 | `useContributions('activityBar')` |
 | [AppShell.tsx](file:///c:/Users/zk/Code/lowcode/shenbi-codes/shenbi/apps/preview/src/ui/AppShell.tsx) L146-209 | Panel 插槽全部硬编码 | LayoutSlot 注册表 |
-| [SetterPanel.tsx](file:///c:/Users/zk/Code/lowcode/shenbi-codes/shenbi/apps/preview/src/panels/SetterPanel.tsx) L5-14 | 5 个 `onPatch*` 回调 | `commands.execute()` |
+| [SetterPanel.tsx](file:///c:/Users/zk/Code/lowcode/shenbi-codes/shenbi/apps/preview/src/panels/SetterPanel.tsx) L5-14 | 5 个 `onPatch*` 回调 | `executeCommand()` |
 
 ---
 
@@ -1083,7 +1083,7 @@ const editor = createEditor({ plugins: [...builtinPlugins, aiPlugin] });
 | 过渡文件 | `apps/preview/src/ui/`、`src/panels/`、`src/hooks/`、`src/styles/` 残留文件 | 已迁移至 `editor-ui` |
 | 适配层 | Phase 0.5 的 `shell mode` 开关逻辑 | 编辑器统一入口后不再需要 |
 | 适配层 | `EditorAIBridge` 的 preview adapter | Phase 3 后由 `PluginContext` 直接提供 |
-| Fallback | `SetterPanel` 中保留的 `onPatch*` 回调 fallback | 已全面切换为 `commands.execute()` |
+| Fallback | `SetterPanel` 中保留的 `onPatch*` 回调 fallback | 已全面切换为 `executeCommand()` |
 | demo 数据 | `src/schemas/` 中的场景 schema（可选保留为测试 fixtures） | 评估是否仍需要 |
 
 ### 7.2 收口步骤
@@ -1134,7 +1134,7 @@ main ──────┬──────────────────
 - Editor 分支：先增后删
 - AI 分支：新代码放 `src/ai/`，不改 `panels/`、`ui/` 已有文件
 - AI 只依赖 `EditorAIBridge`，禁止直接引用 preview 内部面板实现
-- 统一以 `commands.execute()` 作为跨层修改入口，减少并发改动冲突
+- 统一以 `executeCommand()` 作为跨层修改入口，内部 adapter 再映射到 `commands.execute()`，减少并发改动冲突
 
 ---
 
