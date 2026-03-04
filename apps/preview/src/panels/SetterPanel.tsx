@@ -140,6 +140,7 @@ function parseValueByContractType(raw: unknown, contractProp: ContractProp): unk
 }
 
 type PropControlType = 'input' | 'select' | 'number' | 'checkbox' | 'textarea';
+type PropEntry = [string, ContractProp];
 
 function resolvePropControlType(contractProp: ContractProp, currentValue: unknown): PropControlType {
   if (
@@ -164,6 +165,29 @@ function resolvePropControlType(contractProp: ContractProp, currentValue: unknow
   return 'input';
 }
 
+function isStructuredContractType(contractProp: ContractProp): boolean {
+  return (
+    contractProp.type === 'object'
+    || contractProp.type === 'array'
+    || contractProp.type === 'any'
+    || contractProp.type === 'function'
+    || contractProp.type === 'SchemaNode'
+    || contractProp.type === 'Expression'
+  );
+}
+
+function parsePropsPatch(raw: string): Record<string, unknown> {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return {};
+  }
+  const parsed = JSON.parse(trimmed) as unknown;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('props 必须是对象 JSON');
+  }
+  return parsed as Record<string, unknown>;
+}
+
 interface PropsSetterProps {
   selectedNode?: SchemaNode;
   contract?: ComponentContract;
@@ -173,12 +197,21 @@ interface PropsSetterProps {
 function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  const [showPropsJson, setShowPropsJson] = useState(false);
+  const [propsJsonDraft, setPropsJsonDraft] = useState('{}');
+  const [propsJsonError, setPropsJsonError] = useState<string | undefined>(undefined);
   const propsRecord = contract?.props ?? {};
 
   useEffect(() => {
     setDrafts({});
     setErrors({});
+    setShowPropsJson(false);
   }, [selectedNode?.id, contract?.componentType]);
+
+  useEffect(() => {
+    setPropsJsonDraft(formatJsonValue(selectedNode?.props ?? {}));
+    setPropsJsonError(undefined);
+  }, [selectedNode?.id, selectedNode?.props, contract?.componentType]);
 
   const sortedPropEntries = useMemo(
     () =>
@@ -192,6 +225,20 @@ function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps)
       }),
     [propsRecord],
   );
+
+  const groupedPropEntries = useMemo(() => {
+    const basic: PropEntry[] = [];
+    const structured: PropEntry[] = [];
+    for (const entry of sortedPropEntries) {
+      const [, propMeta] = entry;
+      if (isStructuredContractType(propMeta)) {
+        structured.push(entry);
+      } else {
+        basic.push(entry);
+      }
+    }
+    return { basic, structured };
+  }, [sortedPropEntries]);
 
   if (!selectedNode) {
     return (
@@ -222,57 +269,150 @@ function PropsSetter({ selectedNode, contract, onPatchProps }: PropsSetterProps)
         {sortedPropEntries.length === 0 ? (
           <div className="text-[12px] text-text-secondary">该组件未声明 props。</div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {sortedPropEntries.map(([propName, propMeta]) => {
-              const currentValue = selectedNode.props?.[propName] ?? propMeta.default;
-              const controlType = resolvePropControlType(propMeta, currentValue);
-              const rawValue = drafts[propName] ?? formatValue(currentValue, propMeta.default);
-              const enumOptions = Array.isArray(propMeta.enum)
-                ? propMeta.enum.map((item) => String(item))
-                : [];
-              const error = errors[propName];
+          <div className="flex flex-col gap-3">
+            {groupedPropEntries.basic.length > 0 ? (
+              <PropsGroup
+                title="基础属性"
+                entries={groupedPropEntries.basic}
+                selectedNode={selectedNode}
+                drafts={drafts}
+                errors={errors}
+                onChangeDraft={(propName, next) => {
+                  setDrafts((prev) => ({ ...prev, [propName]: next }));
+                }}
+                onCommit={(propName, propMeta, next) => {
+                  try {
+                    onPatchProps?.({
+                      [propName]: parseValueByContractType(next, propMeta),
+                    });
+                    setErrors((prev) => ({ ...prev, [propName]: undefined }));
+                  } catch (err) {
+                    const message = err instanceof Error ? err.message : '属性解析失败';
+                    setErrors((prev) => ({ ...prev, [propName]: message }));
+                  }
+                }}
+              />
+            ) : null}
 
-              return (
-                <div key={propName} className="flex flex-col gap-1">
-                  <PropertyField
-                    label={propName}
-                    value={controlType === 'checkbox' ? Boolean(currentValue) : rawValue}
-                    isExpression={Boolean(propMeta.allowExpression)}
-                    controlType={controlType}
-                    options={enumOptions}
-                    {...(propMeta.description ? { description: propMeta.description } : {})}
-                    {...(propMeta.required ? { required: true } : {})}
-                    onChange={(next) => {
-                      if (typeof next === 'string') {
-                        setDrafts((prev) => ({ ...prev, [propName]: next }));
-                      }
-                    }}
-                    onCommit={(next) => {
-                      try {
-                        onPatchProps?.({
-                          [propName]: parseValueByContractType(next, propMeta),
-                        });
-                        setErrors((prev) => ({ ...prev, [propName]: undefined }));
-                      } catch (err) {
-                        const message = err instanceof Error ? err.message : '属性解析失败';
-                        setErrors((prev) => ({ ...prev, [propName]: message }));
-                      }
-                    }}
-                  />
-                  {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
-                </div>
-              );
-            })}
+            {groupedPropEntries.structured.length > 0 ? (
+              <PropsGroup
+                title="结构属性"
+                entries={groupedPropEntries.structured}
+                selectedNode={selectedNode}
+                drafts={drafts}
+                errors={errors}
+                onChangeDraft={(propName, next) => {
+                  setDrafts((prev) => ({ ...prev, [propName]: next }));
+                }}
+                onCommit={(propName, propMeta, next) => {
+                  try {
+                    onPatchProps?.({
+                      [propName]: parseValueByContractType(next, propMeta),
+                    });
+                    setErrors((prev) => ({ ...prev, [propName]: undefined }));
+                  } catch (err) {
+                    const message = err instanceof Error ? err.message : '属性解析失败';
+                    setErrors((prev) => ({ ...prev, [propName]: message }));
+                  }
+                }}
+              />
+            ) : null}
           </div>
         )}
       </SetterGroup>
 
       <SetterGroup title="高级属性">
-        <div className="text-[12px] text-text-secondary border border-dashed border-border-ide p-3 rounded text-center flex items-center justify-center gap-2 cursor-pointer hover:bg-bg-activity-bar transition-colors">
+        <button
+          type="button"
+          onClick={() => setShowPropsJson((prev) => !prev)}
+          className="w-full text-[12px] text-text-secondary border border-dashed border-border-ide p-3 rounded text-center flex items-center justify-center gap-2 cursor-pointer hover:bg-bg-activity-bar transition-colors"
+        >
           <Code size={14} />
-          <span>打开 JSON 视图</span>
-        </div>
+          <span>{showPropsJson ? '收起 JSON 视图' : '打开 JSON 视图'}</span>
+        </button>
+        {showPropsJson ? (
+          <div className="flex flex-col gap-2">
+            <textarea
+              aria-label="props json"
+              value={propsJsonDraft}
+              onChange={(event) => setPropsJsonDraft(event.target.value)}
+              onBlur={(event) => {
+                try {
+                  const patch = parsePropsPatch(event.target.value);
+                  onPatchProps?.(patch);
+                  setPropsJsonError(undefined);
+                } catch (err) {
+                  const message = err instanceof Error ? err.message : 'props JSON 解析失败';
+                  setPropsJsonError(message);
+                }
+              }}
+              className="w-full min-h-[140px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500"
+            />
+            {propsJsonError ? <div className="text-[11px] text-red-400">{propsJsonError}</div> : null}
+            <div className="text-[11px] text-text-secondary">
+              用于批量编辑 props。失焦后按对象 patch 回写。
+            </div>
+          </div>
+        ) : null}
       </SetterGroup>
+    </div>
+  );
+}
+
+interface PropsGroupProps {
+  title: string;
+  entries: PropEntry[];
+  selectedNode: SchemaNode;
+  drafts: Record<string, string>;
+  errors: Record<string, string | undefined>;
+  onChangeDraft: (propName: string, next: string) => void;
+  onCommit: (propName: string, propMeta: ContractProp, next: unknown) => void;
+}
+
+function PropsGroup({
+  title,
+  entries,
+  selectedNode,
+  drafts,
+  errors,
+  onChangeDraft,
+  onCommit,
+}: PropsGroupProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-[11px] font-semibold text-text-secondary">{title}</div>
+      <div className="flex flex-col gap-2">
+        {entries.map(([propName, propMeta]) => {
+          const currentValue = selectedNode.props?.[propName] ?? propMeta.default;
+          const controlType = resolvePropControlType(propMeta, currentValue);
+          const rawValue = drafts[propName] ?? formatValue(currentValue, propMeta.default);
+          const enumOptions = Array.isArray(propMeta.enum)
+            ? propMeta.enum.map((item) => String(item))
+            : [];
+          const error = errors[propName];
+
+          return (
+            <div key={propName} className="flex flex-col gap-1">
+              <PropertyField
+                label={propName}
+                value={controlType === 'checkbox' ? Boolean(currentValue) : rawValue}
+                isExpression={Boolean(propMeta.allowExpression)}
+                controlType={controlType}
+                options={enumOptions}
+                {...(propMeta.description ? { description: propMeta.description } : {})}
+                {...(propMeta.required ? { required: true } : {})}
+                onChange={(next) => {
+                  if (typeof next === 'string') {
+                    onChangeDraft(propName, next);
+                  }
+                }}
+                onCommit={(next) => onCommit(propName, propMeta, next)}
+              />
+              {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

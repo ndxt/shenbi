@@ -100,4 +100,83 @@ describe('SetterPanel/Props contract-driven controls', () => {
     expect(input.type).toBe('text');
     expect(input.value).toBe('{{state.locked}}');
   });
+
+  it('Props 按基础属性与结构属性分组展示', () => {
+    const selectedNode: SchemaNode = {
+      id: 'table-2',
+      component: 'Table',
+      props: {
+        bordered: true,
+        pagination: { current: 1, pageSize: 10 },
+      },
+    };
+
+    render(
+      <SetterPanel
+        selectedNode={selectedNode}
+        contract={tableContract}
+        activeTab="props"
+      />,
+    );
+
+    expect(screen.getByText('基础属性')).toBeInTheDocument();
+    expect(screen.getByText('结构属性')).toBeInTheDocument();
+  });
+
+  it('高级属性 JSON 视图可回写 props patch', () => {
+    const onPatchProps = vi.fn();
+    const selectedNode: SchemaNode = {
+      id: 'btn-4',
+      component: 'Button',
+      props: { type: 'default' },
+      children: '提交',
+    };
+
+    render(
+      <SetterPanel
+        selectedNode={selectedNode}
+        contract={buttonContract}
+        onPatchProps={onPatchProps}
+        activeTab="props"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '打开 JSON 视图' }));
+    const editor = screen.getByLabelText('props json');
+    fireEvent.change(editor, {
+      target: {
+        value: JSON.stringify({ type: 'primary', loading: true }),
+      },
+    });
+    fireEvent.blur(editor);
+
+    expect(onPatchProps).toHaveBeenCalledWith({ type: 'primary', loading: true });
+  });
+
+  it('高级属性 JSON 非对象时提示错误且不回写', () => {
+    const onPatchProps = vi.fn();
+    const selectedNode: SchemaNode = {
+      id: 'btn-5',
+      component: 'Button',
+      props: { type: 'default' },
+      children: '提交',
+    };
+
+    render(
+      <SetterPanel
+        selectedNode={selectedNode}
+        contract={buttonContract}
+        onPatchProps={onPatchProps}
+        activeTab="props"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '打开 JSON 视图' }));
+    const editor = screen.getByLabelText('props json');
+    fireEvent.change(editor, { target: { value: '[]' } });
+    fireEvent.blur(editor);
+
+    expect(onPatchProps).not.toHaveBeenCalled();
+    expect(screen.getByText('props 必须是对象 JSON')).toBeInTheDocument();
+  });
 });
