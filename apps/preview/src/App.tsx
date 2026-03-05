@@ -199,10 +199,8 @@ export function App() {
   const [scenarioSchemas, setScenarioSchemas] = useState<Record<ScenarioKey, PageSchema>>(
     () => createInitialScenarioState(),
   );
-  const [shellSchema, setShellSchema] = useState<PageSchema>(() => createEmptyShellSchema());
-  const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
+  const [scenarioSelectedNodeId, setScenarioSelectedNodeId] = useState<string | undefined>(undefined);
   const [activityMessage, setActivityMessage] = useState<string>('');
-  const activeSchema = appMode === 'shell' ? shellSchema : scenarioSchemas[activeScenario];
   const fileStorageRef = useRef<LocalFileStorageAdapter | null>(null);
   if (!fileStorageRef.current) {
     fileStorageRef.current = new LocalFileStorageAdapter();
@@ -211,25 +209,29 @@ export function App() {
   const fileEditorRef = useRef<EditorInstance | null>(null);
   if (!fileEditorRef.current) {
     fileEditorRef.current = createEditor({
-      initialSchema: activeSchema,
+      initialSchema: createEmptyShellSchema(),
       fileStorage,
     });
   }
   const fileEditor = fileEditorRef.current;
+  const [shellSnapshot, setShellSnapshot] = useState(() => fileEditor.state.getSnapshot());
+  const selectedNodeId = appMode === 'shell' ? shellSnapshot.selectedNodeId : scenarioSelectedNodeId;
+  const activeSchema = appMode === 'shell' ? shellSnapshot.schema : scenarioSchemas[activeScenario];
   const [storedFiles, setStoredFiles] = useState<FileMetadata[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | undefined>(undefined);
   const [fileStatus, setFileStatus] = useState<string>('当前未绑定文件');
 
   const updateActiveSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
     if (appMode === 'shell') {
-      setShellSchema((prev) => updater(prev));
+      const nextSchema = updater(fileEditor.state.getSchema());
+      fileEditor.state.setSchema(nextSchema);
       return;
     }
     setScenarioSchemas((prev) => ({
       ...prev,
       [activeScenario]: updater(prev[activeScenario]),
     }));
-  }, [activeScenario, appMode]);
+  }, [activeScenario, appMode, fileEditor]);
 
   const refreshStoredFiles = useCallback(async () => {
     try {
@@ -245,15 +247,13 @@ export function App() {
   const handleOpenFile = useCallback(async (fileId: string) => {
     try {
       await fileEditor.commands.execute('file.openSchema', { fileId });
-      const openedSchema = fileEditor.state.getSchema();
-      updateActiveSchema(() => cloneSchema(openedSchema));
       setActiveFileId(fileId);
       setFileStatus(`已打开: ${fileId}`);
       await refreshStoredFiles();
     } catch (error) {
       setFileStatus(`打开失败: ${getErrorMessage(error)}`);
     }
-  }, [fileEditor, refreshStoredFiles, updateActiveSchema]);
+  }, [fileEditor, refreshStoredFiles]);
 
   const handleSaveFile = useCallback(async () => {
     if (!activeFileId) {
@@ -261,14 +261,13 @@ export function App() {
       return;
     }
     try {
-      fileEditor.state.setSchema(activeSchema);
       await fileEditor.commands.execute('file.saveSchema', { fileId: activeFileId });
       setFileStatus(`已保存: ${activeFileId}`);
       await refreshStoredFiles();
     } catch (error) {
       setFileStatus(`保存失败: ${getErrorMessage(error)}`);
     }
-  }, [activeFileId, activeSchema, fileEditor, refreshStoredFiles]);
+  }, [activeFileId, fileEditor, refreshStoredFiles]);
 
   const handleSaveAsFile = useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -280,7 +279,6 @@ export function App() {
       return;
     }
     try {
-      fileEditor.state.setSchema(activeSchema);
       const saveAsResult = await fileEditor.commands.execute('file.saveAs', { name: nextName.trim() });
       const nextFileId = typeof saveAsResult === 'string' ? saveAsResult : nextName.trim();
       setActiveFileId(nextFileId);
@@ -289,7 +287,7 @@ export function App() {
     } catch (error) {
       setFileStatus(`另存失败: ${getErrorMessage(error)}`);
     }
-  }, [activeSchema, fileEditor, refreshStoredFiles]);
+  }, [fileEditor, refreshStoredFiles]);
 
   useEffect(() => {
     syncModeToUrl(appMode);
@@ -300,8 +298,12 @@ export function App() {
   }, [fileEditor]);
 
   useEffect(() => {
-    fileEditor.state.setSchema(activeSchema);
-  }, [activeSchema, fileEditor]);
+    setShellSnapshot(fileEditor.state.getSnapshot());
+    const unsubscribe = fileEditor.state.subscribe((snapshot) => {
+      setShellSnapshot(snapshot);
+    });
+    return unsubscribe;
+  }, [fileEditor]);
 
   useEffect(() => {
     void refreshStoredFiles();
@@ -325,13 +327,24 @@ export function App() {
   const treeNodes = useMemo(() => buildEditorTree(activeSchema), [activeSchema]);
 
   useEffect(() => {
-    setSelectedNodeId((prev) => {
+    if (appMode === 'shell') {
+      const currentSelected = shellSnapshot.selectedNodeId;
+      if (currentSelected && getSchemaNodeByTreeId(activeSchema, currentSelected)) {
+        return;
+      }
+      const nextDefault = getDefaultSelectedNodeId(treeNodes);
+      if (nextDefault !== currentSelected) {
+        fileEditor.state.setSelectedNodeId(nextDefault);
+      }
+      return;
+    }
+    setScenarioSelectedNodeId((prev) => {
       if (prev && getSchemaNodeByTreeId(activeSchema, prev)) {
         return prev;
       }
       return getDefaultSelectedNodeId(treeNodes);
     });
-  }, [activeSchema, treeNodes]);
+  }, [activeSchema, appMode, fileEditor, shellSnapshot.selectedNodeId, treeNodes]);
 
   const selectedNode = useMemo(
     () => getSchemaNodeByTreeId(activeSchema, selectedNodeId),
@@ -465,7 +478,11 @@ export function App() {
   const handleCanvasSelectNode = (schemaNodeId: string) => {
     const treeId = getTreeIdBySchemaNodeId(activeSchema, schemaNodeId);
     if (treeId) {
-      setSelectedNodeId(treeId);
+      if (appMode === 'shell') {
+        fileEditor.state.setSelectedNodeId(treeId);
+      } else {
+        setScenarioSelectedNodeId(treeId);
+      }
     }
   };
 
@@ -477,7 +494,13 @@ export function App() {
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,
-        onSelectNode: setSelectedNodeId,
+        onSelectNode: (nodeId) => {
+          if (appMode === 'shell') {
+            fileEditor.state.setSelectedNodeId(nodeId);
+          } else {
+            setScenarioSelectedNodeId(nodeId);
+          }
+        },
         tabs: sidebarTabs,
         ...(selectedNodeId ? { selectedNodeId } : {}),
       }}

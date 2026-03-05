@@ -633,6 +633,64 @@ describe('preview/App integration', () => {
     promptSpy.mockRestore();
   });
 
+  it('编辑器：Shell 模式 reopen 可恢复已保存内容', async () => {
+    const user = userEvent.setup();
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Shell Persist');
+    await renderAppAndWaitFirstPage();
+
+    await user.selectOptions(screen.getByLabelText('模式切换'), 'shell');
+    await waitFor(() => {
+      expect(screen.queryByText('User 1')).toBeNull();
+    });
+
+    await user.click(screen.getByTitle('Toggle AI Assistant'));
+    await user.click(await screen.findByRole('button', { name: '生成演示页面' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('AI 生成演示页面')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Outline'));
+    await user.click(screen.getByText('ai-generated-card (Card)'));
+
+    const titleInput = await screen.findByLabelText('title');
+    await user.clear(titleInput);
+    await user.type(titleInput, '持久化标题');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByText('持久化标题')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Files'));
+    await user.click(screen.getByRole('button', { name: '另存为' }));
+    await waitFor(() => {
+      expect(screen.getByText(/已保存:/)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Outline'));
+    await user.click(screen.getByText('ai-generated-card (Card)'));
+
+    const titleInputAfterSave = await screen.findByLabelText('title');
+    await user.clear(titleInputAfterSave);
+    await user.type(titleInputAfterSave, '未保存标题');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByText('未保存标题')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Files'));
+    await user.click(screen.getByRole('button', { name: '打开' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('持久化标题')).toBeInTheDocument();
+      expect(screen.queryByText('未保存标题')).toBeNull();
+    });
+
+    promptSpy.mockRestore();
+  });
+
   it('编辑器：ActivityBar 支持插件扩展图标（Rocket）', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
