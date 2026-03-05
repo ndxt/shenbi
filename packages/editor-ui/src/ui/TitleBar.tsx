@@ -59,6 +59,9 @@ export function TitleBar({
           <Command size={14} className="text-white" />
         </div>
         <span className="text-[13px] font-bold tracking-tight text-text-primary">Shenbi IDE</span>
+        <span className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary">
+          Editor UI Package
+        </span>
       </div>
       
       <div className="flex-1 text-center text-[11px] text-text-secondary font-medium">

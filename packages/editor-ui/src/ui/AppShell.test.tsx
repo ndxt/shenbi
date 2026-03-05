@@ -16,6 +16,7 @@ describe('AppShell', () => {
     expect(screen.getByText('Props')).toBeInTheDocument();
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('Run')).toBeInTheDocument();
+    expect(screen.getByText('Editor UI Package')).toBeInTheDocument();
     expect(screen.getByTestId('test-content')).toBeInTheDocument();
   });
 
