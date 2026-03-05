@@ -95,3 +95,32 @@
   - `pnpm --filter @shenbi/preview type-check && pnpm --filter @shenbi/preview test`
   - `pnpm --filter @shenbi/editor-ui type-check && pnpm --filter @shenbi/editor-ui test`
   - `pnpm --filter @shenbi/editor-core type-check && pnpm --filter @shenbi/editor-core test`
+
+---
+
+## 6. 封板状态（2026-03-05）
+
+### 6.1 结论
+
+- 状态：`已收口，可进入下一阶段开发`
+- 说明：
+  - `apps/preview/src/App.tsx` 已完成多轮下沉，当前以 Demo 场景与装配职责为主。
+  - `apps/preview/src/App.test.tsx` 已精简为最小冒烟集合（8 条）。
+  - 编排逻辑测试已迁入 `packages/editor-ui`（hooks/ai/plugins）。
+
+### 6.2 门禁结果
+
+- `@shenbi/editor-core`：
+  - `type-check` 通过
+  - `test` 通过（6 files, 30 tests）
+- `@shenbi/editor-ui`：
+  - `type-check` 通过
+  - `test` 通过（14 files, 59 tests）
+- `@shenbi/preview`：
+  - `type-check` 通过
+  - `test` 通过（6 files, 43 tests）
+
+### 6.3 剩余风险（已记录）
+
+- 预览侧仍保留较多业务演示逻辑（符合当前“Demo 容器”定位），后续若转生产编辑器应用需继续拆分。
+- 视觉回归门禁（截图基线）仍在阶段计划中，尚未纳入本次封板范围。
