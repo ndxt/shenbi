@@ -26,12 +26,14 @@ describe('EditorState', () => {
     const state = new EditorState(createSchema('initial'));
     state.setSelectedNodeId('body.0');
     state.setCurrentFileId('demo');
+    state.setDirty(true);
     state.setHistoryFlags(true, false);
     const snapshot = state.getSnapshot();
 
     state.setSchema(createSchema('changed'));
     state.setSelectedNodeId(undefined);
     state.setCurrentFileId(undefined);
+    state.setDirty(false);
     state.setHistoryFlags(false, false);
     state.restoreSnapshot(snapshot);
 
@@ -39,6 +41,7 @@ describe('EditorState', () => {
     expect(restored.schema.name).toBe('initial');
     expect(restored.selectedNodeId).toBe('body.0');
     expect(restored.currentFileId).toBe('demo');
+    expect(restored.isDirty).toBe(true);
     expect(restored.canUndo).toBe(true);
     expect(restored.canRedo).toBe(false);
   });

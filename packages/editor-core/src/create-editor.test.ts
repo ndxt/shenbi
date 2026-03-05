@@ -91,6 +91,7 @@ describe('createEditor', () => {
 
     expect(editor.state.getSchema().name).toBe('opened');
     expect(editor.state.getCurrentFileId()).toBe('demo');
+    expect(editor.state.getIsDirty()).toBe(false);
     expect(editor.history.getSize()).toBe(1);
     // nested command still emits its executed event.
     expect(commandEvents).toEqual(['schema.replace', 'file.openSchema']);
@@ -109,6 +110,7 @@ describe('createEditor', () => {
 
     expect(saved).toHaveBeenCalledWith({ fileId: 'demo' });
     expect(editor.state.getCurrentFileId()).toBe('demo');
+    expect(editor.state.getIsDirty()).toBe(false);
     expect(editor.history.getSize()).toBe(0);
   });
 
@@ -144,6 +146,7 @@ describe('createEditor', () => {
     expect(saved).toHaveBeenCalled();
     expect(saveAsResult).toBe('id-Trim Name');
     expect(editor.state.getCurrentFileId()).toBe('id-Trim Name');
+    expect(editor.state.getIsDirty()).toBe(false);
   });
 
   it('file.saveSchema can save by current file id without args', async () => {
@@ -201,6 +204,24 @@ describe('createEditor', () => {
     const schema = editor.state.getSchema();
     const card = Array.isArray(schema.body) ? schema.body[0] : undefined;
     expect(card?.props).toMatchObject({ title: 'new-title' });
+    expect(editor.state.getIsDirty()).toBe(true);
     expect(editor.history.getSize()).toBe(1);
+  });
+
+  it('saveAs clears dirty flag after node patch', async () => {
+    const editor = createEditor({
+      initialSchema: createSchemaWithCard('dirty-saveas'),
+      fileStorage: createMemoryStorage(),
+    });
+
+    await editor.commands.execute('node.patchProps', {
+      treeId: 'body.0',
+      patch: { title: 'changed' },
+    });
+    expect(editor.state.getIsDirty()).toBe(true);
+
+    await editor.commands.execute('file.saveAs', { name: 'dirty-page' });
+    expect(editor.state.getCurrentFileId()).toBe('id-dirty-page');
+    expect(editor.state.getIsDirty()).toBe(false);
   });
 });

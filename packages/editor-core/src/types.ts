@@ -8,6 +8,7 @@ export interface EditorStateSnapshot {
   schema: PageSchema;
   selectedNodeId?: string;
   currentFileId?: string;
+  isDirty: boolean;
   canUndo: boolean;
   canRedo: boolean;
 }

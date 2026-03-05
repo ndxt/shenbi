@@ -234,8 +234,15 @@ export function App() {
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : scenarioSchemas[activeScenario];
   const [storedFiles, setStoredFiles] = useState<FileMetadata[]>([]);
   const [fileStatus, setFileStatus] = useState<string>('当前未绑定文件');
+  const isDirty = appMode === 'shell' ? shellSnapshot.isDirty : false;
   const canUndo = appMode === 'shell' ? shellSnapshot.canUndo : false;
   const canRedo = appMode === 'shell' ? shellSnapshot.canRedo : false;
+  const activeFileName = useMemo(() => {
+    if (!activeFileId) {
+      return undefined;
+    }
+    return storedFiles.find((file) => file.id === activeFileId)?.name;
+  }, [activeFileId, storedFiles]);
 
   const updateActiveSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
     if (appMode === 'shell') {
@@ -272,21 +279,7 @@ export function App() {
     }
   }, [fileEditor, refreshStoredFiles]);
 
-  const handleSaveFile = useCallback(async () => {
-    if (!activeFileId) {
-      setFileStatus('请先执行“另存为”');
-      return;
-    }
-    try {
-      await fileEditor.commands.execute('file.saveSchema');
-      setFileStatus(`已保存: ${activeFileId}`);
-      await refreshStoredFiles();
-    } catch (error) {
-      setFileStatus(`保存失败: ${getErrorMessage(error)}`);
-    }
-  }, [activeFileId, fileEditor, refreshStoredFiles]);
-
-  const handleSaveAsFile = useCallback(async () => {
+  const requestSaveAs = useCallback(async () => {
     if (typeof window === 'undefined') {
       return;
     }
@@ -304,6 +297,24 @@ export function App() {
       setFileStatus(`另存失败: ${getErrorMessage(error)}`);
     }
   }, [fileEditor, refreshStoredFiles]);
+
+  const handleSaveAsFile = useCallback(async () => {
+    await requestSaveAs();
+  }, [requestSaveAs]);
+
+  const handleSaveFile = useCallback(async () => {
+    if (!activeFileId) {
+      await requestSaveAs();
+      return;
+    }
+    try {
+      await fileEditor.commands.execute('file.saveSchema');
+      setFileStatus(`已保存: ${activeFileId}`);
+      await refreshStoredFiles();
+    } catch (error) {
+      setFileStatus(`保存失败: ${getErrorMessage(error)}`);
+    }
+  }, [activeFileId, fileEditor, refreshStoredFiles, requestSaveAs]);
 
   useEffect(() => {
     syncModeToUrl(appMode);
@@ -502,15 +513,22 @@ export function App() {
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isEditableHotkeyTarget(event.target)) {
-        return;
-      }
       const withPrimaryModifier = event.ctrlKey || event.metaKey;
       if (!withPrimaryModifier || event.altKey) {
         return;
       }
 
       const key = event.key.toLowerCase();
+      if (key === 's') {
+        event.preventDefault();
+        void handleSaveFile();
+        return;
+      }
+
+      if (isEditableHotkeyTarget(event.target)) {
+        return;
+      }
+
       if (key === 'z' && !event.shiftKey) {
         if (!canUndo) {
           return;
@@ -533,7 +551,7 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [appMode, canRedo, canUndo, handleRedo, handleUndo]);
+  }, [appMode, canRedo, canUndo, handleRedo, handleSaveFile, handleUndo]);
 
   const handlePatchProps = (patch: Record<string, unknown>) => {
     if (appMode === 'shell') {
@@ -665,6 +683,13 @@ export function App() {
           ) : null}
           {appMode === 'shell' ? (
             <>
+              <span
+                aria-label="当前文件"
+                className="max-w-[220px] truncate text-[11px] text-text-secondary"
+              >
+                {activeFileName ?? '未命名页面'}
+                {isDirty ? ' *' : ''}
+              </span>
               <button
                 type="button"
                 aria-label="撤销"

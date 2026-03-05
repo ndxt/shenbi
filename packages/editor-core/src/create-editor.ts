@@ -140,6 +140,7 @@ function registerBuiltinCommands(
     execute(currentState, args) {
       const schema = extractSchemaFromArgs(args);
       currentState.setSchema(schema);
+      currentState.setDirty(true);
       eventBus.emit('schema:changed', { schema });
     },
   });
@@ -150,8 +151,13 @@ function registerBuiltinCommands(
     execute(currentState, args) {
       const treeId = extractTreeIdFromArgs(args, 'node.patchProps');
       const patch = extractPatchFromArgs(args, 'node.patchProps');
-      const nextSchema = patchSchemaNodeProps(currentState.getSchema(), treeId, patch);
+      const previousSchema = currentState.getSchema();
+      const nextSchema = patchSchemaNodeProps(previousSchema, treeId, patch);
+      if (nextSchema === previousSchema) {
+        return;
+      }
       currentState.setSchema(nextSchema);
+      currentState.setDirty(true);
       eventBus.emit('schema:changed', { schema: nextSchema });
     },
   });
@@ -162,8 +168,13 @@ function registerBuiltinCommands(
     execute(currentState, args) {
       const treeId = extractTreeIdFromArgs(args, 'node.patchEvents');
       const patch = extractPatchFromArgs(args, 'node.patchEvents');
-      const nextSchema = patchSchemaNodeEvents(currentState.getSchema(), treeId, patch);
+      const previousSchema = currentState.getSchema();
+      const nextSchema = patchSchemaNodeEvents(previousSchema, treeId, patch);
+      if (nextSchema === previousSchema) {
+        return;
+      }
       currentState.setSchema(nextSchema);
+      currentState.setDirty(true);
       eventBus.emit('schema:changed', { schema: nextSchema });
     },
   });
@@ -174,8 +185,13 @@ function registerBuiltinCommands(
     execute(currentState, args) {
       const treeId = extractTreeIdFromArgs(args, 'node.patchStyle');
       const patch = extractPatchFromArgs(args, 'node.patchStyle');
-      const nextSchema = patchSchemaNodeStyle(currentState.getSchema(), treeId, patch);
+      const previousSchema = currentState.getSchema();
+      const nextSchema = patchSchemaNodeStyle(previousSchema, treeId, patch);
+      if (nextSchema === previousSchema) {
+        return;
+      }
       currentState.setSchema(nextSchema);
+      currentState.setDirty(true);
       eventBus.emit('schema:changed', { schema: nextSchema });
     },
   });
@@ -186,8 +202,13 @@ function registerBuiltinCommands(
     execute(currentState, args) {
       const treeId = extractTreeIdFromArgs(args, 'node.patchLogic');
       const patch = extractPatchFromArgs(args, 'node.patchLogic');
-      const nextSchema = patchSchemaNodeLogic(currentState.getSchema(), treeId, patch);
+      const previousSchema = currentState.getSchema();
+      const nextSchema = patchSchemaNodeLogic(previousSchema, treeId, patch);
+      if (nextSchema === previousSchema) {
+        return;
+      }
       currentState.setSchema(nextSchema);
+      currentState.setDirty(true);
       eventBus.emit('schema:changed', { schema: nextSchema });
     },
   });
@@ -198,8 +219,13 @@ function registerBuiltinCommands(
     execute(currentState, args) {
       const treeId = extractTreeIdFromArgs(args, 'node.patchColumns');
       const columns = extractColumnsFromArgs(args);
-      const nextSchema = patchSchemaNodeColumns(currentState.getSchema(), treeId, columns);
+      const previousSchema = currentState.getSchema();
+      const nextSchema = patchSchemaNodeColumns(previousSchema, treeId, columns);
+      if (nextSchema === previousSchema) {
+        return;
+      }
       currentState.setSchema(nextSchema);
+      currentState.setDirty(true);
       eventBus.emit('schema:changed', { schema: nextSchema });
     },
   });
@@ -257,6 +283,7 @@ function registerBuiltinCommands(
       const schema = await fileStorage.read(fileId);
       await commands.execute('schema.replace', { schema });
       updateCurrentFileId(currentState, fileId);
+      currentState.setDirty(false);
       eventBus.emit('file:opened', { fileId });
     },
   });
@@ -273,6 +300,7 @@ function registerBuiltinCommands(
       }
       await fileStorage.write(fileId, currentState.getSchema());
       updateCurrentFileId(currentState, fileId);
+      currentState.setDirty(false);
       eventBus.emit('file:saved', { fileId });
     },
   });
@@ -288,6 +316,7 @@ function registerBuiltinCommands(
       }
       const fileId = await fileStorage.saveAs(name, currentState.getSchema());
       updateCurrentFileId(currentState, fileId);
+      currentState.setDirty(false);
       eventBus.emit('file:saved', { fileId });
       return fileId;
     },

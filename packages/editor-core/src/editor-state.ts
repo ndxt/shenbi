@@ -7,6 +7,7 @@ export class EditorState {
   private schema: PageSchema;
   private selectedNodeId: string | undefined;
   private currentFileId: string | undefined;
+  private isDirty = false;
   private canUndo = false;
   private canRedo = false;
   private listeners = new Set<EditorStateListener>();
@@ -45,6 +46,18 @@ export class EditorState {
     this.notify();
   }
 
+  getIsDirty(): boolean {
+    return this.isDirty;
+  }
+
+  setDirty(nextDirty: boolean): void {
+    if (this.isDirty === nextDirty) {
+      return;
+    }
+    this.isDirty = nextDirty;
+    this.notify();
+  }
+
   setHistoryFlags(canUndo: boolean, canRedo: boolean): void {
     if (this.canUndo === canUndo && this.canRedo === canRedo) {
       return;
@@ -59,6 +72,7 @@ export class EditorState {
       schema: this.schema,
       ...(this.selectedNodeId ? { selectedNodeId: this.selectedNodeId } : {}),
       ...(this.currentFileId ? { currentFileId: this.currentFileId } : {}),
+      isDirty: this.isDirty,
       canUndo: this.canUndo,
       canRedo: this.canRedo,
     };
@@ -68,6 +82,7 @@ export class EditorState {
     this.schema = snapshot.schema;
     this.selectedNodeId = snapshot.selectedNodeId;
     this.currentFileId = snapshot.currentFileId;
+    this.isDirty = snapshot.isDirty;
     this.canUndo = snapshot.canUndo;
     this.canRedo = snapshot.canRedo;
     this.notify();

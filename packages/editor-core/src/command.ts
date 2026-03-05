@@ -17,6 +17,7 @@ function snapshotsEqual(a: EditorStateSnapshot, b: EditorStateSnapshot): boolean
   return a.schema === b.schema
     && a.selectedNodeId === b.selectedNodeId
     && a.currentFileId === b.currentFileId
+    && a.isDirty === b.isDirty
     && a.canUndo === b.canUndo
     && a.canRedo === b.canRedo;
 }

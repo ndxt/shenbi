@@ -621,7 +621,7 @@ describe('preview/App integration', () => {
     await user.click(screen.getByRole('button', { name: '另存为' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Shell Demo')).toBeInTheDocument();
+      expect(screen.getByLabelText('当前文件')).toHaveTextContent('Shell Demo');
       expect(screen.getByText(/已保存:/)).toBeInTheDocument();
     });
 
@@ -781,6 +781,56 @@ describe('preview/App integration', () => {
     await waitFor(() => {
       expect(screen.getByText('Hotkey 标题')).toBeInTheDocument();
     });
+  });
+
+  it('编辑器：Shell 模式 Ctrl+S 可保存并清除脏标记', async () => {
+    const user = userEvent.setup();
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('SaveByHotkey');
+    await renderAppAndWaitFirstPage();
+
+    await user.selectOptions(screen.getByLabelText('模式切换'), 'shell');
+    await waitFor(() => {
+      expect(screen.queryByText('User 1')).toBeNull();
+    });
+
+    await user.click(screen.getByTitle('Toggle AI Assistant'));
+    await user.click(await screen.findByRole('button', { name: '生成演示页面' }));
+    await waitFor(() => {
+      expect(screen.getByText('AI 生成演示页面')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Outline'));
+    await user.click(screen.getByText('ai-generated-card (Card)'));
+    const titleInput = await screen.findByLabelText('title');
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Dirty Title');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('当前文件')).toHaveTextContent('未命名页面 *');
+    });
+
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByLabelText('当前文件')).toHaveTextContent('SaveByHotkey');
+      expect(screen.getByLabelText('当前文件')).not.toHaveTextContent('*');
+    });
+
+    const titleInput2 = await screen.findByLabelText('title');
+    await user.clear(titleInput2);
+    await user.type(titleInput2, 'Dirty Again');
+    await user.tab();
+    await waitFor(() => {
+      expect(screen.getByLabelText('当前文件')).toHaveTextContent('*');
+    });
+
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByLabelText('当前文件')).not.toHaveTextContent('*');
+    });
+
+    expect(promptSpy).toHaveBeenCalledTimes(1);
+    promptSpy.mockRestore();
   });
 
   it('编辑器：ActivityBar 支持插件扩展图标（Rocket）', async () => {
