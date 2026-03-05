@@ -110,6 +110,20 @@ function normalizeFileMetadataList(value: unknown): FileMetadata[] {
   });
 }
 
+function isEditableHotkeyTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  if (target.isContentEditable) {
+    return true;
+  }
+  const tagName = target.tagName.toLowerCase();
+  if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
+    return true;
+  }
+  return target.closest('[contenteditable="true"]') !== null;
+}
+
 function createInitialScenarioState(): Record<ScenarioKey, PageSchema> {
   return {
     'user-management': cloneSchema(userManagementSchema),
@@ -485,6 +499,45 @@ export function App() {
       antd.message.error(`重做失败: ${getErrorMessage(error)}`);
     });
   }, [appMode, canRedo, fileEditor]);
+
+  useEffect(() => {
+    if (appMode !== 'shell') {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isEditableHotkeyTarget(event.target)) {
+        return;
+      }
+      const withPrimaryModifier = event.ctrlKey || event.metaKey;
+      if (!withPrimaryModifier || event.altKey) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey) {
+        if (!canUndo) {
+          return;
+        }
+        event.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      if ((key === 'z' && event.shiftKey) || key === 'y') {
+        if (!canRedo) {
+          return;
+        }
+        event.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [appMode, canRedo, canUndo, handleRedo, handleUndo]);
 
   const handlePatchProps = (patch: Record<string, unknown>) => {
     if (appMode === 'shell') {

@@ -736,6 +736,53 @@ describe('preview/App integration', () => {
     });
   });
 
+  it('编辑器：Shell 模式支持快捷键撤销/重做，输入框聚焦时不劫持', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.selectOptions(screen.getByLabelText('模式切换'), 'shell');
+    await waitFor(() => {
+      expect(screen.queryByText('User 1')).toBeNull();
+    });
+
+    await user.click(screen.getByTitle('Toggle AI Assistant'));
+    await user.click(await screen.findByRole('button', { name: '生成演示页面' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('AI 生成演示页面')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Outline'));
+    await user.click(screen.getByText('ai-generated-card (Card)'));
+
+    const titleInput = await screen.findByLabelText('title');
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Hotkey 标题');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByText('Hotkey 标题')).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByText('AI 生成演示页面')).toBeInTheDocument();
+      expect(screen.queryByText('Hotkey 标题')).toBeNull();
+    });
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true, shiftKey: true });
+    await waitFor(() => {
+      expect(screen.getByText('Hotkey 标题')).toBeInTheDocument();
+    });
+
+    const focusedInput = screen.getByLabelText('title');
+    (focusedInput as HTMLInputElement).focus();
+    fireEvent.keyDown(focusedInput, { key: 'z', ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByText('Hotkey 标题')).toBeInTheDocument();
+    });
+  });
+
   it('编辑器：ActivityBar 支持插件扩展图标（Rocket）', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
