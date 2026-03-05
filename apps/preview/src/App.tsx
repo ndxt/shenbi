@@ -48,6 +48,11 @@ type ScenarioKey =
   | 'drawer-detail'
   | 'nine-grid';
 
+type AppMode = 'scenarios' | 'shell';
+
+const SHELL_MODE_QUERY_KEY = 'mode';
+const SHELL_MODE_QUERY_VALUE = 'shell';
+
 const scenarioOptions: { label: string; value: ScenarioKey }[] = [
   { label: '用户管理场景', value: 'user-management' },
   { label: 'Form.List', value: 'form-list' },
@@ -56,6 +61,11 @@ const scenarioOptions: { label: string; value: ScenarioKey }[] = [
   { label: 'Descriptions', value: 'descriptions' },
   { label: 'Drawer 详情', value: 'drawer-detail' },
   { label: '九宫格布局', value: 'nine-grid' },
+];
+
+const modeOptions: { label: string; value: AppMode }[] = [
+  { label: '多场景', value: 'scenarios' },
+  { label: 'Shell', value: 'shell' },
 ];
 
 function cloneSchema(schema: PageSchema): PageSchema {
@@ -75,6 +85,41 @@ function createInitialScenarioState(): Record<ScenarioKey, PageSchema> {
     'drawer-detail': cloneSchema(drawerDetailSkeletonSchema),
     'nine-grid': cloneSchema(nineGridSkeletonSchema),
   };
+}
+
+function createEmptyShellSchema(): PageSchema {
+  return {
+    id: 'shell-page',
+    name: 'Shell Page',
+    body: [],
+  };
+}
+
+function getInitialAppMode(): AppMode {
+  if (typeof window === 'undefined') {
+    return 'scenarios';
+  }
+  const search = new URLSearchParams(window.location.search);
+  if (search.get(SHELL_MODE_QUERY_KEY) === SHELL_MODE_QUERY_VALUE) {
+    return 'shell';
+  }
+  if ((window as any).__SHENBI_SHELL_MODE__ === true) {
+    return 'shell';
+  }
+  return 'scenarios';
+}
+
+function syncModeToUrl(mode: AppMode): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const url = new URL(window.location.href);
+  if (mode === 'shell') {
+    url.searchParams.set(SHELL_MODE_QUERY_KEY, SHELL_MODE_QUERY_VALUE);
+  } else {
+    url.searchParams.delete(SHELL_MODE_QUERY_KEY);
+  }
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
 interface ScenarioRuntimeViewProps {
@@ -114,12 +159,18 @@ function ScenarioRuntimeView({ schema }: ScenarioRuntimeViewProps) {
 }
 
 export function App() {
+  const [appMode, setAppMode] = useState<AppMode>(() => getInitialAppMode());
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const [scenarioSchemas, setScenarioSchemas] = useState<Record<ScenarioKey, PageSchema>>(
     () => createInitialScenarioState(),
   );
+  const [shellSchema, setShellSchema] = useState<PageSchema>(() => createEmptyShellSchema());
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
-  const activeSchema = scenarioSchemas[activeScenario];
+  const activeSchema = appMode === 'shell' ? shellSchema : scenarioSchemas[activeScenario];
+
+  useEffect(() => {
+    syncModeToUrl(appMode);
+  }, [appMode]);
 
   const treeNodes = useMemo(() => buildEditorTree(activeSchema), [activeSchema]);
 
@@ -142,39 +193,35 @@ export function App() {
     [selectedNode],
   );
 
-  const handlePatchProps = (patch: Record<string, unknown>) => {
+  const updateActiveSchema = (updater: (schema: PageSchema) => PageSchema) => {
+    if (appMode === 'shell') {
+      setShellSchema((prev) => updater(prev));
+      return;
+    }
     setScenarioSchemas((prev) => ({
       ...prev,
-      [activeScenario]: patchSchemaNodeProps(prev[activeScenario], selectedNodeId, patch),
+      [activeScenario]: updater(prev[activeScenario]),
     }));
+  };
+
+  const handlePatchProps = (patch: Record<string, unknown>) => {
+    updateActiveSchema((schema) => patchSchemaNodeProps(schema, selectedNodeId, patch));
   };
 
   const handlePatchEvents = (patch: Record<string, unknown>) => {
-    setScenarioSchemas((prev) => ({
-      ...prev,
-      [activeScenario]: patchSchemaNodeEvents(prev[activeScenario], selectedNodeId, patch),
-    }));
+    updateActiveSchema((schema) => patchSchemaNodeEvents(schema, selectedNodeId, patch));
   };
 
   const handlePatchColumns = (columns: unknown[]) => {
-    setScenarioSchemas((prev) => ({
-      ...prev,
-      [activeScenario]: patchSchemaNodeColumns(prev[activeScenario], selectedNodeId, columns),
-    }));
+    updateActiveSchema((schema) => patchSchemaNodeColumns(schema, selectedNodeId, columns));
   };
 
   const handlePatchStyle = (patch: Record<string, unknown>) => {
-    setScenarioSchemas((prev) => ({
-      ...prev,
-      [activeScenario]: patchSchemaNodeStyle(prev[activeScenario], selectedNodeId, patch),
-    }));
+    updateActiveSchema((schema) => patchSchemaNodeStyle(schema, selectedNodeId, patch));
   };
 
   const handlePatchLogic = (patch: Record<string, unknown>) => {
-    setScenarioSchemas((prev) => ({
-      ...prev,
-      [activeScenario]: patchSchemaNodeLogic(prev[activeScenario], selectedNodeId, patch),
-    }));
+    updateActiveSchema((schema) => patchSchemaNodeLogic(schema, selectedNodeId, patch));
   };
 
   const handleCanvasSelectNode = (schemaNodeId: string) => {
@@ -204,23 +251,40 @@ export function App() {
       onCanvasSelectNode={handleCanvasSelectNode}
       toolbarExtra={(
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-text-secondary">场景</span>
+          <span className="text-[11px] text-text-secondary">模式</span>
           <select
-            className="h-7 w-[180px] rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
-            aria-label="场景切换"
-            value={activeScenario}
-            onChange={(event) => setActiveScenario(event.target.value as ScenarioKey)}
+            className="h-7 w-[110px] rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
+            aria-label="模式切换"
+            value={appMode}
+            onChange={(event) => setAppMode(event.target.value as AppMode)}
           >
-            {scenarioOptions.map((option) => (
+            {modeOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
           </select>
+          {appMode === 'scenarios' ? (
+            <>
+              <span className="text-[11px] text-text-secondary">场景</span>
+              <select
+                className="h-7 w-[180px] rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
+                aria-label="场景切换"
+                value={activeScenario}
+                onChange={(event) => setActiveScenario(event.target.value as ScenarioKey)}
+              >
+                {scenarioOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : null}
         </div>
       )}
     >
-      <ScenarioRuntimeView key={activeScenario} schema={activeSchema} />
+      <ScenarioRuntimeView key={`${appMode}:${activeScenario}`} schema={activeSchema} />
     </AppShell>
   );
 }
