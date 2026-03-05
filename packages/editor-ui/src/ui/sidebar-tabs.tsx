@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ComponentContract } from '@shenbi/schema';
 import { ComponentPanel } from '../panels/ComponentPanel';
+import { FilePanel, type FilePanelFileItem } from '../panels/FilePanel';
 import { PagePanel } from '../panels/PagePanel';
 import { type SchemaNode as TreeSchemaNode, SchemaTree } from '../panels/SchemaTree';
 
@@ -17,6 +18,19 @@ export interface SidebarTabContribution {
   label: string;
   order?: number;
   render: (context: SidebarTabRenderContext) => React.ReactNode;
+}
+
+export interface CreateFilesSidebarTabOptions {
+  id?: string;
+  label?: string;
+  order?: number;
+  files: FilePanelFileItem[];
+  activeFileId: string | undefined;
+  status: string;
+  onOpenFile: (fileId: string) => void;
+  onSaveFile: () => void;
+  onSaveAsFile: () => void;
+  onRefresh: () => void;
 }
 
 function createBuiltinSidebarTabs(): SidebarTabContribution[] {
@@ -65,4 +79,25 @@ export function resolveSidebarTabs(
     merged.set(tab.id, tab);
   }
   return [...merged.values()].sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
+}
+
+export function createFilesSidebarTab(
+  options: CreateFilesSidebarTabOptions,
+): SidebarTabContribution {
+  return {
+    id: options.id ?? 'files',
+    label: options.label ?? 'Files',
+    order: options.order ?? 35,
+    render: () => (
+      <FilePanel
+        files={options.files}
+        activeFileId={options.activeFileId}
+        status={options.status}
+        onOpenFile={options.onOpenFile}
+        onSaveFile={options.onSaveFile}
+        onSaveAsFile={options.onSaveAsFile}
+        onRefresh={options.onRefresh}
+      />
+    ),
+  };
 }

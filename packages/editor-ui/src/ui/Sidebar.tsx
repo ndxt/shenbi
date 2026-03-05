@@ -6,7 +6,12 @@ import {
   type SidebarTabContribution,
   type SidebarTabRenderContext,
 } from './sidebar-tabs';
-export type { SidebarTabContribution, SidebarTabRenderContext } from './sidebar-tabs';
+export type {
+  CreateFilesSidebarTabOptions,
+  SidebarTabContribution,
+  SidebarTabRenderContext,
+} from './sidebar-tabs';
+export { createFilesSidebarTab } from './sidebar-tabs';
 
 export interface SidebarProps {
   contracts?: ComponentContract[];
