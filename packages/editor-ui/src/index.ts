@@ -14,3 +14,4 @@ export * from './panels';
 export * from './hooks/useResize';
 
 export * from './ai/editor-ai-bridge';
+export * from './plugins';

@@ -26,8 +26,8 @@ import {
 
 import { AppShell } from '@shenbi/editor-ui';
 import {
-  createFilesSidebarTab,
   createEditorAIBridge,
+  useFileWorkspace,
   type ActivityBarItemContribution,
   type InspectorTabContribution,
   type SidebarTabContribution,
@@ -48,7 +48,6 @@ import {
   createEditor,
   LocalFileStorageAdapter,
   type EditorInstance,
-  type FileMetadata,
 } from '@shenbi/editor-core';
 
 const resolver = antdResolver(antd);
@@ -95,33 +94,6 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return 'unknown error';
-}
-
-function normalizeFileMetadataList(value: unknown): FileMetadata[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter((item): item is FileMetadata => {
-    return Boolean(item)
-      && typeof item === 'object'
-      && typeof (item as { id?: unknown }).id === 'string'
-      && typeof (item as { name?: unknown }).name === 'string'
-      && typeof (item as { updatedAt?: unknown }).updatedAt === 'number';
-  });
-}
-
-function isEditableHotkeyTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-  if (target.isContentEditable) {
-    return true;
-  }
-  const tagName = target.tagName.toLowerCase();
-  if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-    return true;
-  }
-  return target.closest('[contenteditable="true"]') !== null;
 }
 
 function createInitialScenarioState(): Record<ScenarioKey, PageSchema> {
@@ -230,19 +202,36 @@ export function App() {
   const fileEditor = fileEditorRef.current;
   const [shellSnapshot, setShellSnapshot] = useState(() => fileEditor.state.getSnapshot());
   const selectedNodeId = appMode === 'shell' ? shellSnapshot.selectedNodeId : scenarioSelectedNodeId;
-  const activeFileId = shellSnapshot.currentFileId;
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : scenarioSchemas[activeScenario];
-  const [storedFiles, setStoredFiles] = useState<FileMetadata[]>([]);
-  const [fileStatus, setFileStatus] = useState<string>('当前未绑定文件');
-  const isDirty = appMode === 'shell' ? shellSnapshot.isDirty : false;
-  const canUndo = appMode === 'shell' ? shellSnapshot.canUndo : false;
-  const canRedo = appMode === 'shell' ? shellSnapshot.canRedo : false;
-  const activeFileName = useMemo(() => {
-    if (!activeFileId) {
-      return undefined;
-    }
-    return storedFiles.find((file) => file.id === activeFileId)?.name;
-  }, [activeFileId, storedFiles]);
+  const {
+    activeFileName,
+    filesSidebarTab,
+    isDirty,
+    canUndo,
+    canRedo,
+    handleSave: handleSaveFile,
+    handleUndo,
+    handleRedo,
+  } = useFileWorkspace({
+    mode: appMode === 'shell' ? 'shell' : 'scenarios',
+    snapshot: {
+      currentFileId: shellSnapshot.currentFileId,
+      schemaName: activeSchema.name,
+      isDirty: shellSnapshot.isDirty,
+      canUndo: shellSnapshot.canUndo,
+      canRedo: shellSnapshot.canRedo,
+    },
+    commands: fileEditor.commands,
+    onError: (message) => {
+      antd.message.error(message);
+    },
+    promptFileName: (defaultName) => {
+      if (typeof window === 'undefined') {
+        return null;
+      }
+      return window.prompt('请输入文件名', defaultName);
+    },
+  });
 
   const updateActiveSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
     if (appMode === 'shell') {
@@ -258,64 +247,6 @@ export function App() {
     }));
   }, [activeScenario, appMode, fileEditor]);
 
-  const refreshStoredFiles = useCallback(async () => {
-    try {
-      const listResult = await fileEditor.commands.execute('file.listSchemas');
-      const files = normalizeFileMetadataList(listResult);
-      const sorted = [...files].sort((left, right) => right.updatedAt - left.updatedAt);
-      setStoredFiles(sorted);
-    } catch (error) {
-      setFileStatus(`文件列表加载失败: ${getErrorMessage(error)}`);
-    }
-  }, [fileEditor]);
-
-  const handleOpenFile = useCallback(async (fileId: string) => {
-    try {
-      await fileEditor.commands.execute('file.openSchema', { fileId });
-      setFileStatus(`已打开: ${fileId}`);
-      await refreshStoredFiles();
-    } catch (error) {
-      setFileStatus(`打开失败: ${getErrorMessage(error)}`);
-    }
-  }, [fileEditor, refreshStoredFiles]);
-
-  const requestSaveAs = useCallback(async () => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const defaultName = activeSchema.name?.trim() || 'new-page';
-    const nextName = window.prompt('请输入文件名', defaultName);
-    if (!nextName || !nextName.trim()) {
-      return;
-    }
-    try {
-      const saveAsResult = await fileEditor.commands.execute('file.saveAs', { name: nextName.trim() });
-      const nextFileId = typeof saveAsResult === 'string' ? saveAsResult : nextName.trim();
-      setFileStatus(`已保存: ${nextFileId}`);
-      await refreshStoredFiles();
-    } catch (error) {
-      setFileStatus(`另存失败: ${getErrorMessage(error)}`);
-    }
-  }, [fileEditor, refreshStoredFiles]);
-
-  const handleSaveAsFile = useCallback(async () => {
-    await requestSaveAs();
-  }, [requestSaveAs]);
-
-  const handleSaveFile = useCallback(async () => {
-    if (!activeFileId) {
-      await requestSaveAs();
-      return;
-    }
-    try {
-      await fileEditor.commands.execute('file.saveSchema');
-      setFileStatus(`已保存: ${activeFileId}`);
-      await refreshStoredFiles();
-    } catch (error) {
-      setFileStatus(`保存失败: ${getErrorMessage(error)}`);
-    }
-  }, [activeFileId, fileEditor, refreshStoredFiles, requestSaveAs]);
-
   useEffect(() => {
     syncModeToUrl(appMode);
   }, [appMode]);
@@ -330,23 +261,6 @@ export function App() {
       setShellSnapshot(snapshot);
     });
     return unsubscribe;
-  }, [fileEditor]);
-
-  useEffect(() => {
-    void refreshStoredFiles();
-  }, [refreshStoredFiles]);
-
-  useEffect(() => {
-    const offSaved = fileEditor.eventBus.on('file:saved', ({ fileId }) => {
-      setFileStatus(`已保存: ${fileId}`);
-    });
-    const offOpened = fileEditor.eventBus.on('file:opened', ({ fileId }) => {
-      setFileStatus(`已打开: ${fileId}`);
-    });
-    return () => {
-      offSaved();
-      offOpened();
-    };
   }, [fileEditor]);
 
   const treeNodes = useMemo(() => buildEditorTree(activeSchema), [activeSchema]);
@@ -409,35 +323,12 @@ export function App() {
       },
     ];
     if (appMode === 'shell') {
-      tabs.push(createFilesSidebarTab({
-        files: storedFiles,
-        activeFileId,
-        status: fileStatus,
-        onOpenFile: (fileId) => {
-          void handleOpenFile(fileId);
-        },
-        onSaveFile: () => {
-          void handleSaveFile();
-        },
-        onSaveAsFile: () => {
-          void handleSaveAsFile();
-        },
-        onRefresh: () => {
-          void refreshStoredFiles();
-        },
-      }));
+      if (filesSidebarTab) {
+        tabs.push(filesSidebarTab);
+      }
     }
     return tabs;
-  }, [
-    activeFileId,
-    appMode,
-    fileStatus,
-    handleOpenFile,
-    handleSaveAsFile,
-    handleSaveFile,
-    refreshStoredFiles,
-    storedFiles,
-  ]);
+  }, [appMode, filesSidebarTab]);
   const activityBarItems = useMemo<ActivityBarItemContribution[]>(() => [
     {
       id: 'rocket',
@@ -488,84 +379,6 @@ export function App() {
     },
     [fileEditor],
   );
-
-  const handleUndo = useCallback(() => {
-    if (appMode !== 'shell' || !canUndo) {
-      return;
-    }
-    void fileEditor.commands.execute('editor.undo').catch((error) => {
-      antd.message.error(`撤销失败: ${getErrorMessage(error)}`);
-    });
-  }, [appMode, canUndo, fileEditor]);
-
-  const handleRedo = useCallback(() => {
-    if (appMode !== 'shell' || !canRedo) {
-      return;
-    }
-    void fileEditor.commands.execute('editor.redo').catch((error) => {
-      antd.message.error(`重做失败: ${getErrorMessage(error)}`);
-    });
-  }, [appMode, canRedo, fileEditor]);
-
-  useEffect(() => {
-    if (appMode !== 'shell') {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const withPrimaryModifier = event.ctrlKey || event.metaKey;
-      if (!withPrimaryModifier || event.altKey) {
-        return;
-      }
-
-      const key = event.key.toLowerCase();
-      if (key === 's') {
-        event.preventDefault();
-        void handleSaveFile();
-        return;
-      }
-
-      if (isEditableHotkeyTarget(event.target)) {
-        return;
-      }
-
-      if (key === 'z' && !event.shiftKey) {
-        if (!canUndo) {
-          return;
-        }
-        event.preventDefault();
-        handleUndo();
-        return;
-      }
-
-      if ((key === 'z' && event.shiftKey) || key === 'y') {
-        if (!canRedo) {
-          return;
-        }
-        event.preventDefault();
-        handleRedo();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [appMode, canRedo, canUndo, handleRedo, handleSaveFile, handleUndo]);
-
-  useEffect(() => {
-    if (appMode !== 'shell' || !isDirty) {
-      return;
-    }
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [appMode, isDirty]);
 
   const handlePatchProps = (patch: Record<string, unknown>) => {
     if (appMode === 'shell') {
