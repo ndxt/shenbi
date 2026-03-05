@@ -27,7 +27,7 @@ import { AppShell } from '@shenbi/editor-ui';
 import {
   createEditorAIBridge,
   type EditorBridgeSnapshot,
-} from './ai/editor-ai-bridge';
+} from '@shenbi/editor-ui';
 import {
   buildEditorTree,
   getDefaultSelectedNodeId,
