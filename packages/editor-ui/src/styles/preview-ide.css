@@ -1,5 +1,3 @@
-@import "tailwindcss";
-
 @theme {
   /* Semantic Backgrounds */
   --color-bg-activity-bar: var(--bg-activity-bar);

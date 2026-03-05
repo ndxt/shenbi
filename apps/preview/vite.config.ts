@@ -11,6 +11,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@shenbi/schema': path.resolve(__dirname, '../../packages/schema/types/index.ts'),
+      '@shenbi/editor-ui': path.resolve(__dirname, '../../packages/editor-ui/src/index.ts'),
     },
   },
 });

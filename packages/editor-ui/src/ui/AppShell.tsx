@@ -7,7 +7,7 @@ import { Inspector } from './Inspector';
 import { AIPanel, type AIPanelProps } from './AIPanel';
 import { Console } from './Console';
 import { StatusBar } from './StatusBar';
-import '../styles/preview-ide.css';
+import '../styles/editor-ui.css';
 import { useResize } from '../hooks/useResize';
 
 import { TitleBar } from './TitleBar';

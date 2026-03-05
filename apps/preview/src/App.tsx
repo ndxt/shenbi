@@ -26,6 +26,7 @@ import {
 import { AppShell } from '@shenbi/editor-ui';
 import {
   createEditorAIBridge,
+  type InspectorTabContribution,
   type EditorBridgeSnapshot,
 } from '@shenbi/editor-ui';
 import {
@@ -196,6 +197,21 @@ export function App() {
     () => (selectedNode ? getBuiltinContract(selectedNode.component) : undefined),
     [selectedNode],
   );
+  const inspectorTabs = useMemo<InspectorTabContribution[]>(() => [
+    {
+      id: 'debug',
+      label: 'Debug',
+      order: 99,
+      render: (context) => (
+        <div className="p-3 text-xs text-text-secondary">
+          Plugin Tab Loaded
+          {context.selectedNode?.id ? (
+            <div className="mt-2 text-[11px]">Selected: {context.selectedNode.id}</div>
+          ) : null}
+        </div>
+      ),
+    },
+  ], []);
 
   const updateActiveSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
     if (appMode === 'shell') {
@@ -279,6 +295,7 @@ export function App() {
         onPatchStyle: handlePatchStyle,
         onPatchEvents: handlePatchEvents,
         onPatchLogic: handlePatchLogic,
+        tabs: inspectorTabs,
         ...(selectedNode ? { selectedNode } : {}),
         ...(selectedContract ? { contract: selectedContract } : {}),
       }}

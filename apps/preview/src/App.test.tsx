@@ -594,6 +594,16 @@ describe('preview/App integration', () => {
     });
   });
 
+  it('编辑器：Inspector 支持插件扩展 Tab（Debug）', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.click(screen.getByText('Debug'));
+    await waitFor(() => {
+      expect(screen.getByText('Plugin Tab Loaded')).toBeInTheDocument();
+    });
+  });
+
   it('AI 面板：通过 bridge 执行 schema.replace 并更新画布', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();

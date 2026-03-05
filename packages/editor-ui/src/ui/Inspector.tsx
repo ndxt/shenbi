@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
-import { SetterPanel } from '../panels/SetterPanel';
-import { ActionPanel } from '../panels/ActionPanel';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ComponentContract, SchemaNode } from '@shenbi/schema';
+import {
+  resolveInspectorTabs,
+  type InspectorTabContribution,
+  type InspectorTabRenderContext,
+} from './inspector-tabs';
+export type { InspectorTabContribution, InspectorTabRenderContext } from './inspector-tabs';
 
-type InspectorTab = 'props' | 'style' | 'events' | 'logic' | 'actions';
+type InspectorTab = string;
 
 export interface InspectorProps {
   selectedNode?: SchemaNode;
@@ -13,6 +17,7 @@ export interface InspectorProps {
   onPatchStyle?: (patch: Record<string, unknown>) => void;
   onPatchEvents?: (patch: Record<string, unknown>) => void;
   onPatchLogic?: (patch: Record<string, unknown>) => void;
+  tabs?: InspectorTabContribution[];
 }
 
 export function Inspector({
@@ -23,36 +28,60 @@ export function Inspector({
   onPatchStyle,
   onPatchEvents,
   onPatchLogic,
+  tabs,
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>('props');
+  const renderContext = useMemo<InspectorTabRenderContext>(() => ({
+    ...(selectedNode ? { selectedNode } : {}),
+    ...(contract ? { contract } : {}),
+    ...(onPatchProps ? { onPatchProps } : {}),
+    ...(onPatchColumns ? { onPatchColumns } : {}),
+    ...(onPatchStyle ? { onPatchStyle } : {}),
+    ...(onPatchEvents ? { onPatchEvents } : {}),
+    ...(onPatchLogic ? { onPatchLogic } : {}),
+  }), [
+    contract,
+    onPatchColumns,
+    onPatchEvents,
+    onPatchLogic,
+    onPatchProps,
+    onPatchStyle,
+    selectedNode,
+  ]);
+  const resolvedTabs = useMemo(() => resolveInspectorTabs(tabs), [tabs]);
+
+  useEffect(() => {
+    if (resolvedTabs.length === 0) {
+      return;
+    }
+    const hasActiveTab = resolvedTabs.some((tab) => tab.id === activeTab);
+    const fallbackTabId = resolvedTabs[0]?.id;
+    if (!hasActiveTab && fallbackTabId) {
+      setActiveTab(fallbackTabId);
+    }
+  }, [activeTab, resolvedTabs]);
+
+  const activeTabDefinition = resolvedTabs.find((tab) => tab.id === activeTab) ?? resolvedTabs[0] ?? undefined;
 
   return (
     <div className="w-full h-full bg-bg-panel border-l border-border-ide flex flex-col shrink-0 overflow-hidden">
       <div className="h-8 border-b border-border-ide flex shrink-0 bg-bg-activity-bar px-1">
-        <TabItem label="Props" isActive={activeTab === 'props'} onClick={() => setActiveTab('props')} />
-        <TabItem label="Style" isActive={activeTab === 'style'} onClick={() => setActiveTab('style')} />
-        <TabItem label="Events" isActive={activeTab === 'events'} onClick={() => setActiveTab('events')} />
-        <TabItem label="Logic" isActive={activeTab === 'logic'} onClick={() => setActiveTab('logic')} />
-        <TabItem label="Actions" isActive={activeTab === 'actions'} onClick={() => setActiveTab('actions')} />
+        {resolvedTabs.map((tab) => (
+          <TabItem
+            key={tab.id}
+            label={tab.label}
+            isActive={activeTab === tab.id}
+            onClick={() => setActiveTab(tab.id)}
+          />
+        ))}
       </div>
 
       <div className="flex-1 w-full flex flex-col min-h-0 overflow-hidden">
-        {activeTab === 'actions' ? (
-          <ActionPanel />
-        ) : (
+        {activeTabDefinition ? (
           <div className="flex-1 overflow-y-auto w-full">
-            <SetterPanel
-              activeTab={activeTab}
-              {...(selectedNode ? { selectedNode } : {})}
-              {...(contract ? { contract } : {})}
-              {...(onPatchProps ? { onPatchProps } : {})}
-              {...(onPatchColumns ? { onPatchColumns } : {})}
-              {...(onPatchStyle ? { onPatchStyle } : {})}
-              {...(onPatchEvents ? { onPatchEvents } : {})}
-              {...(onPatchLogic ? { onPatchLogic } : {})}
-            />
+            {activeTabDefinition.render(renderContext)}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

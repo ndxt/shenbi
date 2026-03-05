@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Shared scan strategy for editor-ui package components. */
+@source "../**/*.{ts,tsx}";
+
+@import "./preview-ide.css";
