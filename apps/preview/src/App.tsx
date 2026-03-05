@@ -220,11 +220,15 @@ export function App() {
   const [storedFiles, setStoredFiles] = useState<FileMetadata[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | undefined>(undefined);
   const [fileStatus, setFileStatus] = useState<string>('当前未绑定文件');
+  const canUndo = appMode === 'shell' ? shellSnapshot.canUndo : false;
+  const canRedo = appMode === 'shell' ? shellSnapshot.canRedo : false;
 
   const updateActiveSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
     if (appMode === 'shell') {
       const nextSchema = updater(fileEditor.state.getSchema());
-      fileEditor.state.setSchema(nextSchema);
+      void fileEditor.commands.execute('schema.replace', { schema: nextSchema }).catch((error) => {
+        antd.message.error(`Schema 更新失败: ${getErrorMessage(error)}`);
+      });
       return;
     }
     setScenarioSchemas((prev) => ({
@@ -464,6 +468,24 @@ export function App() {
     [fileEditor],
   );
 
+  const handleUndo = useCallback(() => {
+    if (appMode !== 'shell' || !canUndo) {
+      return;
+    }
+    void fileEditor.commands.execute('editor.undo').catch((error) => {
+      antd.message.error(`撤销失败: ${getErrorMessage(error)}`);
+    });
+  }, [appMode, canUndo, fileEditor]);
+
+  const handleRedo = useCallback(() => {
+    if (appMode !== 'shell' || !canRedo) {
+      return;
+    }
+    void fileEditor.commands.execute('editor.redo').catch((error) => {
+      antd.message.error(`重做失败: ${getErrorMessage(error)}`);
+    });
+  }, [appMode, canRedo, fileEditor]);
+
   const handlePatchProps = (patch: Record<string, unknown>) => {
     if (appMode === 'shell') {
       if (!selectedNodeId) {
@@ -590,6 +612,28 @@ export function App() {
                   </option>
                 ))}
               </select>
+            </>
+          ) : null}
+          {appMode === 'shell' ? (
+            <>
+              <button
+                type="button"
+                aria-label="撤销"
+                className="h-7 rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary transition-colors hover:bg-bg-activity-bar disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!canUndo}
+                onClick={handleUndo}
+              >
+                撤销
+              </button>
+              <button
+                type="button"
+                aria-label="重做"
+                className="h-7 rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary transition-colors hover:bg-bg-activity-bar disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!canRedo}
+                onClick={handleRedo}
+              >
+                重做
+              </button>
             </>
           ) : null}
           {activityMessage ? (

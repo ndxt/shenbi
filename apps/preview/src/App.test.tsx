@@ -691,6 +691,51 @@ describe('preview/App integration', () => {
     promptSpy.mockRestore();
   });
 
+  it('编辑器：Shell 模式支持撤销与重做', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.selectOptions(screen.getByLabelText('模式切换'), 'shell');
+    await waitFor(() => {
+      expect(screen.queryByText('User 1')).toBeNull();
+    });
+
+    await user.click(screen.getByTitle('Toggle AI Assistant'));
+    await user.click(await screen.findByRole('button', { name: '生成演示页面' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('AI 生成演示页面')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Outline'));
+    await user.click(screen.getByText('ai-generated-card (Card)'));
+
+    const titleInput = await screen.findByLabelText('title');
+    await user.clear(titleInput);
+    await user.type(titleInput, 'UndoRedo 标题');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByText('UndoRedo 标题')).toBeInTheDocument();
+    });
+
+    const undoButton = screen.getByRole('button', { name: '撤销' });
+    const redoButton = screen.getByRole('button', { name: '重做' });
+    expect(undoButton).not.toBeDisabled();
+    expect(redoButton).toBeDisabled();
+
+    await user.click(undoButton);
+    await waitFor(() => {
+      expect(screen.getByText('AI 生成演示页面')).toBeInTheDocument();
+      expect(screen.queryByText('UndoRedo 标题')).toBeNull();
+    });
+
+    await user.click(redoButton);
+    await waitFor(() => {
+      expect(screen.getByText('UndoRedo 标题')).toBeInTheDocument();
+    });
+  });
+
   it('编辑器：ActivityBar 支持插件扩展图标（Rocket）', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
