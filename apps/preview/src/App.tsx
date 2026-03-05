@@ -28,6 +28,7 @@ import { AppShell } from '@shenbi/editor-ui';
 import {
   createEditorAIBridge,
   useFileWorkspace,
+  useNodePatchDispatch,
   useSelectionSync,
   type ActivityBarItemContribution,
   type InspectorTabContribution,
@@ -374,61 +375,23 @@ export function App() {
     },
     [fileEditor],
   );
-
-  const handlePatchProps = (patch: Record<string, unknown>) => {
-    if (appMode === 'shell') {
-      if (!selectedNodeId) {
-        return;
-      }
-      executeShellNodeCommand('node.patchProps', { treeId: selectedNodeId, patch });
-      return;
-    }
-    updateActiveSchema((schema) => patchSchemaNodeProps(schema, selectedNodeId, patch));
-  };
-
-  const handlePatchEvents = (patch: Record<string, unknown>) => {
-    if (appMode === 'shell') {
-      if (!selectedNodeId) {
-        return;
-      }
-      executeShellNodeCommand('node.patchEvents', { treeId: selectedNodeId, patch });
-      return;
-    }
-    updateActiveSchema((schema) => patchSchemaNodeEvents(schema, selectedNodeId, patch));
-  };
-
-  const handlePatchColumns = (columns: unknown[]) => {
-    if (appMode === 'shell') {
-      if (!selectedNodeId) {
-        return;
-      }
-      executeShellNodeCommand('node.patchColumns', { treeId: selectedNodeId, columns });
-      return;
-    }
-    updateActiveSchema((schema) => patchSchemaNodeColumns(schema, selectedNodeId, columns));
-  };
-
-  const handlePatchStyle = (patch: Record<string, unknown>) => {
-    if (appMode === 'shell') {
-      if (!selectedNodeId) {
-        return;
-      }
-      executeShellNodeCommand('node.patchStyle', { treeId: selectedNodeId, patch });
-      return;
-    }
-    updateActiveSchema((schema) => patchSchemaNodeStyle(schema, selectedNodeId, patch));
-  };
-
-  const handlePatchLogic = (patch: Record<string, unknown>) => {
-    if (appMode === 'shell') {
-      if (!selectedNodeId) {
-        return;
-      }
-      executeShellNodeCommand('node.patchLogic', { treeId: selectedNodeId, patch });
-      return;
-    }
-    updateActiveSchema((schema) => patchSchemaNodeLogic(schema, selectedNodeId, patch));
-  };
+  const {
+    handlePatchProps,
+    handlePatchEvents,
+    handlePatchColumns,
+    handlePatchStyle,
+    handlePatchLogic,
+  } = useNodePatchDispatch({
+    mode: appMode === 'shell' ? 'shell' : 'scenarios',
+    selectedNodeId,
+    executeShellCommand: executeShellNodeCommand,
+    updateScenarioSchema: updateActiveSchema,
+    patchSchemaNodeProps,
+    patchSchemaNodeEvents,
+    patchSchemaNodeStyle,
+    patchSchemaNodeLogic,
+    patchSchemaNodeColumns,
+  });
 
   const handleCanvasSelectNode = (schemaNodeId: string) => {
     selectSchemaNode(schemaNodeId);
