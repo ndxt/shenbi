@@ -17,4 +17,5 @@ export * from './hooks/useNodePatchDispatch';
 export * from './hooks/useShellModeUrl';
 
 export * from './ai/editor-ai-bridge';
+export * from './ai/useEditorAIBridge';
 export * from './plugins';

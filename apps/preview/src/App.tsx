@@ -26,7 +26,7 @@ import {
 
 import { AppShell } from '@shenbi/editor-ui';
 import {
-  createEditorAIBridge,
+  useEditorAIBridge,
   useFileWorkspace,
   useNodePatchDispatch,
   useShellModeUrl,
@@ -35,7 +35,6 @@ import {
   type ActivityBarItemContribution,
   type InspectorTabContribution,
   type SidebarTabContribution,
-  type EditorBridgeSnapshot,
 } from '@shenbi/editor-ui';
 import {
   buildEditorTree,
@@ -304,36 +303,12 @@ export function App() {
       onClick: () => setActivityMessage('Activity Plugin Triggered'),
     },
   ], []);
-
-  const aiBridgeListenersRef = useRef(new Set<(snapshot: EditorBridgeSnapshot) => void>());
-  const aiSnapshotRef = useRef<EditorBridgeSnapshot>({
+  const aiBridge = useEditorAIBridge({
     schema: activeSchema,
     ...(selectedNodeId ? { selectedNodeId } : {}),
-  });
-
-  useEffect(() => {
-    const snapshot: EditorBridgeSnapshot = {
-      schema: activeSchema,
-      ...(selectedNodeId ? { selectedNodeId } : {}),
-    };
-    aiSnapshotRef.current = snapshot;
-    for (const listener of aiBridgeListenersRef.current) {
-      listener(snapshot);
-    }
-  }, [activeSchema, selectedNodeId]);
-
-  const aiBridge = useMemo(() => createEditorAIBridge({
-    getSnapshot: () => aiSnapshotRef.current,
     replaceSchema: (schema) => updateActiveSchema(() => schema),
     getAvailableComponents: () => builtinContracts,
-    subscribe: (listener) => {
-      aiBridgeListenersRef.current.add(listener);
-      listener(aiSnapshotRef.current);
-      return () => {
-        aiBridgeListenersRef.current.delete(listener);
-      };
-    },
-  }), [updateActiveSchema]);
+  });
 
   const executeShellNodeCommand = useCallback(
     (commandId: string, args: Record<string, unknown>) => {
