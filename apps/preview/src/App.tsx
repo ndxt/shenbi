@@ -23,7 +23,7 @@ import {
   userManagementSchema,
 } from './schemas';
 
-import { AppShell } from './ui/AppShell';
+import { AppShell } from '@shenbi/editor-ui';
 import {
   createEditorAIBridge,
   type EditorBridgeSnapshot,

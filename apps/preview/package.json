@@ -16,6 +16,7 @@
     "test:e2e:install": "playwright install"
   },
   "dependencies": {
+    "@shenbi/editor-ui": "workspace:*",
     "@shenbi/engine": "workspace:*",
     "@shenbi/schema": "workspace:*",
     "antd": "^6.3.0",
