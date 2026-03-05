@@ -28,6 +28,7 @@ import { AppShell } from '@shenbi/editor-ui';
 import {
   createEditorAIBridge,
   useFileWorkspace,
+  useSelectionSync,
   type ActivityBarItemContribution,
   type InspectorTabContribution,
   type SidebarTabContribution,
@@ -201,7 +202,6 @@ export function App() {
   }
   const fileEditor = fileEditorRef.current;
   const [shellSnapshot, setShellSnapshot] = useState(() => fileEditor.state.getSnapshot());
-  const selectedNodeId = appMode === 'shell' ? shellSnapshot.selectedNodeId : scenarioSelectedNodeId;
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : scenarioSchemas[activeScenario];
   const {
     activeFileName,
@@ -232,6 +232,9 @@ export function App() {
       return window.prompt('请输入文件名', defaultName);
     },
   });
+  const setShellSelectedNodeId = useCallback((nodeId: string | undefined) => {
+    fileEditor.state.setSelectedNodeId(nodeId);
+  }, [fileEditor]);
 
   const updateActiveSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
     if (appMode === 'shell') {
@@ -264,26 +267,18 @@ export function App() {
   }, [fileEditor]);
 
   const treeNodes = useMemo(() => buildEditorTree(activeSchema), [activeSchema]);
-
-  useEffect(() => {
-    if (appMode === 'shell') {
-      const currentSelected = shellSnapshot.selectedNodeId;
-      if (currentSelected && getSchemaNodeByTreeId(activeSchema, currentSelected)) {
-        return;
-      }
-      const nextDefault = getDefaultSelectedNodeId(treeNodes);
-      if (nextDefault !== currentSelected) {
-        fileEditor.state.setSelectedNodeId(nextDefault);
-      }
-      return;
-    }
-    setScenarioSelectedNodeId((prev) => {
-      if (prev && getSchemaNodeByTreeId(activeSchema, prev)) {
-        return prev;
-      }
-      return getDefaultSelectedNodeId(treeNodes);
-    });
-  }, [activeSchema, appMode, fileEditor, shellSnapshot.selectedNodeId, treeNodes]);
+  const { selectedNodeId, selectTreeNode, selectSchemaNode } = useSelectionSync({
+    mode: appMode === 'shell' ? 'shell' : 'scenarios',
+    schema: activeSchema,
+    treeNodes,
+    shellSelectedNodeId: shellSnapshot.selectedNodeId,
+    scenarioSelectedNodeId,
+    setShellSelectedNodeId,
+    setScenarioSelectedNodeId,
+    getNodeByTreeId: getSchemaNodeByTreeId,
+    getDefaultSelectedNodeId,
+    getTreeIdBySchemaNodeId,
+  });
 
   const selectedNode = useMemo(
     () => getSchemaNodeByTreeId(activeSchema, selectedNodeId),
@@ -436,14 +431,7 @@ export function App() {
   };
 
   const handleCanvasSelectNode = (schemaNodeId: string) => {
-    const treeId = getTreeIdBySchemaNodeId(activeSchema, schemaNodeId);
-    if (treeId) {
-      if (appMode === 'shell') {
-        fileEditor.state.setSelectedNodeId(treeId);
-      } else {
-        setScenarioSelectedNodeId(treeId);
-      }
-    }
+    selectSchemaNode(schemaNodeId);
   };
 
   return (
@@ -454,13 +442,7 @@ export function App() {
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,
-        onSelectNode: (nodeId) => {
-          if (appMode === 'shell') {
-            fileEditor.state.setSelectedNodeId(nodeId);
-          } else {
-            setScenarioSelectedNodeId(nodeId);
-          }
-        },
+        onSelectNode: selectTreeNode,
         tabs: sidebarTabs,
         ...(selectedNodeId ? { selectedNodeId } : {}),
       }}
