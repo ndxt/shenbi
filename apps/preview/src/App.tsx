@@ -97,6 +97,19 @@ function getErrorMessage(error: unknown): string {
   return 'unknown error';
 }
 
+function normalizeFileMetadataList(value: unknown): FileMetadata[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is FileMetadata => {
+    return Boolean(item)
+      && typeof item === 'object'
+      && typeof (item as { id?: unknown }).id === 'string'
+      && typeof (item as { name?: unknown }).name === 'string'
+      && typeof (item as { updatedAt?: unknown }).updatedAt === 'number';
+  });
+}
+
 function createInitialScenarioState(): Record<ScenarioKey, PageSchema> {
   return {
     'user-management': cloneSchema(userManagementSchema),
@@ -220,13 +233,14 @@ export function App() {
 
   const refreshStoredFiles = useCallback(async () => {
     try {
-      const files = await fileStorage.list();
+      const listResult = await fileEditor.commands.execute('file.listSchemas');
+      const files = normalizeFileMetadataList(listResult);
       const sorted = [...files].sort((left, right) => right.updatedAt - left.updatedAt);
       setStoredFiles(sorted);
     } catch (error) {
       setFileStatus(`文件列表加载失败: ${getErrorMessage(error)}`);
     }
-  }, [fileStorage]);
+  }, [fileEditor]);
 
   const handleOpenFile = useCallback(async (fileId: string) => {
     try {
@@ -267,20 +281,15 @@ export function App() {
     }
     try {
       fileEditor.state.setSchema(activeSchema);
-      await fileEditor.commands.execute('file.saveAs', { name: nextName.trim() });
+      const saveAsResult = await fileEditor.commands.execute('file.saveAs', { name: nextName.trim() });
+      const nextFileId = typeof saveAsResult === 'string' ? saveAsResult : nextName.trim();
+      setActiveFileId(nextFileId);
+      setFileStatus(`已保存: ${nextFileId}`);
       await refreshStoredFiles();
-      const refreshed = await fileStorage.list();
-      const matched = refreshed.find((file) => file.name === nextName.trim());
-      if (matched) {
-        setActiveFileId(matched.id);
-        setFileStatus(`已保存: ${matched.id}`);
-      } else {
-        setFileStatus(`已保存: ${nextName.trim()}`);
-      }
     } catch (error) {
       setFileStatus(`另存失败: ${getErrorMessage(error)}`);
     }
-  }, [activeSchema, fileEditor, fileStorage, refreshStoredFiles]);
+  }, [activeSchema, fileEditor, refreshStoredFiles]);
 
   useEffect(() => {
     syncModeToUrl(appMode);

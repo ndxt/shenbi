@@ -7,7 +7,7 @@ export interface EditorCommand {
   id: string;
   label: string;
   icon?: string;
-  execute(state: EditorState, args?: unknown): void | Promise<void>;
+  execute(state: EditorState, args?: unknown): unknown | Promise<unknown>;
   canExecute?(state: EditorState): boolean;
   undo?(state: EditorState): void;
   recordHistory?: boolean;
@@ -43,7 +43,7 @@ export class CommandManager {
     };
   }
 
-  async execute(commandId: string, args?: unknown): Promise<void> {
+  async execute(commandId: string, args?: unknown): Promise<unknown> {
     const command = this.commands.get(commandId);
     if (!command) {
       throw new Error(`Command not found: ${commandId}`);
@@ -56,7 +56,7 @@ export class CommandManager {
     const beforeSnapshot = isRootExecution ? this.state.getSnapshot() : undefined;
     this.executionDepth += 1;
     try {
-      await command.execute(this.state, args);
+      const result = await command.execute(this.state, args);
 
       if (isRootExecution) {
         const afterSnapshot = this.state.getSnapshot();
@@ -71,6 +71,7 @@ export class CommandManager {
       }
 
       this.eventBus.emit('command:executed', { commandId });
+      return result;
     } catch (error) {
       if (isRootExecution) {
         this.syncHistoryFlags();

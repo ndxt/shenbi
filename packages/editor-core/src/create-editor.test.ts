@@ -43,6 +43,7 @@ describe('createEditor', () => {
   it('registers builtin commands', () => {
     const editor = createEditor();
     expect(editor.commands.has('schema.replace')).toBe(true);
+    expect(editor.commands.has('file.listSchemas')).toBe(true);
     expect(editor.commands.has('file.openSchema')).toBe(true);
     expect(editor.commands.has('file.saveSchema')).toBe(true);
     expect(editor.commands.has('editor.undo')).toBe(true);
@@ -90,6 +91,22 @@ describe('createEditor', () => {
     expect(editor.history.getSize()).toBe(0);
   });
 
+  it('file.listSchemas returns metadata and does not mutate history', async () => {
+    const storage = createMemoryStorage(createSchema('demo-page'));
+    const editor = createEditor({
+      initialSchema: createSchema('list-target'),
+      fileStorage: storage,
+    });
+
+    const result = await editor.commands.execute('file.listSchemas');
+    expect(Array.isArray(result)).toBe(true);
+    const metadataList = result as FileMetadata[];
+    expect(metadataList.length).toBeGreaterThan(0);
+    expect(metadataList[0]).toHaveProperty('id');
+    expect(metadataList[0]).toHaveProperty('name');
+    expect(editor.history.getSize()).toBe(0);
+  });
+
   it('trims file command args for fileId/name', async () => {
     const storage = createMemoryStorage();
     const editor = createEditor({
@@ -102,7 +119,8 @@ describe('createEditor', () => {
     await editor.commands.execute('file.saveSchema', { fileId: '  demo  ' });
     expect(saved).toHaveBeenCalledWith({ fileId: 'demo' });
 
-    await editor.commands.execute('file.saveAs', { name: '  Trim Name  ' });
+    const saveAsResult = await editor.commands.execute('file.saveAs', { name: '  Trim Name  ' });
     expect(saved).toHaveBeenCalled();
+    expect(saveAsResult).toBe('id-Trim Name');
   });
 });

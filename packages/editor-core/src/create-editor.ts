@@ -135,6 +135,15 @@ function registerBuiltinCommands(
   });
 
   commands.register({
+    id: 'file.listSchemas',
+    label: 'List Files',
+    recordHistory: false,
+    async execute() {
+      return fileStorage.list();
+    },
+  });
+
+  commands.register({
     id: 'file.openSchema',
     label: 'Open File',
     async execute(_currentState, args) {
@@ -167,6 +176,7 @@ function registerBuiltinCommands(
       }
       const fileId = await fileStorage.saveAs(name, currentState.getSchema());
       eventBus.emit('file:saved', { fileId });
+      return fileId;
     },
   });
 }
