@@ -299,6 +299,8 @@ export type EditorEventMap = {
   'history:undo':      void;
   'history:redo':      void;
   'plugin:activated':  { pluginId: string };
+  'file:opened':       { fileId: string };
+  'file:saved':        { fileId: string };
 };
 
 export class EventBus<T extends Record<string, unknown>> {
@@ -416,7 +418,7 @@ export interface EditorCommand {
   id: string;
   label: string;
   icon?: string;
-  execute(state: EditorState, args?: unknown): void;
+  execute(state: EditorState, args?: unknown): void | Promise<void>;
   canExecute?(state: EditorState): boolean;
   /** 可选：自定义撤销逻辑，预留给后续 patch/inversePatch 方案 */
   undo?(state: EditorState): void;
@@ -426,7 +428,7 @@ export class CommandManager {
   constructor(state: EditorState, history: History<EditorStateSnapshot>, eventBus: EventBus);
 
   register(command: EditorCommand): Disposable;
-  execute(commandId: string, args?: unknown): void;
+  execute(commandId: string, args?: unknown): Promise<void>;
   has(commandId: string): boolean;
   getAll(): EditorCommand[];
 }
@@ -452,6 +454,7 @@ export class CommandManager {
 | `schema.replace` | 整体替换 schema（供 AI 批量生成使用） |
 | `file.openSchema` | 从存储加载页面并替换当前 schema（供 File Panel 插件调用） |
 | `file.saveSchema` | 将当前 schema 持久化到存储（供 File Panel 插件调用） |
+| `file.saveAs` | 另存为新文件（可选，Phase 3 最小实现） |
 
 每次 `execute()` 自动：
 1. 执行命令
@@ -468,6 +471,39 @@ export class CommandManager {
 文件命令约束（File Panel 预留）：
 - 命令层仅依赖 `FileStorageAdapter` 抽象，不绑定具体存储实现。
 - Phase 2 使用本地/Mock adapter 验证命令链路，Phase 3 由 File Panel 插件接入。
+
+`FileStorageAdapter` 接口定义：
+
+```typescript
+export interface FileStorageAdapter {
+  /** 列出所有可用页面文件 */
+  list(): Promise<FileMetadata[]>;
+
+  /** 读取指定文件的 schema */
+  read(fileId: string): Promise<PageSchema>;
+
+  /** 保存 schema 到指定文件（覆盖） */
+  write(fileId: string, schema: PageSchema): Promise<void>;
+
+  /** 另存为新文件（可选，Phase 3 再实现） */
+  saveAs?(name: string, schema: PageSchema): Promise<string>;
+
+  /** 删除文件（可选，Phase 3 再实现） */
+  delete?(fileId: string): Promise<void>;
+}
+
+export interface FileMetadata {
+  id: string;
+  name: string;
+  updatedAt: number;
+  size?: number;
+}
+```
+
+内置文件命令实现要点：
+- `file.openSchema`：调用 `adapter.read(fileId)` 获取 schema，然后执行 `schema.replace` 命令（自动记录 history）
+- `file.saveSchema`：调用 `adapter.write(fileId, currentSchema)`，成功后发出 `file:saved` 事件
+- 错误处理：adapter 抛出的异常由命令捕获，转换为用户友好的错误提示
 
 **测试用例**：
 - register + execute 基本流程
@@ -643,7 +679,7 @@ export interface PluginContext {
   readonly selectedNodeId: string | undefined;
 
   // 命令执行（所有状态修改的唯一入口）
-  executeCommand(commandId: string, args?: unknown): void;
+  executeCommand(commandId: string, args?: unknown): Promise<void>;
 
   // 事件订阅
   subscribe(listener: (snapshot: EditorStateSnapshot) => void): () => void;
@@ -772,7 +808,7 @@ export interface EditorAIBridge {
   getAvailableComponents(): ComponentContract[];
 
   /** 执行编辑器命令（自动记录历史），返回执行结果 */
-  execute(commandId: string, args?: unknown): ExecuteResult;
+  execute(commandId: string, args?: unknown): Promise<ExecuteResult>;
 
   /** 整体替换 schema（内部走 schema.replace 命令，记录历史） */
   replaceSchema(schema: PageSchema): void;
@@ -885,8 +921,12 @@ export interface EditorCoreContextValue {
   // ── 对齐 PluginContext 的稳定 API ──
   readonly schema: PageSchema;
   readonly selectedNodeId: string | undefined;
-  executeCommand(commandId: string, args?: unknown): void;
+  executeCommand(commandId: string, args?: unknown): Promise<void>;
   subscribe(listener: (snapshot: EditorStateSnapshot) => void): () => void;
+  onEvent<K extends keyof EditorEventMap>(
+    event: K,
+    handler: (payload: EditorEventMap[K]) => void,
+  ): () => void;
 
   // ── Phase 2 临时保留，Phase 3 移除 ──
   /** @deprecated Phase 3 后由 PluginContext 内部托管，届时删除 */
@@ -905,6 +945,10 @@ export function EditorProvider({ editor, children }) {
     get selectedNodeId() { return editor.state.getSelectedNodeId(); },
     executeCommand: (id, args) => editor.commands.execute(id, args),
     subscribe: (listener) => editor.state.subscribe(listener),
+    onEvent: (event, handler) => {
+      const off = editor.eventBus.on(event, handler);
+      return () => off();
+    },
     // Phase 2 临时逃生口
     commands: editor.commands,
     eventBus: editor.eventBus,
@@ -985,10 +1029,116 @@ export function useContributions<T>(slot: string): T[] { ... }
 
 ### 5.6 File 能力预留（插件落地前）
 
-- 目标：不在 Phase 2 直接固化文件面板 UI，先把“可存取页面 JSON”的能力放到命令与适配层。
-- 约定：文件相关操作统一通过 `executeCommand('file.*')` 进入命令链。
-- 适配：先提供 `FileStorageAdapter` 本地/Mock 实现，满足开发与测试；后续可替换远端存储。
-- 边界：File Panel 本体在 Phase 3 以插件形式接入（Sidebar Tab/Panel Contribution）。
+**目标**：不在 Phase 2 直接固化文件面板 UI，先把”可存取页面 JSON”的能力放到命令与适配层。
+
+**约定**：
+- 文件相关操作统一通过 `executeCommand('file.*')` 进入命令链
+- 所有文件命令依赖 `FileStorageAdapter` 接口（见上文 3.3 command.ts 章节）
+- Phase 2 提供 Mock 实现用于开发测试，Phase 3 可替换为远端存储
+
+**Phase 2 交付物**：
+
+#### [NEW] `packages/editor-core/src/adapters/file-storage.ts`
+
+```typescript
+export interface FileStorageAdapter {
+  // 接口定义见上文 command.ts 章节
+}
+
+/** Mock 实现：基于 localStorage */
+export class LocalFileStorageAdapter implements FileStorageAdapter {
+  private readonly storageKey = 'shenbi-editor-files';
+
+  async list(): Promise<FileMetadata[]> {
+    const data = localStorage.getItem(this.storageKey);
+    return data ? JSON.parse(data) : [];
+  }
+
+  async read(fileId: string): Promise<PageSchema> {
+    const files = await this.list();
+    const file = files.find(f => f.id === fileId);
+    if (!file) throw new Error(`File not found: ${fileId}`);
+    const schemaKey = `${this.storageKey}:${fileId}`;
+    const schema = localStorage.getItem(schemaKey);
+    if (!schema) throw new Error(`Schema not found for file: ${fileId}`);
+    return JSON.parse(schema);
+  }
+
+  async write(fileId: string, schema: PageSchema): Promise<void> {
+    const schemaKey = `${this.storageKey}:${fileId}`;
+    localStorage.setItem(schemaKey, JSON.stringify(schema));
+
+    // 更新元数据
+    const files = await this.list();
+    const index = files.findIndex(f => f.id === fileId);
+    const metadata: FileMetadata = {
+      id: fileId,
+      name: schema.name || fileId,
+      updatedAt: Date.now(),
+      size: JSON.stringify(schema).length,
+    };
+
+    if (index >= 0) {
+      files[index] = metadata;
+    } else {
+      files.push(metadata);
+    }
+    localStorage.setItem(this.storageKey, JSON.stringify(files));
+  }
+}
+```
+
+#### [MODIFY] `packages/editor-core/src/create-editor.ts`
+
+```typescript
+export interface CreateEditorOptions {
+  initialSchema?: PageSchema;
+  historyMaxSize?: number;
+  fileStorage?: FileStorageAdapter;  // 新增
+}
+
+export function createEditor(options?: CreateEditorOptions) {
+  const fileStorage = options?.fileStorage || new LocalFileStorageAdapter();
+
+  // 注册文件命令
+  commands.register({
+    id: 'file.openSchema',
+    label: 'Open File',
+    async execute(state, args: { fileId: string }) {
+      const schema = await fileStorage.read(args.fileId);
+      await commands.execute('schema.replace', { schema });
+      eventBus.emit('file:opened', { fileId: args.fileId });
+    },
+  });
+
+  commands.register({
+    id: 'file.saveSchema',
+    label: 'Save File',
+    async execute(state, args: { fileId: string }) {
+      const schema = state.getSchema();
+      await fileStorage.write(args.fileId, schema);
+      eventBus.emit('file:saved', { fileId: args.fileId });
+    },
+  });
+
+  commands.register({
+    id: 'file.saveAs',
+    label: 'Save As',
+    async execute(state, args: { name: string }) {
+      if (!fileStorage.saveAs) throw new Error('saveAs is not supported by current adapter');
+      const fileId = await fileStorage.saveAs(args.name, state.getSchema());
+      eventBus.emit('file:saved', { fileId });
+    },
+  });
+
+  // ...
+}
+```
+
+**边界**：
+- Phase 2 只实现命令 + Mock adapter，不实现 UI
+- File Panel 本体在 Phase 3 以插件形式接入（Sidebar Tab/Panel Contribution）
+- 测试时可通过 `executeCommand('file.saveSchema', { fileId: 'test' })` 手动验证链路
 
 ---
 
@@ -1090,10 +1240,94 @@ const editor = createEditor({ plugins: [...builtinPlugins, aiPlugin] });
 
 ### 6.4 File Panel 插件（新增）
 
-- 入口：通过 `registerTab('sidebar')` + `registerPanel('sidebar')` 注入，不新增硬编码插槽。
-- 能力：展示页面 JSON 文件列表，支持打开/保存/另存为（最小集）。
-- 执行：所有读写动作都走 `executeCommand('file.*')`，保证 history/event 链路一致。
-- 存储：复用 Phase 2 的 `FileStorageAdapter`，支持本地/Mock，后续可平滑切换远端实现。
+**入口**：通过 `registerTab('sidebar')` + `registerPanel('sidebar')` 注入，不新增硬编码插槽。
+
+**能力**：展示页面 JSON 文件列表，支持打开/保存/另存为（最小集）。
+
+**执行**：所有读写动作都走 `executeCommand('file.*')`，保证 history/event 链路一致。
+
+**存储**：复用 Phase 2 的 `FileStorageAdapter`，支持本地/Mock，后续可平滑切换远端实现。
+
+**实现示例**：
+
+```typescript
+// packages/editor-ui/src/plugins/file-panel.tsx
+export const filePanelPlugin: EditorPlugin = {
+  id: 'builtin.sidebar.file-panel',
+  name: 'File Panel',
+  activate(ctx) {
+    ctx.registerTab({
+      id: 'sidebar-files',
+      slot: 'sidebar',
+      label: 'Files',
+      icon: 'FolderOpen',
+      order: 10,
+      component: FilePanel,
+    });
+  },
+};
+
+function FilePanel() {
+  const { executeCommand, onEvent } = useEditorContext();
+  const [files, setFiles] = useState<FileMetadata[]>([]);
+  const [currentFileId, setCurrentFileId] = useState<string>();
+
+  // 加载文件列表
+  useEffect(() => {
+    // 通过 adapter 直接读取（不走命令，因为 list 不修改状态）
+    // 或者新增 file.listFiles 命令返回列表
+    loadFileList().then(setFiles);
+  }, []);
+
+  // 监听文件保存事件，刷新列表
+  useEffect(() => {
+    return onEvent('file:saved', () => {
+      loadFileList().then(setFiles);
+    });
+  }, [onEvent]);
+
+  const handleOpen = (fileId: string) => {
+    executeCommand('file.openSchema', { fileId });
+    setCurrentFileId(fileId);
+  };
+
+  const handleSave = () => {
+    if (!currentFileId) return;
+    executeCommand('file.saveSchema', { fileId: currentFileId });
+  };
+
+  return (
+    <div className="file-panel">
+      <div className="file-list">
+        {files.map(file => (
+          <div
+            key={file.id}
+            className={cn('file-item', { active: file.id === currentFileId })}
+            onClick={() => handleOpen(file.id)}
+          >
+            <span>{file.name}</span>
+            <span className="file-time">{formatTime(file.updatedAt)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="file-actions">
+        <button onClick={handleSave} disabled={!currentFileId}>
+          Save
+        </button>
+        <button onClick={() => executeCommand('file.saveAs', { name: 'New Page' })}>
+          Save As
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+**关键设计点**：
+- 文件列表通过 adapter 直接读取（不修改状态，无需走命令）
+- 打开操作走 `executeCommand('file.openSchema')` 并通过 `schema.replace` 进入 history；保存操作只持久化，不写 history
+- 监听 `file:saved` 事件刷新列表，保持 UI 同步
+- 当前文件 ID 由组件自己管理（不放入 EditorState，避免污染核心状态）
 
 ---
 
