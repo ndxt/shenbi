@@ -455,23 +455,67 @@ export function App() {
     },
   }), [updateActiveSchema]);
 
+  const executeShellNodeCommand = useCallback(
+    (commandId: string, args: Record<string, unknown>) => {
+      void fileEditor.commands.execute(commandId, args).catch((error) => {
+        antd.message.error(`节点更新失败: ${getErrorMessage(error)}`);
+      });
+    },
+    [fileEditor],
+  );
+
   const handlePatchProps = (patch: Record<string, unknown>) => {
+    if (appMode === 'shell') {
+      if (!selectedNodeId) {
+        return;
+      }
+      executeShellNodeCommand('node.patchProps', { treeId: selectedNodeId, patch });
+      return;
+    }
     updateActiveSchema((schema) => patchSchemaNodeProps(schema, selectedNodeId, patch));
   };
 
   const handlePatchEvents = (patch: Record<string, unknown>) => {
+    if (appMode === 'shell') {
+      if (!selectedNodeId) {
+        return;
+      }
+      executeShellNodeCommand('node.patchEvents', { treeId: selectedNodeId, patch });
+      return;
+    }
     updateActiveSchema((schema) => patchSchemaNodeEvents(schema, selectedNodeId, patch));
   };
 
   const handlePatchColumns = (columns: unknown[]) => {
+    if (appMode === 'shell') {
+      if (!selectedNodeId) {
+        return;
+      }
+      executeShellNodeCommand('node.patchColumns', { treeId: selectedNodeId, columns });
+      return;
+    }
     updateActiveSchema((schema) => patchSchemaNodeColumns(schema, selectedNodeId, columns));
   };
 
   const handlePatchStyle = (patch: Record<string, unknown>) => {
+    if (appMode === 'shell') {
+      if (!selectedNodeId) {
+        return;
+      }
+      executeShellNodeCommand('node.patchStyle', { treeId: selectedNodeId, patch });
+      return;
+    }
     updateActiveSchema((schema) => patchSchemaNodeStyle(schema, selectedNodeId, patch));
   };
 
   const handlePatchLogic = (patch: Record<string, unknown>) => {
+    if (appMode === 'shell') {
+      if (!selectedNodeId) {
+        return;
+      }
+      executeShellNodeCommand('node.patchLogic', { treeId: selectedNodeId, patch });
+      return;
+    }
     updateActiveSchema((schema) => patchSchemaNodeLogic(schema, selectedNodeId, patch));
   };
 

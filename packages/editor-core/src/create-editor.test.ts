@@ -11,6 +11,20 @@ function createSchema(name: string): PageSchema {
   };
 }
 
+function createSchemaWithCard(name: string): PageSchema {
+  return {
+    id: `${name}-id`,
+    name,
+    body: [
+      {
+        id: 'card-1',
+        component: 'Card',
+        props: { title: 'old-title' },
+      },
+    ],
+  };
+}
+
 function createMemoryStorage(initial: PageSchema = createSchema('loaded')): FileStorageAdapter {
   const files = new Map<string, PageSchema>([['demo', initial]]);
   return {
@@ -43,6 +57,11 @@ describe('createEditor', () => {
   it('registers builtin commands', () => {
     const editor = createEditor();
     expect(editor.commands.has('schema.replace')).toBe(true);
+    expect(editor.commands.has('node.patchProps')).toBe(true);
+    expect(editor.commands.has('node.patchEvents')).toBe(true);
+    expect(editor.commands.has('node.patchStyle')).toBe(true);
+    expect(editor.commands.has('node.patchLogic')).toBe(true);
+    expect(editor.commands.has('node.patchColumns')).toBe(true);
     expect(editor.commands.has('file.listSchemas')).toBe(true);
     expect(editor.commands.has('file.openSchema')).toBe(true);
     expect(editor.commands.has('file.saveSchema')).toBe(true);
@@ -122,5 +141,22 @@ describe('createEditor', () => {
     const saveAsResult = await editor.commands.execute('file.saveAs', { name: '  Trim Name  ' });
     expect(saved).toHaveBeenCalled();
     expect(saveAsResult).toBe('id-Trim Name');
+  });
+
+  it('node.patchProps updates schema and records history', async () => {
+    const editor = createEditor({
+      initialSchema: createSchemaWithCard('patch-target'),
+      fileStorage: createMemoryStorage(),
+    });
+
+    await editor.commands.execute('node.patchProps', {
+      treeId: 'body.0',
+      patch: { title: 'new-title' },
+    });
+
+    const schema = editor.state.getSchema();
+    const card = Array.isArray(schema.body) ? schema.body[0] : undefined;
+    expect(card?.props).toMatchObject({ title: 'new-title' });
+    expect(editor.history.getSize()).toBe(1);
   });
 });

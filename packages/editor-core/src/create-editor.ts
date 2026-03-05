@@ -5,6 +5,13 @@ import { EventBus } from './event-bus';
 import { History } from './history';
 import type { EditorEventMap, EditorStateSnapshot } from './types';
 import { LocalFileStorageAdapter, type FileStorageAdapter } from './adapters/file-storage';
+import {
+  patchSchemaNodeColumns,
+  patchSchemaNodeEvents,
+  patchSchemaNodeLogic,
+  patchSchemaNodeProps,
+  patchSchemaNodeStyle,
+} from './schema-editor';
 
 export interface CreateEditorOptions {
   initialSchema?: PageSchema;
@@ -81,6 +88,27 @@ function extractFileNameFromArgs(args: unknown): string {
   return args.name.trim();
 }
 
+function extractTreeIdFromArgs(args: unknown, commandId: string): string {
+  if (!isRecord(args) || typeof args.treeId !== 'string' || args.treeId.trim().length === 0) {
+    throw new Error(`${commandId} expects args: { treeId: string, ... }`);
+  }
+  return args.treeId.trim();
+}
+
+function extractPatchFromArgs(args: unknown, commandId: string): Record<string, unknown> {
+  if (!isRecord(args) || !isRecord(args.patch)) {
+    throw new Error(`${commandId} expects args: { treeId: string, patch: object }`);
+  }
+  return args.patch;
+}
+
+function extractColumnsFromArgs(args: unknown): unknown {
+  if (!isRecord(args) || !Object.prototype.hasOwnProperty.call(args, 'columns')) {
+    throw new Error('node.patchColumns expects args: { treeId: string, columns: unknown }');
+  }
+  return args.columns;
+}
+
 function registerBuiltinCommands(
   state: EditorState,
   history: History<EditorStateSnapshot>,
@@ -95,6 +123,66 @@ function registerBuiltinCommands(
       const schema = extractSchemaFromArgs(args);
       currentState.setSchema(schema);
       eventBus.emit('schema:changed', { schema });
+    },
+  });
+
+  commands.register({
+    id: 'node.patchProps',
+    label: 'Patch Node Props',
+    execute(currentState, args) {
+      const treeId = extractTreeIdFromArgs(args, 'node.patchProps');
+      const patch = extractPatchFromArgs(args, 'node.patchProps');
+      const nextSchema = patchSchemaNodeProps(currentState.getSchema(), treeId, patch);
+      currentState.setSchema(nextSchema);
+      eventBus.emit('schema:changed', { schema: nextSchema });
+    },
+  });
+
+  commands.register({
+    id: 'node.patchEvents',
+    label: 'Patch Node Events',
+    execute(currentState, args) {
+      const treeId = extractTreeIdFromArgs(args, 'node.patchEvents');
+      const patch = extractPatchFromArgs(args, 'node.patchEvents');
+      const nextSchema = patchSchemaNodeEvents(currentState.getSchema(), treeId, patch);
+      currentState.setSchema(nextSchema);
+      eventBus.emit('schema:changed', { schema: nextSchema });
+    },
+  });
+
+  commands.register({
+    id: 'node.patchStyle',
+    label: 'Patch Node Style',
+    execute(currentState, args) {
+      const treeId = extractTreeIdFromArgs(args, 'node.patchStyle');
+      const patch = extractPatchFromArgs(args, 'node.patchStyle');
+      const nextSchema = patchSchemaNodeStyle(currentState.getSchema(), treeId, patch);
+      currentState.setSchema(nextSchema);
+      eventBus.emit('schema:changed', { schema: nextSchema });
+    },
+  });
+
+  commands.register({
+    id: 'node.patchLogic',
+    label: 'Patch Node Logic',
+    execute(currentState, args) {
+      const treeId = extractTreeIdFromArgs(args, 'node.patchLogic');
+      const patch = extractPatchFromArgs(args, 'node.patchLogic');
+      const nextSchema = patchSchemaNodeLogic(currentState.getSchema(), treeId, patch);
+      currentState.setSchema(nextSchema);
+      eventBus.emit('schema:changed', { schema: nextSchema });
+    },
+  });
+
+  commands.register({
+    id: 'node.patchColumns',
+    label: 'Patch Node Columns',
+    execute(currentState, args) {
+      const treeId = extractTreeIdFromArgs(args, 'node.patchColumns');
+      const columns = extractColumnsFromArgs(args);
+      const nextSchema = patchSchemaNodeColumns(currentState.getSchema(), treeId, columns);
+      currentState.setSchema(nextSchema);
+      eventBus.emit('schema:changed', { schema: nextSchema });
     },
   });
 
