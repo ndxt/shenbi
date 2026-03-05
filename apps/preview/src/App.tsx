@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as antd from 'antd';
+import { Rocket } from 'lucide-react';
 import {
   builtinContracts,
   getBuiltinContract,
@@ -26,6 +27,7 @@ import {
 import { AppShell } from '@shenbi/editor-ui';
 import {
   createEditorAIBridge,
+  type ActivityBarItemContribution,
   type InspectorTabContribution,
   type SidebarTabContribution,
   type EditorBridgeSnapshot,
@@ -172,6 +174,7 @@ export function App() {
   );
   const [shellSchema, setShellSchema] = useState<PageSchema>(() => createEmptyShellSchema());
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
+  const [activityMessage, setActivityMessage] = useState<string>('');
   const activeSchema = appMode === 'shell' ? shellSchema : scenarioSchemas[activeScenario];
 
   useEffect(() => {
@@ -223,6 +226,17 @@ export function App() {
           Sidebar Plugin Loaded
         </div>
       ),
+    },
+  ], []);
+  const activityBarItems = useMemo<ActivityBarItemContribution[]>(() => [
+    {
+      id: 'rocket',
+      label: 'Rocket',
+      icon: Rocket,
+      order: 99,
+      section: 'main',
+      targetSidebarTabId: 'assets',
+      onClick: () => setActivityMessage('Activity Plugin Triggered'),
     },
   ], []);
 
@@ -296,6 +310,9 @@ export function App() {
 
   return (
     <AppShell
+      activityBarProps={{
+        items: activityBarItems,
+      }}
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,
@@ -346,6 +363,9 @@ export function App() {
                 ))}
               </select>
             </>
+          ) : null}
+          {activityMessage ? (
+            <span className="ml-2 text-[11px] text-text-secondary">{activityMessage}</span>
           ) : null}
         </div>
       )}

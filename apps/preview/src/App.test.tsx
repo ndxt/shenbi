@@ -604,11 +604,27 @@ describe('preview/App integration', () => {
     });
   });
 
+  it('编辑器：ActivityBar 支持插件扩展图标（Rocket）', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.click(screen.getByLabelText('Rocket'));
+    await waitFor(() => {
+      expect(screen.getByText('Activity Plugin Triggered')).toBeInTheDocument();
+      expect(screen.getByText('Sidebar Plugin Loaded')).toBeInTheDocument();
+    });
+  });
+
   it('编辑器：Inspector 支持插件扩展 Tab（Debug）', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
 
-    await user.click(screen.getByText('Debug'));
+    const debugCandidates = screen.getAllByText('Debug');
+    const inspectorDebugTab = debugCandidates.at(-1);
+    if (!inspectorDebugTab) {
+      throw new Error('Inspector Debug tab not found');
+    }
+    await user.click(inspectorDebugTab);
     await waitFor(() => {
       expect(screen.getByText('Plugin Tab Loaded')).toBeInTheDocument();
     });

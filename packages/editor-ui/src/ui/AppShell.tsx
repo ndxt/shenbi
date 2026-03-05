@@ -11,12 +11,14 @@ import '../styles/editor-ui.css';
 import { useResize } from '../hooks/useResize';
 
 import { TitleBar } from './TitleBar';
+import type { ActivityBarItemContribution, ActivityBarProps } from './ActivityBar';
 import type { SidebarProps } from './Sidebar';
 import type { InspectorProps } from './Inspector';
 
 interface AppShellProps {
   children: React.ReactNode;
   toolbarExtra?: React.ReactNode;
+  activityBarProps?: ActivityBarProps;
   sidebarProps?: SidebarProps;
   inspectorProps?: InspectorProps;
   aiPanelProps?: AIPanelProps;
@@ -36,6 +38,7 @@ const THEME_CLASSES = [
 export function AppShell({
   children,
   toolbarExtra,
+  activityBarProps,
   sidebarProps,
   inspectorProps,
   aiPanelProps,
@@ -48,6 +51,7 @@ export function AppShell({
   const [showInspector, setShowInspector] = React.useState(true);
   const [showConsole, setShowConsole] = React.useState(true);
   const [showAIPanel, setShowAIPanel] = React.useState(false);
+  const [activeSidebarTabId, setActiveSidebarTabId] = React.useState('components');
 
   const [isMaximized, setIsMaximized] = React.useState(false);
   const [previousPanelState, setPreviousPanelState] = React.useState({
@@ -87,6 +91,18 @@ export function AppShell({
 
   const toggleTheme = (newTheme: ThemeMode) => {
     setTheme(newTheme);
+  };
+
+  const handleActivitySelectItem = (item: ActivityBarItemContribution) => {
+    activityBarProps?.onSelectItem?.(item);
+    if (!item.targetSidebarTabId) {
+      return;
+    }
+    setActiveSidebarTabId(item.targetSidebarTabId);
+    if (!showSidebar) {
+      setShowSidebar(true);
+      setIsMaximized(false);
+    }
   };
 
   const handleCanvasClickCapture = (event: React.MouseEvent<HTMLElement>) => {
@@ -141,11 +157,18 @@ export function AppShell({
       
       {/* Main Container */}
       <div className="flex-1 flex overflow-hidden">
-        <ActivityBar />
+        <ActivityBar
+          {...activityBarProps}
+          onSelectItem={handleActivitySelectItem}
+        />
         
         {showSidebar && (
           <div style={{ width: sidebarSize }} className="relative shrink-0 flex flex-col h-full">
-            <Sidebar {...sidebarProps} />
+            <Sidebar
+              {...sidebarProps}
+              activeTabId={activeSidebarTabId}
+              onChangeActiveTab={setActiveSidebarTabId}
+            />
             <div 
               className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
               onMouseDown={(e) => startSidebarResize(e, 'horizontal', false)}

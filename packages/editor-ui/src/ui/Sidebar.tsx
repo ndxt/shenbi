@@ -14,6 +14,8 @@ export interface SidebarProps {
   selectedNodeId?: string;
   onSelectNode?: (nodeId: string) => void;
   onInsertComponent?: (componentType: string) => void;
+  activeTabId?: string;
+  onChangeActiveTab?: (tabId: string) => void;
   tabs?: SidebarTabContribution[];
 }
 
@@ -23,9 +25,11 @@ export function Sidebar({
   selectedNodeId,
   onSelectNode,
   onInsertComponent,
+  activeTabId,
+  onChangeActiveTab,
   tabs,
 }: SidebarProps) {
-  const [activeTab, setActiveTab] = useState<string>('components');
+  const [innerActiveTab, setInnerActiveTab] = useState<string>('components');
   const renderContext = useMemo<SidebarTabRenderContext>(() => ({
     ...(contracts ? { contracts } : {}),
     ...(treeNodes ? { treeNodes } : {}),
@@ -34,6 +38,13 @@ export function Sidebar({
     ...(onInsertComponent ? { onInsertComponent } : {}),
   }), [contracts, onInsertComponent, onSelectNode, selectedNodeId, treeNodes]);
   const resolvedTabs = useMemo(() => resolveSidebarTabs(tabs), [tabs]);
+  const activeTab = activeTabId ?? innerActiveTab;
+  const setActiveTab = (nextTabId: string) => {
+    if (activeTabId === undefined) {
+      setInnerActiveTab(nextTabId);
+    }
+    onChangeActiveTab?.(nextTabId);
+  };
 
   useEffect(() => {
     if (resolvedTabs.length === 0) {
@@ -44,7 +55,7 @@ export function Sidebar({
     if (!hasActiveTab && fallbackTabId) {
       setActiveTab(fallbackTabId);
     }
-  }, [activeTab, resolvedTabs]);
+  }, [activeTab, resolvedTabs, activeTabId]);
 
   const activeTabDefinition = resolvedTabs.find((tab) => tab.id === activeTab) ?? resolvedTabs[0] ?? undefined;
 
