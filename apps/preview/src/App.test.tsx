@@ -572,6 +572,28 @@ describe('preview/App integration', () => {
     });
   });
 
+  it('编辑器：可手动切换 shell mode 与多场景模式', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    const modeSelect = screen.getByLabelText('模式切换');
+    expect(screen.getByLabelText('场景切换')).toBeInTheDocument();
+
+    await user.selectOptions(modeSelect, 'shell');
+    await waitFor(() => {
+      expect(screen.queryByLabelText('场景切换')).toBeNull();
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('User 1')).toBeNull();
+    });
+
+    await user.selectOptions(modeSelect, 'scenarios');
+    await waitFor(() => {
+      expect(screen.getByLabelText('场景切换')).toBeInTheDocument();
+      expect(screen.getByText('User 1')).toBeInTheDocument();
+    });
+  });
+
   it('编辑器：Events 支持 JSON 回写并驱动运行时', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
