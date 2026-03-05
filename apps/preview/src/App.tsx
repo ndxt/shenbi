@@ -29,7 +29,9 @@ import {
   createEditorAIBridge,
   useFileWorkspace,
   useNodePatchDispatch,
+  useShellModeUrl,
   useSelectionSync,
+  type ShellMode,
   type ActivityBarItemContribution,
   type InspectorTabContribution,
   type SidebarTabContribution,
@@ -64,10 +66,7 @@ type ScenarioKey =
   | 'drawer-detail'
   | 'nine-grid';
 
-type AppMode = 'scenarios' | 'shell';
-
-const SHELL_MODE_QUERY_KEY = 'mode';
-const SHELL_MODE_QUERY_VALUE = 'shell';
+type AppMode = ShellMode;
 
 const scenarioOptions: { label: string; value: ScenarioKey }[] = [
   { label: '用户管理场景', value: 'user-management' },
@@ -118,33 +117,6 @@ function createEmptyShellSchema(): PageSchema {
   };
 }
 
-function getInitialAppMode(): AppMode {
-  if (typeof window === 'undefined') {
-    return 'scenarios';
-  }
-  const search = new URLSearchParams(window.location.search);
-  if (search.get(SHELL_MODE_QUERY_KEY) === SHELL_MODE_QUERY_VALUE) {
-    return 'shell';
-  }
-  if ((window as any).__SHENBI_SHELL_MODE__ === true) {
-    return 'shell';
-  }
-  return 'scenarios';
-}
-
-function syncModeToUrl(mode: AppMode): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  const url = new URL(window.location.href);
-  if (mode === 'shell') {
-    url.searchParams.set(SHELL_MODE_QUERY_KEY, SHELL_MODE_QUERY_VALUE);
-  } else {
-    url.searchParams.delete(SHELL_MODE_QUERY_KEY);
-  }
-  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-}
-
 interface ScenarioRuntimeViewProps {
   schema: PageSchema;
 }
@@ -182,7 +154,7 @@ function ScenarioRuntimeView({ schema }: ScenarioRuntimeViewProps) {
 }
 
 export function App() {
-  const [appMode, setAppMode] = useState<AppMode>(() => getInitialAppMode());
+  const [appMode, setAppMode] = useShellModeUrl();
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const [scenarioSchemas, setScenarioSchemas] = useState<Record<ScenarioKey, PageSchema>>(
     () => createInitialScenarioState(),
@@ -250,10 +222,6 @@ export function App() {
       [activeScenario]: updater(prev[activeScenario]),
     }));
   }, [activeScenario, appMode, fileEditor]);
-
-  useEffect(() => {
-    syncModeToUrl(appMode);
-  }, [appMode]);
 
   useEffect(() => () => {
     fileEditor.destroy();
