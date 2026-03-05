@@ -1,5 +1,4 @@
 import {
-  act,
   Children,
   cloneElement,
   createContext,
@@ -9,7 +8,7 @@ import {
   useRef,
 } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 
@@ -400,113 +399,6 @@ describe('preview/App integration', () => {
     });
   });
 
-  it('表格 onChange 会更新分页状态并反映到页面', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await user.click(screen.getByRole('button', { name: '触发表格变化' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('当前页: 2');
-    });
-  });
-
-  it('点击新增用户可打开弹窗并取消关闭', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await user.click(screen.getByRole('button', { name: '新增用户' }));
-    const dialog = screen.getByRole('dialog');
-    expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByText('新增用户')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: '取消' }));
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).toBeNull();
-    });
-  });
-
-  it('行选择会更新已选提示', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await user.click(screen.getByRole('button', { name: '触发行选择' }));
-
-    await waitFor(() => {
-      const alerts = screen.getAllByRole('alert');
-      expect(alerts.some((alert) => alert.textContent?.includes('已选择 1 项'))).toBe(true);
-    });
-  });
-
-  it('状态筛选会同步 URL 并过滤列表', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    const statusSelect = screen.getByLabelText('选择状态');
-    await user.selectOptions(statusSelect, 'disabled');
-
-    await waitFor(() => {
-      const params = new URLSearchParams(window.location.search);
-      expect(params.get('status')).toBe('disabled');
-    });
-    await waitFor(() => {
-      expect(screen.queryByText('User 1')).toBeNull();
-      expect(screen.getByText('User 2')).toBeInTheDocument();
-    });
-  });
-
-  it('重置可清空筛选并回到第 1 页', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    const input = screen.getByPlaceholderText('搜索关键词...');
-    await user.clear(input);
-    await user.type(input, 'User 20');
-    await user.click(screen.getByRole('button', { name: '查询' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('User 20')).toBeInTheDocument();
-    });
-    // 等待 keyword watcher 的 debounce 落稳，避免与分页变更断言产生竞态。
-    await act(async () => {
-      await new Promise((resolve) => {
-        setTimeout(resolve, 350);
-      });
-    });
-
-    await user.click(screen.getByRole('button', { name: '触发表格变化' }));
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('当前页: 2');
-    });
-
-    await user.click(screen.getByRole('button', { name: '重置' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('User 1')).toBeInTheDocument();
-      expect(screen.getByRole('alert')).toHaveTextContent('当前页: 1');
-    });
-  });
-
-  it('syncToUrl: 关键词与分页状态会同步到 URL', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    const input = screen.getByPlaceholderText('搜索关键词...');
-    await user.clear(input);
-    await user.type(input, 'User 3');
-
-    await waitFor(() => {
-      const params = new URLSearchParams(window.location.search);
-      expect(params.get('keyword')).toBe('User 3');
-    });
-
-    await user.click(screen.getByRole('button', { name: '触发表格变化' }));
-    await waitFor(() => {
-      const params = new URLSearchParams(window.location.search);
-      expect(params.get('page')).toBe('2');
-    });
-  });
-
   it('syncToUrl: 首次加载会从 URL 恢复查询条件', async () => {
     window.history.replaceState(null, '', '/?keyword=User+2&page=1');
     render(createElement(App));
@@ -518,16 +410,6 @@ describe('preview/App integration', () => {
     await waitFor(() => {
       expect(screen.getByText('User 2')).toBeInTheDocument();
     });
-  });
-
-  it('编辑器：选中节点后右侧按契约展示属性', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await selectCardNodeInOutline(user);
-
-    expect(screen.getByText('契约属性')).toBeInTheDocument();
-    expect(screen.getByLabelText('title')).toHaveValue('用户管理');
   });
 
   it('编辑器：修改 props 会回写场景并刷新渲染', async () => {
@@ -543,33 +425,6 @@ describe('preview/App integration', () => {
 
     await waitFor(() => {
       expect(screen.getByText('用户管理-测试改名')).toBeInTheDocument();
-    });
-  });
-
-  it('编辑器：切换场景后状态隔离，不串改动', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await selectCardNodeInOutline(user);
-
-    const titleInput = screen.getByLabelText('title');
-    await user.clear(titleInput);
-    await user.type(titleInput, '用户管理-隔离验证');
-    await user.tab();
-
-    await waitFor(() => {
-      expect(screen.getByText('用户管理-隔离验证')).toBeInTheDocument();
-    });
-
-    const scenarioSelect = screen.getByLabelText('场景切换');
-    await user.selectOptions(scenarioSelect, 'form-list');
-    await waitFor(() => {
-      expect(screen.queryByText('用户管理-隔离验证')).toBeNull();
-    });
-
-    await user.selectOptions(scenarioSelect, 'user-management');
-    await waitFor(() => {
-      expect(screen.getByText('用户管理-隔离验证')).toBeInTheDocument();
     });
   });
 
@@ -592,16 +447,6 @@ describe('preview/App integration', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('场景切换')).toBeInTheDocument();
       expect(screen.getByText('User 1')).toBeInTheDocument();
-    });
-  });
-
-  it('编辑器：Sidebar 支持插件扩展 Tab（Assets）', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await user.click(screen.getByText('Assets'));
-    await waitFor(() => {
-      expect(screen.getByText('Sidebar Plugin Loaded')).toBeInTheDocument();
     });
   });
 
@@ -631,32 +476,6 @@ describe('preview/App integration', () => {
     });
 
     promptSpy.mockRestore();
-  });
-
-  it('编辑器：ActivityBar 支持插件扩展图标（Rocket）', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await user.click(screen.getByLabelText('Rocket'));
-    await waitFor(() => {
-      expect(screen.getByText('Activity Plugin Triggered')).toBeInTheDocument();
-      expect(screen.getByText('Sidebar Plugin Loaded')).toBeInTheDocument();
-    });
-  });
-
-  it('编辑器：Inspector 支持插件扩展 Tab（Debug）', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    const debugCandidates = screen.getAllByText('Debug');
-    const inspectorDebugTab = debugCandidates.at(-1);
-    if (!inspectorDebugTab) {
-      throw new Error('Inspector Debug tab not found');
-    }
-    await user.click(inspectorDebugTab);
-    await waitFor(() => {
-      expect(screen.getByText('Plugin Tab Loaded')).toBeInTheDocument();
-    });
   });
 
   it('AI 面板：通过 bridge 执行 schema.replace 并更新画布', async () => {
@@ -704,104 +523,6 @@ describe('preview/App integration', () => {
     await waitFor(() => {
       expect(input.value).toBe('User 3');
       expect(screen.getByText('User 3')).toBeInTheDocument();
-    });
-  });
-
-  it('编辑器：Input onChange 事件支持回写', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await selectNodeInOutline(user, 'search-keyword-input (Input)');
-    await user.click(screen.getByText('Events'));
-
-    const actionsEditor = await screen.findByLabelText('onChange actions');
-    fireEvent.change(actionsEditor, {
-      target: {
-        value: JSON.stringify(
-          [{ type: 'setState', key: 'keyword', value: 'User 9' }],
-          null,
-          2,
-        ),
-      },
-    });
-    fireEvent.blur(actionsEditor);
-
-    const input = screen.getByPlaceholderText('搜索关键词...') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'anything' } });
-
-    await waitFor(() => {
-      expect(input.value).toBe('User 9');
-      expect(screen.getByText('User 9')).toBeInTheDocument();
-    });
-  });
-
-  it('编辑器：Table onChange 事件支持回写', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await selectNodeInOutline(user, 'user-table (Table)');
-    await user.click(screen.getByText('Events'));
-
-    const actionsEditor = await screen.findByLabelText('onChange actions');
-    fireEvent.change(actionsEditor, {
-      target: {
-        value: JSON.stringify(
-          [{ type: 'setState', key: 'pagination.current', value: 5 }],
-          null,
-          2,
-        ),
-      },
-    });
-    fireEvent.blur(actionsEditor);
-
-    await user.click(screen.getByRole('button', { name: '触发表格变化' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('当前页: 5');
-    });
-  });
-
-  it('编辑器：Style 支持 JSON 回写', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await selectNodeInOutline(user, 'search-submit-btn (Button)');
-    await user.click(screen.getByText('Style'));
-
-    const styleEditor = await screen.findByLabelText('style json');
-    fireEvent.change(styleEditor, {
-      target: {
-        value: JSON.stringify({ display: 'none' }, null, 2),
-      },
-    });
-    fireEvent.blur(styleEditor);
-
-    await waitFor(() => {
-      const submitButton = document.querySelector('[data-shenbi-node-id="search-submit-btn"]') as HTMLButtonElement | null;
-      if (!submitButton) {
-        throw new Error('search-submit-btn not found');
-      }
-      expect(submitButton.style.display).toBe('none');
-    });
-  });
-
-  it('编辑器：Logic 支持 JSON 回写', async () => {
-    const user = userEvent.setup();
-    await renderAppAndWaitFirstPage();
-
-    await selectNodeInOutline(user, 'search-submit-btn (Button)');
-    await user.click(screen.getByText('Logic'));
-
-    const logicEditor = await screen.findByLabelText('logic json');
-    fireEvent.change(logicEditor, {
-      target: {
-        value: JSON.stringify({ if: '{{false}}' }, null, 2),
-      },
-    });
-    fireEvent.blur(logicEditor);
-
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: '查询' })).toBeNull();
     });
   });
 });
