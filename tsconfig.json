@@ -16,7 +16,8 @@
     "baseUrl": ".",
     "paths": {
       "@shenbi/schema": ["packages/schema/types/index.ts"],
-      "@shenbi/engine": ["packages/engine/src/index.ts"]
+      "@shenbi/engine": ["packages/engine/src/index.ts"],
+      "@shenbi/editor-core": ["packages/editor-core/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "dist", "coverage"]

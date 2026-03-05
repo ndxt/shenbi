@@ -76,6 +76,22 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(jsdom@26.1.0)(lightningcss@1.31.1)
 
+  packages/editor-core:
+    dependencies:
+      '@shenbi/schema':
+        specifier: workspace:*
+        version: link:../schema
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.11
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(jsdom@26.1.0)(lightningcss@1.31.1)
+
   packages/engine:
     dependencies:
       '@shenbi/schema':
