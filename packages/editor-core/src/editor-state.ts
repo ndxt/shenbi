@@ -6,6 +6,7 @@ type EditorStateListener = (state: EditorStateSnapshot) => void;
 export class EditorState {
   private schema: PageSchema;
   private selectedNodeId: string | undefined;
+  private currentFileId: string | undefined;
   private canUndo = false;
   private canRedo = false;
   private listeners = new Set<EditorStateListener>();
@@ -32,6 +33,18 @@ export class EditorState {
     this.notify();
   }
 
+  getCurrentFileId(): string | undefined {
+    return this.currentFileId;
+  }
+
+  setCurrentFileId(fileId: string | undefined): void {
+    if (this.currentFileId === fileId) {
+      return;
+    }
+    this.currentFileId = fileId;
+    this.notify();
+  }
+
   setHistoryFlags(canUndo: boolean, canRedo: boolean): void {
     if (this.canUndo === canUndo && this.canRedo === canRedo) {
       return;
@@ -45,6 +58,7 @@ export class EditorState {
     return {
       schema: this.schema,
       ...(this.selectedNodeId ? { selectedNodeId: this.selectedNodeId } : {}),
+      ...(this.currentFileId ? { currentFileId: this.currentFileId } : {}),
       canUndo: this.canUndo,
       canRedo: this.canRedo,
     };
@@ -53,6 +67,7 @@ export class EditorState {
   restoreSnapshot(snapshot: EditorStateSnapshot): void {
     this.schema = snapshot.schema;
     this.selectedNodeId = snapshot.selectedNodeId;
+    this.currentFileId = snapshot.currentFileId;
     this.canUndo = snapshot.canUndo;
     this.canRedo = snapshot.canRedo;
     this.notify();

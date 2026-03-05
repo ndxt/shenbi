@@ -81,6 +81,16 @@ function extractFileIdFromArgs(args: unknown): string {
   return args.fileId.trim();
 }
 
+function extractOptionalFileIdFromArgs(args: unknown): string | undefined {
+  if (!isRecord(args) || args.fileId === undefined) {
+    return undefined;
+  }
+  if (typeof args.fileId !== 'string' || args.fileId.trim().length === 0) {
+    throw new Error('file.saveSchema expects args: { fileId?: string }');
+  }
+  return args.fileId.trim();
+}
+
 function extractFileNameFromArgs(args: unknown): string {
   if (!isRecord(args) || typeof args.name !== 'string' || args.name.trim().length === 0) {
     throw new Error('file.saveAs expects args: { name: string }');
@@ -116,6 +126,14 @@ function registerBuiltinCommands(
   eventBus: EventBus<EditorEventMap>,
   fileStorage: FileStorageAdapter,
 ): void {
+  const updateCurrentFileId = (currentState: EditorState, fileId: string | undefined): void => {
+    if (currentState.getCurrentFileId() === fileId) {
+      return;
+    }
+    currentState.setCurrentFileId(fileId);
+    eventBus.emit('file:currentChanged', fileId ? { fileId } : {});
+  };
+
   commands.register({
     id: 'schema.replace',
     label: 'Replace Schema',
@@ -234,10 +252,11 @@ function registerBuiltinCommands(
   commands.register({
     id: 'file.openSchema',
     label: 'Open File',
-    async execute(_currentState, args) {
+    async execute(currentState, args) {
       const fileId = extractFileIdFromArgs(args);
       const schema = await fileStorage.read(fileId);
       await commands.execute('schema.replace', { schema });
+      updateCurrentFileId(currentState, fileId);
       eventBus.emit('file:opened', { fileId });
     },
   });
@@ -247,8 +266,13 @@ function registerBuiltinCommands(
     label: 'Save File',
     recordHistory: false,
     async execute(currentState, args) {
-      const fileId = extractFileIdFromArgs(args);
+      const fileIdFromArgs = extractOptionalFileIdFromArgs(args);
+      const fileId = fileIdFromArgs ?? currentState.getCurrentFileId();
+      if (!fileId) {
+        throw new Error('file.saveSchema requires current file, please open or saveAs first');
+      }
       await fileStorage.write(fileId, currentState.getSchema());
+      updateCurrentFileId(currentState, fileId);
       eventBus.emit('file:saved', { fileId });
     },
   });
@@ -263,6 +287,7 @@ function registerBuiltinCommands(
         throw new Error('saveAs is not supported by current adapter');
       }
       const fileId = await fileStorage.saveAs(name, currentState.getSchema());
+      updateCurrentFileId(currentState, fileId);
       eventBus.emit('file:saved', { fileId });
       return fileId;
     },

@@ -7,6 +7,7 @@ export interface Disposable {
 export interface EditorStateSnapshot {
   schema: PageSchema;
   selectedNodeId?: string;
+  currentFileId?: string;
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -20,6 +21,7 @@ export interface EditorEventMap {
   'history:undo': void;
   'history:redo': void;
   'plugin:activated': { pluginId: string };
+  'file:currentChanged': { fileId?: string };
   'file:opened': { fileId: string };
   'file:saved': { fileId: string };
 }

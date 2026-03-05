@@ -230,9 +230,9 @@ export function App() {
   const fileEditor = fileEditorRef.current;
   const [shellSnapshot, setShellSnapshot] = useState(() => fileEditor.state.getSnapshot());
   const selectedNodeId = appMode === 'shell' ? shellSnapshot.selectedNodeId : scenarioSelectedNodeId;
+  const activeFileId = shellSnapshot.currentFileId;
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : scenarioSchemas[activeScenario];
   const [storedFiles, setStoredFiles] = useState<FileMetadata[]>([]);
-  const [activeFileId, setActiveFileId] = useState<string | undefined>(undefined);
   const [fileStatus, setFileStatus] = useState<string>('当前未绑定文件');
   const canUndo = appMode === 'shell' ? shellSnapshot.canUndo : false;
   const canRedo = appMode === 'shell' ? shellSnapshot.canRedo : false;
@@ -265,7 +265,6 @@ export function App() {
   const handleOpenFile = useCallback(async (fileId: string) => {
     try {
       await fileEditor.commands.execute('file.openSchema', { fileId });
-      setActiveFileId(fileId);
       setFileStatus(`已打开: ${fileId}`);
       await refreshStoredFiles();
     } catch (error) {
@@ -279,7 +278,7 @@ export function App() {
       return;
     }
     try {
-      await fileEditor.commands.execute('file.saveSchema', { fileId: activeFileId });
+      await fileEditor.commands.execute('file.saveSchema');
       setFileStatus(`已保存: ${activeFileId}`);
       await refreshStoredFiles();
     } catch (error) {
@@ -299,7 +298,6 @@ export function App() {
     try {
       const saveAsResult = await fileEditor.commands.execute('file.saveAs', { name: nextName.trim() });
       const nextFileId = typeof saveAsResult === 'string' ? saveAsResult : nextName.trim();
-      setActiveFileId(nextFileId);
       setFileStatus(`已保存: ${nextFileId}`);
       await refreshStoredFiles();
     } catch (error) {
@@ -329,11 +327,9 @@ export function App() {
 
   useEffect(() => {
     const offSaved = fileEditor.eventBus.on('file:saved', ({ fileId }) => {
-      setActiveFileId(fileId);
       setFileStatus(`已保存: ${fileId}`);
     });
     const offOpened = fileEditor.eventBus.on('file:opened', ({ fileId }) => {
-      setActiveFileId(fileId);
       setFileStatus(`已打开: ${fileId}`);
     });
     return () => {

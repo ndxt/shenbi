@@ -90,6 +90,7 @@ describe('createEditor', () => {
     await editor.commands.execute('file.openSchema', { fileId: 'demo' });
 
     expect(editor.state.getSchema().name).toBe('opened');
+    expect(editor.state.getCurrentFileId()).toBe('demo');
     expect(editor.history.getSize()).toBe(1);
     // nested command still emits its executed event.
     expect(commandEvents).toEqual(['schema.replace', 'file.openSchema']);
@@ -107,6 +108,7 @@ describe('createEditor', () => {
     await editor.commands.execute('file.saveSchema', { fileId: 'demo' });
 
     expect(saved).toHaveBeenCalledWith({ fileId: 'demo' });
+    expect(editor.state.getCurrentFileId()).toBe('demo');
     expect(editor.history.getSize()).toBe(0);
   });
 
@@ -141,6 +143,48 @@ describe('createEditor', () => {
     const saveAsResult = await editor.commands.execute('file.saveAs', { name: '  Trim Name  ' });
     expect(saved).toHaveBeenCalled();
     expect(saveAsResult).toBe('id-Trim Name');
+    expect(editor.state.getCurrentFileId()).toBe('id-Trim Name');
+  });
+
+  it('file.saveSchema can save by current file id without args', async () => {
+    const storage = createMemoryStorage();
+    const editor = createEditor({
+      initialSchema: createSchema('save-by-current'),
+      fileStorage: storage,
+    });
+
+    await editor.commands.execute('file.openSchema', { fileId: 'demo' });
+    await editor.commands.execute('file.saveSchema');
+
+    expect(editor.state.getCurrentFileId()).toBe('demo');
+  });
+
+  it('file.saveSchema without current file throws explicit error', async () => {
+    const storage = createMemoryStorage();
+    const editor = createEditor({
+      initialSchema: createSchema('no-current-file'),
+      fileStorage: storage,
+    });
+
+    await expect(editor.commands.execute('file.saveSchema')).rejects.toThrow(
+      'requires current file',
+    );
+  });
+
+  it('file.open/saveAs emits file:currentChanged', async () => {
+    const storage = createMemoryStorage();
+    const editor = createEditor({
+      initialSchema: createSchema('current-changed'),
+      fileStorage: storage,
+    });
+    const changed = vi.fn();
+    editor.eventBus.on('file:currentChanged', changed);
+
+    await editor.commands.execute('file.openSchema', { fileId: 'demo' });
+    await editor.commands.execute('file.saveAs', { name: 'new-page' });
+
+    expect(changed).toHaveBeenCalledWith({ fileId: 'demo' });
+    expect(changed).toHaveBeenCalledWith({ fileId: 'id-new-page' });
   });
 
   it('node.patchProps updates schema and records history', async () => {
