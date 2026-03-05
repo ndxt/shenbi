@@ -462,6 +462,8 @@ export class CommandManager {
 3. 通过 EventBus emit `command:executed`
 
 > **设计说明**：快照在命令成功后记录，而非执行前。这样命令抛异常时不会在 History 中留下无效快照。内部实现采用"先存旧快照 -> 执行命令 -> 成功则 push 旧快照到 undo 栈"的模式。
+>
+> **嵌套命令处理**：当命令内部调用其他命令时（如 `file.openSchema` 内部调用 `schema.replace`），只在最外层命令成功后记录一次快照，避免重复记录。实现方式：`CommandManager` 维护执行深度计数器，仅在深度为 0 时记录快照。
 
 `schema.replace` 命令约束：
 - 入参必须通过最小结构校验（`id`/`name`/`body`）。
