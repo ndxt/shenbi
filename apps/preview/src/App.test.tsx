@@ -594,6 +594,21 @@ describe('preview/App integration', () => {
     });
   });
 
+  it('AI 面板：通过 bridge 执行 schema.replace 并更新画布', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.click(screen.getByTitle('Toggle AI Assistant'));
+    const generateButton = await screen.findByRole('button', { name: '生成演示页面' });
+    await user.click(generateButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('AI 生成演示页面')).toBeInTheDocument();
+      expect(screen.getByText('开始使用')).toBeInTheDocument();
+      expect(screen.getByText('状态：已应用 AI 演示页面')).toBeInTheDocument();
+    });
+  });
+
   it('编辑器：Events 支持 JSON 回写并驱动运行时', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();

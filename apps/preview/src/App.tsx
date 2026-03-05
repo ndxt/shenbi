@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as antd from 'antd';
 import {
   builtinContracts,
@@ -24,6 +24,10 @@ import {
 } from './schemas';
 
 import { AppShell } from './ui/AppShell';
+import {
+  createEditorAIBridge,
+  type EditorBridgeSnapshot,
+} from './ai/editor-ai-bridge';
 import {
   buildEditorTree,
   getDefaultSelectedNodeId,
@@ -193,7 +197,7 @@ export function App() {
     [selectedNode],
   );
 
-  const updateActiveSchema = (updater: (schema: PageSchema) => PageSchema) => {
+  const updateActiveSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
     if (appMode === 'shell') {
       setShellSchema((prev) => updater(prev));
       return;
@@ -202,7 +206,37 @@ export function App() {
       ...prev,
       [activeScenario]: updater(prev[activeScenario]),
     }));
-  };
+  }, [activeScenario, appMode]);
+
+  const aiBridgeListenersRef = useRef(new Set<(snapshot: EditorBridgeSnapshot) => void>());
+  const aiSnapshotRef = useRef<EditorBridgeSnapshot>({
+    schema: activeSchema,
+    ...(selectedNodeId ? { selectedNodeId } : {}),
+  });
+
+  useEffect(() => {
+    const snapshot: EditorBridgeSnapshot = {
+      schema: activeSchema,
+      ...(selectedNodeId ? { selectedNodeId } : {}),
+    };
+    aiSnapshotRef.current = snapshot;
+    for (const listener of aiBridgeListenersRef.current) {
+      listener(snapshot);
+    }
+  }, [activeSchema, selectedNodeId]);
+
+  const aiBridge = useMemo(() => createEditorAIBridge({
+    getSnapshot: () => aiSnapshotRef.current,
+    replaceSchema: (schema) => updateActiveSchema(() => schema),
+    getAvailableComponents: () => builtinContracts,
+    subscribe: (listener) => {
+      aiBridgeListenersRef.current.add(listener);
+      listener(aiSnapshotRef.current);
+      return () => {
+        aiBridgeListenersRef.current.delete(listener);
+      };
+    },
+  }), [updateActiveSchema]);
 
   const handlePatchProps = (patch: Record<string, unknown>) => {
     updateActiveSchema((schema) => patchSchemaNodeProps(schema, selectedNodeId, patch));
@@ -248,6 +282,7 @@ export function App() {
         ...(selectedNode ? { selectedNode } : {}),
         ...(selectedContract ? { contract: selectedContract } : {}),
       }}
+      aiPanelProps={{ bridge: aiBridge }}
       onCanvasSelectNode={handleCanvasSelectNode}
       toolbarExtra={(
         <div className="flex items-center gap-2">

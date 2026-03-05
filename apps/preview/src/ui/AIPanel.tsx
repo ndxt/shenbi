@@ -1,7 +1,41 @@
 import React from 'react';
 import { Sparkles, Send } from 'lucide-react';
+import { createAIDemoSchema } from '../ai/demo-schema';
+import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 
-export function AIPanel() {
+export interface AIPanelProps {
+  bridge?: EditorAIBridge;
+}
+
+export function AIPanel({ bridge }: AIPanelProps) {
+  const [statusText, setStatusText] = React.useState<string>('等待指令');
+  const [selectedNodeLabel, setSelectedNodeLabel] = React.useState<string>('未选中');
+
+  React.useEffect(() => {
+    if (!bridge) {
+      return undefined;
+    }
+    return bridge.subscribe((snapshot) => {
+      setSelectedNodeLabel(snapshot.selectedNodeId ?? '未选中');
+    });
+  }, [bridge]);
+
+  const handleGenerateDemo = async () => {
+    if (!bridge) {
+      setStatusText('Bridge 未连接');
+      return;
+    }
+    setStatusText('正在生成...');
+    const result = await bridge.execute('schema.replace', {
+      schema: createAIDemoSchema(),
+    });
+    if (result.success) {
+      setStatusText('已应用 AI 演示页面');
+      return;
+    }
+    setStatusText(`生成失败：${result.error ?? '未知错误'}`);
+  };
+
   return (
     <div className="w-full h-full bg-bg-panel border-l border-border-ide flex flex-col shrink-0 overflow-hidden">
       <div className="h-9 px-4 border-b border-border-ide flex items-center justify-between shrink-0">
@@ -12,6 +46,18 @@ export function AIPanel() {
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-2">
+          <span className="text-[11px] text-text-secondary">当前选中节点：{selectedNodeLabel}</span>
+          <span className="text-[11px] text-text-secondary">状态：{statusText}</span>
+          <button
+            type="button"
+            onClick={handleGenerateDemo}
+            className="self-start mt-1 h-7 px-3 rounded border border-border-ide bg-bg-activity-bar text-[12px] text-text-primary hover:border-blue-500 transition-colors"
+          >
+            生成演示页面
+          </button>
+        </div>
+
         {/* Mock Messages */}
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-text-secondary font-semibold">Shenbi AI</span>

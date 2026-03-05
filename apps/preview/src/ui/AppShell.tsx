@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar';
 import { WorkbenchToolbar } from './WorkbenchToolbar';
 import { EditorTabs } from './EditorTabs';
 import { Inspector } from './Inspector';
-import { AIPanel } from './AIPanel';
+import { AIPanel, type AIPanelProps } from './AIPanel';
 import { Console } from './Console';
 import { StatusBar } from './StatusBar';
 import '../styles/preview-ide.css';
@@ -19,6 +19,7 @@ interface AppShellProps {
   toolbarExtra?: React.ReactNode;
   sidebarProps?: SidebarProps;
   inspectorProps?: InspectorProps;
+  aiPanelProps?: AIPanelProps;
   onCanvasSelectNode?: (nodeId: string) => void;
 }
 
@@ -37,6 +38,7 @@ export function AppShell({
   toolbarExtra,
   sidebarProps,
   inspectorProps,
+  aiPanelProps,
   onCanvasSelectNode,
 }: AppShellProps) {
   const [theme, setTheme] = React.useState<ThemeMode>('dark');
@@ -190,7 +192,7 @@ export function AppShell({
                   className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
                   onMouseDown={(e) => startAIPanelResize(e, 'horizontal', true)}
                 />
-                <AIPanel />
+                <AIPanel {...aiPanelProps} />
               </div>
             )}
 
