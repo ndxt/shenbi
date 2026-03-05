@@ -7,8 +7,8 @@ Phase 0.5 -> Phase 1-MVP -> AI 并行接入 -> Phase 2 -> Phase 3 -> Phase 3.5
 - Phase 0.5：Preview 增加 `shell mode`（兼容过渡，不立即移除多场景）
 - Phase 1-MVP：先抽最小闭环核心（`schema-editor`/`editor-state`/`event-bus`/`history`/`command`/`create-editor`）
 - AI 并行接入：先冻结 AI 接口，避免等到全面插件化后再接导致接口漂移
-- Phase 2：迁移 `editor-ui`（先增后删，保留兼容窗口）
-- Phase 3：分层插件化（Inspector -> Sidebar -> ActivityBar）
+- Phase 2：迁移 `editor-ui`（先增后删，保留兼容窗口）并预留文件存储适配能力
+- Phase 3：分层插件化（Inspector -> Sidebar -> File Panel -> ActivityBar）
 - Phase 3.5：移除过渡适配层与旧入口，完成收口
 
 > 本文档后续内容如与本段冲突，以本段为准。
@@ -450,6 +450,8 @@ export class CommandManager {
 | `node.patchLogic` | 修改逻辑 |
 | `node.patchColumns` | 修改列配置 |
 | `schema.replace` | 整体替换 schema（供 AI 批量生成使用） |
+| `file.openSchema` | 从存储加载页面并替换当前 schema（供 File Panel 插件调用） |
+| `file.saveSchema` | 将当前 schema 持久化到存储（供 File Panel 插件调用） |
 
 每次 `execute()` 自动：
 1. 执行命令
@@ -462,6 +464,10 @@ export class CommandManager {
 - 入参必须通过最小结构校验（`id`/`name`/`body`）。
 - 校验失败或执行异常时抛出错误，不写入 history。
 - 成功执行后才写入 history 并发出 `command:executed` 事件。
+
+文件命令约束（File Panel 预留）：
+- 命令层仅依赖 `FileStorageAdapter` 抽象，不绑定具体存储实现。
+- Phase 2 使用本地/Mock adapter 验证命令链路，Phase 3 由 File Panel 插件接入。
 
 **测试用例**：
 - register + execute 基本流程
@@ -977,6 +983,13 @@ export function useContributions<T>(slot: string): T[] { ... }
 > [!TIP]
 > 采用「先增后删」策略：Phase 2 第一个 PR 只增不删（改 import），第二个 PR 删旧文件。这样与 AI 分支不冲突。
 
+### 5.6 File 能力预留（插件落地前）
+
+- 目标：不在 Phase 2 直接固化文件面板 UI，先把“可存取页面 JSON”的能力放到命令与适配层。
+- 约定：文件相关操作统一通过 `executeCommand('file.*')` 进入命令链。
+- 适配：先提供 `FileStorageAdapter` 本地/Mock 实现，满足开发与测试；后续可替换远端存储。
+- 边界：File Panel 本体在 Phase 3 以插件形式接入（Sidebar Tab/Panel Contribution）。
+
 ---
 
 ## 六、Phase 3：分层插件化
@@ -986,8 +999,9 @@ export function useContributions<T>(slot: string): T[] { ... }
 分层顺序（必须按顺序推进）：
 1. 先改 `Inspector` 为动态 Tab（风险最小，收益最高）
 2. 再改 `Sidebar` 为动态 Tab（验证左侧生态扩展）
-3. 最后改 `ActivityBar` 为动态图标（全局导航改动最大）
-4. `SetterPanel onPatch -> commands` 可提前落地，但需保留 fallback
+3. 接入 `File Panel` 插件（以 Sidebar Tab/Panel Contribution 方式落地）
+4. 最后改 `ActivityBar` 为动态图标（全局导航改动最大）
+5. `SetterPanel onPatch -> executeCommand` 可提前落地，但需保留 fallback
 
 ### 6.1 UI 组件改造
 
@@ -1031,8 +1045,16 @@ export const builtinPlugins: EditorPlugin[] = [
       });
     },
   },
+  {
+    id: 'builtin.sidebar.file-panel',
+    name: 'File Panel',
+    activate(ctx) {
+      // 以 Sidebar Tab/Panel Contribution 注入
+      // 内部通过 executeCommand('file.openSchema'/'file.saveSchema') 读写页面 JSON
+    },
+  },
   // ... style, events, logic, actions
-  // ... sidebar 的 components, outline, data
+  // ... sidebar 的 components, outline, data, file-panel
   // ... activityBar 的 6 个图标
   // ... 所有内置热键
 ];
@@ -1066,6 +1088,13 @@ export const aiPlugin: EditorPlugin = {
 const editor = createEditor({ plugins: [...builtinPlugins, aiPlugin] });
 ```
 
+### 6.4 File Panel 插件（新增）
+
+- 入口：通过 `registerTab('sidebar')` + `registerPanel('sidebar')` 注入，不新增硬编码插槽。
+- 能力：展示页面 JSON 文件列表，支持打开/保存/另存为（最小集）。
+- 执行：所有读写动作都走 `executeCommand('file.*')`，保证 history/event 链路一致。
+- 存储：复用 Phase 2 的 `FileStorageAdapter`，支持本地/Mock，后续可平滑切换远端实现。
+
 ---
 
 ## 七、Phase 3.5：收口清理
@@ -1083,6 +1112,7 @@ const editor = createEditor({ plugins: [...builtinPlugins, aiPlugin] });
 | 过渡文件 | `apps/preview/src/ui/`、`src/panels/`、`src/hooks/`、`src/styles/` 残留文件 | 已迁移至 `editor-ui` |
 | 适配层 | Phase 0.5 的 `shell mode` 开关逻辑 | 编辑器统一入口后不再需要 |
 | 适配层 | `EditorAIBridge` 的 preview adapter | Phase 3 后由 `PluginContext` 直接提供 |
+| 适配层 | `FileStorageAdapter` 的临时 Mock 实现（若已切远端） | 统一收敛到正式存储适配器 |
 | Fallback | `SetterPanel` 中保留的 `onPatch*` 回调 fallback | 已全面切换为 `executeCommand()` |
 | demo 数据 | `src/schemas/` 中的场景 schema（可选保留为测试 fixtures） | 评估是否仍需要 |
 
@@ -1125,7 +1155,7 @@ main ──────┬──────────────────
            │                                           │    Phase 2（先增后删）
            │                                           │
            │                                           └─ feature/editor-plugins
-           │                                                Phase 3（分层推进）
+           │                                                Phase 3（分层推进 + File Panel 插件）
            │
            └─ feature/editor-cleanup ── Phase 3.5（收口）──►
 ```
@@ -1135,6 +1165,7 @@ main ──────┬──────────────────
 - AI 分支：新代码放 `src/ai/`，不改 `panels/`、`ui/` 已有文件
 - AI 只依赖 `EditorAIBridge`，禁止直接引用 preview 内部面板实现
 - 统一以 `executeCommand()` 作为跨层修改入口，内部 adapter 再映射到 `commands.execute()`，减少并发改动冲突
+- File Panel 必须走 Contribution 注册（`registerTab/registerPanel`），禁止在 `AppShell` 新增硬编码入口
 
 ---
 
@@ -1150,8 +1181,8 @@ main ──────┬──────────────────
 | 1-MVP | `pnpm --filter @shenbi/editor-core type-check` | 通过 |
 | 1-MVP | `pnpm --filter @shenbi/editor-core test` | 核心模块单测通过 |
 | 2 | `pnpm --filter @shenbi/editor-ui type-check` | 通过 |
-| 2 | `pnpm --filter @shenbi/preview test` | 通过（迁移后无功能退化） |
-| 3 | 同上 + 手动验证 contribution 注册 | Inspector/Sidebar/ActivityBar 分层生效 |
+| 2 | `pnpm --filter @shenbi/preview test` | 通过（迁移后无功能退化，`file.*` 命令链路可测） |
+| 3 | 同上 + 手动验证 contribution 注册 | Inspector/Sidebar/File Panel/ActivityBar 分层生效 |
 | 3.5 | `pnpm -r type-check && pnpm -r test` | 通过（收口后回归） |
 
 ### 9.2 DoD（Definition of Done）
@@ -1161,8 +1192,8 @@ main ──────┬──────────────────
 | 0.5 | 现有多场景链路可用；shell mode 可切入；无回归 |
 | 1-MVP | 完成最小闭环（event-bus/state/history/command/create-editor/schema-editor）；接口文档齐全 |
 | AI 接入 | `EditorAIBridge` v1 接口冻结；bridge adapter 就绪；AI 分支可独立开发 |
-| 2 | `editor-ui` 接入后通过回归，旧实现保留一个兼容窗口 |
-| 3 | 三层插件化按顺序落地，Setter 改走 command（保留 fallback） |
+| 2 | `editor-ui` 接入后通过回归；`FileStorageAdapter` + `file.*` 命令预留完成 |
+| 3 | 三层插件化按顺序落地；File Panel 通过插件接入；Setter 改走 `executeCommand`（保留 fallback） |
 | 3.5 | 移除过渡 adapter/旧入口，代码路径收敛，`pre-cleanup` tag 保留，文档同步 |
 
 ### 9.3 回滚策略
