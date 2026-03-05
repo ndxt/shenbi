@@ -553,6 +553,20 @@ export function App() {
     };
   }, [appMode, canRedo, canUndo, handleRedo, handleSaveFile, handleUndo]);
 
+  useEffect(() => {
+    if (appMode !== 'shell' || !isDirty) {
+      return;
+    }
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [appMode, isDirty]);
+
   const handlePatchProps = (patch: Record<string, unknown>) => {
     if (appMode === 'shell') {
       if (!selectedNodeId) {

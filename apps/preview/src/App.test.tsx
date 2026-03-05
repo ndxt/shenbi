@@ -833,6 +833,49 @@ describe('preview/App integration', () => {
     promptSpy.mockRestore();
   });
 
+  it('编辑器：Shell 模式未保存时离开页面会提示，保存后不提示', async () => {
+    const user = userEvent.setup();
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('BeforeUnloadSave');
+    await renderAppAndWaitFirstPage();
+
+    await user.selectOptions(screen.getByLabelText('模式切换'), 'shell');
+    await waitFor(() => {
+      expect(screen.queryByText('User 1')).toBeNull();
+    });
+
+    await user.click(screen.getByTitle('Toggle AI Assistant'));
+    await user.click(await screen.findByRole('button', { name: '生成演示页面' }));
+    await waitFor(() => {
+      expect(screen.getByText('AI 生成演示页面')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Outline'));
+    await user.click(screen.getByText('ai-generated-card (Card)'));
+    const titleInput = await screen.findByLabelText('title');
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Leave Dirty');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('当前文件')).toHaveTextContent('*');
+    });
+
+    const dirtyEvent = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(dirtyEvent);
+    expect(dirtyEvent.defaultPrevented).toBe(true);
+
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByLabelText('当前文件')).not.toHaveTextContent('*');
+    });
+
+    const cleanEvent = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(cleanEvent);
+    expect(cleanEvent.defaultPrevented).toBe(false);
+
+    promptSpy.mockRestore();
+  });
+
   it('编辑器：ActivityBar 支持插件扩展图标（Rocket）', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
