@@ -378,6 +378,7 @@ describe('preview/App integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.replaceState(null, '', '/');
+    window.localStorage.clear();
   });
 
   it('首屏渲染用户管理并自动拉取用户列表', async () => {
@@ -602,6 +603,34 @@ describe('preview/App integration', () => {
     await waitFor(() => {
       expect(screen.getByText('Sidebar Plugin Loaded')).toBeInTheDocument();
     });
+  });
+
+  it('编辑器：Shell 模式 Files 面板支持另存并打开', async () => {
+    const user = userEvent.setup();
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Shell Demo');
+    await renderAppAndWaitFirstPage();
+
+    const modeSelect = screen.getByLabelText('模式切换');
+    await user.selectOptions(modeSelect, 'shell');
+
+    await waitFor(() => {
+      expect(screen.queryByText('User 1')).toBeNull();
+    });
+
+    await user.click(screen.getByText('Files'));
+    await user.click(screen.getByRole('button', { name: '另存为' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Shell Demo')).toBeInTheDocument();
+      expect(screen.getByText(/已保存:/)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: '打开' }));
+    await waitFor(() => {
+      expect(screen.getByText(/已打开:/)).toBeInTheDocument();
+    });
+
+    promptSpy.mockRestore();
   });
 
   it('编辑器：ActivityBar 支持插件扩展图标（Rocket）', async () => {

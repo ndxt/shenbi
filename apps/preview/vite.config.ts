@@ -10,6 +10,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
+      '@shenbi/editor-core': path.resolve(__dirname, '../../packages/editor-core/src/index.ts'),
       '@shenbi/schema': path.resolve(__dirname, '../../packages/schema/types/index.ts'),
       '@shenbi/editor-ui': path.resolve(__dirname, '../../packages/editor-ui/src/index.ts'),
     },
