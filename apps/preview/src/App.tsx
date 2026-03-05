@@ -27,6 +27,7 @@ import { AppShell } from '@shenbi/editor-ui';
 import {
   createEditorAIBridge,
   type InspectorTabContribution,
+  type SidebarTabContribution,
   type EditorBridgeSnapshot,
 } from '@shenbi/editor-ui';
 import {
@@ -212,6 +213,18 @@ export function App() {
       ),
     },
   ], []);
+  const sidebarTabs = useMemo<SidebarTabContribution[]>(() => [
+    {
+      id: 'assets',
+      label: 'Assets',
+      order: 99,
+      render: () => (
+        <div className="p-3 text-xs text-text-secondary">
+          Sidebar Plugin Loaded
+        </div>
+      ),
+    },
+  ], []);
 
   const updateActiveSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
     if (appMode === 'shell') {
@@ -287,6 +300,7 @@ export function App() {
         contracts: builtinContracts,
         treeNodes,
         onSelectNode: setSelectedNodeId,
+        tabs: sidebarTabs,
         ...(selectedNodeId ? { selectedNodeId } : {}),
       }}
       inspectorProps={{

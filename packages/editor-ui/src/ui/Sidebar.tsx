@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
-import { ComponentPanel } from '../panels/ComponentPanel';
-import { type SchemaNode as TreeSchemaNode, SchemaTree } from '../panels/SchemaTree';
-import { PagePanel } from '../panels/PagePanel';
+import React, { useEffect, useMemo, useState } from 'react';
+import { type SchemaNode as TreeSchemaNode } from '../panels/SchemaTree';
 import type { ComponentContract } from '@shenbi/schema';
+import {
+  resolveSidebarTabs,
+  type SidebarTabContribution,
+  type SidebarTabRenderContext,
+} from './sidebar-tabs';
+export type { SidebarTabContribution, SidebarTabRenderContext } from './sidebar-tabs';
 
 export interface SidebarProps {
   contracts?: ComponentContract[];
@@ -10,6 +14,7 @@ export interface SidebarProps {
   selectedNodeId?: string;
   onSelectNode?: (nodeId: string) => void;
   onInsertComponent?: (componentType: string) => void;
+  tabs?: SidebarTabContribution[];
 }
 
 export function Sidebar({
@@ -18,47 +23,50 @@ export function Sidebar({
   selectedNodeId,
   onSelectNode,
   onInsertComponent,
+  tabs,
 }: SidebarProps) {
-  const [activeTab, setActiveTab] = useState<'components' | 'outline' | 'data'>('components');
+  const [activeTab, setActiveTab] = useState<string>('components');
+  const renderContext = useMemo<SidebarTabRenderContext>(() => ({
+    ...(contracts ? { contracts } : {}),
+    ...(treeNodes ? { treeNodes } : {}),
+    ...(selectedNodeId ? { selectedNodeId } : {}),
+    ...(onSelectNode ? { onSelectNode } : {}),
+    ...(onInsertComponent ? { onInsertComponent } : {}),
+  }), [contracts, onInsertComponent, onSelectNode, selectedNodeId, treeNodes]);
+  const resolvedTabs = useMemo(() => resolveSidebarTabs(tabs), [tabs]);
+
+  useEffect(() => {
+    if (resolvedTabs.length === 0) {
+      return;
+    }
+    const hasActiveTab = resolvedTabs.some((tab) => tab.id === activeTab);
+    const fallbackTabId = resolvedTabs[0]?.id;
+    if (!hasActiveTab && fallbackTabId) {
+      setActiveTab(fallbackTabId);
+    }
+  }, [activeTab, resolvedTabs]);
+
+  const activeTabDefinition = resolvedTabs.find((tab) => tab.id === activeTab) ?? resolvedTabs[0] ?? undefined;
 
   return (
     <div className="w-full h-full bg-bg-sidebar border-r border-border-ide flex flex-col shrink-0 overflow-hidden">
       <div className="h-9 flex items-center border-b border-border-ide shrink-0 bg-bg-panel px-1">
-        <TabItem 
-          label="Components" 
-          active={activeTab === 'components'} 
-          onClick={() => setActiveTab('components')} 
-        />
-        <TabItem 
-          label="Outline" 
-          active={activeTab === 'outline'} 
-          onClick={() => setActiveTab('outline')} 
-        />
-        <TabItem 
-          label="Data" 
-          active={activeTab === 'data'} 
-          onClick={() => setActiveTab('data')} 
-        />
+        {resolvedTabs.map((tab) => (
+          <TabItem
+            key={tab.id}
+            label={tab.label}
+            active={activeTab === tab.id}
+            onClick={() => setActiveTab(tab.id)}
+          />
+        ))}
       </div>
       
       <div className="flex-1 overflow-hidden">
-        <div style={{ display: activeTab === 'components' ? 'block' : 'none', height: '100%' }}>
-          <ComponentPanel
-            {...(contracts ? { contracts } : {})}
-            {...(onInsertComponent ? { onInsert: onInsertComponent } : {})}
-          />
-        </div>
-        <div style={{ display: activeTab === 'outline' ? 'block' : 'none', height: '100%' }}>
-          <SchemaTree
-            {...(treeNodes ? { nodes: treeNodes } : {})}
-            {...(selectedNodeId ? { selectedNodeId } : {})}
-            {...(onSelectNode ? { onSelect: onSelectNode } : {})}
-            {...(contracts ? { contracts } : {})}
-          />
-        </div>
-        <div style={{ display: activeTab === 'data' ? 'block' : 'none', height: '100%' }}>
-          <PagePanel />
-        </div>
+        {activeTabDefinition ? (
+          <div style={{ height: '100%' }}>
+            {activeTabDefinition.render(renderContext)}
+          </div>
+        ) : null}
       </div>
     </div>
   );

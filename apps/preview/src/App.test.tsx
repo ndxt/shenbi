@@ -594,6 +594,16 @@ describe('preview/App integration', () => {
     });
   });
 
+  it('编辑器：Sidebar 支持插件扩展 Tab（Assets）', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.click(screen.getByText('Assets'));
+    await waitFor(() => {
+      expect(screen.getByText('Sidebar Plugin Loaded')).toBeInTheDocument();
+    });
+  });
+
   it('编辑器：Inspector 支持插件扩展 Tab（Debug）', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
