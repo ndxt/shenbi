@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as antd from 'antd';
 import { Rocket } from 'lucide-react';
 import {
@@ -27,6 +27,7 @@ import {
 import { AppShell } from '@shenbi/editor-ui';
 import {
   useEditorAIBridge,
+  useEditorSession,
   useFileWorkspace,
   useNodePatchDispatch,
   useShellModeUrl,
@@ -47,12 +48,6 @@ import {
   patchSchemaNodeProps,
   patchSchemaNodeStyle,
 } from './editor/schema-editor';
-import {
-  createEditor,
-  LocalFileStorageAdapter,
-  type EditorInstance,
-} from '@shenbi/editor-core';
-
 const resolver = antdResolver(antd);
 resolver.register('Container', Container);
 
@@ -87,13 +82,6 @@ function cloneSchema(schema: PageSchema): PageSchema {
     return structuredClone(schema);
   }
   return JSON.parse(JSON.stringify(schema)) as PageSchema;
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return 'unknown error';
 }
 
 function createInitialScenarioState(): Record<ScenarioKey, PageSchema> {
@@ -160,20 +148,27 @@ export function App() {
   );
   const [scenarioSelectedNodeId, setScenarioSelectedNodeId] = useState<string | undefined>(undefined);
   const [activityMessage, setActivityMessage] = useState<string>('');
-  const fileStorageRef = useRef<LocalFileStorageAdapter | null>(null);
-  if (!fileStorageRef.current) {
-    fileStorageRef.current = new LocalFileStorageAdapter();
-  }
-  const fileStorage = fileStorageRef.current;
-  const fileEditorRef = useRef<EditorInstance | null>(null);
-  if (!fileEditorRef.current) {
-    fileEditorRef.current = createEditor({
-      initialSchema: createEmptyShellSchema(),
-      fileStorage,
-    });
-  }
-  const fileEditor = fileEditorRef.current;
-  const [shellSnapshot, setShellSnapshot] = useState(() => fileEditor.state.getSnapshot());
+  const initialShellSchema = useMemo(() => createEmptyShellSchema(), []);
+  const updateScenarioSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
+    setScenarioSchemas((previousSchemas) => ({
+      ...previousSchemas,
+      [activeScenario]: updater(previousSchemas[activeScenario]),
+    }));
+  }, [activeScenario]);
+  const {
+    editor: fileEditor,
+    shellSnapshot,
+    setShellSelectedNodeId,
+    executeShellNodeCommand,
+    updateActiveSchema,
+  } = useEditorSession({
+    mode: appMode,
+    initialShellSchema,
+    updateScenarioSchema,
+    onError: (message) => {
+      antd.message.error(message);
+    },
+  });
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : scenarioSchemas[activeScenario];
   const {
     activeFileName,
@@ -204,35 +199,6 @@ export function App() {
       return window.prompt('请输入文件名', defaultName);
     },
   });
-  const setShellSelectedNodeId = useCallback((nodeId: string | undefined) => {
-    fileEditor.state.setSelectedNodeId(nodeId);
-  }, [fileEditor]);
-
-  const updateActiveSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
-    if (appMode === 'shell') {
-      const nextSchema = updater(fileEditor.state.getSchema());
-      void fileEditor.commands.execute('schema.replace', { schema: nextSchema }).catch((error) => {
-        antd.message.error(`Schema 更新失败: ${getErrorMessage(error)}`);
-      });
-      return;
-    }
-    setScenarioSchemas((prev) => ({
-      ...prev,
-      [activeScenario]: updater(prev[activeScenario]),
-    }));
-  }, [activeScenario, appMode, fileEditor]);
-
-  useEffect(() => () => {
-    fileEditor.destroy();
-  }, [fileEditor]);
-
-  useEffect(() => {
-    setShellSnapshot(fileEditor.state.getSnapshot());
-    const unsubscribe = fileEditor.state.subscribe((snapshot) => {
-      setShellSnapshot(snapshot);
-    });
-    return unsubscribe;
-  }, [fileEditor]);
 
   const treeNodes = useMemo(() => buildEditorTree(activeSchema), [activeSchema]);
   const { selectedNodeId, selectTreeNode, selectSchemaNode } = useSelectionSync({
@@ -309,15 +275,6 @@ export function App() {
     replaceSchema: (schema) => updateActiveSchema(() => schema),
     getAvailableComponents: () => builtinContracts,
   });
-
-  const executeShellNodeCommand = useCallback(
-    (commandId: string, args: Record<string, unknown>) => {
-      void fileEditor.commands.execute(commandId, args).catch((error) => {
-        antd.message.error(`节点更新失败: ${getErrorMessage(error)}`);
-      });
-    },
-    [fileEditor],
-  );
   const {
     handlePatchProps,
     handlePatchEvents,
@@ -328,7 +285,7 @@ export function App() {
     mode: appMode === 'shell' ? 'shell' : 'scenarios',
     selectedNodeId,
     executeShellCommand: executeShellNodeCommand,
-    updateScenarioSchema: updateActiveSchema,
+    updateScenarioSchema,
     patchSchemaNodeProps,
     patchSchemaNodeEvents,
     patchSchemaNodeStyle,

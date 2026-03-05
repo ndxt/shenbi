@@ -15,6 +15,7 @@ export * from './hooks/useResize';
 export * from './hooks/useSelectionSync';
 export * from './hooks/useNodePatchDispatch';
 export * from './hooks/useShellModeUrl';
+export * from './hooks/useEditorSession';
 
 export * from './ai/editor-ai-bridge';
 export * from './ai/useEditorAIBridge';
