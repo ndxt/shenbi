@@ -52,6 +52,8 @@ interface AppShellProps {
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
 
+const MAX_RECENT_COMMANDS = 6;
+
 const THEME_CLASSES = [
   'theme-light',
   'theme-dark',
@@ -112,6 +114,7 @@ export function AppShell({
   const [activeAuxiliaryPanelId, setActiveAuxiliaryPanelId] = React.useState<string | undefined>(undefined);
 
   const [isMaximized, setIsMaximized] = React.useState(false);
+  const recentCommandIdsRef = React.useRef<string[]>([]);
   const [previousPanelState, setPreviousPanelState] = React.useState({
     sidebar: true,
     inspector: true,
@@ -339,8 +342,16 @@ export function AppShell({
     }
     return items;
   }, [hostCommands, pluginContributes.commands, resolveCommandState, shortcutMap]);
+  const recordRecentCommand = React.useCallback((commandId: string) => {
+    if (commandId === 'commandPalette.open') {
+      return;
+    }
+    recentCommandIdsRef.current = [
+      commandId,
+      ...recentCommandIdsRef.current.filter((item) => item !== commandId),
+    ].slice(0, MAX_RECENT_COMMANDS);
+  }, []);
   const resolvedPluginContext = React.useMemo<PluginContext>(() => {
-    const hostExecute = pluginContext?.commands?.execute;
     let context!: PluginContext;
     const execute = (commandId: string, payload?: unknown) => {
       const hostCommand = hostCommandMap.get(commandId);
@@ -351,7 +362,7 @@ export function AppShell({
       if (pluginCommand) {
         return pluginCommand.execute(context, payload);
       }
-      return hostExecute?.(commandId, payload);
+      return pluginContext?.commands?.execute?.(commandId, payload);
     };
     context = {
       ...pluginContext,
@@ -361,6 +372,10 @@ export function AppShell({
     };
     return context;
   }, [hostCommandMap, pluginContext, pluginContributes.commands]);
+  const runCommand = React.useCallback((commandId: string, payload?: unknown) => {
+    recordRecentCommand(commandId);
+    return resolvedPluginContext.commands?.execute(commandId, payload);
+  }, [recordRecentCommand, resolvedPluginContext.commands]);
 
   const toggleTheme = (newTheme: ThemeMode) => {
     setTheme(newTheme);
@@ -446,7 +461,7 @@ export function AppShell({
         return;
       }
       event.preventDefault();
-      void resolvedPluginContext.commands?.execute(shortcut.commandId);
+      void runCommand(shortcut.commandId);
     };
 
     document.addEventListener('keydown', handleKeyDown);
@@ -456,7 +471,7 @@ export function AppShell({
   }, [
     allShortcuts,
     pluginContext?.selection,
-    resolvedPluginContext.commands,
+    runCommand,
     showInspector,
     showSidebar,
   ]);
@@ -602,7 +617,7 @@ export function AppShell({
             extra={toolbarExtra}
             menus={allMenus}
             onRunMenuCommand={(commandId) => {
-              void resolvedPluginContext.commands?.execute(commandId);
+              void runCommand(commandId);
             }}
           />
           
@@ -626,12 +641,13 @@ export function AppShell({
                   </div>
                 </div>
               </main>
-              <CommandPalette
-                commands={commandPaletteCommands}
-                open={showCommandPalette}
-                onClose={() => setShowCommandPalette(false)}
+                <CommandPalette
+                  commands={commandPaletteCommands}
+                  recentCommandIds={recentCommandIdsRef.current}
+                  open={showCommandPalette}
+                  onClose={() => setShowCommandPalette(false)}
                 onRunCommand={(commandId) => {
-                  void resolvedPluginContext.commands?.execute(commandId);
+                  void runCommand(commandId);
                 }}
               />
               <ContextMenuOverlay
@@ -640,7 +656,7 @@ export function AppShell({
                 position={contextMenuState.position}
                 onClose={() => setContextMenuState((current) => ({ ...current, open: false }))}
                 onRunCommand={(commandId) => {
-                  void resolvedPluginContext.commands?.execute(commandId);
+                  void runCommand(commandId);
                 }}
               />
               

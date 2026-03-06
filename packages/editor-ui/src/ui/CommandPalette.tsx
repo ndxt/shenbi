@@ -12,6 +12,7 @@ export interface CommandPaletteItem {
 
 interface CommandPaletteProps {
   commands: CommandPaletteItem[];
+  recentCommandIds?: string[];
   open: boolean;
   onClose: () => void;
   onRunCommand: (commandId: string) => void;
@@ -19,6 +20,7 @@ interface CommandPaletteProps {
 
 export function CommandPalette({
   commands,
+  recentCommandIds = [],
   open,
   onClose,
   onRunCommand,
@@ -48,6 +50,32 @@ export function CommandPalette({
     ));
   }, [commands, query]);
   const groupedCommands = React.useMemo(() => {
+    if (query.trim().length === 0 && recentCommandIds.length > 0) {
+      const commandById = new Map(filteredCommands.map((command) => [command.id, command]));
+      const recentCommands = recentCommandIds
+        .map((commandId) => commandById.get(commandId))
+        .filter((command): command is CommandPaletteItem => Boolean(command));
+      const recentCommandIdsSet = new Set(recentCommands.map((command) => command.id));
+      const groups: Array<[string, CommandPaletteItem[]]> = [];
+
+      if (recentCommands.length > 0) {
+        groups.push(['Recent', recentCommands]);
+      }
+
+      const remainingGroups = new Map<string, CommandPaletteItem[]>();
+      for (const command of filteredCommands) {
+        if (recentCommandIdsSet.has(command.id)) {
+          continue;
+        }
+        const key = command.category ?? 'Other';
+        const items = remainingGroups.get(key) ?? [];
+        items.push(command);
+        remainingGroups.set(key, items);
+      }
+
+      return [...groups, ...remainingGroups.entries()];
+    }
+
     const groups = new Map<string, CommandPaletteItem[]>();
     for (const command of filteredCommands) {
       const key = command.category ?? 'Other';
@@ -56,7 +84,7 @@ export function CommandPalette({
       groups.set(key, items);
     }
     return [...groups.entries()];
-  }, [filteredCommands]);
+  }, [filteredCommands, query, recentCommandIds]);
   const selectableCommandIds = React.useMemo(
     () => filteredCommands.filter((command) => !command.disabled).map((command) => command.id),
     [filteredCommands],

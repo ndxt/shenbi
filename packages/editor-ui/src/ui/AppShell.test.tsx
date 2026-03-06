@@ -795,6 +795,111 @@ describe('AppShell', () => {
     expect(within(palette as HTMLElement).getByText('Generate placeholder records for the selected table.')).toBeInTheDocument();
   });
 
+  it('命令面板会在空搜索时展示最近使用命令', async () => {
+    const firstExecute = vi.fn();
+    const secondExecute = vi.fn();
+
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.palette.recent',
+            name: 'Palette Recent Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.palette.recent.first',
+                  title: 'Recent First',
+                  category: 'RecentGroup',
+                  execute: firstExecute,
+                },
+                {
+                  id: 'plugin.palette.recent.second',
+                  title: 'Recent Second',
+                  category: 'RecentGroup',
+                  execute: secondExecute,
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    fireEvent.click(screen.getByRole('option', { name: /Recent First/ }));
+    expect(firstExecute).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    fireEvent.click(screen.getByRole('option', { name: /Recent Second/ }));
+    expect(secondExecute).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+
+    const recentHeader = await screen.findByText('Recent');
+    const recentGroup = recentHeader.parentElement;
+    expect(recentGroup).not.toBeNull();
+    const recentOptions = within(recentGroup as HTMLElement).getAllByRole('option');
+    expect(recentOptions).toHaveLength(2);
+    expect(recentOptions[0]).toHaveAccessibleName(/Recent Second/);
+    expect(recentOptions[1]).toHaveAccessibleName(/Recent First/);
+  });
+
+  it('命令面板最近使用命令会去重并前移', async () => {
+    const firstExecute = vi.fn();
+    const secondExecute = vi.fn();
+
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.palette.recent-dedupe',
+            name: 'Palette Recent Dedupe Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.palette.recent-dedupe.first',
+                  title: 'Dedupe First',
+                  category: 'RecentDedupe',
+                  execute: firstExecute,
+                },
+                {
+                  id: 'plugin.palette.recent-dedupe.second',
+                  title: 'Dedupe Second',
+                  category: 'RecentDedupe',
+                  execute: secondExecute,
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    fireEvent.click(screen.getByRole('option', { name: /Dedupe First/ }));
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    fireEvent.click(screen.getByRole('option', { name: /Dedupe Second/ }));
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    fireEvent.click(screen.getByRole('option', { name: /Dedupe First/ }));
+
+    expect(firstExecute).toHaveBeenCalledTimes(2);
+    expect(secondExecute).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+
+    const recentGroup = (await screen.findByText('Recent')).parentElement;
+    expect(recentGroup).not.toBeNull();
+    const recentOptions = within(recentGroup as HTMLElement).getAllByRole('option');
+    expect(recentOptions).toHaveLength(2);
+    expect(recentOptions[0]).toHaveTextContent('Dedupe First');
+    expect(recentOptions[1]).toHaveTextContent('Dedupe Second');
+  });
+
   it('命令面板支持键盘导航并通过回车执行命令', async () => {
     const firstExecute = vi.fn();
     const secondExecute = vi.fn();
