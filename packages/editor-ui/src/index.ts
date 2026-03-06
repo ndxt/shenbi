@@ -17,7 +17,10 @@ export * from './hooks/useSelectionSync';
 export * from './hooks/useNodePatchDispatch';
 export * from './hooks/useShellModeUrl';
 export * from './hooks/useEditorSession';
+export * from './hooks/useScenarioSession';
+export * from './hooks/useEditorHostBridge';
 
 export * from './ai/editor-ai-bridge';
 export * from './ai/useEditorAIBridge';
 export * from './plugins';
+export * from './plugins/use-plugin-context';

@@ -1,126 +1,189 @@
-# Preview 瘦身边界清单（Phase 2）
+# Preview 薄壳化迁移清单
 
-> 目标：`apps/preview` 只保留“启动壳 + 示例数据 + 最小集成冒烟”，编辑器域逻辑下沉到 `@shenbi/editor-ui` / `@shenbi/editor-core`。
+> 目标：`apps/preview` 只保留“示例数据 + mock + demo 配置 + 最小装配入口”，宿主运行时、通用 schema 工具、命令桥接和 `PluginContext` 适配下沉到 `packages`。
 
 ---
 
-## 1. 边界定义
+## 1. 目标边界
 
-### 必须留在 `apps/preview`
+### 允许保留在 `apps/preview`
 
-- 示例场景数据与切换：
+- 示例场景数据：
   - `apps/preview/src/schemas/**`
-  - 场景下拉与 Demo 入口（业务演示职责）
-- 预览运行时装配（Demo 环境）：
-  - `installMockFetch` 注入
+- Demo mock 与演示仓储：
+  - `apps/preview/src/mock/**`
+- Demo 插件配置与场景配置：
+  - 场景下拉、示例 plugin 列表、演示 icon/label
+- Preview 专用 runtime glue：
+  - 是否安装 mock fetch
   - `antdResolver + ShenbiPage` 的最小装配
-- 插件演示占位：
-  - `Assets/Rocket/Debug` 等演示性扩展
 
-### 必须下沉出 `apps/preview`
+### 必须迁出 `apps/preview`
 
-- 文件工作区行为（已完成第一阶段）：
-  - 文件列表/打开/保存/另存、快捷键、`beforeunload`
-- 编辑器壳层通用编排：
-  - 选中节点同步、树与画布联动、节点 patch 分发
-- Shell 模式通用能力：
-  - URL 模式同步、标题脏标记/撤销重做统一行为
-- AI Bridge 状态桥接：
-  - `schema + selectedNodeId` 的订阅同步机制
+- 通用 schema tree / path / patch 逻辑
+- `scenario` 会话状态、history、文件持久化、命令桥接
+- `PluginContext` 宿主适配
+- `shell / scenarios` 双模式命令归一
+- 非 demo 专属的宿主编排测试
 
 ---
 
-## 2. 代码迁移清单（从 `App.tsx` 视角）
+## 2. 当前未抽干净的部分
 
-| 当前逻辑 | 当前文件 | 目标位置 | 优先级 |
-|---|---|---|---|
-| 文件工作区（保存/快捷键/离开提示） | `apps/preview/src/App.tsx` | `packages/editor-ui/src/plugins/files/use-file-workspace.ts` | 已完成 |
-| 模式 URL 同步（`mode=shell`） | `apps/preview/src/App.tsx` | `packages/editor-ui/src/hooks/useShellModeUrl.ts` | 已完成 |
-| 树选中与默认节点兜底 | `apps/preview/src/App.tsx` | `packages/editor-ui/src/hooks/useSelectionSync.ts` | 已完成 |
-| 节点 patch 分发（props/style/events/logic/columns） | `apps/preview/src/App.tsx` | `packages/editor-ui/src/hooks/useNodePatchDispatch.ts` | 已完成 |
-| AI bridge listeners/snapshot 维护 | `apps/preview/src/App.tsx` | `packages/editor-ui/src/ai/useEditorAIBridge.ts` | 已完成 |
-| 编辑器会话编排（editor 初始化/订阅/销毁） | `apps/preview/src/App.tsx` | `packages/editor-ui/src/hooks/useEditorSession.ts` | 已完成 |
-| 场景 schema 初始化与切换 | `apps/preview/src/App.tsx` | 保留在 preview（示例职责） | 保留 |
+### 2.1 `apps/preview/src/App.tsx`
 
----
+- 仍包含 `scenario` 会话状态机：
+  - `createInitialScenarioSnapshots`
+  - `createScenarioHistories`
+  - `updateScenarioSnapshot`
+  - `updateScenarioSchema`
+- 仍包含 `scenario` 命令桥：
+  - `executeScenarioCommand`
+  - `executeBaseCommand`
+  - `executePluginCommand`
+- 仍包含宿主适配：
+  - `PluginContext` 的 `document / selection / commands / notifications` 组装
+- 仍包含 preview runtime 组件：
+  - `ScenarioRuntimeView`
 
-## 3. 测试迁移矩阵
+### 2.2 `apps/preview/src/editor/schema-editor.ts`
 
-## 原则
+- 这是纯通用工具，不是 preview 数据：
+  - `buildEditorTree`
+  - `getSchemaNodeByTreeId`
+  - `getTreeIdBySchemaNodeId`
+  - `patchSchemaNodeProps`
+  - `patchSchemaNodeEvents`
+  - `patchSchemaNodeStyle`
+  - `patchSchemaNodeLogic`
+  - `patchSchemaNodeColumns`
 
-- `preview`：只保留“用户可见链路”冒烟。
-- `editor-ui`：承接交互编排与 hook 级行为测试。
-- `editor-core`：承接命令、状态、历史、文件存储一致性测试。
+### 2.3 `apps/preview/src/App.test.tsx`
 
-## 已完成
-
-- `apps/preview/src/App.test.tsx` 已删除 5 个重型文件域用例。
-- `packages/editor-ui/src/plugins/files/use-file-workspace.test.tsx` 已补文件域与热键覆盖。
-- `packages/editor-ui/src/hooks/useSelectionSync.test.tsx` 已承接选中同步逻辑测试。
-- `packages/editor-ui/src/hooks/useNodePatchDispatch.test.tsx` 已承接 patch 分发逻辑测试。
-- `packages/editor-ui/src/hooks/useShellModeUrl.test.tsx` 已承接模式 URL 同步测试。
-- `packages/editor-ui/src/ai/useEditorAIBridge.test.tsx` 已承接 AI bridge 编排测试。
-- `packages/editor-ui/src/hooks/useEditorSession.test.tsx` 已承接 editor 会话编排测试。
-
-## 下一步迁移建议
-
-- 从 `apps/preview/src/App.test.tsx` 继续下沉：
-  - 保留最小冒烟集合（模式切换/场景切换/AI 生成/基础 setter 回写）
-  - 将其余“编排细节断言”持续迁移到 `editor-ui` hook 级测试
-- 迁入目标：
-  - `packages/editor-ui/src/hooks/*.test.tsx`（编排层）
-  - `packages/editor-core/src/*.test.ts`（命令层）
+- 已经比之前轻，但仍覆盖了一部分宿主编排细节：
+  - `Undo`
+  - `Save File`
+  - mode/scenario bridge
+- 这些测试里，用户可见链路应该保留在 preview，桥接细节应继续迁出
 
 ---
 
-## 4. 执行顺序（建议）
+## 3. 迁移目标映射
 
-1. `P1`：拆 `use-selection-sync`，先迁移对应测试再改 `App.tsx` 接线。
-2. `P1`：拆 `use-node-patch-dispatch`，收敛 5 个 patch handler 的重复分支。
-3. `P1`：拆 `use-shell-mode-url`，统一 URL 同步逻辑。
-4. `P2`：拆 AI bridge hook，`App.tsx` 只负责注入依赖与组装 props。
-5. `P2`：拆 `useEditorSession`，收敛 editor 生命周期与 schema 更新入口。
-6. `P2`：精简 `App.test.tsx` 为最小冒烟集合。
-
----
-
-## 5. 完成标准（DoD）
-
-- `apps/preview/src/App.tsx` 不再包含：
-  - 文件域细节逻辑
-  - 复杂编辑器编排逻辑（超过单纯装配）
-- `preview` 侧测试以冒烟为主（集成链路可跑通即可）。
-- `editor-ui/editor-core` 对通用行为有稳定单测覆盖。
-- 全量通过：
-  - `pnpm --filter @shenbi/preview type-check && pnpm --filter @shenbi/preview test`
-  - `pnpm --filter @shenbi/editor-ui type-check && pnpm --filter @shenbi/editor-ui test`
-  - `pnpm --filter @shenbi/editor-core type-check && pnpm --filter @shenbi/editor-core test`
+| 当前逻辑 | 当前文件 | 目标位置 | 原因 | 优先级 |
+|---|---|---|---|---|
+| schema tree 构建 | `apps/preview/src/editor/schema-editor.ts` | `packages/editor-core/src/schema-tree.ts` 或同类文件 | 纯 schema 数据层能力 | P1 |
+| `treeId <-> schemaNodeId` 映射 | `apps/preview/src/editor/schema-editor.ts` | `packages/editor-core/src/schema-tree.ts` | 纯 schema 数据层能力 | P1 |
+| schema patch 纯函数 | `apps/preview/src/editor/schema-editor.ts` | `packages/editor-core/src/schema-editor.ts` 或现有 schema 模块 | 与 UI/preview 无关 | P1 |
+| `scenario` snapshot/history/file 状态 | `apps/preview/src/App.tsx` | `packages/editor-ui/src/hooks/useScenarioSession.ts` | React 宿主编排逻辑 | P1 |
+| `scenario` 命令执行桥 | `apps/preview/src/App.tsx` | `packages/editor-ui/src/hooks/useScenarioSession.ts` | 宿主运行时能力 | P1 |
+| `PluginContext` 组装 | `apps/preview/src/App.tsx` | `packages/editor-ui/src/plugins/create-plugin-context.ts` | 宿主适配器 | P2 |
+| `shell/scenarios` 双模式命令归一 | `apps/preview/src/App.tsx` | `packages/editor-ui/src/hooks/useEditorHostBridge.ts` | 宿主桥接逻辑 | P2 |
+| `ScenarioRuntimeView` | `apps/preview/src/App.tsx` | `apps/preview/src/runtime/ScenarioRuntimeView.tsx` | 可留 preview，但必须从大壳拆开 | P2 |
+| preview 冒烟测试之外的编排测试 | `apps/preview/src/App.test.tsx` | `packages/editor-ui/src/hooks/*.test.tsx` / `packages/editor-core/src/*.test.ts` | 让测试跟着通用能力走 | P3 |
 
 ---
 
-## 6. 封板状态（2026-03-05）
+## 4. 执行顺序
 
-### 6.1 结论
+### P1 先拆纯通用能力
 
-- 状态：`已收口，可进入下一阶段开发`
-- 说明：
-  - `apps/preview/src/App.tsx` 已完成多轮下沉，当前以 Demo 场景与装配职责为主。
-  - `apps/preview/src/App.test.tsx` 已精简为最小冒烟集合（8 条）。
-  - 编排逻辑测试已迁入 `packages/editor-ui`（hooks/ai/plugins）。
+1. 抽 `schema-editor.ts`
+2. 在 `editor-core` 补对应单测
+3. 把 `preview` 对这些工具的 import 切到 `packages`
 
-### 6.2 门禁结果
+### P2 再拆宿主编排
 
-- `@shenbi/editor-core`：
-  - `type-check` 通过
-  - `test` 通过（6 files, 30 tests）
-- `@shenbi/editor-ui`：
-  - `type-check` 通过
-  - `test` 通过（14 files, 59 tests）
-- `@shenbi/preview`：
-  - `type-check` 通过
-  - `test` 通过（6 files, 43 tests）
+1. 新增 `useScenarioSession`
+2. 把 `scenario snapshot/history/open/save/undo/redo` 从 `App.tsx` 挪进去
+3. 新增 `createPluginContext` 或同等 host adapter
+4. 把 `PluginContext` 装配从 `App.tsx` 移走
+5. 拆出 `ScenarioRuntimeView`
 
-### 6.3 剩余风险（已记录）
+### P3 收口测试与入口
 
-- 预览侧仍保留较多业务演示逻辑（符合当前“Demo 容器”定位），后续若转生产编辑器应用需继续拆分。
-- 视觉回归门禁（截图基线）仍在阶段计划中，尚未纳入本次封板范围。
+1. `App.test.tsx` 只保留用户可见冒烟
+2. `editor-ui/editor-core` 补齐迁出的桥接测试
+3. `App.tsx` 收口成“配置 + 组合”
+
+---
+
+## 5. `App.tsx` 目标形态
+
+迁移完成后，`apps/preview/src/App.tsx` 应只做这几件事：
+
+- 读取场景配置和 demo schema
+- 读取 preview mock/runtime 配置
+- 调用 `packages` 提供的宿主 hook
+- 生成 demo 插件列表
+- 将结果传给 `AppShell`
+- 渲染独立的 preview runtime 组件
+
+### 不应再出现的关键词
+
+- `History`
+- `LocalFileStorageAdapter`
+- `EditorStateSnapshot`
+- `executeScenarioCommand`
+- `executeBaseCommand`
+- `executePluginCommand`
+- 大段 `PluginContext` 对象装配
+- schema patch/tree 工具实现
+
+---
+
+## 6. 每阶段完成标准
+
+### P1 完成标准
+
+- `apps/preview/src/editor/schema-editor.ts` 已删除或仅保留 preview 专属包装
+- `editor-core` 持有 schema tree / patch 主实现
+- 相关测试迁入 `packages/editor-core`
+
+当前状态：
+- 已完成。`App.tsx` 已切到 `@shenbi/editor-core`，preview 内重复实现和重复测试已删除。
+
+### P2 完成标准
+
+- `App.tsx` 不再直接维护 `scenario` history / save / undo / redo
+- `App.tsx` 不再手写 `PluginContext`
+- `ScenarioRuntimeView` 已拆出独立文件
+
+当前状态：
+- 已基本完成。`scenario` session 已迁入 `packages/editor-ui/src/hooks/useScenarioSession.ts`，`PluginContext` 装配已迁入 `packages/editor-ui/src/plugins/use-plugin-context.ts`，`ScenarioRuntimeView` 已拆到 `apps/preview/src/runtime/ScenarioRuntimeView.tsx`。
+- `App.tsx` 仍保留少量 preview-specific 命令包装和 demo 插件配置，这部分属于允许保留的组合逻辑。
+
+### P3 完成标准
+
+- `App.tsx` 主要是 imports + hooks + props 组装
+- `App.test.tsx` 只保留最小冒烟集合
+- 宿主桥接细节测试迁到 `editor-ui/editor-core`
+
+当前状态：
+- 已部分完成。宿主桥接细节已经迁到 `packages/editor-ui/src/hooks/useEditorHostBridge.test.tsx`、`useScenarioSession.test.tsx`、`use-plugin-context.test.tsx`。
+- `App.test.tsx` 已从 10 个集成用例收口到 7 个偏用户可见的冒烟用例。
+- `App.tsx` 目前已主要由场景配置、hooks 调用、demo plugin 配置和 `AppShell` props 组装构成。
+
+---
+
+## 7. 当前判断
+
+- 结论：`apps/preview` 还没有薄到“只剩数据和配置”
+- 当前状态：
+  - `packages` 已承接平台主干
+  - `preview` 仍然保留较厚的宿主编排
+- 下一步最应该先做：
+  1. 抽 `apps/preview/src/editor/schema-editor.ts`
+  2. 抽 `useScenarioSession`
+  3. 抽 `createPluginContext`
+
+---
+
+## 8. 验证门禁
+
+- `pnpm --filter @shenbi/editor-core type-check`
+- `pnpm --filter @shenbi/editor-core test`
+- `pnpm --filter @shenbi/editor-ui type-check`
+- `pnpm --filter @shenbi/editor-ui test`
+- `pnpm --filter @shenbi/preview type-check`
+- `pnpm --filter @shenbi/preview test`
