@@ -22,12 +22,12 @@
 16. `PluginContext` 旧别名兼容已收敛到 `packages/editor-plugins/api/src/context.ts`，插件实现层不再直接感知历史字段。
 17. `editor-ui/AppShell` 已停止生成 `executeCommand/notify` 等旧 alias，宿主层只分发新服务面。
 18. `ai-chat` 已改为只通过 `editor-plugin-api` helper 访问 schema 替换能力，不再在插件实现层直接判断旧 alias。
-19. `PluginContext` 旧 alias 删除清单与迁移影响说明已补齐到 `docs/active/plugin-context-alias-removal-plan.md`。
+19. `PluginContext` 旧 alias 删除清单与迁移影响说明已补齐到 `docs/archive/history-plugin-context-alias-removal-plan.md`。
 20. `packages/editor-plugins/api` 已补充 `PluginShortcutContribution.priority` 与正式插件激活结果类型，Phase 3.2 协议冻结已形成代码基线。
 21. `editor-ui/AppShell` 已接入最小 `ShortcutManager` 与 `Command Palette` 骨架，插件声明的 `shortcuts` 可直接触发命令。
 22. 命令面板已支持 `category / description / aliases / keywords / recent commands`，宿主命令与插件命令可统一检索。
 23. 工具栏菜单已支持 `target / group`，上下文菜单已支持 `group` 分隔，命令 surfaces 的平台模型已补齐。
-24. 插件平台生命周期与服务面冻结结论已沉淀到 `docs/active/plugin-platform-lifecycle-service-freeze.md`。
+24. 插件平台生命周期与服务面冻结结论已沉淀到 `docs/active/platform-plugin-lifecycle-and-service-freeze.md`。
 25. 最小插件模板已落地到 `templates/editor-plugin/minimal-plugin.tsx`，插件接入说明已补齐。
 
 ### 1.2 当前结论

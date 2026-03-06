@@ -93,7 +93,7 @@
 
 验证方式：
 
-1. 审核 [plugin-platform-phase-3-plan.md](D:/Code/lowcode/shenbi-codes/shenbi/docs/active/plugin-platform-phase-3-plan.md) 与后续边界文档。
+1. 审核 [history-plugin-platform-phase-3-plan.md](D:/Code/lowcode/shenbi-codes/shenbi/docs/archive/history-plugin-platform-phase-3-plan.md) 与后续边界文档。
 2. 选 2-3 个新增能力候选项，验证都能明确归位。
 
 ### 3.2 快捷键协议冻结

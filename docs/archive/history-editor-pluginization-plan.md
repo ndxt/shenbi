@@ -142,7 +142,7 @@
 允许：
 1. `packages/editor-plugins/api/**`
 2. `packages/editor-ui/src/**`（仅扩展点与宿主适配）
-3. `docs/active/editor-pluginization-plan.md`（必要更新）
+3. `docs/archive/history-editor-pluginization-plan.md`（必要更新）
 
 禁止：
 1. `packages/editor-plugins/files/**`

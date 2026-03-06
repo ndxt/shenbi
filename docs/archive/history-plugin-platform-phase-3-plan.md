@@ -322,11 +322,11 @@ P3 第一阶段要先冻结扩展点，而不是直接做某个插件能力。
 
 **产物：**
 
-1. 平台三层边界说明文档，见 `docs/active/plugin-platform-boundaries-and-services.md`。
-2. 平台服务面清单与职责定义（含准入规则），见 `docs/active/plugin-platform-boundaries-and-services.md`。
-3. "服务 vs 命令"判定规则文档，见 `docs/active/plugin-platform-boundaries-and-services.md` 与 `docs/active/plugin-platform-command-inventory.md`。
-4. 现有命令归类清单，见 `docs/active/plugin-platform-command-inventory.md`。
-5. 新增服务面准入评审模板，见 `docs/active/plugin-platform-service-admission-template.md`。
+1. 平台三层边界说明文档，见 `docs/archive/history-plugin-platform-boundaries-and-services.md`。
+2. 平台服务面清单与职责定义（含准入规则），见 `docs/archive/history-plugin-platform-boundaries-and-services.md`。
+3. "服务 vs 命令"判定规则文档，见 `docs/archive/history-plugin-platform-boundaries-and-services.md` 与 `docs/archive/history-plugin-platform-command-inventory.md`。
+4. 现有命令归类清单，见 `docs/archive/history-plugin-platform-command-inventory.md`。
+5. 新增服务面准入评审模板，见 `docs/archive/history-plugin-platform-service-admission-template.md`。
 
 **验收：**
 
@@ -413,7 +413,7 @@ P3 第一阶段要先冻结扩展点，而不是直接做某个插件能力。
 
 | # | 交付物 | 所属阶段 |
 |---|--------|---------|
-| 1 | 本规划文档 `docs/active/plugin-platform-phase-3-plan.md` | — |
+| 1 | 本规划文档 `docs/archive/history-plugin-platform-phase-3-plan.md` | — |
 | 2 | 平台三层边界与服务面职责文档 | 3.1 |
 | 3 | "服务 vs 命令"判定规则文档 | 3.1 |
 | 4 | 插件生命周期与 contribution 规范文档 | 3.2 |

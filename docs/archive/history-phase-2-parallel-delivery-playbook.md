@@ -31,7 +31,7 @@
 - `apps/preview/src/App.tsx`（非契约集成需求不改）
 
 参考文档：
-- `docs/active/branch-a-contracts-catalog-guide.md`（在A分支）
+- `docs/archive/history-branch-a-contracts-catalog-guide.md`（在A分支）
 
 ### 2.2 分支B（Editor Setter）
 
@@ -47,7 +47,7 @@
 - `packages/schema/types/contract.ts`
 
 参考文档：
-- `docs/active/branch-b-editor-setter-guide.md`（在B分支）
+- `docs/archive/history-branch-b-editor-setter-guide.md`（在B分支）
 
 ---
 

@@ -30,7 +30,7 @@
 
 ### P2. 评估旧 alias 删除窗口
 
-状态：已完成，产物见 `docs/active/plugin-context-alias-removal-plan.md`。
+状态：已完成，产物见 `docs/archive/history-plugin-context-alias-removal-plan.md`。
 
 目标：
 1. 列出仍然依赖兼容字段的真实调用点。
@@ -46,7 +46,7 @@
 
 ### P3. 进入插件能力增强阶段
 
-状态：平台必需骨架已完成，后续进入可选增强阶段，详见 `docs/active/plugin-platform-phase-3-plan.md`。
+状态：平台必需骨架已完成，后续进入可选增强阶段，详见 `docs/archive/history-plugin-platform-phase-3-plan.md`。
 
 前提：
 1. P1/P2 完成。
