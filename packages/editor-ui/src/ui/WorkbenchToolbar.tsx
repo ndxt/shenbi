@@ -1,4 +1,5 @@
 import React from 'react';
+import type { MenuContribution } from '@shenbi/editor-plugin-api';
 import { 
   MousePointer2, 
   Hand, 
@@ -10,12 +11,15 @@ import {
   ChevronRight,
   Share2
 } from 'lucide-react';
+import { ToolbarMenus } from './ToolbarMenus';
 
 interface WorkbenchToolbarProps {
   extra?: React.ReactNode;
+  menus?: MenuContribution[];
+  onRunMenuCommand?: (commandId: string) => void;
 }
 
-export function WorkbenchToolbar({ extra }: WorkbenchToolbarProps) {
+export function WorkbenchToolbar({ extra, menus, onRunMenuCommand }: WorkbenchToolbarProps) {
   return (
     <div className="h-9 bg-bg-sidebar border-b border-border-ide flex items-center justify-between px-2 shrink-0">
       <div className="flex items-center gap-2">
@@ -36,6 +40,7 @@ export function WorkbenchToolbar({ extra }: WorkbenchToolbarProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {menus && onRunMenuCommand ? <ToolbarMenus menus={menus} onRunCommand={onRunMenuCommand} /> : null}
         {extra ? <div>{extra}</div> : null}
         <button className="flex items-center gap-1.5 px-2 py-1 hover:bg-bg-activity-bar rounded text-emerald-500 transition-colors">
           <Play size={14} fill="currentColor" />

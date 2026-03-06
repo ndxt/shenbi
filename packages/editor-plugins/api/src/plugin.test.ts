@@ -31,6 +31,12 @@ describe('collectPluginContributes', () => {
           commands: [
             { id: 'cmd.save', title: 'Save', order: 10, execute },
           ],
+          menus: [
+            { id: 'menu.save', label: 'Save', commandId: 'cmd.save', order: 10 },
+          ],
+          contextMenus: [
+            { id: 'context.copy', label: 'Copy Node', commandId: 'node.copy', order: 10 },
+          ],
           shortcuts: [
             {
               id: 'shortcut.save',
@@ -53,6 +59,14 @@ describe('collectPluginContributes', () => {
           ],
           commands: [
             { id: 'cmd.save', title: '保存', order: 5, execute },
+          ],
+          menus: [
+            { id: 'menu.save', label: '保存', commandId: 'cmd.save', order: 5 },
+            { id: 'menu.assistant', label: 'Assistant', commandId: 'cmd.assistant', order: 20 },
+          ],
+          contextMenus: [
+            { id: 'context.copy', label: 'Duplicate Node', commandId: 'node.duplicate', order: 5 },
+            { id: 'context.delete', label: 'Delete Node', commandId: 'node.delete', order: 20 },
           ],
           shortcuts: [
             {
@@ -82,6 +96,10 @@ describe('collectPluginContributes', () => {
     expect(resolved.activityBarItems[0]?.label).toBe('搜索');
     expect(resolved.commands).toHaveLength(1);
     expect(resolved.commands[0]?.title).toBe('保存');
+    expect(resolved.menus.map((item) => item.id)).toEqual(['menu.save', 'menu.assistant']);
+    expect(resolved.menus[0]?.label).toBe('保存');
+    expect(resolved.contextMenus.map((item) => item.id)).toEqual(['context.copy', 'context.delete']);
+    expect(resolved.contextMenus[0]?.label).toBe('Duplicate Node');
     expect(resolved.shortcuts).toHaveLength(1);
     expect(resolved.shortcuts[0]).toMatchObject({
       id: 'shortcut.save',

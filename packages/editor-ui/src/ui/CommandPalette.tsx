@@ -3,8 +3,11 @@ import React from 'react';
 export interface CommandPaletteItem {
   id: string;
   title: string;
+  category?: string;
+  description?: string;
   shortcut: string | undefined;
   source: 'host' | 'plugin';
+  disabled?: boolean;
 }
 
 interface CommandPaletteProps {
@@ -21,10 +24,12 @@ export function CommandPalette({
   onRunCommand,
 }: CommandPaletteProps) {
   const [query, setQuery] = React.useState('');
+  const [selectedCommandId, setSelectedCommandId] = React.useState<string | undefined>(undefined);
 
   React.useEffect(() => {
     if (!open) {
       setQuery('');
+      setSelectedCommandId(undefined);
     }
   }, [open]);
 
@@ -35,9 +40,54 @@ export function CommandPalette({
     }
     return commands.filter((command) => (
       command.title.toLowerCase().includes(normalizedQuery)
+      || command.category?.toLowerCase().includes(normalizedQuery)
+      || command.description?.toLowerCase().includes(normalizedQuery)
       || command.id.toLowerCase().includes(normalizedQuery)
     ));
   }, [commands, query]);
+  const groupedCommands = React.useMemo(() => {
+    const groups = new Map<string, CommandPaletteItem[]>();
+    for (const command of filteredCommands) {
+      const key = command.category ?? 'Other';
+      const items = groups.get(key) ?? [];
+      items.push(command);
+      groups.set(key, items);
+    }
+    return [...groups.entries()];
+  }, [filteredCommands]);
+  const selectableCommandIds = React.useMemo(
+    () => filteredCommands.filter((command) => !command.disabled).map((command) => command.id),
+    [filteredCommands],
+  );
+
+  React.useEffect(() => {
+    if (selectableCommandIds.length === 0) {
+      setSelectedCommandId(undefined);
+      return;
+    }
+    if (!selectedCommandId || !selectableCommandIds.includes(selectedCommandId)) {
+      setSelectedCommandId(selectableCommandIds[0]);
+    }
+  }, [selectableCommandIds, selectedCommandId]);
+
+  const moveSelection = (direction: 1 | -1) => {
+    if (selectableCommandIds.length === 0) {
+      return;
+    }
+    const currentIndex = selectedCommandId ? selectableCommandIds.indexOf(selectedCommandId) : -1;
+    const nextIndex = currentIndex === -1
+      ? 0
+      : (currentIndex + direction + selectableCommandIds.length) % selectableCommandIds.length;
+    setSelectedCommandId(selectableCommandIds[nextIndex]);
+  };
+
+  const runSelectedCommand = () => {
+    if (!selectedCommandId) {
+      return;
+    }
+    onRunCommand(selectedCommandId);
+    onClose();
+  };
 
   if (!open) {
     return null;
@@ -60,32 +110,72 @@ export function CommandPalette({
             placeholder="Type a command"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                moveSelection(1);
+                return;
+              }
+              if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                moveSelection(-1);
+                return;
+              }
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                runSelectedCommand();
+              }
+            }}
           />
         </div>
         <div className="max-h-[360px] overflow-auto py-1">
           {filteredCommands.length === 0 ? (
             <div className="px-3 py-4 text-sm text-text-secondary">No commands found.</div>
           ) : (
-            filteredCommands.map((command) => (
-              <button
-                key={command.id}
-                type="button"
-                className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-bg-activity-bar"
-                onClick={() => {
-                  onRunCommand(command.id);
-                  onClose();
-                }}
-              >
-                <div className="min-w-0">
-                  <div className="text-sm text-text-primary">{command.title}</div>
-                  <div className="text-[11px] text-text-secondary">
-                    {command.id} · {command.source}
-                  </div>
+            groupedCommands.map(([category, items]) => (
+              <div key={category} className="py-1">
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                  {category}
                 </div>
-                <div className="text-[11px] text-text-secondary">
-                  {command.shortcut ?? ''}
-                </div>
-              </button>
+                {items.map((command) => (
+                  <button
+                    key={command.id}
+                    type="button"
+                    disabled={command.disabled}
+                    aria-selected={selectedCommandId === command.id}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left ${
+                      command.disabled
+                        ? 'cursor-not-allowed opacity-50'
+                        : selectedCommandId === command.id
+                          ? 'bg-bg-activity-bar'
+                          : 'hover:bg-bg-activity-bar'
+                    }`}
+                    onMouseEnter={() => {
+                      if (!command.disabled) {
+                        setSelectedCommandId(command.id);
+                      }
+                    }}
+                    onClick={() => {
+                      if (command.disabled) {
+                        return;
+                      }
+                      setSelectedCommandId(command.id);
+                      onRunCommand(command.id);
+                      onClose();
+                    }}
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm text-text-primary">{command.title}</div>
+                      <div className="text-[11px] text-text-secondary">
+                        {command.description ?? `${command.id} · ${command.source}`}
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-text-secondary">
+                      {command.shortcut ?? ''}
+                    </div>
+                  </button>
+                ))}
+              </div>
             ))
           )}
         </div>

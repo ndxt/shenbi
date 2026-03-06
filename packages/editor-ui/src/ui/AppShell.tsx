@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   collectPluginContributes,
+  type ContextMenuArea,
   type EditorPluginActivateResult,
   type EditorPluginCleanup,
   type EditorPluginManifest,
@@ -13,13 +14,21 @@ import { EditorTabs } from './EditorTabs';
 import { Inspector } from './Inspector';
 import { AIPanel, type AIPanelProps } from './AIPanel';
 import { CommandPalette, type CommandPaletteItem } from './CommandPalette';
+import { ContextMenuOverlay, type ContextMenuItem } from './ContextMenuOverlay';
 import { Console } from './Console';
 import { StatusBar } from './StatusBar';
 import '../styles/editor-ui.css';
 import { useResize } from '../hooks/useResize';
-import { findMatchingShortcut, getShortcutEventContext } from '../shortcuts/shortcut-manager';
+import {
+  evaluateShortcutWhen,
+  evaluateWhenExpression,
+  findMatchingShortcut,
+  getShortcutEventContext,
+} from '../shortcuts/shortcut-manager';
 import {
   createHostCommandRegistry,
+  hostCommandsToContextMenus,
+  hostCommandsToMenus,
   hostCommandsToShortcuts,
 } from '../commands/host-command-registry';
 
@@ -27,6 +36,7 @@ import { TitleBar } from './TitleBar';
 import type { ActivityBarItemContribution, ActivityBarProps } from './ActivityBar';
 import type { SidebarProps } from './Sidebar';
 import type { InspectorProps } from './Inspector';
+import type { ToolbarMenuItem } from './ToolbarMenus';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -58,6 +68,17 @@ function isCleanup(value: unknown): value is EditorPluginCleanup {
   return typeof value === 'function';
 }
 
+function isInputLike(element: Element | null): boolean {
+  return Boolean(
+    element
+    && (
+      element instanceof HTMLInputElement
+      || element instanceof HTMLTextAreaElement
+      || (element instanceof HTMLElement && element.isContentEditable)
+    ),
+  );
+}
+
 export function AppShell({
   children,
   toolbarExtra,
@@ -78,6 +99,15 @@ export function AppShell({
   const [showConsole, setShowConsole] = React.useState(true);
   const [showAssistantPanel, setShowAssistantPanel] = React.useState(false);
   const [showCommandPalette, setShowCommandPalette] = React.useState(false);
+  const [contextMenuState, setContextMenuState] = React.useState<{
+    open: boolean;
+    area: ContextMenuArea;
+    position: { x: number; y: number };
+  }>({
+    open: false,
+    area: 'canvas',
+    position: { x: 0, y: 0 },
+  });
   const [activeSidebarTabId, setActiveSidebarTabId] = React.useState('components');
   const [activeAuxiliaryPanelId, setActiveAuxiliaryPanelId] = React.useState<string | undefined>(undefined);
 
@@ -186,13 +216,94 @@ export function AppShell({
     () => new Map(hostCommands.map((command) => [command.id, command])),
     [hostCommands],
   );
+  const pluginCommandMap = React.useMemo(
+    () => new Map(pluginContributes.commands.map((command) => [command.id, command])),
+    [pluginContributes.commands],
+  );
   const hostShortcuts = React.useMemo(
     () => hostCommandsToShortcuts(hostCommands),
+    [hostCommands],
+  );
+  const hostMenus = React.useMemo(
+    () => hostCommandsToMenus(hostCommands),
+    [hostCommands],
+  );
+  const hostContextMenus = React.useMemo(
+    () => hostCommandsToContextMenus(hostCommands),
     [hostCommands],
   );
   const allShortcuts = React.useMemo(
     () => [...hostShortcuts, ...pluginContributes.shortcuts],
     [hostShortcuts, pluginContributes.shortcuts],
+  );
+  const getRuntimeContext = React.useCallback((area?: ContextMenuArea) => {
+    const activeElement = rootRef.current?.contains(document.activeElement) ? document.activeElement : null;
+
+    return {
+      editorFocused: true,
+      sidebarVisible: showSidebar,
+      inspectorVisible: showInspector,
+      hasSelection: Boolean(pluginContext?.selection?.getSelectedNodeId?.()),
+      inputFocused: isInputLike(activeElement),
+      canvasFocused: area === 'canvas',
+      sidebarFocused: area === 'sidebar',
+      inspectorFocused: area === 'inspector',
+      activityBarFocused: area === 'activity-bar',
+    };
+  }, [pluginContext?.selection, showInspector, showSidebar]);
+  const resolveCommandState = React.useCallback((commandId: string, area?: ContextMenuArea) => {
+    const context = getRuntimeContext(area);
+    const hostCommand = hostCommandMap.get(commandId);
+    if (hostCommand) {
+      const visible = evaluateWhenExpression(hostCommand.when, context, true);
+      const enabled = visible && evaluateWhenExpression(hostCommand.enabledWhen, context, true);
+      return { visible, enabled };
+    }
+
+    const pluginCommand = pluginCommandMap.get(commandId);
+    if (pluginCommand) {
+      const visible = evaluateWhenExpression(pluginCommand.when, context, true);
+      const enabled = visible && evaluateWhenExpression(pluginCommand.enabledWhen, context, true);
+      return { visible, enabled };
+    }
+
+    return { visible: true, enabled: true };
+  }, [getRuntimeContext, hostCommandMap, pluginCommandMap]);
+  const allMenus = React.useMemo<ToolbarMenuItem[]>(() => (
+    [...hostMenus, ...pluginContributes.menus]
+      .filter((item) => evaluateWhenExpression(item.when, getRuntimeContext(), true))
+      .filter((item) => resolveCommandState(item.commandId).visible)
+      .map((item) => ({
+        id: item.id,
+        label: item.label,
+        commandId: item.commandId,
+        disabled: !(
+          evaluateWhenExpression(item.enabledWhen, getRuntimeContext(), true)
+          && resolveCommandState(item.commandId).enabled
+        ),
+        ...(item.section ? { section: item.section } : {}),
+      }))
+  ), [getRuntimeContext, hostMenus, pluginContributes.menus, resolveCommandState]);
+  const getContextMenuItems = React.useCallback((area: ContextMenuArea): ContextMenuItem[] => {
+    const context = getRuntimeContext(area);
+
+    return [...hostContextMenus, ...pluginContributes.contextMenus]
+      .filter((item) => (item.area ?? 'canvas') === area)
+      .filter((item) => evaluateWhenExpression(item.when, context, true))
+      .filter((item) => resolveCommandState(item.commandId, area).visible)
+      .map((item) => ({
+        id: item.id,
+        label: item.label,
+        commandId: item.commandId,
+        disabled: !(
+          evaluateWhenExpression(item.enabledWhen, context, true)
+          && resolveCommandState(item.commandId, area).enabled
+        ),
+      }));
+  }, [getRuntimeContext, hostContextMenus, pluginContributes.contextMenus, resolveCommandState]);
+  const activeContextMenuItems = React.useMemo(
+    () => (contextMenuState.open ? getContextMenuItems(contextMenuState.area) : []),
+    [contextMenuState, getContextMenuItems],
   );
   const shortcutMap = React.useMemo(() => {
     const entries = new Map<string, string>();
@@ -204,22 +315,30 @@ export function AppShell({
     return entries;
   }, [allShortcuts]);
   const commandPaletteCommands = React.useMemo<CommandPaletteItem[]>(() => {
-    const items: CommandPaletteItem[] = hostCommands.map((command) => ({
-      id: command.id,
-      title: command.title,
-      shortcut: shortcutMap.get(command.id),
-      source: 'host',
-    }));
-    for (const command of pluginContributes.commands) {
+    const items: CommandPaletteItem[] = hostCommands
+      .filter((command) => resolveCommandState(command.id).visible)
+      .map((command) => ({
+        id: command.id,
+        title: command.title,
+        ...(command.category ? { category: command.category } : {}),
+        ...(command.description ? { description: command.description } : {}),
+        shortcut: shortcutMap.get(command.id),
+        source: 'host',
+        disabled: !resolveCommandState(command.id).enabled,
+      }));
+    for (const command of pluginContributes.commands.filter((item) => resolveCommandState(item.id).visible)) {
       items.push({
         id: command.id,
         title: command.title,
+        ...(command.category ? { category: command.category } : {}),
+        ...(command.description ? { description: command.description } : {}),
         shortcut: shortcutMap.get(command.id),
         source: 'plugin',
+        disabled: !resolveCommandState(command.id).enabled,
       });
     }
     return items;
-  }, [hostCommands, pluginContributes.commands, shortcutMap]);
+  }, [hostCommands, pluginContributes.commands, resolveCommandState, shortcutMap]);
   const resolvedPluginContext = React.useMemo<PluginContext>(() => {
     const hostExecute = pluginContext?.commands?.execute;
     let context!: PluginContext;
@@ -342,6 +461,21 @@ export function AppShell({
     showSidebar,
   ]);
 
+  React.useEffect(() => {
+    if (!contextMenuState.open) {
+      return;
+    }
+
+    const handlePointerDown = () => {
+      setContextMenuState((current) => ({ ...current, open: false }));
+    };
+
+    window.addEventListener('resize', handlePointerDown);
+    return () => {
+      window.removeEventListener('resize', handlePointerDown);
+    };
+  }, [contextMenuState.open]);
+
   const handleActivitySelectItem = (item: ActivityBarItemContribution) => {
     activityBarProps?.onSelectItem?.(item);
     if (!item.targetSidebarTabId) {
@@ -355,6 +489,9 @@ export function AppShell({
   };
 
   const handleCanvasClickCapture = (event: React.MouseEvent<HTMLElement>) => {
+    if (contextMenuState.open) {
+      setContextMenuState((current) => ({ ...current, open: false }));
+    }
     if (!onCanvasSelectNode) {
       return;
     }
@@ -375,6 +512,23 @@ export function AppShell({
       setShowInspector(true);
       setIsMaximized(false);
     }
+  };
+
+  const openContextMenu = (area: ContextMenuArea, event: React.MouseEvent<HTMLElement>) => {
+    const items = getContextMenuItems(area);
+    if (items.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    setContextMenuState({
+      open: true,
+      area,
+      position: {
+        x: event.clientX,
+        y: event.clientY,
+      },
+    });
   };
 
   React.useEffect(() => {
@@ -414,14 +568,20 @@ export function AppShell({
       
       {/* Main Container */}
       <div className="flex-1 flex overflow-hidden">
-        <ActivityBar
-          {...activityBarProps}
-          items={activityItems}
-          onSelectItem={handleActivitySelectItem}
-        />
+        <div onContextMenu={(event) => openContextMenu('activity-bar', event)}>
+          <ActivityBar
+            {...activityBarProps}
+            items={activityItems}
+            onSelectItem={handleActivitySelectItem}
+          />
+        </div>
         
         {showSidebar && (
-          <div style={{ width: sidebarSize }} className="relative shrink-0 flex flex-col h-full">
+          <div
+            style={{ width: sidebarSize }}
+            className="relative shrink-0 flex flex-col h-full"
+            onContextMenu={(event) => openContextMenu('sidebar', event)}
+          >
             <Sidebar
               {...sidebarProps}
               tabs={sidebarTabs}
@@ -438,12 +598,21 @@ export function AppShell({
         
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <EditorTabs />
-          <WorkbenchToolbar extra={toolbarExtra} />
+          <WorkbenchToolbar
+            extra={toolbarExtra}
+            menus={allMenus}
+            onRunMenuCommand={(commandId) => {
+              void resolvedPluginContext.commands?.execute(commandId);
+            }}
+          />
           
           <div className="flex-1 flex overflow-hidden">
             {/* Editor/Canvas Area Container */}
             <div className="flex-1 flex flex-col overflow-hidden relative bg-bg-canvas">
-              <main className="flex-1 overflow-auto p-12 flex justify-center items-start scrollbar-hide relative canvas-grid">
+              <main
+                className="flex-1 overflow-auto p-12 flex justify-center items-start scrollbar-hide relative canvas-grid"
+                onContextMenu={(event) => openContextMenu('canvas', event)}
+              >
                 {/* The Stage / Viewport */}
                 <div className="relative z-10 stage-viewport min-h-[600px] w-full max-w-[1200px] rounded-sm overflow-hidden border border-border-ide">
                   <div className="bg-white min-h-full" onClickCapture={handleCanvasClickCapture}>
@@ -461,6 +630,15 @@ export function AppShell({
                 commands={commandPaletteCommands}
                 open={showCommandPalette}
                 onClose={() => setShowCommandPalette(false)}
+                onRunCommand={(commandId) => {
+                  void resolvedPluginContext.commands?.execute(commandId);
+                }}
+              />
+              <ContextMenuOverlay
+                items={activeContextMenuItems}
+                open={contextMenuState.open}
+                position={contextMenuState.position}
+                onClose={() => setContextMenuState((current) => ({ ...current, open: false }))}
                 onRunCommand={(commandId) => {
                   void resolvedPluginContext.commands?.execute(commandId);
                 }}
@@ -488,7 +666,11 @@ export function AppShell({
             ) : null}
 
             {showInspector && (
-              <div style={{ width: inspectorSize }} className="relative shrink-0 flex flex-col h-full">
+              <div
+                style={{ width: inspectorSize }}
+                className="relative shrink-0 flex flex-col h-full"
+                onContextMenu={(event) => openContextMenu('inspector', event)}
+              >
                 <div 
                   className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
                   onMouseDown={(e) => startInspectorResize(e, 'horizontal', true)}

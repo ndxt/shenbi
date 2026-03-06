@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { AppShell } from './AppShell';
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
@@ -368,10 +368,14 @@ describe('AppShell', () => {
 
     fireEvent.click(screen.getByTitle('Open Command Palette'));
 
-    expect(screen.getByLabelText('Command Palette Search')).toBeInTheDocument();
-    expect(screen.getByText('Open Command Palette')).toBeInTheDocument();
-    expect(screen.getByText('Palette Run')).toBeInTheDocument();
-    expect(screen.getByText('Mod+R')).toBeInTheDocument();
+    const searchInput = screen.getByLabelText('Command Palette Search');
+    const palette = searchInput.closest('.w-\\[560px\\]');
+
+    expect(searchInput).toBeInTheDocument();
+    expect(palette).not.toBeNull();
+    expect(within(palette as HTMLElement).getByRole('button', { name: /Open Command Palette/ })).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByRole('button', { name: /Palette Run/ })).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByText('Mod+R')).toBeInTheDocument();
   });
 
   it('命令面板可以执行插件命令', () => {
@@ -422,11 +426,15 @@ describe('AppShell', () => {
 
     fireEvent.click(screen.getByTitle('Open Command Palette'));
 
-    expect(screen.getByText('Save File')).toBeInTheDocument();
-    expect(screen.getByText('Undo')).toBeInTheDocument();
-    expect(screen.getByText('Hide Sidebar')).toBeInTheDocument();
-    expect(screen.getByText('Mod+S')).toBeInTheDocument();
-    expect(screen.getByText('Mod+Z')).toBeInTheDocument();
+    const searchInput = screen.getByLabelText('Command Palette Search');
+    const palette = searchInput.closest('.w-\\[560px\\]');
+
+    expect(palette).not.toBeNull();
+    expect(within(palette as HTMLElement).getByRole('button', { name: /Save File/ })).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByRole('button', { name: /Undo/ })).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByRole('button', { name: /Hide Sidebar/ })).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByText('Mod+S')).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByText('Mod+Z')).toBeInTheDocument();
   });
 
   it('宿主快捷键可以打开命令面板', () => {
@@ -439,5 +447,463 @@ describe('AppShell', () => {
     fireEvent.keyDown(screen.getByText('Content'), { key: 'p', ctrlKey: true, shiftKey: true });
 
     expect(screen.getByLabelText('Command Palette Search')).toBeInTheDocument();
+  });
+
+  it('宿主菜单会显示在工具栏中', () => {
+    const hostExecute = vi.fn();
+
+    render(
+      <AppShell
+        pluginContext={{
+          commands: {
+            execute: hostExecute,
+          },
+        }}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Save File' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide Sidebar' })).toBeInTheDocument();
+  });
+
+  it('插件声明的菜单可以执行命令', () => {
+    const pluginExecute = vi.fn();
+
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.menus',
+            name: 'Menus Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.menus.run',
+                  title: 'Menu Run',
+                  execute: pluginExecute,
+                },
+              ],
+              menus: [
+                {
+                  id: 'plugin.menus.entry',
+                  label: 'Plugin Menu Run',
+                  commandId: 'plugin.menus.run',
+                  order: 90,
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Plugin Menu Run' }));
+
+    expect(pluginExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it('宿主上下文菜单会显示在画布区域中', () => {
+    const hostExecute = vi.fn();
+
+    render(
+      <AppShell
+        pluginContext={{
+          commands: {
+            execute: hostExecute,
+          },
+        }}
+      >
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.contextMenu(screen.getByText('Canvas Content'));
+
+    expect(screen.getByRole('menu', { name: 'Canvas Context Menu' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Save File' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Undo' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Open Command Palette' })).toBeInTheDocument();
+  });
+
+  it('宿主上下文菜单会按区域切换菜单项', () => {
+    render(
+      <AppShell
+        inspectorProps={{
+          tabs: [
+            {
+              id: 'advanced',
+              label: 'Advanced',
+              order: 10,
+              render: () => <div>Advanced Panel</div>,
+            },
+          ],
+        }}
+      >
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.contextMenu(screen.getByText('Components'));
+    expect(screen.getByRole('menuitem', { name: 'Hide Sidebar' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Save File' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('menu'));
+    fireEvent.contextMenu(screen.getByText('Advanced'));
+    expect(screen.getByRole('menuitem', { name: 'Hide Inspector' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Hide Sidebar' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('menu'));
+    fireEvent.contextMenu(screen.getByLabelText('Explorer'));
+    expect(screen.getByRole('menuitem', { name: 'Hide Console' })).toBeInTheDocument();
+  });
+
+  it('插件声明的上下文菜单可以执行命令', () => {
+    const pluginExecute = vi.fn();
+
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.context-menus',
+            name: 'Context Menus Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.context.run',
+                  title: 'Context Run',
+                  execute: pluginExecute,
+                },
+              ],
+              contextMenus: [
+                {
+                  id: 'plugin.context.entry',
+                  label: 'Plugin Context Run',
+                  commandId: 'plugin.context.run',
+                  order: 90,
+                  when: 'editorFocused && !inputFocused',
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.contextMenu(screen.getByText('Canvas Content'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Plugin Context Run' }));
+
+    expect(pluginExecute).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menu', { name: 'Canvas Context Menu' })).not.toBeInTheDocument();
+  });
+
+  it('插件声明的上下文菜单可以指定目标区域', () => {
+    const pluginExecute = vi.fn();
+
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.context-targets',
+            name: 'Context Targets Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.context-targets.run',
+                  title: 'Sidebar Context Run',
+                  execute: pluginExecute,
+                },
+              ],
+              contextMenus: [
+                {
+                  id: 'plugin.context-targets.sidebar',
+                  label: 'Sidebar Context Run',
+                  commandId: 'plugin.context-targets.run',
+                  area: 'sidebar',
+                  order: 50,
+                  when: 'sidebarFocused',
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.contextMenu(screen.getByText('Components'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sidebar Context Run' }));
+
+    expect(pluginExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it('命令面板会按命令 when 过滤不可见命令', () => {
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.command-visibility',
+            name: 'Command Visibility Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.command-visibility.run',
+                  title: 'Hidden Without Selection',
+                  when: 'hasSelection',
+                  execute: vi.fn(),
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+
+    expect(screen.queryByRole('button', { name: /Hidden Without Selection/ })).not.toBeInTheDocument();
+  });
+
+  it('命令面板、工具栏菜单和上下文菜单会展示禁用态', () => {
+    const pluginExecute = vi.fn();
+
+    render(
+      <AppShell
+        pluginContext={{
+          selection: {
+            getSelectedNodeId: () => undefined,
+          },
+        }}
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.command-enabled',
+            name: 'Command Enabled Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.command-enabled.run',
+                  title: 'Disabled Without Selection',
+                  enabledWhen: 'hasSelection',
+                  execute: pluginExecute,
+                },
+              ],
+              menus: [
+                {
+                  id: 'plugin.command-enabled.menu',
+                  label: 'Disabled Menu Run',
+                  commandId: 'plugin.command-enabled.run',
+                  order: 30,
+                },
+              ],
+              contextMenus: [
+                {
+                  id: 'plugin.command-enabled.context',
+                  label: 'Disabled Context Run',
+                  commandId: 'plugin.command-enabled.run',
+                  order: 30,
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    const disabledPaletteCommand = screen.getByRole('button', { name: /Disabled Without Selection/ });
+    expect(disabledPaletteCommand).toBeDisabled();
+    fireEvent.click(disabledPaletteCommand);
+
+    const disabledToolbarMenu = screen.getByRole('button', { name: 'Disabled Menu Run' });
+    expect(disabledToolbarMenu).toBeDisabled();
+    fireEvent.click(disabledToolbarMenu);
+
+    fireEvent.contextMenu(screen.getByText('Canvas Content'));
+    const disabledContextMenu = screen.getByRole('menuitem', { name: 'Disabled Context Run' });
+    expect(disabledContextMenu).toBeDisabled();
+    fireEvent.click(disabledContextMenu);
+
+    expect(pluginExecute).not.toHaveBeenCalled();
+  });
+
+  it('命令面板会按 category 分组展示宿主命令', () => {
+    const hostExecute = vi.fn();
+
+    render(
+      <AppShell
+        pluginContext={{
+          commands: {
+            execute: hostExecute,
+          },
+        }}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+
+    expect(screen.getByText('Workbench')).toBeInTheDocument();
+    expect(screen.getByText('File')).toBeInTheDocument();
+    expect(screen.getByText('Edit')).toBeInTheDocument();
+    expect(screen.getByText('Layout')).toBeInTheDocument();
+  });
+
+  it('命令面板会展示插件命令 description', () => {
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.command-meta',
+            name: 'Command Meta Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.command-meta.run',
+                  title: 'Generate Mock Data',
+                  category: 'Data',
+                  description: 'Generate placeholder records for the selected table.',
+                  execute: vi.fn(),
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+
+    const searchInput = screen.getByLabelText('Command Palette Search');
+    const palette = searchInput.closest('.w-\\[560px\\]');
+
+    expect(palette).not.toBeNull();
+    expect(within(palette as HTMLElement).getByText('Data')).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByText('Generate placeholder records for the selected table.')).toBeInTheDocument();
+  });
+
+  it('命令面板支持键盘导航并通过回车执行命令', async () => {
+    const firstExecute = vi.fn();
+    const secondExecute = vi.fn();
+
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.palette.keyboard',
+            name: 'Palette Keyboard Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.palette.keyboard.first',
+                  title: 'First Command',
+                  category: 'PaletteNav',
+                  execute: firstExecute,
+                },
+                {
+                  id: 'plugin.palette.keyboard.second',
+                  title: 'Second Command',
+                  category: 'PaletteNav',
+                  execute: secondExecute,
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+
+    const searchInput = screen.getByLabelText('Command Palette Search');
+    fireEvent.change(searchInput, { target: { value: 'palettenav' } });
+
+    await waitFor(() => {
+      const firstButton = screen.getByRole('button', { name: /First Command/ });
+      const secondButton = screen.getByRole('button', { name: /Second Command/ });
+      expect(firstButton).toHaveAttribute('aria-selected', 'true');
+      expect(secondButton).toHaveAttribute('aria-selected', 'false');
+    });
+
+    fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
+    expect(screen.getByRole('button', { name: /First Command/ })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('button', { name: /Second Command/ })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(searchInput, { key: 'Enter' });
+    expect(secondExecute).toHaveBeenCalledTimes(1);
+    expect(firstExecute).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Command Palette Search')).not.toBeInTheDocument();
+  });
+
+  it('命令面板键盘导航会跳过禁用命令', async () => {
+    const enabledExecute = vi.fn();
+
+    render(
+      <AppShell
+        pluginContext={{
+          selection: {
+            getSelectedNodeId: () => undefined,
+          },
+        }}
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.palette.disabled-keyboard',
+            name: 'Palette Disabled Keyboard Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.palette.disabled-keyboard.blocked',
+                  title: 'Blocked Command',
+                  category: 'PaletteDisabledNav',
+                  enabledWhen: 'hasSelection',
+                  execute: vi.fn(),
+                },
+                {
+                  id: 'plugin.palette.disabled-keyboard.enabled',
+                  title: 'Enabled Command',
+                  category: 'PaletteDisabledNav',
+                  execute: enabledExecute,
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+
+    const searchInput = screen.getByLabelText('Command Palette Search');
+    fireEvent.change(searchInput, { target: { value: 'palettedisablednav' } });
+
+    await waitFor(() => {
+      const blockedButton = screen.getByRole('button', { name: /Blocked Command/ });
+      const enabledButton = screen.getByRole('button', { name: /Enabled Command/ });
+      expect(blockedButton).toHaveAttribute('aria-selected', 'false');
+      expect(enabledButton).toHaveAttribute('aria-selected', 'true');
+    });
+
+    fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
+    expect(screen.getByRole('button', { name: /Enabled Command/ })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(searchInput, { key: 'Enter' });
+    expect(enabledExecute).toHaveBeenCalledTimes(1);
   });
 });

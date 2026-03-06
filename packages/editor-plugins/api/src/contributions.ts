@@ -82,3 +82,21 @@ export interface AuxiliaryPanelContribution extends OrderedContribution {
   defaultWidth?: number;
   render: (context: PluginContext) => React.ReactNode;
 }
+
+export interface MenuContribution extends OrderedContribution {
+  label: string;
+  commandId: string;
+  when?: string;
+  enabledWhen?: string;
+  section?: 'primary' | 'secondary';
+}
+
+export type ContextMenuArea = 'canvas' | 'sidebar' | 'inspector' | 'activity-bar';
+
+export interface ContextMenuContribution extends OrderedContribution {
+  label: string;
+  commandId: string;
+  when?: string;
+  enabledWhen?: string;
+  area?: ContextMenuArea;
+}

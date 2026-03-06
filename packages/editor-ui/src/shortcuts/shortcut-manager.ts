@@ -6,6 +6,10 @@ export interface ShortcutRuntimeContext {
   inspectorVisible: boolean;
   hasSelection: boolean;
   inputFocused: boolean;
+  canvasFocused: boolean;
+  sidebarFocused: boolean;
+  inspectorFocused: boolean;
+  activityBarFocused: boolean;
 }
 
 const MODIFIER_ORDER = ['Ctrl', 'Alt', 'Shift', 'Mod'] as const;
@@ -93,12 +97,13 @@ function evaluateWhenToken(token: string, context: ShortcutRuntimeContext): bool
   return isNegated ? !value : value;
 }
 
-export function evaluateShortcutWhen(
+export function evaluateWhenExpression(
   when: string | undefined,
   context: ShortcutRuntimeContext,
+  defaultValue = true,
 ): boolean {
   if (!when) {
-    return !context.inputFocused;
+    return defaultValue;
   }
 
   const tokens = when
@@ -107,11 +112,17 @@ export function evaluateShortcutWhen(
     .filter(Boolean);
 
   if (tokens.length === 0) {
-    return !context.inputFocused;
+    return defaultValue;
   }
 
-  const matched = tokens.every((token) => evaluateWhenToken(token, context));
-  if (!matched) {
+  return tokens.every((token) => evaluateWhenToken(token, context));
+}
+
+export function evaluateShortcutWhen(
+  when: string | undefined,
+  context: ShortcutRuntimeContext,
+): boolean {
+  if (!evaluateWhenExpression(when, context, !context.inputFocused)) {
     return false;
   }
 
@@ -119,13 +130,20 @@ export function evaluateShortcutWhen(
     return true;
   }
 
+  const tokens = when
+    ?.split('&&')
+    .map((token) => token.trim())
+    .filter(Boolean) ?? [];
   return tokens.some((token) => token === 'inputFocused' || token === '!inputFocused');
 }
 
 export function getShortcutEventContext(
   eventTarget: EventTarget | null,
   rootElement: HTMLElement | null,
-  context: Omit<ShortcutRuntimeContext, 'editorFocused' | 'inputFocused'>,
+  context: Omit<
+    ShortcutRuntimeContext,
+    'editorFocused' | 'inputFocused' | 'canvasFocused' | 'sidebarFocused' | 'inspectorFocused' | 'activityBarFocused'
+  >,
 ): ShortcutRuntimeContext {
   const activeElement = document.activeElement;
   const inputFocused = Boolean(
@@ -146,6 +164,10 @@ export function getShortcutEventContext(
     ...context,
     editorFocused,
     inputFocused,
+    canvasFocused: false,
+    sidebarFocused: false,
+    inspectorFocused: false,
+    activityBarFocused: false,
   };
 }
 

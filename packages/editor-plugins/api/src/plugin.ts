@@ -1,5 +1,7 @@
 import {
   type AuxiliaryPanelContribution,
+  type ContextMenuContribution,
+  type MenuContribution,
   mergeContributions,
   type ActivityBarItemContribution,
   type InspectorTabContribution,
@@ -10,7 +12,11 @@ import type { PluginContext } from './context';
 export interface PluginCommandContribution {
   id: string;
   title: string;
+  category?: string;
+  description?: string;
   order?: number;
+  when?: string;
+  enabledWhen?: string;
   execute: (context: PluginContext, payload?: unknown) => void | Promise<void>;
 }
 
@@ -31,6 +37,8 @@ export interface PluginContributes {
   sidebarTabs?: SidebarTabContribution[];
   inspectorTabs?: InspectorTabContribution[];
   auxiliaryPanels?: AuxiliaryPanelContribution[];
+  menus?: MenuContribution[];
+  contextMenus?: ContextMenuContribution[];
   commands?: PluginCommandContribution[];
   shortcuts?: PluginShortcutContribution[];
 }
@@ -48,6 +56,8 @@ export interface ResolvedPluginContributes {
   sidebarTabs: SidebarTabContribution[];
   inspectorTabs: InspectorTabContribution[];
   auxiliaryPanels: AuxiliaryPanelContribution[];
+  menus: MenuContribution[];
+  contextMenus: ContextMenuContribution[];
   commands: PluginCommandContribution[];
   shortcuts: PluginShortcutContribution[];
 }
@@ -63,6 +73,8 @@ export function collectPluginContributes(
   const sidebarTabs: SidebarTabContribution[] = [];
   const inspectorTabs: InspectorTabContribution[] = [];
   const auxiliaryPanels: AuxiliaryPanelContribution[] = [];
+  const menus: MenuContribution[] = [];
+  const contextMenus: ContextMenuContribution[] = [];
   const commands: PluginCommandContribution[] = [];
   const shortcuts: PluginShortcutContribution[] = [];
 
@@ -75,6 +87,8 @@ export function collectPluginContributes(
     sidebarTabs.push(...(contributes.sidebarTabs ?? []));
     inspectorTabs.push(...(contributes.inspectorTabs ?? []));
     auxiliaryPanels.push(...(contributes.auxiliaryPanels ?? []));
+    menus.push(...(contributes.menus ?? []));
+    contextMenus.push(...(contributes.contextMenus ?? []));
     commands.push(...(contributes.commands ?? []));
     shortcuts.push(...(contributes.shortcuts ?? []));
   }
@@ -84,6 +98,8 @@ export function collectPluginContributes(
     sidebarTabs: mergeContributions([], sidebarTabs),
     inspectorTabs: mergeContributions([], inspectorTabs),
     auxiliaryPanels: mergeContributions([], auxiliaryPanels),
+    menus: mergeContributions([], menus),
+    contextMenus: mergeContributions([], contextMenus),
     commands: mergeContributions([], commands),
     shortcuts: mergeContributions([], shortcuts),
   };

@@ -1,11 +1,14 @@
-import type { PluginShortcutContribution } from '@shenbi/editor-plugin-api';
+import type { ContextMenuContribution, MenuContribution, PluginShortcutContribution } from '@shenbi/editor-plugin-api';
 import type { PluginContext } from '@shenbi/editor-plugin-api';
 
 export interface HostCommandDefinition {
   id: string;
   title: string;
+  category?: string;
+  description?: string;
   shortcut?: string;
   when?: string;
+  enabledWhen?: string;
   priority?: number;
   execute: (payload?: unknown) => unknown | Promise<unknown>;
 }
@@ -40,6 +43,14 @@ function createDelegatedCommand(
   return {
     id,
     title,
+    category: id.startsWith('file.') ? 'File' : 'Edit',
+    description: id === 'file.saveSchema'
+      ? 'Save the current schema.'
+      : id === 'file.saveAs'
+        ? 'Save the current schema as a new file.'
+        : id === 'editor.undo'
+          ? 'Undo the most recent change.'
+          : 'Redo the most recent undone change.',
     when,
     priority: 50,
     execute: (payload) => execute(id, payload),
@@ -52,6 +63,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
     {
       id: 'commandPalette.open',
       title: 'Open Command Palette',
+      category: 'Workbench',
+      description: 'Open the command palette to search and run commands.',
       shortcut: 'Mod+Shift+P',
       when: '!inputFocused',
       priority: 100,
@@ -66,6 +79,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
     {
       id: 'layout.toggleSidebar',
       title: options.showSidebar ? 'Hide Sidebar' : 'Show Sidebar',
+      category: 'Layout',
+      description: 'Toggle the visibility of the left sidebar.',
       shortcut: 'Mod+B',
       when: '!inputFocused',
       priority: 10,
@@ -76,6 +91,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
     {
       id: 'layout.toggleConsole',
       title: options.showConsole ? 'Hide Console' : 'Show Console',
+      category: 'Layout',
+      description: 'Toggle the visibility of the bottom console panel.',
       shortcut: 'Mod+J',
       when: '!inputFocused',
       priority: 10,
@@ -86,6 +103,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
     {
       id: 'layout.toggleInspector',
       title: options.showInspector ? 'Hide Inspector' : 'Show Inspector',
+      category: 'Layout',
+      description: 'Toggle the visibility of the right inspector panel.',
       shortcut: 'Mod+Shift+I',
       when: '!inputFocused',
       priority: 10,
@@ -97,6 +116,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
       ? {
           id: 'layout.toggleAssistantPanel',
           title: options.showAssistantPanel ? 'Hide Assistant Panel' : 'Show Assistant Panel',
+          category: 'Layout',
+          description: 'Toggle the visibility of the assistant panel.',
           when: '!inputFocused',
           priority: 10,
           execute: () => {
@@ -107,6 +128,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
     {
       id: 'layout.toggleMaximize',
       title: options.isMaximized ? 'Restore Layout' : 'Maximize Center Area',
+      category: 'Layout',
+      description: 'Maximize or restore the center editing area.',
       when: '!inputFocused',
       priority: 10,
       execute: () => {
@@ -128,4 +151,61 @@ export function hostCommandsToShortcuts(hostCommands: readonly HostCommandDefini
       ...(command.priority !== undefined ? { priority: command.priority } : {}),
       ...(command.when ? { when: command.when } : {}),
     }));
+}
+
+export function hostCommandsToMenus(hostCommands: readonly HostCommandDefinition[]): MenuContribution[] {
+  const menuCommandIds = new Set([
+    'file.saveSchema',
+    'file.saveAs',
+    'editor.undo',
+    'editor.redo',
+    'layout.toggleSidebar',
+    'layout.toggleConsole',
+    'layout.toggleInspector',
+    'commandPalette.open',
+  ]);
+
+  return hostCommands
+    .filter((command) => menuCommandIds.has(command.id))
+    .map((command, index) => ({
+      id: `host.menu.${command.id}`,
+      label: command.title,
+      commandId: command.id,
+      order: (index + 1) * 10,
+      section: command.id.startsWith('layout.') ? 'secondary' : 'primary',
+    }));
+}
+
+export function hostCommandsToContextMenus(hostCommands: readonly HostCommandDefinition[]): ContextMenuContribution[] {
+  return hostCommands.reduce<ContextMenuContribution[]>((menus, command, index) => {
+      const base = {
+        id: `host.context-menu.${command.id}`,
+        label: command.title,
+        commandId: command.id,
+        order: (index + 1) * 10,
+        ...(command.when ? { when: command.when } : {}),
+      };
+
+      switch (command.id) {
+        case 'editor.undo':
+        case 'editor.redo':
+        case 'file.saveSchema':
+        case 'file.saveAs':
+        case 'commandPalette.open':
+          menus.push({ ...base, area: 'canvas' });
+          break;
+        case 'layout.toggleSidebar':
+          menus.push({ ...base, area: 'sidebar' });
+          break;
+        case 'layout.toggleInspector':
+          menus.push({ ...base, area: 'inspector' });
+          break;
+        case 'layout.toggleConsole':
+          menus.push({ ...base, area: 'activity-bar' });
+          break;
+        default:
+          break;
+      }
+      return menus;
+    }, []);
 }
