@@ -31,6 +31,16 @@ describe('collectPluginContributes', () => {
           commands: [
             { id: 'cmd.save', title: 'Save', order: 10, execute },
           ],
+          shortcuts: [
+            {
+              id: 'shortcut.save',
+              commandId: 'cmd.save',
+              keybinding: 'Mod+S',
+              order: 10,
+              priority: 1,
+              when: 'editorFocused',
+            },
+          ],
         },
       }),
       defineEditorPlugin({
@@ -43,6 +53,16 @@ describe('collectPluginContributes', () => {
           ],
           commands: [
             { id: 'cmd.save', title: '保存', order: 5, execute },
+          ],
+          shortcuts: [
+            {
+              id: 'shortcut.save',
+              commandId: 'cmd.save',
+              keybinding: 'Mod+Shift+S',
+              order: 5,
+              priority: 10,
+              when: 'editorFocused && !inputFocused',
+            },
           ],
           auxiliaryPanels: [
             {
@@ -62,6 +82,28 @@ describe('collectPluginContributes', () => {
     expect(resolved.activityBarItems[0]?.label).toBe('搜索');
     expect(resolved.commands).toHaveLength(1);
     expect(resolved.commands[0]?.title).toBe('保存');
+    expect(resolved.shortcuts).toHaveLength(1);
+    expect(resolved.shortcuts[0]).toMatchObject({
+      id: 'shortcut.save',
+      keybinding: 'Mod+Shift+S',
+      priority: 10,
+      when: 'editorFocused && !inputFocused',
+    });
     expect(resolved.auxiliaryPanels.map((item) => item.id)).toEqual(['assistant']);
+  });
+
+  it('允许插件返回清理函数作为激活结果', async () => {
+    const cleanup = vi.fn();
+    const plugin = defineEditorPlugin({
+      id: 'plugin.activate',
+      name: 'Plugin Activate',
+      activate: async () => cleanup,
+    });
+
+    const result = await plugin.activate?.({} as never);
+
+    expect(typeof result).toBe('function');
+    result?.();
+    expect(cleanup).toHaveBeenCalled();
   });
 });

@@ -19,6 +19,9 @@
 | `docs/active/plugin-context-alias-removal-plan.md` | `PluginContext` 旧 alias 删除清单与迁移影响说明 | 执行中 |
 | `docs/active/plugin-platform-phase-3-plan.md` | 插件平台 Phase 3 框架搭建计划与里程碑 | 执行中 |
 | `docs/active/plugin-platform-phase-3-acceptance-checklist.md` | 插件平台 Phase 3 可见效果、验证方式与验收清单 | 执行中 |
+| `docs/active/plugin-platform-boundaries-and-services.md` | Phase 3.1 平台边界、服务面与命令归位设计 | 执行中 |
+| `docs/active/plugin-platform-command-inventory.md` | Phase 3.1 现有命令归类与后续目标命令清单 | 执行中 |
+| `docs/active/plugin-platform-service-admission-template.md` | Phase 3.1 新增服务面准入评审模板 | 执行中 |
 | `docs/active/phase-2-parallel-delivery-playbook.md` | 并行分支交付边界、接口冻结与合并门禁 | 执行中 |
 | `docs/active/phase-2-merge-acceptance-checklist.md` | A/B 分支合并验收模板与主线复核清单 | 执行中 |
 | `docs/active/ui-guidelines.md` | 预览端 UI 风格与实现规范 | 生效中 |

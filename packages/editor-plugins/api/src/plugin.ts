@@ -19,8 +19,12 @@ export interface PluginShortcutContribution {
   commandId: string;
   keybinding: string;
   order?: number;
+  priority?: number;
   when?: string;
 }
+
+export type EditorPluginCleanup = () => void;
+export type EditorPluginActivateResult = void | EditorPluginCleanup | Promise<void | EditorPluginCleanup>;
 
 export interface PluginContributes {
   activityBarItems?: ActivityBarItemContribution[];
@@ -36,9 +40,7 @@ export interface EditorPluginManifest {
   name: string;
   version?: string;
   contributes?: PluginContributes;
-  activate?: (
-    context: PluginContext,
-  ) => void | (() => void) | Promise<void | (() => void)>;
+  activate?: (context: PluginContext) => EditorPluginActivateResult;
 }
 
 export interface ResolvedPluginContributes {

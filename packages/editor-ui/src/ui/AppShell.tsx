@@ -1,6 +1,8 @@
 import React from 'react';
 import {
   collectPluginContributes,
+  type EditorPluginActivateResult,
+  type EditorPluginCleanup,
   type EditorPluginManifest,
   type PluginContext,
 } from '@shenbi/editor-plugin-api';
@@ -10,10 +12,16 @@ import { WorkbenchToolbar } from './WorkbenchToolbar';
 import { EditorTabs } from './EditorTabs';
 import { Inspector } from './Inspector';
 import { AIPanel, type AIPanelProps } from './AIPanel';
+import { CommandPalette, type CommandPaletteItem } from './CommandPalette';
 import { Console } from './Console';
 import { StatusBar } from './StatusBar';
 import '../styles/editor-ui.css';
 import { useResize } from '../hooks/useResize';
+import { findMatchingShortcut, getShortcutEventContext } from '../shortcuts/shortcut-manager';
+import {
+  createHostCommandRegistry,
+  hostCommandsToShortcuts,
+} from '../commands/host-command-registry';
 
 import { TitleBar } from './TitleBar';
 import type { ActivityBarItemContribution, ActivityBarProps } from './ActivityBar';
@@ -42,6 +50,14 @@ const THEME_CLASSES = [
   'theme-webstorm-dark',
 ] as const;
 
+function isPromiseLike(value: unknown): value is Promise<unknown> {
+  return Boolean(value) && typeof (value as Promise<unknown>).then === 'function';
+}
+
+function isCleanup(value: unknown): value is EditorPluginCleanup {
+  return typeof value === 'function';
+}
+
 export function AppShell({
   children,
   toolbarExtra,
@@ -53,6 +69,7 @@ export function AppShell({
   pluginContext,
   onCanvasSelectNode,
 }: AppShellProps) {
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
   const [theme, setTheme] = React.useState<ThemeMode>('dark');
   
   // Panel Visibility State
@@ -60,6 +77,7 @@ export function AppShell({
   const [showInspector, setShowInspector] = React.useState(true);
   const [showConsole, setShowConsole] = React.useState(true);
   const [showAssistantPanel, setShowAssistantPanel] = React.useState(false);
+  const [showCommandPalette, setShowCommandPalette] = React.useState(false);
   const [activeSidebarTabId, setActiveSidebarTabId] = React.useState('components');
   const [activeAuxiliaryPanelId, setActiveAuxiliaryPanelId] = React.useState<string | undefined>(undefined);
 
@@ -102,24 +120,6 @@ export function AppShell({
     () => collectPluginContributes(plugins),
     [plugins],
   );
-  const resolvedPluginContext = React.useMemo<PluginContext>(() => {
-    const hostExecute = pluginContext?.commands?.execute;
-    let context!: PluginContext;
-    const execute = (commandId: string, payload?: unknown) => {
-      const pluginCommand = pluginContributes.commands.find((item) => item.id === commandId);
-      if (pluginCommand) {
-        return pluginCommand.execute(context, payload);
-      }
-      return hostExecute?.(commandId, payload);
-    };
-    context = {
-      ...pluginContext,
-      commands: {
-        execute,
-      },
-    };
-    return context;
-  }, [pluginContext, pluginContributes.commands]);
   const activityItems = React.useMemo(
     () => [
       ...pluginContributes.activityBarItems,
@@ -159,6 +159,89 @@ export function AppShell({
     [activeAuxiliaryPanelId, auxiliaryPanels],
   );
   const assistantPanelSize = activeAuxiliaryPanel?.defaultWidth ?? aiPanelSize;
+  const hostCommands = React.useMemo(() => createHostCommandRegistry({
+    pluginContext,
+    showSidebar,
+    showInspector,
+    showConsole,
+    hasAssistantPanel: auxiliaryPanels.length > 0,
+    showAssistantPanel,
+    isMaximized,
+    setShowSidebar,
+    setShowInspector,
+    setShowConsole,
+    setShowAssistantPanel,
+    setShowCommandPalette,
+    toggleMaximize,
+  }), [
+    auxiliaryPanels.length,
+    isMaximized,
+    pluginContext,
+    showAssistantPanel,
+    showConsole,
+    showInspector,
+    showSidebar,
+  ]);
+  const hostCommandMap = React.useMemo(
+    () => new Map(hostCommands.map((command) => [command.id, command])),
+    [hostCommands],
+  );
+  const hostShortcuts = React.useMemo(
+    () => hostCommandsToShortcuts(hostCommands),
+    [hostCommands],
+  );
+  const allShortcuts = React.useMemo(
+    () => [...hostShortcuts, ...pluginContributes.shortcuts],
+    [hostShortcuts, pluginContributes.shortcuts],
+  );
+  const shortcutMap = React.useMemo(() => {
+    const entries = new Map<string, string>();
+    for (const shortcut of allShortcuts) {
+      if (!entries.has(shortcut.commandId)) {
+        entries.set(shortcut.commandId, shortcut.keybinding);
+      }
+    }
+    return entries;
+  }, [allShortcuts]);
+  const commandPaletteCommands = React.useMemo<CommandPaletteItem[]>(() => {
+    const items: CommandPaletteItem[] = hostCommands.map((command) => ({
+      id: command.id,
+      title: command.title,
+      shortcut: shortcutMap.get(command.id),
+      source: 'host',
+    }));
+    for (const command of pluginContributes.commands) {
+      items.push({
+        id: command.id,
+        title: command.title,
+        shortcut: shortcutMap.get(command.id),
+        source: 'plugin',
+      });
+    }
+    return items;
+  }, [hostCommands, pluginContributes.commands, shortcutMap]);
+  const resolvedPluginContext = React.useMemo<PluginContext>(() => {
+    const hostExecute = pluginContext?.commands?.execute;
+    let context!: PluginContext;
+    const execute = (commandId: string, payload?: unknown) => {
+      const hostCommand = hostCommandMap.get(commandId);
+      if (hostCommand) {
+        return hostCommand.execute(payload);
+      }
+      const pluginCommand = pluginContributes.commands.find((item) => item.id === commandId);
+      if (pluginCommand) {
+        return pluginCommand.execute(context, payload);
+      }
+      return hostExecute?.(commandId, payload);
+    };
+    context = {
+      ...pluginContext,
+      commands: {
+        execute,
+      },
+    };
+    return context;
+  }, [hostCommandMap, pluginContext, pluginContributes.commands]);
 
   const toggleTheme = (newTheme: ThemeMode) => {
     setTheme(newTheme);
@@ -185,22 +268,37 @@ export function AppShell({
   }, [activeAuxiliaryPanelId, auxiliaryPanels, showAssistantPanel]);
 
   React.useEffect(() => {
-    const cleanups: Array<() => void> = [];
+    const cleanups: EditorPluginCleanup[] = [];
+    const reportActivationError = (plugin: EditorPluginManifest, error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      pluginContext?.notifications?.error?.(`Plugin "${plugin.name}" activate failed: ${message}`);
+    };
+    const collectCleanup = (result: EditorPluginActivateResult, plugin: EditorPluginManifest) => {
+      if (isCleanup(result)) {
+        cleanups.push(result);
+        return;
+      }
+      if (isPromiseLike(result)) {
+        void result
+          .then((cleanup) => {
+            if (isCleanup(cleanup)) {
+              cleanups.push(cleanup);
+            }
+          })
+          .catch((error) => {
+            reportActivationError(plugin, error);
+          });
+      }
+    };
     for (const plugin of plugins ?? []) {
       if (!plugin.activate) {
         continue;
       }
-      const result = plugin.activate(resolvedPluginContext);
-      if (typeof result === 'function') {
-        cleanups.push(result);
-        continue;
-      }
-      if (result && typeof (result as Promise<unknown>).then === 'function') {
-        void (result as Promise<void | (() => void)>).then((cleanup) => {
-          if (typeof cleanup === 'function') {
-            cleanups.push(cleanup);
-          }
-        });
+      try {
+        const result = plugin.activate(resolvedPluginContext);
+        collectCleanup(result, plugin);
+      } catch (error) {
+        reportActivationError(plugin, error);
       }
     }
     return () => {
@@ -209,6 +307,40 @@ export function AppShell({
       }
     };
   }, [plugins, resolvedPluginContext]);
+
+  React.useEffect(() => {
+    if (allShortcuts.length === 0) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const shortcut = findMatchingShortcut(
+        allShortcuts,
+        event,
+        getShortcutEventContext(event.target, rootRef.current, {
+          sidebarVisible: showSidebar,
+          inspectorVisible: showInspector,
+          hasSelection: Boolean(pluginContext?.selection?.getSelectedNodeId?.()),
+        }),
+      );
+      if (!shortcut) {
+        return;
+      }
+      event.preventDefault();
+      void resolvedPluginContext.commands?.execute(shortcut.commandId);
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    allShortcuts,
+    pluginContext?.selection,
+    resolvedPluginContext.commands,
+    showInspector,
+    showSidebar,
+  ]);
 
   const handleActivitySelectItem = (item: ActivityBarItemContribution) => {
     activityBarProps?.onSelectItem?.(item);
@@ -256,7 +388,7 @@ export function AppShell({
   }, [theme]);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-bg-canvas text-text-primary overflow-hidden font-inter">
+    <div ref={rootRef} className="h-screen w-screen flex flex-col bg-bg-canvas text-text-primary overflow-hidden font-inter">
       <TitleBar 
         theme={theme} 
         onToggleTheme={toggleTheme}
@@ -277,6 +409,7 @@ export function AppShell({
         }}
         isMaximized={isMaximized}
         onToggleMaximize={toggleMaximize}
+        onOpenCommandPalette={() => setShowCommandPalette(true)}
       />
       
       {/* Main Container */}
@@ -324,6 +457,14 @@ export function AppShell({
                   </div>
                 </div>
               </main>
+              <CommandPalette
+                commands={commandPaletteCommands}
+                open={showCommandPalette}
+                onClose={() => setShowCommandPalette(false)}
+                onRunCommand={(commandId) => {
+                  void resolvedPluginContext.commands?.execute(commandId);
+                }}
+              />
               
               {showConsole && (
                 <div style={{ height: consoleSize }} className="relative shrink-0 flex flex-col w-full">

@@ -16,6 +16,7 @@ interface TitleBarProps {
   onToggleAssistantPanel: () => void;
   isMaximized: boolean;
   onToggleMaximize: () => void;
+  onOpenCommandPalette?: () => void;
 }
 
 export function TitleBar({ 
@@ -31,7 +32,8 @@ export function TitleBar({
   showAssistantPanel,
   onToggleAssistantPanel,
   isMaximized,
-  onToggleMaximize
+  onToggleMaximize,
+  onOpenCommandPalette,
 }: TitleBarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -112,6 +114,14 @@ export function TitleBar({
         </button>
 
         <div className="w-[1px] h-4 bg-border-ide mx-1" />
+
+        <button
+          onClick={onOpenCommandPalette}
+          className="flex items-center gap-1.5 rounded p-1.5 text-text-secondary transition-colors hover:bg-bg-panel hover:text-text-primary"
+          title="Open Command Palette"
+        >
+          <Command size={16} />
+        </button>
 
         <div className="relative" ref={dropdownRef}>
           <button 

@@ -23,6 +23,8 @@
 17. `editor-ui/AppShell` 已停止生成 `executeCommand/notify` 等旧 alias，宿主层只分发新服务面。
 18. `ai-chat` 已改为只通过 `editor-plugin-api` helper 访问 schema 替换能力，不再在插件实现层直接判断旧 alias。
 19. `PluginContext` 旧 alias 删除清单与迁移影响说明已补齐到 `docs/active/plugin-context-alias-removal-plan.md`。
+20. `packages/editor-plugins/api` 已补充 `PluginShortcutContribution.priority` 与正式插件激活结果类型，Phase 3.2 协议冻结已形成代码基线。
+21. `editor-ui/AppShell` 已接入最小 `ShortcutManager` 与 `Command Palette` 骨架，插件声明的 `shortcuts` 可直接触发命令。
 
 ### 1.2 当前结论
 

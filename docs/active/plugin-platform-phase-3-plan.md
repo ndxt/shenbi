@@ -322,9 +322,11 @@ P3 第一阶段要先冻结扩展点，而不是直接做某个插件能力。
 
 **产物：**
 
-1. 平台三层边界说明文档。
-2. 平台服务面清单与职责定义（含准入规则）。
-3. "服务 vs 命令"判定规则文档。
+1. 平台三层边界说明文档，见 `docs/active/plugin-platform-boundaries-and-services.md`。
+2. 平台服务面清单与职责定义（含准入规则），见 `docs/active/plugin-platform-boundaries-and-services.md`。
+3. "服务 vs 命令"判定规则文档，见 `docs/active/plugin-platform-boundaries-and-services.md` 与 `docs/active/plugin-platform-command-inventory.md`。
+4. 现有命令归类清单，见 `docs/active/plugin-platform-command-inventory.md`。
+5. 新增服务面准入评审模板，见 `docs/active/plugin-platform-service-admission-template.md`。
 
 **验收：**
 
@@ -333,6 +335,8 @@ P3 第一阶段要先冻结扩展点，而不是直接做某个插件能力。
 3. 每个待纳入服务面都能回答"为什么不能只用 command"。
 
 ### Phase 3.2：生命周期与贡献协议固定
+
+状态：已完成基础协议冻结，`PluginShortcutContribution.priority` 与插件激活结果类型已落到 API。
 
 **产物：**
 
@@ -353,6 +357,8 @@ P3 第一阶段要先冻结扩展点，而不是直接做某个插件能力。
 
 ### Phase 3.3：快捷键引擎与框架样板
 
+状态：已完成最小可运行骨架，宿主侧快捷键监听、`when` 求值与 `inputFocused` 屏蔽已落地。
+
 **产物：**
 
 1. `ShortcutManager` 运行时实现（宿主层）。
@@ -370,6 +376,13 @@ P3 第一阶段要先冻结扩展点，而不是直接做某个插件能力。
 5. 能用模板在 30 分钟内接入一个含快捷键的新插件。
 
 ### Phase 3.4：扩展点骨架落地
+
+状态：已完成 `Command Palette` 最小骨架，可打开、展示命令与执行命令；`menus / contextMenus` 仍未开始。
+
+补充：
+
+1. 宿主命令注册表已落地，`commandPalette.open`、`editor.undo`、`editor.redo`、`file.saveSchema`、`file.saveAs` 以及布局切换命令已纳入统一命令清单。
+2. `Command Palette` 当前已可同时展示宿主命令和插件命令，并展示对应快捷键。
 
 **产物：**
 
