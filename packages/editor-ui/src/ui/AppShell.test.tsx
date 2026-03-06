@@ -336,6 +336,90 @@ describe('AppShell', () => {
     expect(pluginExecute).not.toHaveBeenCalled();
   });
 
+  it('快捷键不会绕过命令禁用态', () => {
+    const pluginExecute = vi.fn();
+
+    render(
+      <AppShell
+        pluginContext={{
+          selection: {
+            getSelectedNodeId: () => undefined,
+          },
+        }}
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.shortcuts.disabled',
+            name: 'Disabled Shortcut Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.shortcuts.disabled.run',
+                  title: 'Disabled Shortcut Run',
+                  enabledWhen: 'hasSelection',
+                  execute: pluginExecute,
+                },
+              ],
+              shortcuts: [
+                {
+                  id: 'plugin.shortcuts.disabled.run.binding',
+                  commandId: 'plugin.shortcuts.disabled.run',
+                  keybinding: 'Mod+Shift+K',
+                  when: 'editorFocused',
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.keyDown(screen.getByText('Content'), { key: 'k', ctrlKey: true, shiftKey: true });
+
+    expect(pluginExecute).not.toHaveBeenCalled();
+  });
+
+  it('区域焦点快捷键会按目标区域生效', () => {
+    const pluginExecute = vi.fn();
+
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.shortcuts.sidebar-focus',
+            name: 'Sidebar Focus Shortcut Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.shortcuts.sidebar-focus.run',
+                  title: 'Sidebar Focus Run',
+                  execute: pluginExecute,
+                },
+              ],
+              shortcuts: [
+                {
+                  id: 'plugin.shortcuts.sidebar-focus.run.binding',
+                  commandId: 'plugin.shortcuts.sidebar-focus.run',
+                  keybinding: 'Mod+Shift+L',
+                  when: 'sidebarFocused',
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.keyDown(screen.getByText('Content'), { key: 'l', ctrlKey: true, shiftKey: true });
+    expect(pluginExecute).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(screen.getByText('Components'), { key: 'l', ctrlKey: true, shiftKey: true });
+    expect(pluginExecute).toHaveBeenCalledTimes(1);
+  });
+
   it('可以打开命令面板并展示命令与快捷键', () => {
     render(
       <AppShell
@@ -933,6 +1017,57 @@ describe('AppShell', () => {
     expect(recentOptions).toHaveLength(2);
     expect(recentOptions[0]).toHaveTextContent('Dedupe First');
     expect(recentOptions[1]).toHaveTextContent('Dedupe Second');
+  });
+
+  it('命令面板空搜索时回车会执行最近分组第一项', async () => {
+    const firstExecute = vi.fn();
+    const secondExecute = vi.fn();
+
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.palette.recent-enter',
+            name: 'Palette Recent Enter Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.palette.recent-enter.first',
+                  title: 'Recent Enter First',
+                  category: 'RecentEnter',
+                  execute: firstExecute,
+                },
+                {
+                  id: 'plugin.palette.recent-enter.second',
+                  title: 'Recent Enter Second',
+                  category: 'RecentEnter',
+                  execute: secondExecute,
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    fireEvent.click(screen.getByRole('option', { name: /Recent Enter First/ }));
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    fireEvent.click(screen.getByRole('option', { name: /Recent Enter Second/ }));
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    const searchInput = screen.getByLabelText('Command Palette Search');
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /Recent Enter Second/ })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    fireEvent.keyDown(searchInput, { key: 'Enter' });
+
+    expect(secondExecute).toHaveBeenCalledTimes(2);
+    expect(firstExecute).toHaveBeenCalledTimes(1);
   });
 
   it('工具栏菜单会按 target 放到不同区域并按 group 分隔', () => {

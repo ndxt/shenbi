@@ -467,6 +467,10 @@ export function AppShell({
       if (!shortcut) {
         return;
       }
+      const commandState = resolveCommandState(shortcut.commandId);
+      if (!commandState.visible || !commandState.enabled) {
+        return;
+      }
       event.preventDefault();
       void runCommand(shortcut.commandId);
     };
@@ -478,6 +482,7 @@ export function AppShell({
   }, [
     allShortcuts,
     pluginContext?.selection,
+    resolveCommandState,
     runCommand,
     showInspector,
     showSidebar,
@@ -590,7 +595,10 @@ export function AppShell({
       
       {/* Main Container */}
       <div className="flex-1 flex overflow-hidden">
-        <div onContextMenu={(event) => openContextMenu('activity-bar', event)}>
+        <div
+          data-shenbi-shortcut-area="activity-bar"
+          onContextMenu={(event) => openContextMenu('activity-bar', event)}
+        >
           <ActivityBar
             {...activityBarProps}
             items={activityItems}
@@ -602,6 +610,7 @@ export function AppShell({
           <div
             style={{ width: sidebarSize }}
             className="relative shrink-0 flex flex-col h-full"
+            data-shenbi-shortcut-area="sidebar"
             onContextMenu={(event) => openContextMenu('sidebar', event)}
           >
             <Sidebar
@@ -632,6 +641,7 @@ export function AppShell({
             {/* Editor/Canvas Area Container */}
             <div className="flex-1 flex flex-col overflow-hidden relative bg-bg-canvas">
               <main
+                data-shenbi-shortcut-area="canvas"
                 className="flex-1 overflow-auto p-12 flex justify-center items-start scrollbar-hide relative canvas-grid"
                 onContextMenu={(event) => openContextMenu('canvas', event)}
               >
@@ -692,6 +702,7 @@ export function AppShell({
               <div
                 style={{ width: inspectorSize }}
                 className="relative shrink-0 flex flex-col h-full"
+                data-shenbi-shortcut-area="inspector"
                 onContextMenu={(event) => openContextMenu('inspector', event)}
               >
                 <div 

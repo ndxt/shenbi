@@ -146,9 +146,13 @@ export function CommandPalette({
     }
     return [...groups.entries()];
   }, [filteredCommands, query, recentCommandIds]);
+  const orderedCommands = React.useMemo(
+    () => groupedCommands.flatMap(([, items]) => items),
+    [groupedCommands],
+  );
   const selectableCommandIds = React.useMemo(
-    () => filteredCommands.filter((command) => !command.disabled).map((command) => command.id),
-    [filteredCommands],
+    () => orderedCommands.filter((command) => !command.disabled).map((command) => command.id),
+    [orderedCommands],
   );
 
   React.useEffect(() => {
@@ -244,7 +248,7 @@ export function CommandPalette({
           aria-label="Command Palette Results"
           className="max-h-[360px] overflow-auto py-1"
         >
-          {filteredCommands.length === 0 ? (
+          {orderedCommands.length === 0 ? (
             <div className="px-3 py-4 text-sm text-text-secondary">No commands found.</div>
           ) : (
             groupedCommands.map(([category, items]) => (

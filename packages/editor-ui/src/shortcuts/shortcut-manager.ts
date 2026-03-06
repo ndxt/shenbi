@@ -12,6 +12,8 @@ export interface ShortcutRuntimeContext {
   activityBarFocused: boolean;
 }
 
+type ShortcutArea = 'canvas' | 'sidebar' | 'inspector' | 'activity-bar';
+
 const MODIFIER_ORDER = ['Ctrl', 'Alt', 'Shift', 'Mod'] as const;
 
 interface ParsedKeybinding {
@@ -145,6 +147,27 @@ export function getShortcutEventContext(
     'editorFocused' | 'inputFocused' | 'canvasFocused' | 'sidebarFocused' | 'inspectorFocused' | 'activityBarFocused'
   >,
 ): ShortcutRuntimeContext {
+  const resolveShortcutArea = (): ShortcutArea | undefined => {
+    const candidates: Array<EventTarget | Element | null> = [eventTarget, document.activeElement];
+    for (const candidate of candidates) {
+      if (!(candidate instanceof Element)) {
+        continue;
+      }
+      if (rootElement && !rootElement.contains(candidate)) {
+        continue;
+      }
+      const area = candidate.closest<HTMLElement>('[data-shenbi-shortcut-area]')?.dataset.shenbiShortcutArea;
+      if (
+        area === 'canvas'
+        || area === 'sidebar'
+        || area === 'inspector'
+        || area === 'activity-bar'
+      ) {
+        return area;
+      }
+    }
+    return undefined;
+  };
   const activeElement = document.activeElement;
   const inputFocused = Boolean(
     activeElement
@@ -159,15 +182,16 @@ export function getShortcutEventContext(
     && eventTarget instanceof Node
     && rootElement.contains(eventTarget),
   );
+  const focusedArea = resolveShortcutArea();
 
   return {
     ...context,
     editorFocused,
     inputFocused,
-    canvasFocused: false,
-    sidebarFocused: false,
-    inspectorFocused: false,
-    activityBarFocused: false,
+    canvasFocused: focusedArea === 'canvas',
+    sidebarFocused: focusedArea === 'sidebar',
+    inspectorFocused: focusedArea === 'inspector',
+    activityBarFocused: focusedArea === 'activity-bar',
   };
 }
 
