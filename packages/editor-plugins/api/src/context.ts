@@ -39,20 +39,52 @@ export interface PluginContext {
   notifications?: PluginNotifications;
 
   // Backward-compatible aliases during migration.
+  /** @deprecated Use document.getSchema instead. */
   getSchema?: () => PageSchema;
+  /** @deprecated Use document.replaceSchema instead. */
   replaceSchema?: (schema: PageSchema) => void;
+  /** @deprecated Use selection.getSelectedNode instead. */
   getSelectedNode?: () => SchemaNode | undefined;
+  /** @deprecated Use document.patchSelectedNode.props instead. */
   patchNodeProps?: (patch: Record<string, unknown>) => void;
+  /** @deprecated Use document.patchSelectedNode.columns instead. */
   patchNodeColumns?: (columns: unknown[]) => void;
+  /** @deprecated Use document.patchSelectedNode.style instead. */
   patchNodeStyle?: (patch: Record<string, unknown>) => void;
+  /** @deprecated Use document.patchSelectedNode.events instead. */
   patchNodeEvents?: (patch: Record<string, unknown>) => void;
+  /** @deprecated Use document.patchSelectedNode.logic instead. */
   patchNodeLogic?: (patch: Record<string, unknown>) => void;
+  /** @deprecated Use commands.execute instead. */
   executeCommand?: (commandId: string, payload?: unknown) => unknown | Promise<unknown>;
+  /** @deprecated Use notifications instead. */
   notify?: PluginNotifications;
 }
 
 export function getPluginSchema(context: PluginContext): PageSchema | undefined {
   return context.document?.getSchema?.() ?? context.getSchema?.();
+}
+
+export function getPluginDocumentPatchService(context: PluginContext): PluginDocumentPatchService | undefined {
+  if (context.document?.patchSelectedNode) {
+    return context.document.patchSelectedNode;
+  }
+  if (
+    context.patchNodeProps
+    || context.patchNodeColumns
+    || context.patchNodeStyle
+    || context.patchNodeEvents
+    || context.patchNodeLogic
+  ) {
+    return {
+      ...(context.patchNodeProps ? { props: context.patchNodeProps } : {}),
+      ...(context.patchNodeColumns ? { columns: context.patchNodeColumns } : {}),
+      ...(context.patchNodeStyle ? { style: context.patchNodeStyle } : {}),
+      ...(context.patchNodeEvents ? { events: context.patchNodeEvents } : {}),
+      ...(context.patchNodeLogic ? { logic: context.patchNodeLogic } : {}),
+    };
+  }
+  return undefined;
 }
 
 export function replacePluginSchema(context: PluginContext, schema: PageSchema): void {

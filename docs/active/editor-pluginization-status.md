@@ -19,6 +19,7 @@
 13. `AppShell` 已提供统一命令总线：插件命令优先执行，宿主命令作为兜底回退。
 14. AI bridge 已优先走 `document.replaceSchema`，不再依赖宿主命令是否实现 `schema.replace`。
 15. `apps/preview` 已移除对 `PluginContext` 旧别名字段的注入，当前三类插件均通过新服务面运行。
+16. `PluginContext` 旧别名兼容已收敛到 `packages/editor-plugins/api/src/context.ts`，插件实现层不再直接感知历史字段。
 
 ### 1.2 当前结论
 
