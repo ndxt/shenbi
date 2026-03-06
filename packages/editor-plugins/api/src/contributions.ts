@@ -89,6 +89,8 @@ export interface MenuContribution extends OrderedContribution {
   when?: string;
   enabledWhen?: string;
   section?: 'primary' | 'secondary';
+  target?: 'toolbar-start' | 'toolbar-end';
+  group?: string;
 }
 
 export type ContextMenuArea = 'canvas' | 'sidebar' | 'inspector' | 'activity-bar';
@@ -99,4 +101,5 @@ export interface ContextMenuContribution extends OrderedContribution {
   when?: string;
   enabledWhen?: string;
   area?: ContextMenuArea;
+  group?: string;
 }

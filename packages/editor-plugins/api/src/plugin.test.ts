@@ -29,13 +29,27 @@ describe('collectPluginContributes', () => {
             { id: 'search', label: 'Search', icon: SearchIcon, order: 10 },
           ],
           commands: [
-            { id: 'cmd.save', title: 'Save', order: 10, execute },
+            {
+              id: 'cmd.save',
+              title: 'Save',
+              aliases: ['persist schema'],
+              keywords: ['save', 'schema'],
+              order: 10,
+              execute,
+            },
           ],
           menus: [
-            { id: 'menu.save', label: 'Save', commandId: 'cmd.save', order: 10 },
+            {
+              id: 'menu.save',
+              label: 'Save',
+              commandId: 'cmd.save',
+              target: 'toolbar-start',
+              group: 'file',
+              order: 10,
+            },
           ],
           contextMenus: [
-            { id: 'context.copy', label: 'Copy Node', commandId: 'node.copy', order: 10 },
+            { id: 'context.copy', label: 'Copy Node', commandId: 'node.copy', group: 'edit', order: 10 },
           ],
           shortcuts: [
             {
@@ -58,15 +72,36 @@ describe('collectPluginContributes', () => {
             { id: 'data', label: 'Data', icon: DataIcon, order: 20 },
           ],
           commands: [
-            { id: 'cmd.save', title: '保存', order: 5, execute },
+            {
+              id: 'cmd.save',
+              title: '保存',
+              aliases: ['save schema'],
+              keywords: ['store'],
+              order: 5,
+              execute,
+            },
           ],
           menus: [
-            { id: 'menu.save', label: '保存', commandId: 'cmd.save', order: 5 },
-            { id: 'menu.assistant', label: 'Assistant', commandId: 'cmd.assistant', order: 20 },
+            {
+              id: 'menu.save',
+              label: '保存',
+              commandId: 'cmd.save',
+              target: 'toolbar-start',
+              group: 'file',
+              order: 5,
+            },
+            {
+              id: 'menu.assistant',
+              label: 'Assistant',
+              commandId: 'cmd.assistant',
+              target: 'toolbar-end',
+              group: 'assist',
+              order: 20,
+            },
           ],
           contextMenus: [
-            { id: 'context.copy', label: 'Duplicate Node', commandId: 'node.duplicate', order: 5 },
-            { id: 'context.delete', label: 'Delete Node', commandId: 'node.delete', order: 20 },
+            { id: 'context.copy', label: 'Duplicate Node', commandId: 'node.duplicate', group: 'edit', order: 5 },
+            { id: 'context.delete', label: 'Delete Node', commandId: 'node.delete', group: 'danger', order: 20 },
           ],
           shortcuts: [
             {
@@ -96,10 +131,15 @@ describe('collectPluginContributes', () => {
     expect(resolved.activityBarItems[0]?.label).toBe('搜索');
     expect(resolved.commands).toHaveLength(1);
     expect(resolved.commands[0]?.title).toBe('保存');
+    expect(resolved.commands[0]?.aliases).toEqual(['save schema']);
+    expect(resolved.commands[0]?.keywords).toEqual(['store']);
     expect(resolved.menus.map((item) => item.id)).toEqual(['menu.save', 'menu.assistant']);
     expect(resolved.menus[0]?.label).toBe('保存');
+    expect(resolved.menus[0]?.target).toBe('toolbar-start');
+    expect(resolved.menus[1]?.group).toBe('assist');
     expect(resolved.contextMenus.map((item) => item.id)).toEqual(['context.copy', 'context.delete']);
     expect(resolved.contextMenus[0]?.label).toBe('Duplicate Node');
+    expect(resolved.contextMenus[1]?.group).toBe('danger');
     expect(resolved.shortcuts).toHaveLength(1);
     expect(resolved.shortcuts[0]).toMatchObject({
       id: 'shortcut.save',

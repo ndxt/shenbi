@@ -3,6 +3,7 @@ export interface ContextMenuItem {
   id: string;
   label: string;
   commandId: string;
+  group?: string;
   disabled?: boolean;
 }
 
@@ -42,6 +43,17 @@ export function ContextMenuOverlay({
     return null;
   }
 
+  const groupedItems = items.reduce<Array<{ group: string; items: ContextMenuItem[] }>>((groups, item) => {
+    const group = item.group ?? '__default__';
+    const current = groups.find((entry) => entry.group === group);
+    if (current) {
+      current.items.push(item);
+      return groups;
+    }
+    groups.push({ group, items: [item] });
+    return groups;
+  }, []);
+
   return (
     <div
       className="absolute inset-0 z-50"
@@ -58,27 +70,32 @@ export function ContextMenuOverlay({
         style={{ left: position.x, top: position.y }}
         onClick={(event) => event.stopPropagation()}
       >
-        {items.map((item) => (
-          <button
-            key={item.id}
-            role="menuitem"
-            type="button"
-            disabled={item.disabled}
-            className={`flex w-full items-center px-3 py-2 text-left text-[12px] ${
-              item.disabled
-                ? 'cursor-not-allowed text-text-secondary/50'
-                : 'text-text-primary hover:bg-bg-activity-bar'
-            }`}
-            onClick={() => {
-              if (item.disabled) {
-                return;
-              }
-              onRunCommand(item.commandId);
-              onClose();
-            }}
-          >
-            {item.label}
-          </button>
+        {groupedItems.map((group, index) => (
+          <React.Fragment key={group.group}>
+            {index > 0 ? <div role="separator" className="my-1 border-t border-border-ide" /> : null}
+            {group.items.map((item) => (
+              <button
+                key={item.id}
+                role="menuitem"
+                type="button"
+                disabled={item.disabled}
+                className={`flex w-full items-center px-3 py-2 text-left text-[12px] ${
+                  item.disabled
+                    ? 'cursor-not-allowed text-text-secondary/50'
+                    : 'text-text-primary hover:bg-bg-activity-bar'
+                }`}
+                onClick={() => {
+                  if (item.disabled) {
+                    return;
+                  }
+                  onRunCommand(item.commandId);
+                  onClose();
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </React.Fragment>
         ))}
       </div>
     </div>

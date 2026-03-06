@@ -6,6 +6,8 @@ export interface HostCommandDefinition {
   title: string;
   category?: string;
   description?: string;
+  aliases?: string[];
+  keywords?: string[];
   shortcut?: string;
   when?: string;
   enabledWhen?: string;
@@ -44,6 +46,20 @@ function createDelegatedCommand(
     id,
     title,
     category: id.startsWith('file.') ? 'File' : 'Edit',
+    aliases: id === 'file.saveSchema'
+      ? ['save']
+      : id === 'file.saveAs'
+        ? ['save as']
+        : id === 'editor.undo'
+          ? ['undo change']
+          : ['redo change'],
+    keywords: id === 'file.saveSchema'
+      ? ['schema', 'persist']
+      : id === 'file.saveAs'
+        ? ['schema', 'export']
+        : id === 'editor.undo'
+          ? ['history', 'back']
+          : ['history', 'forward'],
     description: id === 'file.saveSchema'
       ? 'Save the current schema.'
       : id === 'file.saveAs'
@@ -64,6 +80,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
       id: 'commandPalette.open',
       title: 'Open Command Palette',
       category: 'Workbench',
+      aliases: ['show commands', 'open palette'],
+      keywords: ['commands', 'search', 'palette'],
       description: 'Open the command palette to search and run commands.',
       shortcut: 'Mod+Shift+P',
       when: '!inputFocused',
@@ -80,6 +98,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
       id: 'layout.toggleSidebar',
       title: options.showSidebar ? 'Hide Sidebar' : 'Show Sidebar',
       category: 'Layout',
+      aliases: ['toggle sidebar', 'left panel'],
+      keywords: ['sidebar', 'layout', 'navigation'],
       description: 'Toggle the visibility of the left sidebar.',
       shortcut: 'Mod+B',
       when: '!inputFocused',
@@ -92,6 +112,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
       id: 'layout.toggleConsole',
       title: options.showConsole ? 'Hide Console' : 'Show Console',
       category: 'Layout',
+      aliases: ['toggle console', 'bottom panel'],
+      keywords: ['console', 'layout', 'logs'],
       description: 'Toggle the visibility of the bottom console panel.',
       shortcut: 'Mod+J',
       when: '!inputFocused',
@@ -104,6 +126,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
       id: 'layout.toggleInspector',
       title: options.showInspector ? 'Hide Inspector' : 'Show Inspector',
       category: 'Layout',
+      aliases: ['toggle inspector', 'right panel'],
+      keywords: ['inspector', 'layout', 'properties'],
       description: 'Toggle the visibility of the right inspector panel.',
       shortcut: 'Mod+Shift+I',
       when: '!inputFocused',
@@ -117,6 +141,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
           id: 'layout.toggleAssistantPanel',
           title: options.showAssistantPanel ? 'Hide Assistant Panel' : 'Show Assistant Panel',
           category: 'Layout',
+          aliases: ['toggle assistant', 'toggle ai panel'],
+          keywords: ['assistant', 'ai', 'layout'],
           description: 'Toggle the visibility of the assistant panel.',
           when: '!inputFocused',
           priority: 10,
@@ -129,6 +155,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
       id: 'layout.toggleMaximize',
       title: options.isMaximized ? 'Restore Layout' : 'Maximize Center Area',
       category: 'Layout',
+      aliases: ['maximize editor', 'restore panels'],
+      keywords: ['maximize', 'layout', 'focus'],
       description: 'Maximize or restore the center editing area.',
       when: '!inputFocused',
       priority: 10,
@@ -173,6 +201,16 @@ export function hostCommandsToMenus(hostCommands: readonly HostCommandDefinition
       commandId: command.id,
       order: (index + 1) * 10,
       section: command.id.startsWith('layout.') ? 'secondary' : 'primary',
+      target: command.id.startsWith('layout.') || command.id === 'commandPalette.open'
+        ? 'toolbar-end'
+        : 'toolbar-start',
+      group: command.id.startsWith('file.')
+        ? 'file'
+        : command.id.startsWith('editor.')
+          ? 'edit'
+          : command.id.startsWith('layout.')
+            ? 'layout'
+            : 'workbench',
     }));
 }
 
@@ -183,6 +221,13 @@ export function hostCommandsToContextMenus(hostCommands: readonly HostCommandDef
         label: command.title,
         commandId: command.id,
         order: (index + 1) * 10,
+        group: command.id.startsWith('file.')
+          ? 'file'
+          : command.id.startsWith('editor.')
+            ? 'edit'
+            : command.id.startsWith('layout.')
+              ? 'layout'
+              : 'workbench',
         ...(command.when ? { when: command.when } : {}),
       };
 

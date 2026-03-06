@@ -14,6 +14,8 @@ export interface PluginCommandContribution {
   title: string;
   category?: string;
   description?: string;
+  aliases?: string[];
+  keywords?: string[];
   order?: number;
   when?: string;
   enabledWhen?: string;

@@ -25,6 +25,10 @@
 19. `PluginContext` 旧 alias 删除清单与迁移影响说明已补齐到 `docs/active/plugin-context-alias-removal-plan.md`。
 20. `packages/editor-plugins/api` 已补充 `PluginShortcutContribution.priority` 与正式插件激活结果类型，Phase 3.2 协议冻结已形成代码基线。
 21. `editor-ui/AppShell` 已接入最小 `ShortcutManager` 与 `Command Palette` 骨架，插件声明的 `shortcuts` 可直接触发命令。
+22. 命令面板已支持 `category / description / aliases / keywords / recent commands`，宿主命令与插件命令可统一检索。
+23. 工具栏菜单已支持 `target / group`，上下文菜单已支持 `group` 分隔，命令 surfaces 的平台模型已补齐。
+24. 插件平台生命周期与服务面冻结结论已沉淀到 `docs/active/plugin-platform-lifecycle-service-freeze.md`。
+25. 最小插件模板已落地到 `templates/editor-plugin/minimal-plugin.tsx`，插件接入说明已补齐。
 
 ### 1.2 当前结论
 
@@ -32,6 +36,7 @@
 2. 后续新增能力应优先以插件形式落到 `packages/editor-plugins/*`，而不是回写到 `editor-ui`。
 3. `apps/preview` 已切到插件 manifest 注册链路，业务插件可通过 `plugins` 统一装配。
 4. 当前体系已具备“独立装配插件”的基本能力，但更细的服务抽象与命令分层仍可继续演进。
+5. Phase 3 平台“必须做”事项已闭环，后续主要是可选增强而非基础协议补洞。
 
 ## 1.4 已完成的迁移闭环
 

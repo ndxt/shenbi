@@ -285,6 +285,8 @@ export function AppShell({
           && resolveCommandState(item.commandId).enabled
         ),
         ...(item.section ? { section: item.section } : {}),
+        ...(item.target ? { target: item.target } : {}),
+        ...(item.group ? { group: item.group } : {}),
       }))
   ), [getRuntimeContext, hostMenus, pluginContributes.menus, resolveCommandState]);
   const getContextMenuItems = React.useCallback((area: ContextMenuArea): ContextMenuItem[] => {
@@ -298,6 +300,7 @@ export function AppShell({
         id: item.id,
         label: item.label,
         commandId: item.commandId,
+        ...(item.group ? { group: item.group } : {}),
         disabled: !(
           evaluateWhenExpression(item.enabledWhen, context, true)
           && resolveCommandState(item.commandId, area).enabled
@@ -325,6 +328,8 @@ export function AppShell({
         title: command.title,
         ...(command.category ? { category: command.category } : {}),
         ...(command.description ? { description: command.description } : {}),
+        ...(command.aliases ? { aliases: command.aliases } : {}),
+        ...(command.keywords ? { keywords: command.keywords } : {}),
         shortcut: shortcutMap.get(command.id),
         source: 'host',
         disabled: !resolveCommandState(command.id).enabled,
@@ -335,6 +340,8 @@ export function AppShell({
         title: command.title,
         ...(command.category ? { category: command.category } : {}),
         ...(command.description ? { description: command.description } : {}),
+        ...(command.aliases ? { aliases: command.aliases } : {}),
+        ...(command.keywords ? { keywords: command.keywords } : {}),
         shortcut: shortcutMap.get(command.id),
         source: 'plugin',
         disabled: !resolveCommandState(command.id).enabled,

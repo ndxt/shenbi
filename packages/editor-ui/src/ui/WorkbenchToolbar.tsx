@@ -1,5 +1,4 @@
 import React from 'react';
-import type { MenuContribution } from '@shenbi/editor-plugin-api';
 import { 
   MousePointer2, 
   Hand, 
@@ -12,14 +11,24 @@ import {
   Share2
 } from 'lucide-react';
 import { ToolbarMenus } from './ToolbarMenus';
+import type { ToolbarMenuItem } from './ToolbarMenus';
 
 interface WorkbenchToolbarProps {
   extra?: React.ReactNode;
-  menus?: MenuContribution[];
+  menus?: ToolbarMenuItem[];
   onRunMenuCommand?: (commandId: string) => void;
 }
 
 export function WorkbenchToolbar({ extra, menus, onRunMenuCommand }: WorkbenchToolbarProps) {
+  const startMenus = React.useMemo(
+    () => menus?.filter((menu) => menu.target === 'toolbar-start') ?? [],
+    [menus],
+  );
+  const endMenus = React.useMemo(
+    () => menus?.filter((menu) => menu.target !== 'toolbar-start') ?? [],
+    [menus],
+  );
+
   return (
     <div className="h-9 bg-bg-sidebar border-b border-border-ide flex items-center justify-between px-2 shrink-0">
       <div className="flex items-center gap-2">
@@ -29,6 +38,11 @@ export function WorkbenchToolbar({ extra, menus, onRunMenuCommand }: WorkbenchTo
         <ToolbarButton icon={Monitor} />
         <ToolbarButton icon={Tablet} />
         <ToolbarButton icon={Smartphone} />
+        {startMenus.length > 0 && onRunMenuCommand ? (
+          <div className="ml-2 flex items-center gap-1 border-l border-border-ide pl-2">
+            <ToolbarMenus menus={startMenus} onRunCommand={onRunMenuCommand} />
+          </div>
+        ) : null}
       </div>
 
       <div className="flex items-center text-[11px] text-text-secondary gap-1 overflow-hidden max-w-[40%]">
@@ -40,7 +54,7 @@ export function WorkbenchToolbar({ extra, menus, onRunMenuCommand }: WorkbenchTo
       </div>
 
       <div className="flex items-center gap-2">
-        {menus && onRunMenuCommand ? <ToolbarMenus menus={menus} onRunCommand={onRunMenuCommand} /> : null}
+        {endMenus.length > 0 && onRunMenuCommand ? <ToolbarMenus menus={endMenus} onRunCommand={onRunMenuCommand} /> : null}
         {extra ? <div>{extra}</div> : null}
         <button className="flex items-center gap-1.5 px-2 py-1 hover:bg-bg-activity-bar rounded text-emerald-500 transition-colors">
           <Play size={14} fill="currentColor" />

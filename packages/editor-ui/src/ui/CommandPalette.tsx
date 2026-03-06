@@ -5,9 +5,57 @@ export interface CommandPaletteItem {
   title: string;
   category?: string;
   description?: string;
+  aliases?: string[];
+  keywords?: string[];
   shortcut: string | undefined;
   source: 'host' | 'plugin';
   disabled?: boolean;
+}
+
+function normalizeSearchValue(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function getCommandMatchScore(command: CommandPaletteItem, normalizedQuery: string): number {
+  if (!normalizedQuery) {
+    return 1;
+  }
+
+  const exactTerms = [
+    command.title,
+    ...(command.aliases ?? []),
+    ...(command.keywords ?? []),
+  ].map(normalizeSearchValue);
+  if (exactTerms.includes(normalizedQuery)) {
+    return 120;
+  }
+
+  const prefixTerms = [
+    command.title,
+    ...(command.aliases ?? []),
+    ...(command.keywords ?? []),
+  ].map(normalizeSearchValue);
+  if (prefixTerms.some((value) => value.startsWith(normalizedQuery))) {
+    return 90;
+  }
+
+  const secondaryTerms = [
+    command.category,
+    command.description,
+    command.id,
+    ...(command.aliases ?? []),
+    ...(command.keywords ?? []),
+  ].filter((value): value is string => Boolean(value)).map(normalizeSearchValue);
+  if (secondaryTerms.some((value) => value.includes(normalizedQuery))) {
+    return 60;
+  }
+
+  const titleWords = normalizeSearchValue(command.title).split(/\s+/);
+  if (titleWords.some((word) => word.startsWith(normalizedQuery))) {
+    return 75;
+  }
+
+  return 0;
 }
 
 interface CommandPaletteProps {
@@ -38,17 +86,30 @@ export function CommandPalette({
   }, [open]);
 
   const filteredCommands = React.useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = normalizeSearchValue(query);
     if (!normalizedQuery) {
       return commands;
     }
-    return commands.filter((command) => (
-      command.title.toLowerCase().includes(normalizedQuery)
-      || command.category?.toLowerCase().includes(normalizedQuery)
-      || command.description?.toLowerCase().includes(normalizedQuery)
-      || command.id.toLowerCase().includes(normalizedQuery)
-    ));
-  }, [commands, query]);
+    const recentIndexMap = new Map(recentCommandIds.map((commandId, index) => [commandId, index]));
+    return commands
+      .map((command) => ({
+        command,
+        score: getCommandMatchScore(command, normalizedQuery),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => {
+        if (right.score !== left.score) {
+          return right.score - left.score;
+        }
+        const leftRecentIndex = recentIndexMap.get(left.command.id) ?? Number.MAX_SAFE_INTEGER;
+        const rightRecentIndex = recentIndexMap.get(right.command.id) ?? Number.MAX_SAFE_INTEGER;
+        if (leftRecentIndex !== rightRecentIndex) {
+          return leftRecentIndex - rightRecentIndex;
+        }
+        return left.command.title.localeCompare(right.command.title);
+      })
+      .map((entry) => entry.command);
+  }, [commands, query, recentCommandIds]);
   const groupedCommands = React.useMemo(() => {
     if (query.trim().length === 0 && recentCommandIds.length > 0) {
       const commandById = new Map(filteredCommands.map((command) => [command.id, command]));

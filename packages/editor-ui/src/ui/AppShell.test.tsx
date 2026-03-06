@@ -795,6 +795,41 @@ describe('AppShell', () => {
     expect(within(palette as HTMLElement).getByText('Generate placeholder records for the selected table.')).toBeInTheDocument();
   });
 
+  it('命令面板支持 aliases 和 keywords 搜索', async () => {
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.command-search-meta',
+            name: 'Command Search Meta Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.command-search-meta.persist',
+                  title: 'Persist Selected Schema',
+                  aliases: ['save schema'],
+                  keywords: ['store', 'persist'],
+                  execute: vi.fn(),
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    const searchInput = screen.getByLabelText('Command Palette Search');
+
+    fireEvent.change(searchInput, { target: { value: 'save schema' } });
+    expect(await screen.findByRole('option', { name: /Persist Selected Schema/ })).toBeInTheDocument();
+
+    fireEvent.change(searchInput, { target: { value: 'store' } });
+    expect(await screen.findByRole('option', { name: /Persist Selected Schema/ })).toBeInTheDocument();
+  });
+
   it('命令面板会在空搜索时展示最近使用命令', async () => {
     const firstExecute = vi.fn();
     const secondExecute = vi.fn();
@@ -898,6 +933,94 @@ describe('AppShell', () => {
     expect(recentOptions).toHaveLength(2);
     expect(recentOptions[0]).toHaveTextContent('Dedupe First');
     expect(recentOptions[1]).toHaveTextContent('Dedupe Second');
+  });
+
+  it('工具栏菜单会按 target 放到不同区域并按 group 分隔', () => {
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.toolbar-layout',
+            name: 'Toolbar Layout Plugin',
+            contributes: {
+              commands: [
+                { id: 'plugin.toolbar-layout.left', title: 'Left Tool', execute: vi.fn() },
+                { id: 'plugin.toolbar-layout.right', title: 'Right Tool', execute: vi.fn() },
+              ],
+              menus: [
+                {
+                  id: 'plugin.toolbar-layout.left.menu',
+                  label: 'Left Tool',
+                  commandId: 'plugin.toolbar-layout.left',
+                  target: 'toolbar-start',
+                  group: 'plugin-left',
+                  order: 10,
+                },
+                {
+                  id: 'plugin.toolbar-layout.right.menu',
+                  label: 'Right Tool',
+                  commandId: 'plugin.toolbar-layout.right',
+                  target: 'toolbar-end',
+                  group: 'plugin-right',
+                  order: 10,
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    const leftButton = screen.getByRole('button', { name: 'Left Tool' });
+    const rightButton = screen.getByRole('button', { name: 'Right Tool' });
+    const breadcrumb = screen.getByText('Page');
+
+    expect(leftButton.compareDocumentPosition(breadcrumb) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rightButton.compareDocumentPosition(breadcrumb) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  });
+
+  it('上下文菜单会按 group 渲染分隔线', () => {
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.context-groups',
+            name: 'Context Groups Plugin',
+            contributes: {
+              commands: [
+                { id: 'plugin.context-groups.first', title: 'First Group Item', execute: vi.fn() },
+                { id: 'plugin.context-groups.second', title: 'Second Group Item', execute: vi.fn() },
+              ],
+              contextMenus: [
+                {
+                  id: 'plugin.context-groups.first.item',
+                  label: 'First Group Item',
+                  commandId: 'plugin.context-groups.first',
+                  group: 'edit',
+                  order: 90,
+                },
+                {
+                  id: 'plugin.context-groups.second.item',
+                  label: 'Second Group Item',
+                  commandId: 'plugin.context-groups.second',
+                  group: 'danger',
+                  order: 100,
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.contextMenu(screen.getByText('Canvas Content'));
+
+    const menu = screen.getByRole('menu', { name: 'Canvas Context Menu' });
+    expect(within(menu).getAllByRole('separator').length).toBeGreaterThanOrEqual(1);
   });
 
   it('命令面板支持键盘导航并通过回车执行命令', async () => {
