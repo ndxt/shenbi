@@ -373,8 +373,8 @@ describe('AppShell', () => {
 
     expect(searchInput).toBeInTheDocument();
     expect(palette).not.toBeNull();
-    expect(within(palette as HTMLElement).getByRole('button', { name: /Open Command Palette/ })).toBeInTheDocument();
-    expect(within(palette as HTMLElement).getByRole('button', { name: /Palette Run/ })).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByRole('option', { name: /Open Command Palette/ })).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByRole('option', { name: /Palette Run/ })).toBeInTheDocument();
     expect(within(palette as HTMLElement).getByText('Mod+R')).toBeInTheDocument();
   });
 
@@ -404,7 +404,7 @@ describe('AppShell', () => {
     );
 
     fireEvent.click(screen.getByTitle('Open Command Palette'));
-    fireEvent.click(screen.getByRole('button', { name: /Palette Execute/ }));
+    fireEvent.click(screen.getByRole('option', { name: /Palette Execute/ }));
 
     expect(pluginExecute).toHaveBeenCalledTimes(1);
   });
@@ -430,9 +430,9 @@ describe('AppShell', () => {
     const palette = searchInput.closest('.w-\\[560px\\]');
 
     expect(palette).not.toBeNull();
-    expect(within(palette as HTMLElement).getByRole('button', { name: /Save File/ })).toBeInTheDocument();
-    expect(within(palette as HTMLElement).getByRole('button', { name: /Undo/ })).toBeInTheDocument();
-    expect(within(palette as HTMLElement).getByRole('button', { name: /Hide Sidebar/ })).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByRole('option', { name: /Save File/ })).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByRole('option', { name: /Undo/ })).toBeInTheDocument();
+    expect(within(palette as HTMLElement).getByRole('option', { name: /Hide Sidebar/ })).toBeInTheDocument();
     expect(within(palette as HTMLElement).getByText('Mod+S')).toBeInTheDocument();
     expect(within(palette as HTMLElement).getByText('Mod+Z')).toBeInTheDocument();
   });
@@ -670,7 +670,7 @@ describe('AppShell', () => {
 
     fireEvent.click(screen.getByTitle('Open Command Palette'));
 
-    expect(screen.queryByRole('button', { name: /Hidden Without Selection/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Hidden Without Selection/ })).not.toBeInTheDocument();
   });
 
   it('命令面板、工具栏菜单和上下文菜单会展示禁用态', () => {
@@ -721,7 +721,7 @@ describe('AppShell', () => {
     );
 
     fireEvent.click(screen.getByTitle('Open Command Palette'));
-    const disabledPaletteCommand = screen.getByRole('button', { name: /Disabled Without Selection/ });
+    const disabledPaletteCommand = screen.getByRole('option', { name: /Disabled Without Selection/ });
     expect(disabledPaletteCommand).toBeDisabled();
     fireEvent.click(disabledPaletteCommand);
 
@@ -834,15 +834,15 @@ describe('AppShell', () => {
     fireEvent.change(searchInput, { target: { value: 'palettenav' } });
 
     await waitFor(() => {
-      const firstButton = screen.getByRole('button', { name: /First Command/ });
-      const secondButton = screen.getByRole('button', { name: /Second Command/ });
+      const firstButton = screen.getByRole('option', { name: /First Command/ });
+      const secondButton = screen.getByRole('option', { name: /Second Command/ });
       expect(firstButton).toHaveAttribute('aria-selected', 'true');
       expect(secondButton).toHaveAttribute('aria-selected', 'false');
     });
 
     fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
-    expect(screen.getByRole('button', { name: /First Command/ })).toHaveAttribute('aria-selected', 'false');
-    expect(screen.getByRole('button', { name: /Second Command/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: /First Command/ })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('option', { name: /Second Command/ })).toHaveAttribute('aria-selected', 'true');
 
     fireEvent.keyDown(searchInput, { key: 'Enter' });
     expect(secondExecute).toHaveBeenCalledTimes(1);
@@ -894,16 +894,128 @@ describe('AppShell', () => {
     fireEvent.change(searchInput, { target: { value: 'palettedisablednav' } });
 
     await waitFor(() => {
-      const blockedButton = screen.getByRole('button', { name: /Blocked Command/ });
-      const enabledButton = screen.getByRole('button', { name: /Enabled Command/ });
+      const blockedButton = screen.getByRole('option', { name: /Blocked Command/ });
+      const enabledButton = screen.getByRole('option', { name: /Enabled Command/ });
       expect(blockedButton).toHaveAttribute('aria-selected', 'false');
       expect(enabledButton).toHaveAttribute('aria-selected', 'true');
     });
 
     fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
-    expect(screen.getByRole('button', { name: /Enabled Command/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: /Enabled Command/ })).toHaveAttribute('aria-selected', 'true');
 
     fireEvent.keyDown(searchInput, { key: 'Enter' });
     expect(enabledExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it('命令面板支持 Escape 和 Tab 关闭', () => {
+    render(
+      <AppShell>
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    const searchInput = screen.getByLabelText('Command Palette Search');
+
+    fireEvent.keyDown(searchInput, { key: 'Escape' });
+    expect(screen.queryByLabelText('Command Palette Search')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    const reopenedSearchInput = screen.getByLabelText('Command Palette Search');
+    fireEvent.keyDown(reopenedSearchInput, { key: 'Tab' });
+    expect(screen.queryByLabelText('Command Palette Search')).not.toBeInTheDocument();
+  });
+
+  it('命令面板提供 listbox 语义和 active descendant', () => {
+    render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.palette.a11y',
+            name: 'Palette A11y Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.palette.a11y.run',
+                  title: 'Accessible Command',
+                  category: 'PaletteA11y',
+                  execute: vi.fn(),
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Open Command Palette'));
+    const searchInput = screen.getByLabelText('Command Palette Search');
+    fireEvent.change(searchInput, { target: { value: 'palettea11y' } });
+
+    const listbox = screen.getByRole('listbox', { name: 'Command Palette Results' });
+    const option = screen.getByRole('option', { name: /Accessible Command/ });
+
+    expect(screen.getByRole('dialog', { name: 'Command Palette' })).toBeInTheDocument();
+    expect(listbox).toBeInTheDocument();
+    expect(option).toHaveAttribute('id', 'command-palette-option-plugin.palette.a11y.run');
+    expect(searchInput).toHaveAttribute('aria-controls', 'command-palette-listbox');
+    expect(searchInput).toHaveAttribute('aria-activedescendant', 'command-palette-option-plugin.palette.a11y.run');
+  });
+
+  it('命令面板选中项变化时会滚动到可见区域', async () => {
+    const scrollIntoView = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    try {
+      render(
+        <AppShell
+          plugins={[
+            defineEditorPlugin({
+              id: 'plugin.palette.scroll',
+              name: 'Palette Scroll Plugin',
+              contributes: {
+                commands: [
+                  {
+                    id: 'plugin.palette.scroll.first',
+                    title: 'Scroll First',
+                    category: 'PaletteScroll',
+                    execute: vi.fn(),
+                  },
+                  {
+                    id: 'plugin.palette.scroll.second',
+                    title: 'Scroll Second',
+                    category: 'PaletteScroll',
+                    execute: vi.fn(),
+                  },
+                ],
+              },
+            }),
+          ]}
+        >
+          <div>Content</div>
+        </AppShell>,
+      );
+
+      fireEvent.click(screen.getByTitle('Open Command Palette'));
+      const searchInput = screen.getByLabelText('Command Palette Search');
+      fireEvent.change(searchInput, { target: { value: 'palettescroll' } });
+
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalled();
+      });
+
+      scrollIntoView.mockClear();
+      fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
+
+      await waitFor(() => {
+        expect(screen.getByRole('option', { name: /Scroll Second/ })).toHaveAttribute('aria-selected', 'true');
+      });
+      expect(scrollIntoView).toHaveBeenCalled();
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
   });
 });

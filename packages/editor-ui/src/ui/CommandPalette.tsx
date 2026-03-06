@@ -25,6 +25,8 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [query, setQuery] = React.useState('');
   const [selectedCommandId, setSelectedCommandId] = React.useState<string | undefined>(undefined);
+  const listRef = React.useRef<HTMLDivElement | null>(null);
+  const itemRefs = React.useRef(new Map<string, HTMLButtonElement | null>());
 
   React.useEffect(() => {
     if (!open) {
@@ -70,6 +72,14 @@ export function CommandPalette({
     }
   }, [selectableCommandIds, selectedCommandId]);
 
+  React.useEffect(() => {
+    if (!selectedCommandId) {
+      return;
+    }
+    const selectedElement = itemRefs.current.get(selectedCommandId);
+    selectedElement?.scrollIntoView?.({ block: 'nearest' });
+  }, [selectedCommandId]);
+
   const moveSelection = (direction: 1 | -1) => {
     if (selectableCommandIds.length === 0) {
       return;
@@ -99,6 +109,9 @@ export function CommandPalette({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command Palette"
         className="w-[560px] overflow-hidden rounded border border-border-ide bg-bg-panel shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
@@ -106,11 +119,18 @@ export function CommandPalette({
           <input
             autoFocus
             aria-label="Command Palette Search"
+            aria-controls="command-palette-listbox"
+            aria-activedescendant={selectedCommandId ? `command-palette-option-${selectedCommandId}` : undefined}
             className="w-full bg-transparent text-sm text-text-primary outline-none"
             placeholder="Type a command"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
+              if (event.key === 'Escape' || event.key === 'Tab') {
+                event.preventDefault();
+                onClose();
+                return;
+              }
               if (event.key === 'ArrowDown') {
                 event.preventDefault();
                 moveSelection(1);
@@ -128,7 +148,13 @@ export function CommandPalette({
             }}
           />
         </div>
-        <div className="max-h-[360px] overflow-auto py-1">
+        <div
+          id="command-palette-listbox"
+          ref={listRef}
+          role="listbox"
+          aria-label="Command Palette Results"
+          className="max-h-[360px] overflow-auto py-1"
+        >
           {filteredCommands.length === 0 ? (
             <div className="px-3 py-4 text-sm text-text-secondary">No commands found.</div>
           ) : (
@@ -140,7 +166,12 @@ export function CommandPalette({
                 {items.map((command) => (
                   <button
                     key={command.id}
+                    id={`command-palette-option-${command.id}`}
+                    ref={(element) => {
+                      itemRefs.current.set(command.id, element);
+                    }}
                     type="button"
+                    role="option"
                     disabled={command.disabled}
                     aria-selected={selectedCommandId === command.id}
                     className={`flex w-full items-center justify-between px-3 py-2 text-left ${
