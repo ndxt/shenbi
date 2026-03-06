@@ -1,0 +1,74 @@
+import type React from 'react';
+import type { ComponentContract, SchemaNode } from '@shenbi/schema';
+
+export interface OrderedContribution {
+  id: string;
+  order?: number;
+}
+
+export function mergeContributions<T extends OrderedContribution>(
+  builtin: readonly T[],
+  extensions?: readonly T[],
+): T[] {
+  const merged = new Map<string, T>();
+  for (const item of builtin) {
+    merged.set(item.id, item);
+  }
+  for (const item of extensions ?? []) {
+    merged.set(item.id, item);
+  }
+  return [...merged.values()].sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
+}
+
+export type ActivityBarSection = 'main' | 'bottom';
+
+export interface ActivityBarItemIconProps {
+  size?: number;
+  strokeWidth?: number;
+  className?: string;
+}
+
+export interface ActivityBarItemContribution extends OrderedContribution {
+  label: string;
+  icon: React.ComponentType<ActivityBarItemIconProps>;
+  active?: boolean;
+  section?: ActivityBarSection;
+  targetSidebarTabId?: string;
+  onClick?: () => void;
+}
+
+export interface SchemaTreeNode {
+  id: string;
+  type: string;
+  name?: string;
+  children?: SchemaTreeNode[];
+  isHidden?: boolean;
+}
+
+export interface SidebarTabRenderContext {
+  contracts?: ComponentContract[];
+  treeNodes?: SchemaTreeNode[];
+  selectedNodeId?: string;
+  onSelectNode?: (nodeId: string) => void;
+  onInsertComponent?: (componentType: string) => void;
+}
+
+export interface SidebarTabContribution extends OrderedContribution {
+  label: string;
+  render: (context: SidebarTabRenderContext) => React.ReactNode;
+}
+
+export interface InspectorTabRenderContext {
+  selectedNode?: SchemaNode;
+  contract?: ComponentContract;
+  onPatchProps?: (patch: Record<string, unknown>) => void;
+  onPatchColumns?: (columns: unknown[]) => void;
+  onPatchStyle?: (patch: Record<string, unknown>) => void;
+  onPatchEvents?: (patch: Record<string, unknown>) => void;
+  onPatchLogic?: (patch: Record<string, unknown>) => void;
+}
+
+export interface InspectorTabContribution extends OrderedContribution {
+  label: string;
+  render: (context: InspectorTabRenderContext) => React.ReactNode;
+}

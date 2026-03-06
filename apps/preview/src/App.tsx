@@ -26,9 +26,7 @@ import {
 
 import { AppShell } from '@shenbi/editor-ui';
 import {
-  useEditorAIBridge,
   useEditorSession,
-  useFileWorkspace,
   useNodePatchDispatch,
   useShellModeUrl,
   useSelectionSync,
@@ -37,6 +35,8 @@ import {
   type InspectorTabContribution,
   type SidebarTabContribution,
 } from '@shenbi/editor-ui';
+import { useEditorAIBridge } from '@shenbi/editor-plugin-ai-chat';
+import { useFileWorkspace } from '@shenbi/editor-plugin-files';
 import {
   buildEditorTree,
   getDefaultSelectedNodeId,

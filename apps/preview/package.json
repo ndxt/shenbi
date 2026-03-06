@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@shenbi/editor-core": "workspace:*",
+    "@shenbi/editor-plugin-ai-chat": "workspace:*",
+    "@shenbi/editor-plugin-files": "workspace:*",
     "@shenbi/editor-ui": "workspace:*",
     "@shenbi/engine": "workspace:*",
     "@shenbi/schema": "workspace:*",

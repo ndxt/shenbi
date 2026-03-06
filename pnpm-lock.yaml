@@ -14,6 +14,15 @@ importers:
 
   apps/preview:
     dependencies:
+      '@shenbi/editor-core':
+        specifier: workspace:*
+        version: link:../../packages/editor-core
+      '@shenbi/editor-plugin-ai-chat':
+        specifier: workspace:*
+        version: link:../../packages/editor-plugins/ai-chat
+      '@shenbi/editor-plugin-files':
+        specifier: workspace:*
+        version: link:../../packages/editor-plugins/files
       '@shenbi/editor-ui':
         specifier: workspace:*
         version: link:../../packages/editor-ui
@@ -95,8 +104,174 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(jsdom@26.1.0)(lightningcss@1.31.1)
 
+  packages/editor-plugins/ai-chat:
+    dependencies:
+      '@shenbi/schema':
+        specifier: workspace:*
+        version: link:../../schema
+      lucide-react:
+        specifier: ^0.575.0
+        version: 0.575.0(react@19.2.4)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@testing-library/jest-dom':
+        specifier: ^6.9.1
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.11
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.7.0(vite@6.4.1(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.31.1))
+      jsdom:
+        specifier: ^26.0.0
+        version: 26.1.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(jsdom@26.1.0)(lightningcss@1.31.1)
+
+  packages/editor-plugins/api:
+    dependencies:
+      '@shenbi/schema':
+        specifier: workspace:*
+        version: link:../../schema
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.11
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(jsdom@26.1.0)(lightningcss@1.31.1)
+
+  packages/editor-plugins/files:
+    dependencies:
+      '@shenbi/editor-plugin-api':
+        specifier: workspace:*
+        version: link:../api
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@testing-library/jest-dom':
+        specifier: ^6.9.1
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.11
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.7.0(vite@6.4.1(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.31.1))
+      jsdom:
+        specifier: ^26.0.0
+        version: 26.1.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(jsdom@26.1.0)(lightningcss@1.31.1)
+
+  packages/editor-plugins/setter:
+    dependencies:
+      '@shenbi/editor-plugin-api':
+        specifier: workspace:*
+        version: link:../api
+      '@shenbi/schema':
+        specifier: workspace:*
+        version: link:../../schema
+      lucide-react:
+        specifier: ^0.575.0
+        version: 0.575.0(react@19.2.4)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@testing-library/jest-dom':
+        specifier: ^6.9.1
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.11
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.7.0(vite@6.4.1(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.31.1))
+      jsdom:
+        specifier: ^26.0.0
+        version: 26.1.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(jsdom@26.1.0)(lightningcss@1.31.1)
+
   packages/editor-ui:
     dependencies:
+      '@shenbi/editor-core':
+        specifier: workspace:*
+        version: link:../editor-core
+      '@shenbi/editor-plugin-ai-chat':
+        specifier: workspace:*
+        version: link:../editor-plugins/ai-chat
+      '@shenbi/editor-plugin-api':
+        specifier: workspace:*
+        version: link:../editor-plugins/api
+      '@shenbi/editor-plugin-files':
+        specifier: workspace:*
+        version: link:../editor-plugins/files
+      '@shenbi/editor-plugin-setter':
+        specifier: workspace:*
+        version: link:../editor-plugins/setter
       '@shenbi/schema':
         specifier: workspace:*
         version: link:../schema
@@ -192,6 +367,9 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(jsdom@26.1.0)(lightningcss@1.31.1)
 
 packages:
 

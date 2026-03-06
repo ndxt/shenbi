@@ -18,7 +18,11 @@
       "@shenbi/schema": ["packages/schema/types/index.ts"],
       "@shenbi/engine": ["packages/engine/src/index.ts"],
       "@shenbi/editor-core": ["packages/editor-core/src/index.ts"],
-      "@shenbi/editor-ui": ["packages/editor-ui/src/index.ts"]
+      "@shenbi/editor-ui": ["packages/editor-ui/src/index.ts"],
+      "@shenbi/editor-plugin-api": ["packages/editor-plugins/api/src/index.ts"],
+      "@shenbi/editor-plugin-files": ["packages/editor-plugins/files/src/index.ts"],
+      "@shenbi/editor-plugin-setter": ["packages/editor-plugins/setter/src/index.ts"],
+      "@shenbi/editor-plugin-ai-chat": ["packages/editor-plugins/ai-chat/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "dist", "coverage"]

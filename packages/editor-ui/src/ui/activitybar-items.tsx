@@ -1,4 +1,3 @@
-import type React from 'react';
 import {
   BugPlay,
   Database,
@@ -7,25 +6,16 @@ import {
   Search,
   Settings,
 } from 'lucide-react';
+import {
+  mergeContributions,
+  type ActivityBarItemContribution,
+} from '@shenbi/editor-plugin-api';
 
-export type ActivityBarSection = 'main' | 'bottom';
-
-export interface ActivityBarItemIconProps {
-  size?: number;
-  strokeWidth?: number;
-  className?: string;
-}
-
-export interface ActivityBarItemContribution {
-  id: string;
-  label: string;
-  icon: React.ComponentType<ActivityBarItemIconProps>;
-  order?: number;
-  active?: boolean;
-  section?: ActivityBarSection;
-  targetSidebarTabId?: string;
-  onClick?: () => void;
-}
+export type {
+  ActivityBarItemContribution,
+  ActivityBarItemIconProps,
+  ActivityBarSection,
+} from '@shenbi/editor-plugin-api';
 
 function createBuiltinActivityItems(): ActivityBarItemContribution[] {
   return [
@@ -41,12 +31,5 @@ function createBuiltinActivityItems(): ActivityBarItemContribution[] {
 export function resolveActivityBarItems(
   extensions?: ActivityBarItemContribution[],
 ): ActivityBarItemContribution[] {
-  const merged = new Map<string, ActivityBarItemContribution>();
-  for (const item of createBuiltinActivityItems()) {
-    merged.set(item.id, item);
-  }
-  for (const item of extensions ?? []) {
-    merged.set(item.id, item);
-  }
-  return [...merged.values()].sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
+  return mergeContributions(createBuiltinActivityItems(), extensions);
 }

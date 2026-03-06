@@ -13,6 +13,8 @@
 | `docs/active/contract-freeze-v1.md` | 核心接口冻结与变更规则 | 生效中 |
 | `docs/active/component-contract-spec-v1.md` | 组件契约 v1 草案与落地建议 | 草案 |
 | `docs/active/phase-2-plan.md` | 阶段 2 剩余工作计划 | 执行中 |
+| `docs/active/editor-pluginization-plan.md` | Editor 插件化重构计划、并行分支边界与验收门禁 | 执行中 |
+| `docs/active/editor-pluginization-status.md` | Editor 插件化当前进度、目录决策与同步清单 | 执行中 |
 | `docs/active/phase-2-parallel-delivery-playbook.md` | 并行分支交付边界、接口冻结与合并门禁 | 执行中 |
 | `docs/active/phase-2-merge-acceptance-checklist.md` | A/B 分支合并验收模板与主线复核清单 | 执行中 |
 | `docs/active/ui-guidelines.md` | 预览端 UI 风格与实现规范 | 生效中 |

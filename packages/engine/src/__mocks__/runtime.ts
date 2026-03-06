@@ -27,7 +27,11 @@ export function createMockRuntime(
       }
     },
     async executeActions(actions: ActionChain, eventData?: any, extraContext?: Record<string, any>) {
-      runtime.__executedActions.push({ actions, eventData, extraContext });
+      runtime.__executedActions.push({
+        actions,
+        ...(eventData !== undefined ? { eventData } : {}),
+        ...(extraContext !== undefined ? { extraContext } : {}),
+      });
     },
     getContext(extra?: Partial<ExpressionContext>): ExpressionContext {
       return {

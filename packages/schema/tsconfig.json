@@ -7,5 +7,6 @@
     "declarationMap": true,
     "outDir": "dist"
   },
-  "include": ["types/**/*.ts", "contracts/**/*.ts"]
+  "include": ["types/**/*.ts", "contracts/**/*.ts"],
+  "exclude": ["contracts/**/*.test.ts", "contracts/**/*.test.tsx"]
 }

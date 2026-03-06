@@ -1,4 +1,8 @@
 import React from 'react';
+import {
+  collectPluginContributes,
+  type EditorPluginManifest,
+} from '@shenbi/editor-plugin-api';
 import { ActivityBar } from './ActivityBar';
 import { Sidebar } from './Sidebar';
 import { WorkbenchToolbar } from './WorkbenchToolbar';
@@ -22,6 +26,7 @@ interface AppShellProps {
   sidebarProps?: SidebarProps;
   inspectorProps?: InspectorProps;
   aiPanelProps?: AIPanelProps;
+  plugins?: EditorPluginManifest[];
   onCanvasSelectNode?: (nodeId: string) => void;
 }
 
@@ -42,6 +47,7 @@ export function AppShell({
   sidebarProps,
   inspectorProps,
   aiPanelProps,
+  plugins,
   onCanvasSelectNode,
 }: AppShellProps) {
   const [theme, setTheme] = React.useState<ThemeMode>('dark');
@@ -88,6 +94,31 @@ export function AppShell({
   const { size: inspectorSize, startResize: startInspectorResize } = useResize(256, 160, 600);
   const { size: aiPanelSize, startResize: startAIPanelResize } = useResize(300, 200, 800);
   const { size: consoleSize, startResize: startConsoleResize } = useResize(192, 100, 800);
+  const pluginContributes = React.useMemo(
+    () => collectPluginContributes(plugins),
+    [plugins],
+  );
+  const activityItems = React.useMemo(
+    () => [
+      ...pluginContributes.activityBarItems,
+      ...(activityBarProps?.items ?? []),
+    ],
+    [activityBarProps?.items, pluginContributes.activityBarItems],
+  );
+  const sidebarTabs = React.useMemo(
+    () => [
+      ...pluginContributes.sidebarTabs,
+      ...(sidebarProps?.tabs ?? []),
+    ],
+    [pluginContributes.sidebarTabs, sidebarProps?.tabs],
+  );
+  const inspectorTabs = React.useMemo(
+    () => [
+      ...pluginContributes.inspectorTabs,
+      ...(inspectorProps?.tabs ?? []),
+    ],
+    [inspectorProps?.tabs, pluginContributes.inspectorTabs],
+  );
 
   const toggleTheme = (newTheme: ThemeMode) => {
     setTheme(newTheme);
@@ -159,6 +190,7 @@ export function AppShell({
       <div className="flex-1 flex overflow-hidden">
         <ActivityBar
           {...activityBarProps}
+          items={activityItems}
           onSelectItem={handleActivitySelectItem}
         />
         
@@ -166,6 +198,7 @@ export function AppShell({
           <div style={{ width: sidebarSize }} className="relative shrink-0 flex flex-col h-full">
             <Sidebar
               {...sidebarProps}
+              tabs={sidebarTabs}
               activeTabId={activeSidebarTabId}
               onChangeActiveTab={setActiveSidebarTabId}
             />
@@ -225,7 +258,7 @@ export function AppShell({
                   className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
                   onMouseDown={(e) => startInspectorResize(e, 'horizontal', true)}
                 />
-                <Inspector {...inspectorProps} />
+                <Inspector {...inspectorProps} tabs={inspectorTabs} />
               </div>
             )}
           </div>

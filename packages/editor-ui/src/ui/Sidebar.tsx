@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { type SchemaNode as TreeSchemaNode } from '../panels/SchemaTree';
 import type { ComponentContract } from '@shenbi/schema';
+import type { SchemaTreeNode } from '@shenbi/editor-plugin-api';
 import {
   resolveSidebarTabs,
   type SidebarTabContribution,
@@ -15,7 +15,7 @@ export { createFilesSidebarTab } from './sidebar-tabs';
 
 export interface SidebarProps {
   contracts?: ComponentContract[];
-  treeNodes?: TreeSchemaNode[];
+  treeNodes?: SchemaTreeNode[];
   selectedNodeId?: string;
   onSelectNode?: (nodeId: string) => void;
   onInsertComponent?: (componentType: string) => void;

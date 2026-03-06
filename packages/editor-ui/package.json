@@ -14,6 +14,10 @@
   },
   "dependencies": {
     "@shenbi/editor-core": "workspace:*",
+    "@shenbi/editor-plugin-api": "workspace:*",
+    "@shenbi/editor-plugin-ai-chat": "workspace:*",
+    "@shenbi/editor-plugin-files": "workspace:*",
+    "@shenbi/editor-plugin-setter": "workspace:*",
     "@shenbi/schema": "workspace:*",
     "lucide-react": "^0.575.0",
     "tailwindcss": "^4.0.0"

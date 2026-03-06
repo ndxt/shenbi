@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { builtinContracts } from '@shenbi/schema';
+import { builtinContracts } from '../types';
 
 describe('Component Contract Icons', () => {
   it('should have icon field for all contracts', () => {
