@@ -145,8 +145,7 @@ export function createEditorAIBridgeFromPluginContext(
   return createEditorAIBridge({
     getSnapshot,
     replaceSchema: (schema) => {
-      if (options.context.document?.replaceSchema || options.context.replaceSchema) {
-        replacePluginSchema(options.context, schema);
+      if (replacePluginSchema(options.context, schema)) {
         return;
       }
       void executePluginCommand(options.context, 'schema.replace', { schema });

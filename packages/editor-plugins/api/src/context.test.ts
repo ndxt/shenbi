@@ -67,13 +67,23 @@ describe('plugin context helpers', () => {
 
   it('replacePluginSchema falls back to deprecated replaceSchema alias', () => {
     const replaceSchema = vi.fn();
-    replacePluginSchema(
+    const handled = replacePluginSchema(
       {
         replaceSchema,
       },
       { id: 'page-2', body: [] },
     );
 
+    expect(handled).toBe(true);
     expect(replaceSchema).toHaveBeenCalledWith({ id: 'page-2', body: [] });
+  });
+
+  it('replacePluginSchema returns false when no replacement service exists', () => {
+    const handled = replacePluginSchema(
+      {},
+      { id: 'page-3', body: [] },
+    );
+
+    expect(handled).toBe(false);
   });
 });

@@ -21,6 +21,8 @@
 15. `apps/preview` 已移除对 `PluginContext` 旧别名字段的注入，当前三类插件均通过新服务面运行。
 16. `PluginContext` 旧别名兼容已收敛到 `packages/editor-plugins/api/src/context.ts`，插件实现层不再直接感知历史字段。
 17. `editor-ui/AppShell` 已停止生成 `executeCommand/notify` 等旧 alias，宿主层只分发新服务面。
+18. `ai-chat` 已改为只通过 `editor-plugin-api` helper 访问 schema 替换能力，不再在插件实现层直接判断旧 alias。
+19. `PluginContext` 旧 alias 删除清单与迁移影响说明已补齐到 `docs/active/plugin-context-alias-removal-plan.md`。
 
 ### 1.2 当前结论
 

@@ -87,11 +87,16 @@ export function getPluginDocumentPatchService(context: PluginContext): PluginDoc
   return undefined;
 }
 
-export function replacePluginSchema(context: PluginContext, schema: PageSchema): void {
-  context.document?.replaceSchema?.(schema);
-  if (!context.document?.replaceSchema) {
-    context.replaceSchema?.(schema);
+export function replacePluginSchema(context: PluginContext, schema: PageSchema): boolean {
+  if (context.document?.replaceSchema) {
+    context.document.replaceSchema(schema);
+    return true;
   }
+  if (context.replaceSchema) {
+    context.replaceSchema(schema);
+    return true;
+  }
+  return false;
 }
 
 export function getPluginSelectedNode(context: PluginContext): SchemaNode | undefined {

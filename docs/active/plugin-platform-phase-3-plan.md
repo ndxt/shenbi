@@ -79,6 +79,12 @@
 
 **`overlay` 抽象约束：** overlay 只暴露声明式意图接口（描述 what），渲染实现（how）留在宿主层。插件调用 `overlay.confirm({ title, content })` 返回 `Promise<boolean>`，不关心底层用了 antd 还是自定义组件。
 
+**`clipboard` 服务边界：**
+
+1. `clipboard` 初版只负责编辑器内部的结构化复制粘贴，如节点、Schema 片段、编辑器私有 MIME 数据。
+2. 浏览器原生 Clipboard API 不直接暴露给插件，避免节点复制和文本复制两套语义混杂。
+3. 如未来确有系统剪贴板读写需求，再单独评估 `clipboard.system` 或宿主私有桥接能力。
+
 **准入规则：**
 
 1. 每个服务面必须有明确职责边界。
@@ -106,7 +112,7 @@
 
 ### 4.3 生命周期与激活机制
 
-**当前状态：** 插件仅有 `activate` 入口，通过返回清理函数实现简易销毁，缺少显式的 register / deactivate / dispose 阶段。
+**当前状态：** 插件仅有 `activate` 入口，通过返回清理函数实现简易销毁，缺少显式的 deactivate / dispose 阶段；`register` 更适合作为宿主内部的加载步骤，而不是额外暴露给插件的钩子。
 
 **目标最小生命周期：**
 
@@ -114,11 +120,17 @@
 register → activate → deactivate → dispose
 ```
 
+**阶段解释：**
+
+1. `register` 是宿主内部步骤：收集 manifest、校验 contribution、合并注册表，不要求插件额外实现 `register()` 钩子。
+2. 插件对外仍只需要声明式 manifest 和 `activate` 入口；`deactivate / dispose` 由宿主调度并消费 `activate` 返回的清理能力。
+3. Phase 3 第一阶段中，`deactivate` **不因面板隐藏、tab 切换、扩展点暂时不可见而触发**，只用于插件被手动停用、宿主主动卸载或未来明确支持的插件停用场景。
+
 | 阶段 | 时机 | 职责 | 允许的操作 |
 |------|------|------|-----------|
-| `register` | 插件清单加载时 | 声明贡献、注册静态信息 | 只读，不允许调用服务 |
+| `register` | 宿主加载插件清单时 | 收集 manifest、校验贡献、注册静态信息 | 宿主内部步骤，不向插件暴露服务 |
 | `activate` | 扩展点首次可见或手动激活 | 启动运行时逻辑、订阅事件 | 可调用全部服务 |
-| `deactivate` | 扩展点隐藏或手动停用 | 暂停运行时逻辑、暂存状态 | 可调用 storage |
+| `deactivate` | 插件被手动停用或宿主主动停用 | 暂停运行时逻辑、暂存状态 | 可调用 storage |
 | `dispose` | 插件卸载 | 释放全部资源、取消全部订阅 | 只允许清理 |
 
 **异常处理策略：**
@@ -165,7 +177,7 @@ register → activate → deactivate → dispose
 
 #### 4.5.1 协议层（Platform Layer）
 
-**现有类型（无需修改）：**
+**Phase 3.2 建议冻结为如下类型：**
 
 ```typescript
 // packages/editor-plugins/api/src/plugin.ts
@@ -173,8 +185,9 @@ interface PluginShortcutContribution {
   id: string;
   commandId: string;    // 引用已注册的命令 ID
   keybinding: string;   // 快捷键描述串
-  order?: number;
-  when?: string;         // 条件表达式
+  order?: number;       // 仅用于展示排序，不参与冲突决策
+  priority?: number;    // 冲突决策优先级，默认 0
+  when?: string;        // 条件表达式
 }
 ```
 
@@ -190,6 +203,18 @@ interface PluginShortcutContribution {
 **修饰键标准名称：** `Ctrl`、`Shift`、`Alt`、`Mod`（跨平台主修饰键）。
 
 **按键标准名称：** 使用 `KeyboardEvent.key` 标准值，大写字母键用大写字母（`A`-`Z`），特殊键用标准名（`Delete`、`Backspace`、`Enter`、`Escape`、`ArrowUp` 等）。
+
+**`when` 语法（初版冻结范围）：**
+
+1. 支持布尔变量名，如 `editorFocused`
+2. 支持单变量取反，如 `!inputFocused`
+3. 支持用 `&&` 做并且组合，如 `editorFocused && !inputFocused && hasSelection`
+4. 初版 **不支持** `||`、括号、比较运算、自定义函数调用
+
+说明：
+
+1. 这套语法足以覆盖快捷键启用的大多数场景。
+2. 如后续确实出现明显的“或条件”需求，再单独升级语法；Phase 3 不引入完整 VS Code when clause 解析器。
 
 #### 4.5.2 运行时引擎（Host Layer）
 
@@ -207,7 +232,7 @@ interface PluginShortcutContribution {
 |------|------|
 | 快捷键注册 | 从 `ResolvedPluginContributes.shortcuts` 构建 `keybinding → commandId` 映射 |
 | 键盘事件解析 | 将 `KeyboardEvent` 标准化为 keybinding 描述串进行匹配 |
-| 冲突检测 | 多个插件注册同一快捷键时，按 `order` 优先级取最高者，开发模式下 console.warn |
+| 冲突检测 | 多个插件注册同一快捷键时，按 `priority` 优先级取最高者；若相同则取先注册者，开发模式下 console.warn |
 | `when` 条件求值 | 根据当前编辑器上下文（如 `editorFocused`、`sidebarVisible`）判断快捷键是否激活 |
 | 命令执行 | 匹配成功后调用 `commands.execute(commandId)` |
 | 阻止默认行为 | 匹配成功时 `preventDefault()`，避免浏览器默认快捷键冲突 |
@@ -240,8 +265,13 @@ interface PluginShortcutContribution {
 | `Delete` / `Backspace` | `editor.deleteNode` | 删除选中节点 | 待补命令 |
 | `Mod+D` | `editor.duplicateNode` | 复制并粘贴节点 | 待补命令 |
 | `Mod+A` | `editor.selectAll` | 全选 | 待补命令 |
-| `Mod+P` | `commandPalette.open` | 打开命令面板 | 待补命令 |
+| `Mod+Shift+P` | `commandPalette.open` | 打开命令面板 | 待补命令 |
 | `Escape` | `editor.deselect` | 取消选中 | 待补命令 |
+
+说明：
+
+1. `Mod+P` 不作为默认命令面板快捷键，避免与浏览器打印冲突。
+2. 若未来以桌面壳或 PWA 模式运行，可再单独评估是否支持平台级覆盖。
 
 #### 4.5.4 插件声明示例
 
@@ -311,12 +341,15 @@ P3 第一阶段要先冻结扩展点，而不是直接做某个插件能力。
 3. contribution 类型完整清单（含已有 + 待新增）。
 4. 统一标识体系规范（命令 ID 格式、引用关系）。
 5. 快捷键 keybinding 格式规范。
+6. `when` 表达式初版语法定义。
+7. 快捷键冲突优先级规则（`priority`）。
 
 **验收：**
 
 1. 新插件不需要额外阅读宿主实现也能理解接入流程。
 2. 不同插件对同一扩展点的接入方式保持一致。
 3. `PluginShortcutContribution` 的声明格式已冻结，后续只增不改。
+4. `register` 被明确定义为宿主内部加载步骤，而不是插件钩子。
 
 ### Phase 3.3：快捷键引擎与框架样板
 

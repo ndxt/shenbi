@@ -12,6 +12,8 @@
 
 ### P1. 继续收缩 `PluginContext` 旧 alias
 
+状态：已完成。
+
 目标：
 1. 缩减 `getSchema / replaceSchema / getSelectedNode` 等旧字段 fallback。
 2. 继续把兼容逻辑限制在 `packages/editor-plugins/api/src/context.ts`。
@@ -27,6 +29,8 @@
 
 ### P2. 评估旧 alias 删除窗口
 
+状态：已完成，产物见 `docs/active/plugin-context-alias-removal-plan.md`。
+
 目标：
 1. 列出仍然依赖兼容字段的真实调用点。
 2. 判断是否可以在下一阶段直接删除：
@@ -40,6 +44,8 @@
 2. 一份迁移影响说明。
 
 ### P3. 进入插件能力增强阶段
+
+状态：当前主线下一步，先做平台框架搭建，详见 `docs/active/plugin-platform-phase-3-plan.md`。
 
 前提：
 1. P1/P2 完成。
