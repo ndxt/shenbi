@@ -70,17 +70,6 @@ function isCleanup(value: unknown): value is EditorPluginCleanup {
   return typeof value === 'function';
 }
 
-function isInputLike(element: Element | null): boolean {
-  return Boolean(
-    element
-    && (
-      element instanceof HTMLInputElement
-      || element instanceof HTMLTextAreaElement
-      || (element instanceof HTMLElement && element.isContentEditable)
-    ),
-  );
-}
-
 export function AppShell({
   children,
   toolbarExtra,
@@ -112,6 +101,7 @@ export function AppShell({
   });
   const [activeSidebarTabId, setActiveSidebarTabId] = React.useState('components');
   const [activeAuxiliaryPanelId, setActiveAuxiliaryPanelId] = React.useState<string | undefined>(undefined);
+  const [focusVersion, setFocusVersion] = React.useState(0);
 
   const [isMaximized, setIsMaximized] = React.useState(false);
   const recentCommandIdsRef = React.useRef<string[]>([]);
@@ -239,21 +229,55 @@ export function AppShell({
     () => [...hostShortcuts, ...pluginContributes.shortcuts],
     [hostShortcuts, pluginContributes.shortcuts],
   );
+  React.useEffect(() => {
+    const syncFocus = () => {
+      setFocusVersion((current) => current + 1);
+    };
+    document.addEventListener('focusin', syncFocus);
+    document.addEventListener('focusout', syncFocus);
+    window.addEventListener('blur', syncFocus);
+    return () => {
+      document.removeEventListener('focusin', syncFocus);
+      document.removeEventListener('focusout', syncFocus);
+      window.removeEventListener('blur', syncFocus);
+    };
+  }, []);
   const getRuntimeContext = React.useCallback((area?: ContextMenuArea) => {
-    const activeElement = rootRef.current?.contains(document.activeElement) ? document.activeElement : null;
-
-    return {
-      editorFocused: true,
+    const activeElement = document.activeElement;
+    const baseContext = getShortcutEventContext(activeElement, rootRef.current, {
       sidebarVisible: showSidebar,
       inspectorVisible: showInspector,
       hasSelection: Boolean(pluginContext?.selection?.getSelectedNodeId?.()),
-      inputFocused: isInputLike(activeElement),
+    });
+    const paletteInputFocused = Boolean(
+      activeElement instanceof Element
+      && activeElement.closest('[data-shenbi-command-palette-input="true"]'),
+    );
+    const isEditorActive = Boolean(
+      area
+      || !activeElement
+      || activeElement === document.body
+      || (rootRef.current && rootRef.current.contains(activeElement)),
+    );
+
+    if (!area) {
+      return {
+        ...baseContext,
+        editorFocused: isEditorActive,
+        inputFocused: paletteInputFocused ? false : baseContext.inputFocused,
+      };
+    }
+
+    return {
+      ...baseContext,
+      editorFocused: isEditorActive,
+      inputFocused: paletteInputFocused ? false : baseContext.inputFocused,
       canvasFocused: area === 'canvas',
       sidebarFocused: area === 'sidebar',
       inspectorFocused: area === 'inspector',
       activityBarFocused: area === 'activity-bar',
     };
-  }, [pluginContext?.selection, showInspector, showSidebar]);
+  }, [focusVersion, pluginContext?.selection, showInspector, showSidebar]);
   const resolveCommandState = React.useCallback((commandId: string, area?: ContextMenuArea) => {
     const context = getRuntimeContext(area);
     const hostCommand = hostCommandMap.get(commandId);
@@ -410,20 +434,31 @@ export function AppShell({
 
   React.useEffect(() => {
     const cleanups: EditorPluginCleanup[] = [];
+    let disposed = false;
     const reportActivationError = (plugin: EditorPluginManifest, error: unknown) => {
+      if (disposed) {
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       pluginContext?.notifications?.error?.(`Plugin "${plugin.name}" activate failed: ${message}`);
     };
+    const registerCleanup = (cleanup: EditorPluginCleanup) => {
+      if (disposed) {
+        cleanup();
+        return;
+      }
+      cleanups.push(cleanup);
+    };
     const collectCleanup = (result: EditorPluginActivateResult, plugin: EditorPluginManifest) => {
       if (isCleanup(result)) {
-        cleanups.push(result);
+        registerCleanup(result);
         return;
       }
       if (isPromiseLike(result)) {
         void result
           .then((cleanup) => {
             if (isCleanup(cleanup)) {
-              cleanups.push(cleanup);
+              registerCleanup(cleanup);
             }
           })
           .catch((error) => {
@@ -443,6 +478,7 @@ export function AppShell({
       }
     }
     return () => {
+      disposed = true;
       for (const cleanup of cleanups) {
         cleanup();
       }

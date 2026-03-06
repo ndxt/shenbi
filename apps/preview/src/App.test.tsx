@@ -428,6 +428,60 @@ describe('preview/App integration', () => {
     });
   });
 
+  it('编辑器：场景模式下宿主 Undo 会回滚当前场景 schema', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await selectCardNodeInOutline(user);
+
+    const titleInput = screen.getByLabelText('title');
+    await user.clear(titleInput);
+    await user.type(titleInput, '用户管理-撤销测试');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByText('用户管理-撤销测试')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('用户管理-撤销测试')).toBeNull();
+      expect(screen.getByText('用户管理')).toBeInTheDocument();
+    });
+  });
+
+  it('编辑器：场景模式下 Save File 会保存当前场景 schema', async () => {
+    const user = userEvent.setup();
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Scenario Demo');
+    await renderAppAndWaitFirstPage();
+
+    await selectCardNodeInOutline(user);
+
+    const titleInput = screen.getByLabelText('title');
+    await user.clear(titleInput);
+    await user.type(titleInput, '场景保存标题');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByText('场景保存标题')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save File' }));
+
+    await waitFor(() => {
+      const rawIndex = window.localStorage.getItem('shenbi-editor-files');
+      expect(rawIndex).not.toBeNull();
+      const metadataList = JSON.parse(rawIndex ?? '[]') as Array<{ id: string }>;
+      expect(metadataList).toHaveLength(1);
+      const savedRecord = window.localStorage.getItem(`shenbi-editor-file:${metadataList[0]!.id}`);
+      expect(savedRecord).not.toBeNull();
+      expect(savedRecord ?? '').toContain('场景保存标题');
+    });
+
+    promptSpy.mockRestore();
+  });
+
   it('编辑器：可手动切换 shell mode 与多场景模式', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();

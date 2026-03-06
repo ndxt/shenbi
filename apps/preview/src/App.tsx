@@ -8,6 +8,12 @@ import {
 } from '@shenbi/schema';
 import { defineEditorPlugin, type PluginContext } from '@shenbi/editor-plugin-api';
 import {
+  History,
+  LocalFileStorageAdapter,
+  type EditorStateSnapshot,
+  type FileStorageAdapter,
+} from '@shenbi/editor-core';
+import {
   antdResolver,
   compileSchema,
   Container,
@@ -96,6 +102,46 @@ function createInitialScenarioState(): Record<ScenarioKey, PageSchema> {
   };
 }
 
+function createScenarioSnapshot(schema: PageSchema): EditorStateSnapshot {
+  return {
+    schema,
+    isDirty: false,
+    canUndo: false,
+    canRedo: false,
+  };
+}
+
+function createInitialScenarioSnapshots(): Record<ScenarioKey, EditorStateSnapshot> {
+  const schemas = createInitialScenarioState();
+  return {
+    'user-management': createScenarioSnapshot(schemas['user-management']),
+    'form-list': createScenarioSnapshot(schemas['form-list']),
+    'tabs-detail': createScenarioSnapshot(schemas['tabs-detail']),
+    'tree-management': createScenarioSnapshot(schemas['tree-management']),
+    descriptions: createScenarioSnapshot(schemas.descriptions),
+    'drawer-detail': createScenarioSnapshot(schemas['drawer-detail']),
+    'nine-grid': createScenarioSnapshot(schemas['nine-grid']),
+  };
+}
+
+function createScenarioHistories(
+  snapshots: Record<ScenarioKey, EditorStateSnapshot>,
+): Record<ScenarioKey, History<EditorStateSnapshot>> {
+  return {
+    'user-management': new History(snapshots['user-management']),
+    'form-list': new History(snapshots['form-list']),
+    'tabs-detail': new History(snapshots['tabs-detail']),
+    'tree-management': new History(snapshots['tree-management']),
+    descriptions: new History(snapshots.descriptions),
+    'drawer-detail': new History(snapshots['drawer-detail']),
+    'nine-grid': new History(snapshots['nine-grid']),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 function createEmptyShellSchema(): PageSchema {
   return {
     id: 'shell-page',
@@ -143,17 +189,50 @@ function ScenarioRuntimeView({ schema }: ScenarioRuntimeViewProps) {
 export function App() {
   const [appMode, setAppMode] = useShellModeUrl();
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
-  const [scenarioSchemas, setScenarioSchemas] = useState<Record<ScenarioKey, PageSchema>>(
-    () => createInitialScenarioState(),
+  const [scenarioSnapshots, setScenarioSnapshots] = useState<Record<ScenarioKey, EditorStateSnapshot>>(
+    () => createInitialScenarioSnapshots(),
   );
-  const [scenarioSelectedNodeId, setScenarioSelectedNodeId] = useState<string | undefined>(undefined);
   const [activityMessage, setActivityMessage] = useState<string>('');
   const initialShellSchema = useMemo(() => createEmptyShellSchema(), []);
-  const updateScenarioSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
-    setScenarioSchemas((previousSchemas) => ({
-      ...previousSchemas,
-      [activeScenario]: updater(previousSchemas[activeScenario]),
+  const scenarioFileStorageRef = useRef<FileStorageAdapter>(new LocalFileStorageAdapter());
+  const scenarioHistoriesRef = useRef<Record<ScenarioKey, History<EditorStateSnapshot>> | null>(null);
+  if (!scenarioHistoriesRef.current) {
+    scenarioHistoriesRef.current = createScenarioHistories(scenarioSnapshots);
+  }
+  const updateScenarioSnapshot = useCallback((
+    scenario: ScenarioKey,
+    updater: (snapshot: EditorStateSnapshot) => EditorStateSnapshot,
+  ) => {
+    setScenarioSnapshots((previousSnapshots) => ({
+      ...previousSnapshots,
+      [scenario]: updater(previousSnapshots[scenario]),
     }));
+  }, []);
+  const updateScenarioSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
+    const scenario = activeScenario;
+    const history = scenarioHistoriesRef.current?.[scenario];
+    setScenarioSnapshots((previousSnapshots) => {
+      const previousSnapshot = previousSnapshots[scenario];
+      const nextSchema = updater(previousSnapshot.schema);
+      if (nextSchema === previousSnapshot.schema) {
+        return previousSnapshots;
+      }
+      const nextSnapshotBase: EditorStateSnapshot = {
+        ...previousSnapshot,
+        schema: nextSchema,
+        isDirty: true,
+      };
+      history?.push(nextSnapshotBase);
+      const nextSnapshot: EditorStateSnapshot = {
+        ...nextSnapshotBase,
+        canUndo: history?.canUndo() ?? previousSnapshot.canUndo,
+        canRedo: history?.canRedo() ?? previousSnapshot.canRedo,
+      };
+      return {
+        ...previousSnapshots,
+        [scenario]: nextSnapshot,
+      };
+    });
   }, [activeScenario]);
   const {
     editor: fileEditor,
@@ -169,7 +248,8 @@ export function App() {
       antd.message.error(message);
     },
   });
-  const activeSchema = appMode === 'shell' ? shellSnapshot.schema : scenarioSchemas[activeScenario];
+  const activeScenarioSnapshot = scenarioSnapshots[activeScenario];
+  const activeSchema = appMode === 'shell' ? shellSnapshot.schema : activeScenarioSnapshot.schema;
   const {
     activeFileName,
     filesSidebarTabOptions,
@@ -182,11 +262,11 @@ export function App() {
   } = useFileWorkspace({
     mode: appMode === 'shell' ? 'shell' : 'scenarios',
     snapshot: {
-      currentFileId: shellSnapshot.currentFileId,
+      currentFileId: appMode === 'shell' ? shellSnapshot.currentFileId : activeScenarioSnapshot.currentFileId,
       schemaName: activeSchema.name,
-      isDirty: shellSnapshot.isDirty,
-      canUndo: shellSnapshot.canUndo,
-      canRedo: shellSnapshot.canRedo,
+      isDirty: appMode === 'shell' ? shellSnapshot.isDirty : activeScenarioSnapshot.isDirty,
+      canUndo: appMode === 'shell' ? shellSnapshot.canUndo : activeScenarioSnapshot.canUndo,
+      canRedo: appMode === 'shell' ? shellSnapshot.canRedo : activeScenarioSnapshot.canRedo,
     },
     commands: fileEditor.commands,
     onError: (message) => {
@@ -201,12 +281,26 @@ export function App() {
   });
 
   const treeNodes = useMemo(() => buildEditorTree(activeSchema), [activeSchema]);
+  const setScenarioSelectedNodeId = useCallback((
+    nextNodeId: string | undefined | ((previousNodeId: string | undefined) => string | undefined),
+  ) => {
+    updateScenarioSnapshot(activeScenario, (previousSnapshot) => {
+      const resolvedNodeId = typeof nextNodeId === 'function'
+        ? nextNodeId(previousSnapshot.selectedNodeId)
+        : nextNodeId;
+      const { selectedNodeId: _selectedNodeId, ...restSnapshot } = previousSnapshot;
+      return {
+        ...restSnapshot,
+        ...(resolvedNodeId ? { selectedNodeId: resolvedNodeId } : {}),
+      };
+    });
+  }, [activeScenario, updateScenarioSnapshot]);
   const { selectedNodeId, selectTreeNode, selectSchemaNode } = useSelectionSync({
     mode: appMode === 'shell' ? 'shell' : 'scenarios',
     schema: activeSchema,
     treeNodes,
     shellSelectedNodeId: shellSnapshot.selectedNodeId,
-    scenarioSelectedNodeId,
+    scenarioSelectedNodeId: activeScenarioSnapshot.selectedNodeId,
     setShellSelectedNodeId,
     setScenarioSelectedNodeId,
     getNodeByTreeId: getSchemaNodeByTreeId,
@@ -240,6 +334,118 @@ export function App() {
     patchSchemaNodeLogic,
     patchSchemaNodeColumns,
   });
+  const executeScenarioCommand = useCallback(async (commandId: string, payload?: unknown) => {
+    const scenario = activeScenario;
+    const history = scenarioHistoriesRef.current?.[scenario];
+    const storage = scenarioFileStorageRef.current;
+    if (!history) {
+      throw new Error(`Scenario history not initialized: ${scenario}`);
+    }
+
+    const getActiveScenarioSnapshot = (): EditorStateSnapshot => scenarioSnapshots[scenario];
+
+    switch (commandId) {
+      case 'schema.replace': {
+        if (!isRecord(payload) || !('schema' in payload)) {
+          throw new Error('schema.replace expects args: { schema }');
+        }
+        updateScenarioSchema(() => payload.schema as PageSchema);
+        return undefined;
+      }
+      case 'editor.undo': {
+        const previousSnapshot = history.undo();
+        if (!previousSnapshot) {
+          return undefined;
+        }
+        updateScenarioSnapshot(scenario, () => ({
+          ...previousSnapshot,
+          canUndo: history.canUndo(),
+          canRedo: history.canRedo(),
+        }));
+        return undefined;
+      }
+      case 'editor.redo': {
+        const nextSnapshot = history.redo();
+        if (!nextSnapshot) {
+          return undefined;
+        }
+        updateScenarioSnapshot(scenario, () => ({
+          ...nextSnapshot,
+          canUndo: history.canUndo(),
+          canRedo: history.canRedo(),
+        }));
+        return undefined;
+      }
+      case 'file.listSchemas':
+        return storage.list();
+      case 'file.openSchema': {
+        if (!isRecord(payload) || typeof payload.fileId !== 'string' || payload.fileId.trim().length === 0) {
+          throw new Error('file command expects args: { fileId: string }');
+        }
+        const fileId = payload.fileId.trim();
+        const schema = await storage.read(fileId);
+        const previousSnapshot = getActiveScenarioSnapshot();
+        const { selectedNodeId: _selectedNodeId, ...restSnapshot } = previousSnapshot;
+        const nextSnapshotBase: EditorStateSnapshot = {
+          ...restSnapshot,
+          schema,
+          currentFileId: fileId,
+          isDirty: false,
+        };
+        history.push(nextSnapshotBase);
+        updateScenarioSnapshot(scenario, () => ({
+          ...nextSnapshotBase,
+          canUndo: history.canUndo(),
+          canRedo: history.canRedo(),
+        }));
+        return undefined;
+      }
+      case 'file.saveSchema': {
+        const snapshot = getActiveScenarioSnapshot();
+        const fileId = isRecord(payload) && typeof payload.fileId === 'string' && payload.fileId.trim().length > 0
+          ? payload.fileId.trim()
+          : snapshot.currentFileId;
+        if (!fileId) {
+          throw new Error('file.saveSchema requires current file, please open or saveAs first');
+        }
+        await storage.write(fileId, snapshot.schema);
+        updateScenarioSnapshot(scenario, (previousSnapshot) => ({
+          ...previousSnapshot,
+          currentFileId: fileId,
+          isDirty: false,
+        }));
+        return undefined;
+      }
+      case 'file.saveAs': {
+        if (!isRecord(payload) || typeof payload.name !== 'string' || payload.name.trim().length === 0) {
+          throw new Error('file.saveAs expects args: { name: string }');
+        }
+        const snapshot = getActiveScenarioSnapshot();
+        const name = payload.name.trim();
+        const fileId = await storage.saveAs!(name, snapshot.schema);
+        updateScenarioSnapshot(scenario, (previousSnapshot) => ({
+          ...previousSnapshot,
+          currentFileId: fileId,
+          isDirty: false,
+        }));
+        return fileId;
+      }
+      default:
+        throw new Error(`Command "${commandId}" is not supported in scenarios mode`);
+    }
+  }, [activeScenario, scenarioSnapshots, updateScenarioSchema, updateScenarioSnapshot]);
+  const promptFileName = useCallback((defaultName: string) => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    return window.prompt('请输入文件名', defaultName);
+  }, []);
+  const executeBaseCommand = useCallback((commandId: string, payload?: unknown) => {
+    if (appMode === 'shell') {
+      return fileEditor.commands.execute(commandId, payload);
+    }
+    return executeScenarioCommand(commandId, payload);
+  }, [appMode, executeScenarioCommand, fileEditor.commands]);
   const activeSchemaRef = useRef(activeSchema);
   const selectedNodeRef = useRef(selectedNode);
   const selectedNodeIdRef = useRef(selectedNodeId);
@@ -261,6 +467,38 @@ export function App() {
     }
   }, [selectedNode, selectedNodeId]);
 
+  const executePluginCommand = useCallback((commandId: string, payload?: unknown) => {
+    const activeFileId = appMode === 'shell'
+      ? shellSnapshot.currentFileId
+      : activeScenarioSnapshot.currentFileId;
+    const defaultName = activeSchemaRef.current.name?.trim() || 'new-page';
+
+    if (commandId === 'file.saveAs') {
+      const explicitName = isRecord(payload) && typeof payload.name === 'string' && payload.name.trim().length > 0
+        ? payload.name.trim()
+        : promptFileName(defaultName);
+      if (!explicitName) {
+        return Promise.resolve(undefined);
+      }
+      return executeBaseCommand(commandId, { name: explicitName });
+    }
+
+    if (commandId === 'file.saveSchema' && !activeFileId && (!isRecord(payload) || payload.fileId === undefined)) {
+      const explicitName = promptFileName(defaultName);
+      if (!explicitName) {
+        return Promise.resolve(undefined);
+      }
+      return executeBaseCommand('file.saveAs', { name: explicitName });
+    }
+
+    return executeBaseCommand(commandId, payload);
+  }, [
+    activeScenarioSnapshot.currentFileId,
+    appMode,
+    executeBaseCommand,
+    promptFileName,
+    shellSnapshot.currentFileId,
+  ]);
   const pluginContext = useMemo<PluginContext>(() => ({
     document: {
       getSchema: () => activeSchemaRef.current,
@@ -292,7 +530,7 @@ export function App() {
       },
     },
     commands: {
-      execute: (commandId, payload) => fileEditor.commands.execute(commandId, payload),
+      execute: executePluginCommand,
     },
     notifications: {
       info: (message) => antd.message.info(message),
@@ -301,7 +539,7 @@ export function App() {
       error: (message) => antd.message.error(message),
     },
   }), [
-    fileEditor.commands,
+    executePluginCommand,
     handlePatchColumns,
     handlePatchEvents,
     handlePatchLogic,

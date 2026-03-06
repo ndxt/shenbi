@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { AppShell } from './AppShell';
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
@@ -202,6 +202,34 @@ describe('AppShell', () => {
     });
   });
 
+  it('异步激活插件在卸载后 resolve cleanup 也会立即清理', async () => {
+    let resolveCleanup!: (value: (() => void) | undefined) => void;
+    const cleanup = vi.fn();
+
+    const { unmount } = render(
+      <AppShell
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.async-cleanup',
+            name: 'Async Cleanup Plugin',
+            activate: () => new Promise<(() => void) | undefined>((resolve) => {
+              resolveCleanup = resolve;
+            }),
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    unmount();
+    resolveCleanup(cleanup);
+
+    await waitFor(() => {
+      expect(cleanup).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('插件上下文命令总线优先执行插件命令并回退宿主命令', () => {
     const pluginExecute = vi.fn();
     const hostExecute = vi.fn();
@@ -330,7 +358,9 @@ describe('AppShell', () => {
     );
 
     const input = screen.getByLabelText('editor-input');
-    input.focus();
+    act(() => {
+      input.focus();
+    });
     fireEvent.keyDown(input, { key: 's', ctrlKey: true });
 
     expect(pluginExecute).not.toHaveBeenCalled();
@@ -551,6 +581,52 @@ describe('AppShell', () => {
     expect(screen.getByRole('button', { name: 'Save File' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hide Sidebar' })).toBeInTheDocument();
+  });
+
+  it('未聚焦编辑器时 editorFocused 命令不会出现在菜单中', async () => {
+    render(
+      <div>
+        <button type="button">Outside Trigger</button>
+        <AppShell
+          plugins={[
+            defineEditorPlugin({
+              id: 'plugin.focus-aware',
+              name: 'Focus Aware Plugin',
+              contributes: {
+                commands: [
+                  {
+                    id: 'plugin.focus-aware.run',
+                    title: 'Focused Only Command',
+                    when: 'editorFocused',
+                    execute: vi.fn(),
+                  },
+                ],
+                menus: [
+                  {
+                    id: 'plugin.focus-aware.run.menu',
+                    label: 'Focused Only Command',
+                    commandId: 'plugin.focus-aware.run',
+                    target: 'toolbar-start',
+                    order: 90,
+                  },
+                ],
+              },
+            }),
+          ]}
+        >
+          <div>Content</div>
+        </AppShell>
+      </div>,
+    );
+
+    const outsideButton = screen.getByRole('button', { name: 'Outside Trigger' });
+    act(() => {
+      outsideButton.focus();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Focused Only Command' })).not.toBeInTheDocument();
+    });
   });
 
   it('插件声明的菜单可以执行命令', () => {

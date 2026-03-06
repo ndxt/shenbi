@@ -211,6 +211,7 @@ export function CommandPalette({
         <div className="border-b border-border-ide px-3 py-2">
           <input
             autoFocus
+            data-shenbi-command-palette-input="true"
             aria-label="Command Palette Search"
             aria-controls="command-palette-listbox"
             aria-activedescendant={selectedCommandId ? `command-palette-option-${selectedCommandId}` : undefined}
