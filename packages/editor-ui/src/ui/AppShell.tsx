@@ -103,7 +103,7 @@ export function AppShell({
     [plugins],
   );
   const resolvedPluginContext = React.useMemo<PluginContext>(() => {
-    const hostExecute = pluginContext?.commands?.execute ?? pluginContext?.executeCommand;
+    const hostExecute = pluginContext?.commands?.execute;
     let context!: PluginContext;
     const execute = (commandId: string, payload?: unknown) => {
       const pluginCommand = pluginContributes.commands.find((item) => item.id === commandId);
@@ -117,7 +117,6 @@ export function AppShell({
       commands: {
         execute,
       },
-      executeCommand: execute,
     };
     return context;
   }, [pluginContext, pluginContributes.commands]);

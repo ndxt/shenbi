@@ -118,7 +118,7 @@ describe('AppShell', () => {
     const { unmount } = render(
       <AppShell
         pluginContext={{
-          notify: {
+          notifications: {
             info: vi.fn(),
           },
         }}
