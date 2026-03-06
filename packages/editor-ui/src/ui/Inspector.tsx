@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ComponentContract, SchemaNode } from '@shenbi/schema';
+import type { PluginContext } from '@shenbi/editor-plugin-api';
 import {
   resolveInspectorTabs,
   type InspectorTabContribution,
@@ -18,6 +19,7 @@ export interface InspectorProps {
   onPatchEvents?: (patch: Record<string, unknown>) => void;
   onPatchLogic?: (patch: Record<string, unknown>) => void;
   tabs?: InspectorTabContribution[];
+  pluginContext?: PluginContext;
 }
 
 export function Inspector({
@@ -29,6 +31,7 @@ export function Inspector({
   onPatchEvents,
   onPatchLogic,
   tabs,
+  pluginContext,
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>('props');
   const renderContext = useMemo<InspectorTabRenderContext>(() => ({
@@ -39,6 +42,7 @@ export function Inspector({
     ...(onPatchStyle ? { onPatchStyle } : {}),
     ...(onPatchEvents ? { onPatchEvents } : {}),
     ...(onPatchLogic ? { onPatchLogic } : {}),
+    ...(pluginContext ? { pluginContext } : {}),
   }), [
     contract,
     onPatchColumns,
@@ -46,6 +50,7 @@ export function Inspector({
     onPatchLogic,
     onPatchProps,
     onPatchStyle,
+    pluginContext,
     selectedNode,
   ]);
   const resolvedTabs = useMemo(() => resolveInspectorTabs(tabs), [tabs]);

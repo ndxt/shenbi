@@ -1,5 +1,6 @@
 import type React from 'react';
 import type { ComponentContract, SchemaNode } from '@shenbi/schema';
+import type { PluginContext } from './context';
 
 export interface OrderedContribution {
   id: string;
@@ -51,6 +52,7 @@ export interface SidebarTabRenderContext {
   selectedNodeId?: string;
   onSelectNode?: (nodeId: string) => void;
   onInsertComponent?: (componentType: string) => void;
+  pluginContext?: PluginContext;
 }
 
 export interface SidebarTabContribution extends OrderedContribution {
@@ -66,9 +68,17 @@ export interface InspectorTabRenderContext {
   onPatchStyle?: (patch: Record<string, unknown>) => void;
   onPatchEvents?: (patch: Record<string, unknown>) => void;
   onPatchLogic?: (patch: Record<string, unknown>) => void;
+  pluginContext?: PluginContext;
 }
 
 export interface InspectorTabContribution extends OrderedContribution {
   label: string;
   render: (context: InspectorTabRenderContext) => React.ReactNode;
+}
+
+export interface AuxiliaryPanelContribution extends OrderedContribution {
+  label: string;
+  defaultOpen?: boolean;
+  defaultWidth?: number;
+  render: (context: PluginContext) => React.ReactNode;
 }

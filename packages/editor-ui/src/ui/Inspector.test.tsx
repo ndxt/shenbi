@@ -5,17 +5,14 @@ import { Inspector } from './Inspector';
 import type { InspectorTabContribution } from './inspector-tabs';
 
 describe('Inspector', () => {
-  it('默认使用内置 tabs（fallback）', () => {
+  it('默认不内置业务 tabs', () => {
     render(<Inspector />);
 
-    expect(screen.getByText('Props')).toBeInTheDocument();
-    expect(screen.getByText('Style')).toBeInTheDocument();
-    expect(screen.getByText('Events')).toBeInTheDocument();
-    expect(screen.getByText('Logic')).toBeInTheDocument();
-    expect(screen.getByText('Actions')).toBeInTheDocument();
+    expect(screen.queryByText('Props')).toBeNull();
+    expect(screen.queryByText('Style')).toBeNull();
   });
 
-  it('支持按 id 覆盖内置 tab', () => {
+  it('支持渲染插件注入 tab', () => {
     const tabs: InspectorTabContribution[] = [
       {
         id: 'events',
@@ -29,7 +26,6 @@ describe('Inspector', () => {
 
     fireEvent.click(screen.getByText('事件配置'));
     expect(screen.getByText('自定义事件面板')).toBeInTheDocument();
-    expect(screen.queryByText('Events')).toBeNull();
   });
 
   it('支持新增自定义 tab', () => {

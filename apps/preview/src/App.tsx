@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as antd from 'antd';
 import { Rocket } from 'lucide-react';
 import {
@@ -6,6 +6,7 @@ import {
   getBuiltinContract,
   type PageSchema,
 } from '@shenbi/schema';
+import { defineEditorPlugin, type PluginContext } from '@shenbi/editor-plugin-api';
 import {
   antdResolver,
   compileSchema,
@@ -32,11 +33,10 @@ import {
   useSelectionSync,
   type ShellMode,
   type ActivityBarItemContribution,
-  type InspectorTabContribution,
-  type SidebarTabContribution,
 } from '@shenbi/editor-ui';
-import { useEditorAIBridge } from '@shenbi/editor-plugin-ai-chat';
-import { useFileWorkspace } from '@shenbi/editor-plugin-files';
+import { createAIChatPlugin } from '@shenbi/editor-plugin-ai-chat';
+import { createFilesPlugin, useFileWorkspace } from '@shenbi/editor-plugin-files';
+import { createSetterPlugin } from '@shenbi/editor-plugin-setter';
 import {
   buildEditorTree,
   getDefaultSelectedNodeId,
@@ -172,7 +172,7 @@ export function App() {
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : scenarioSchemas[activeScenario];
   const {
     activeFileName,
-    filesSidebarTab,
+    filesSidebarTabOptions,
     isDirty,
     canUndo,
     canRedo,
@@ -223,58 +223,6 @@ export function App() {
     () => (selectedNode ? getBuiltinContract(selectedNode.component) : undefined),
     [selectedNode],
   );
-  const inspectorTabs = useMemo<InspectorTabContribution[]>(() => [
-    {
-      id: 'debug',
-      label: 'Debug',
-      order: 99,
-      render: (context) => (
-        <div className="p-3 text-xs text-text-secondary">
-          Plugin Tab Loaded
-          {context.selectedNode?.id ? (
-            <div className="mt-2 text-[11px]">Selected: {context.selectedNode.id}</div>
-          ) : null}
-        </div>
-      ),
-    },
-  ], []);
-  const sidebarTabs = useMemo<SidebarTabContribution[]>(() => {
-    const tabs: SidebarTabContribution[] = [
-      {
-        id: 'assets',
-        label: 'Assets',
-        order: 99,
-        render: () => (
-          <div className="p-3 text-xs text-text-secondary">
-            Sidebar Plugin Loaded
-          </div>
-        ),
-      },
-    ];
-    if (appMode === 'shell') {
-      if (filesSidebarTab) {
-        tabs.push(filesSidebarTab);
-      }
-    }
-    return tabs;
-  }, [appMode, filesSidebarTab]);
-  const activityBarItems = useMemo<ActivityBarItemContribution[]>(() => [
-    {
-      id: 'rocket',
-      label: 'Rocket',
-      icon: Rocket,
-      order: 99,
-      section: 'main',
-      targetSidebarTabId: 'assets',
-      onClick: () => setActivityMessage('Activity Plugin Triggered'),
-    },
-  ], []);
-  const aiBridge = useEditorAIBridge({
-    schema: activeSchema,
-    ...(selectedNodeId ? { selectedNodeId } : {}),
-    replaceSchema: (schema) => updateActiveSchema(() => schema),
-    getAvailableComponents: () => builtinContracts,
-  });
   const {
     handlePatchProps,
     handlePatchEvents,
@@ -292,6 +240,133 @@ export function App() {
     patchSchemaNodeLogic,
     patchSchemaNodeColumns,
   });
+  const activeSchemaRef = useRef(activeSchema);
+  const selectedNodeRef = useRef(selectedNode);
+  const selectedNodeIdRef = useRef(selectedNodeId);
+  const documentListenersRef = useRef(new Set<(schema: PageSchema) => void>());
+  const selectionListenersRef = useRef(new Set<(nodeId: string | undefined) => void>());
+
+  useEffect(() => {
+    activeSchemaRef.current = activeSchema;
+    for (const listener of documentListenersRef.current) {
+      listener(activeSchema);
+    }
+  }, [activeSchema]);
+
+  useEffect(() => {
+    selectedNodeRef.current = selectedNode;
+    selectedNodeIdRef.current = selectedNodeId;
+    for (const listener of selectionListenersRef.current) {
+      listener(selectedNodeId);
+    }
+  }, [selectedNode, selectedNodeId]);
+
+  const pluginContext = useMemo<PluginContext>(() => ({
+    document: {
+      getSchema: () => activeSchemaRef.current,
+      replaceSchema: (schema) => updateActiveSchema(() => schema),
+      patchSelectedNode: {
+        props: handlePatchProps,
+        columns: handlePatchColumns,
+        style: handlePatchStyle,
+        events: handlePatchEvents,
+        logic: handlePatchLogic,
+      },
+      subscribe: (listener) => {
+        documentListenersRef.current.add(listener);
+        listener(activeSchemaRef.current);
+        return () => {
+          documentListenersRef.current.delete(listener);
+        };
+      },
+    },
+    selection: {
+      getSelectedNode: () => selectedNodeRef.current,
+      getSelectedNodeId: () => selectedNodeIdRef.current,
+      subscribe: (listener) => {
+        selectionListenersRef.current.add(listener);
+        listener(selectedNodeIdRef.current);
+        return () => {
+          selectionListenersRef.current.delete(listener);
+        };
+      },
+    },
+    commands: {
+      execute: (commandId, payload) => fileEditor.commands.execute(commandId, payload),
+    },
+    notifications: {
+      info: (message) => antd.message.info(message),
+      success: (message) => antd.message.success(message),
+      warning: (message) => antd.message.warning(message),
+      error: (message) => antd.message.error(message),
+    },
+  }), [
+    fileEditor.commands,
+    handlePatchColumns,
+    handlePatchEvents,
+    handlePatchLogic,
+    handlePatchProps,
+    handlePatchStyle,
+    updateActiveSchema,
+  ]);
+  const plugins = useMemo(() => {
+    const registeredPlugins = [
+      createSetterPlugin({
+        inspectorTabs: [
+          {
+            id: 'debug',
+            label: 'Debug',
+            order: 99,
+            render: (context) => (
+              <div className="p-3 text-xs text-text-secondary">
+                Plugin Tab Loaded
+                {context.selectedNode?.id ? (
+                  <div className="mt-2 text-[11px]">Selected: {context.selectedNode.id}</div>
+                ) : null}
+              </div>
+            ),
+          },
+        ],
+      }),
+      defineEditorPlugin({
+        id: 'preview.assets',
+        name: 'Preview Assets Plugin',
+        contributes: {
+          activityBarItems: [
+            {
+              id: 'rocket',
+              label: 'Rocket',
+              icon: Rocket,
+              order: 99,
+              section: 'main',
+              targetSidebarTabId: 'assets',
+              onClick: () => setActivityMessage('Activity Plugin Triggered'),
+            },
+          ],
+          sidebarTabs: [
+            {
+              id: 'assets',
+              label: 'Assets',
+              order: 99,
+              render: () => (
+                <div className="p-3 text-xs text-text-secondary">
+                  Sidebar Plugin Loaded
+                </div>
+              ),
+            },
+          ],
+        },
+      }),
+      createAIChatPlugin({
+        defaultWidth: 300,
+        getAvailableComponents: () => builtinContracts,
+      }),
+    ];
+    if (appMode === 'shell' && filesSidebarTabOptions) {
+      registeredPlugins.push(createFilesPlugin(filesSidebarTabOptions));
+    }
+    return registeredPlugins;
+  }, [appMode, filesSidebarTabOptions]);
 
   const handleCanvasSelectNode = (schemaNodeId: string) => {
     selectSchemaNode(schemaNodeId);
@@ -299,27 +374,18 @@ export function App() {
 
   return (
     <AppShell
-      activityBarProps={{
-        items: activityBarItems,
-      }}
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,
         onSelectNode: selectTreeNode,
-        tabs: sidebarTabs,
         ...(selectedNodeId ? { selectedNodeId } : {}),
       }}
       inspectorProps={{
-        onPatchProps: handlePatchProps,
-        onPatchColumns: handlePatchColumns,
-        onPatchStyle: handlePatchStyle,
-        onPatchEvents: handlePatchEvents,
-        onPatchLogic: handlePatchLogic,
-        tabs: inspectorTabs,
         ...(selectedNode ? { selectedNode } : {}),
         ...(selectedContract ? { contract: selectedContract } : {}),
       }}
-      aiPanelProps={{ bridge: aiBridge }}
+      plugins={plugins}
+      pluginContext={pluginContext}
       onCanvasSelectNode={handleCanvasSelectNode}
       toolbarExtra={(
         <div className="flex items-center gap-2">

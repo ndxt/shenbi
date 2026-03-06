@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ComponentContract } from '@shenbi/schema';
-import type { SchemaTreeNode } from '@shenbi/editor-plugin-api';
+import type { PluginContext, SchemaTreeNode } from '@shenbi/editor-plugin-api';
 import {
   resolveSidebarTabs,
   type SidebarTabContribution,
@@ -22,6 +22,7 @@ export interface SidebarProps {
   activeTabId?: string;
   onChangeActiveTab?: (tabId: string) => void;
   tabs?: SidebarTabContribution[];
+  pluginContext?: PluginContext;
 }
 
 export function Sidebar({
@@ -33,6 +34,7 @@ export function Sidebar({
   activeTabId,
   onChangeActiveTab,
   tabs,
+  pluginContext,
 }: SidebarProps) {
   const [innerActiveTab, setInnerActiveTab] = useState<string>('components');
   const renderContext = useMemo<SidebarTabRenderContext>(() => ({
@@ -41,7 +43,8 @@ export function Sidebar({
     ...(selectedNodeId ? { selectedNodeId } : {}),
     ...(onSelectNode ? { onSelectNode } : {}),
     ...(onInsertComponent ? { onInsertComponent } : {}),
-  }), [contracts, onInsertComponent, onSelectNode, selectedNodeId, treeNodes]);
+    ...(pluginContext ? { pluginContext } : {}),
+  }), [contracts, onInsertComponent, onSelectNode, pluginContext, selectedNodeId, treeNodes]);
   const resolvedTabs = useMemo(() => resolveSidebarTabs(tabs), [tabs]);
   const activeTab = activeTabId ?? innerActiveTab;
   const setActiveTab = (nextTabId: string) => {

@@ -12,11 +12,20 @@
 6. `apps/preview` 已直接装配插件包，不再依赖 `editor-ui` 内部业务实现。
 7. `editor-ui` 已收口为宿主层 + 兼容转发层，重复业务测试已移除，保留统一兼容测试。
 8. 根级门禁已收口，`pnpm type-check` 与 `pnpm test` 已通过。
+9. `packages/editor-plugins/files|setter|ai-chat` 已补齐 `createXxxPlugin()` 入口，可按 manifest 独立装配。
+10. `AppShell` 已支持插件激活与通用辅助面板贡献，AI 不再依赖专属宿主 props 才能接入。
+11. `packages/editor-plugins/*` 已切到 `dist` 产物导出，独立构建边界已建立。
+12. `PluginContext` 已形成 `document / selection / commands / notifications` 四类宿主服务面，并保留兼容别名。
+13. `AppShell` 已提供统一命令总线：插件命令优先执行，宿主命令作为兜底回退。
+14. AI bridge 已优先走 `document.replaceSchema`，不再依赖宿主命令是否实现 `schema.replace`。
+15. `apps/preview` 已移除对 `PluginContext` 旧别名字段的注入，当前三类插件均通过新服务面运行。
 
 ### 1.2 当前结论
 
 1. 当前主线已具备继续并行演进插件的稳定基线。
 2. 后续新增能力应优先以插件形式落到 `packages/editor-plugins/*`，而不是回写到 `editor-ui`。
+3. `apps/preview` 已切到插件 manifest 注册链路，业务插件可通过 `plugins` 统一装配。
+4. 当前体系已具备“独立装配插件”的基本能力，但更细的服务抽象与命令分层仍可继续演进。
 
 ## 1.4 已完成的迁移闭环
 
@@ -30,6 +39,7 @@
 8. `editor-ui` 中的 `SetterPanel`、`ActionPanel`、`inspector-tabs` 已改为薄转发层。
 9. `editor-ui` 内重复的 Files / AI / Setter 测试已移除，改为统一兼容转发测试。
 10. `packages/schema` 与 `packages/engine` 的既有门禁问题已顺带修复，根级验证恢复可用。
+11. `apps/preview` 已切到 `pluginContext` 驱动的 AI / Setter / Files 接线，宿主 props 依赖显著减少。
 
 ## 2. 目录规范决策
 

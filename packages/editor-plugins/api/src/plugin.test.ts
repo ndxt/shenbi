@@ -44,6 +44,14 @@ describe('collectPluginContributes', () => {
           commands: [
             { id: 'cmd.save', title: '保存', order: 5, execute },
           ],
+          auxiliaryPanels: [
+            {
+              id: 'assistant',
+              label: 'Assistant',
+              order: 10,
+              render: () => null,
+            },
+          ],
         },
       }),
     ];
@@ -54,5 +62,6 @@ describe('collectPluginContributes', () => {
     expect(resolved.activityBarItems[0]?.label).toBe('搜索');
     expect(resolved.commands).toHaveLength(1);
     expect(resolved.commands[0]?.title).toBe('保存');
+    expect(resolved.auxiliaryPanels.map((item) => item.id)).toEqual(['assistant']);
   });
 });

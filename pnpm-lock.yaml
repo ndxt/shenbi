@@ -106,6 +106,9 @@ importers:
 
   packages/editor-plugins/ai-chat:
     dependencies:
+      '@shenbi/editor-plugin-api':
+        specifier: workspace:*
+        version: link:../api
       '@shenbi/schema':
         specifier: workspace:*
         version: link:../../schema

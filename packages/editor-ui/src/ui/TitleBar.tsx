@@ -11,8 +11,9 @@ interface TitleBarProps {
   onToggleInspector: () => void;
   showConsole: boolean;
   onToggleConsole: () => void;
-  showAIPanel: boolean;
-  onToggleAIPanel: () => void;
+  hasAssistantPanel?: boolean;
+  showAssistantPanel: boolean;
+  onToggleAssistantPanel: () => void;
   isMaximized: boolean;
   onToggleMaximize: () => void;
 }
@@ -26,8 +27,9 @@ export function TitleBar({
   onToggleInspector,
   showConsole,
   onToggleConsole,
-  showAIPanel,
-  onToggleAIPanel,
+  hasAssistantPanel = false,
+  showAssistantPanel,
+  onToggleAssistantPanel,
   isMaximized,
   onToggleMaximize
 }: TitleBarProps) {
@@ -92,8 +94,9 @@ export function TitleBar({
             <PanelRight size={14} />
           </button>
           <button 
-            onClick={onToggleAIPanel}
-            className={`p-1 rounded transition-colors ml-1 ${showAIPanel ? 'bg-bg-activity-bar text-purple-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}`}
+            onClick={onToggleAssistantPanel}
+            disabled={!hasAssistantPanel}
+            className={`p-1 rounded transition-colors ml-1 ${showAssistantPanel ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'} ${!hasAssistantPanel ? 'cursor-not-allowed opacity-40' : ''}`}
             title="Toggle AI Assistant"
           >
             <Sparkles size={14} />

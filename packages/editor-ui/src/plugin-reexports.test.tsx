@@ -14,7 +14,6 @@ import {
   SetterPanel as hostSetterPanel,
   useFileWorkspace as hostUseFileWorkspace,
 } from './index';
-import { resolveInspectorTabs as hostResolveInspectorTabs } from './ui/inspector-tabs';
 import {
   createFilesSidebarTab as pluginCreateFilesSidebarTab,
   FilePanel as pluginFilePanel,
@@ -22,7 +21,6 @@ import {
 } from '@shenbi/editor-plugin-files';
 import {
   ActionPanel as pluginActionPanel,
-  resolveInspectorTabs as pluginResolveInspectorTabs,
   SetterPanel as pluginSetterPanel,
 } from '@shenbi/editor-plugin-setter';
 
@@ -41,6 +39,5 @@ describe('editor-ui plugin compatibility re-exports', () => {
   it('re-exports Setter plugin APIs', () => {
     expect(hostActionPanel).toBe(pluginActionPanel);
     expect(hostSetterPanel).toBe(pluginSetterPanel);
-    expect(hostResolveInspectorTabs).toBe(pluginResolveInspectorTabs);
   });
 });

@@ -2,6 +2,7 @@ import React from 'react';
 import {
   collectPluginContributes,
   type EditorPluginManifest,
+  type PluginContext,
 } from '@shenbi/editor-plugin-api';
 import { ActivityBar } from './ActivityBar';
 import { Sidebar } from './Sidebar';
@@ -27,6 +28,7 @@ interface AppShellProps {
   inspectorProps?: InspectorProps;
   aiPanelProps?: AIPanelProps;
   plugins?: EditorPluginManifest[];
+  pluginContext?: PluginContext;
   onCanvasSelectNode?: (nodeId: string) => void;
 }
 
@@ -48,6 +50,7 @@ export function AppShell({
   inspectorProps,
   aiPanelProps,
   plugins,
+  pluginContext,
   onCanvasSelectNode,
 }: AppShellProps) {
   const [theme, setTheme] = React.useState<ThemeMode>('dark');
@@ -56,15 +59,16 @@ export function AppShell({
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [showInspector, setShowInspector] = React.useState(true);
   const [showConsole, setShowConsole] = React.useState(true);
-  const [showAIPanel, setShowAIPanel] = React.useState(false);
+  const [showAssistantPanel, setShowAssistantPanel] = React.useState(false);
   const [activeSidebarTabId, setActiveSidebarTabId] = React.useState('components');
+  const [activeAuxiliaryPanelId, setActiveAuxiliaryPanelId] = React.useState<string | undefined>(undefined);
 
   const [isMaximized, setIsMaximized] = React.useState(false);
   const [previousPanelState, setPreviousPanelState] = React.useState({
     sidebar: true,
     inspector: true,
     console: true,
-    aiPanel: false,
+    assistantPanel: false,
   });
 
   const toggleMaximize = () => {
@@ -72,19 +76,19 @@ export function AppShell({
       setShowSidebar(previousPanelState.sidebar);
       setShowInspector(previousPanelState.inspector);
       setShowConsole(previousPanelState.console);
-      setShowAIPanel(previousPanelState.aiPanel);
+      setShowAssistantPanel(previousPanelState.assistantPanel);
       setIsMaximized(false);
     } else {
       setPreviousPanelState({
         sidebar: showSidebar,
         inspector: showInspector,
         console: showConsole,
-        aiPanel: showAIPanel,
+        assistantPanel: showAssistantPanel,
       });
       setShowSidebar(false);
       setShowInspector(false);
       setShowConsole(false);
-      setShowAIPanel(false);
+      setShowAssistantPanel(false);
       setIsMaximized(true);
     }
   };
@@ -98,6 +102,25 @@ export function AppShell({
     () => collectPluginContributes(plugins),
     [plugins],
   );
+  const resolvedPluginContext = React.useMemo<PluginContext>(() => {
+    const hostExecute = pluginContext?.commands?.execute ?? pluginContext?.executeCommand;
+    let context!: PluginContext;
+    const execute = (commandId: string, payload?: unknown) => {
+      const pluginCommand = pluginContributes.commands.find((item) => item.id === commandId);
+      if (pluginCommand) {
+        return pluginCommand.execute(context, payload);
+      }
+      return hostExecute?.(commandId, payload);
+    };
+    context = {
+      ...pluginContext,
+      commands: {
+        execute,
+      },
+      executeCommand: execute,
+    };
+    return context;
+  }, [pluginContext, pluginContributes.commands]);
   const activityItems = React.useMemo(
     () => [
       ...pluginContributes.activityBarItems,
@@ -119,10 +142,74 @@ export function AppShell({
     ],
     [inspectorProps?.tabs, pluginContributes.inspectorTabs],
   );
+  const auxiliaryPanels = React.useMemo(() => {
+    const panels = [...pluginContributes.auxiliaryPanels];
+    if (aiPanelProps) {
+      panels.push({
+        id: 'legacy.ai-assistant',
+        label: 'AI Assistant',
+        order: 1000,
+        defaultWidth: 300,
+        render: () => <AIPanel {...aiPanelProps} />,
+      });
+    }
+    return panels.sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
+  }, [aiPanelProps, pluginContributes.auxiliaryPanels]);
+  const activeAuxiliaryPanel = React.useMemo(
+    () => auxiliaryPanels.find((panel) => panel.id === activeAuxiliaryPanelId) ?? auxiliaryPanels[0],
+    [activeAuxiliaryPanelId, auxiliaryPanels],
+  );
+  const assistantPanelSize = activeAuxiliaryPanel?.defaultWidth ?? aiPanelSize;
 
   const toggleTheme = (newTheme: ThemeMode) => {
     setTheme(newTheme);
   };
+
+  React.useEffect(() => {
+    if (auxiliaryPanels.length === 0) {
+      if (showAssistantPanel) {
+        setShowAssistantPanel(false);
+      }
+      if (activeAuxiliaryPanelId !== undefined) {
+        setActiveAuxiliaryPanelId(undefined);
+      }
+      return;
+    }
+    const fallbackPanel = auxiliaryPanels.find((panel) => panel.defaultOpen) ?? auxiliaryPanels[0];
+    const nextPanelId = activeAuxiliaryPanelId ?? fallbackPanel?.id;
+    if (nextPanelId !== activeAuxiliaryPanelId) {
+      setActiveAuxiliaryPanelId(nextPanelId);
+    }
+    if (!showAssistantPanel && auxiliaryPanels.some((panel) => panel.defaultOpen)) {
+      setShowAssistantPanel(true);
+    }
+  }, [activeAuxiliaryPanelId, auxiliaryPanels, showAssistantPanel]);
+
+  React.useEffect(() => {
+    const cleanups: Array<() => void> = [];
+    for (const plugin of plugins ?? []) {
+      if (!plugin.activate) {
+        continue;
+      }
+      const result = plugin.activate(resolvedPluginContext);
+      if (typeof result === 'function') {
+        cleanups.push(result);
+        continue;
+      }
+      if (result && typeof (result as Promise<unknown>).then === 'function') {
+        void (result as Promise<void | (() => void)>).then((cleanup) => {
+          if (typeof cleanup === 'function') {
+            cleanups.push(cleanup);
+          }
+        });
+      }
+    }
+    return () => {
+      for (const cleanup of cleanups) {
+        cleanup();
+      }
+    };
+  }, [plugins, resolvedPluginContext]);
 
   const handleActivitySelectItem = (item: ActivityBarItemContribution) => {
     activityBarProps?.onSelectItem?.(item);
@@ -180,8 +267,15 @@ export function AppShell({
         onToggleInspector={() => { setShowInspector(!showInspector); setIsMaximized(false); }}
         showConsole={showConsole}
         onToggleConsole={() => { setShowConsole(!showConsole); setIsMaximized(false); }}
-        showAIPanel={showAIPanel}
-        onToggleAIPanel={() => { setShowAIPanel(!showAIPanel); setIsMaximized(false); }}
+        hasAssistantPanel={auxiliaryPanels.length > 0}
+        showAssistantPanel={showAssistantPanel}
+        onToggleAssistantPanel={() => {
+          if (auxiliaryPanels.length === 0) {
+            return;
+          }
+          setShowAssistantPanel(!showAssistantPanel);
+          setIsMaximized(false);
+        }}
         isMaximized={isMaximized}
         onToggleMaximize={toggleMaximize}
       />
@@ -201,6 +295,7 @@ export function AppShell({
               tabs={sidebarTabs}
               activeTabId={activeSidebarTabId}
               onChangeActiveTab={setActiveSidebarTabId}
+              pluginContext={resolvedPluginContext}
             />
             <div 
               className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
@@ -242,15 +337,15 @@ export function AppShell({
               )}
             </div>
 
-            {showAIPanel && (
-              <div style={{ width: aiPanelSize }} className="relative shrink-0 flex flex-col h-full border-r border-border-ide">
+            {showAssistantPanel && activeAuxiliaryPanel ? (
+              <div style={{ width: assistantPanelSize }} className="relative shrink-0 flex flex-col h-full border-r border-border-ide">
                 <div 
                   className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
                   onMouseDown={(e) => startAIPanelResize(e, 'horizontal', true)}
                 />
-                <AIPanel {...aiPanelProps} />
+                {activeAuxiliaryPanel.render(resolvedPluginContext)}
               </div>
-            )}
+            ) : null}
 
             {showInspector && (
               <div style={{ width: inspectorSize }} className="relative shrink-0 flex flex-col h-full">
@@ -258,7 +353,11 @@ export function AppShell({
                   className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
                   onMouseDown={(e) => startInspectorResize(e, 'horizontal', true)}
                 />
-                <Inspector {...inspectorProps} tabs={inspectorTabs} />
+                <Inspector
+                  {...inspectorProps}
+                  tabs={inspectorTabs}
+                  pluginContext={resolvedPluginContext}
+                />
               </div>
             )}
           </div>

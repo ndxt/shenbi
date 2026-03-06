@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SidebarTabContribution } from '@shenbi/editor-plugin-api';
 import type { FilePanelFileItem } from './FilePanel';
-import { createFilesSidebarTab } from './sidebar-tab';
+import {
+  createFilesSidebarTab,
+  type CreateFilesSidebarTabOptions,
+} from './sidebar-tab';
 
 export type EditorMode = 'shell' | 'scenarios';
 
@@ -33,6 +36,7 @@ export interface UseFileWorkspaceResult {
   canRedo: boolean;
   fileStatus: string;
   filesSidebarTab: SidebarTabContribution | undefined;
+  filesSidebarTabOptions: CreateFilesSidebarTabOptions | undefined;
   handleSave: () => void;
   handleUndo: () => void;
   handleRedo: () => void;
@@ -255,6 +259,20 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       onRefresh: refreshFiles,
     });
   }, [activeFileId, fileStatus, handleOpenFile, handleSave, handleSaveAs, mode, refreshFiles, storedFiles]);
+  const filesSidebarTabOptions = useMemo<CreateFilesSidebarTabOptions | undefined>(() => {
+    if (mode !== 'shell') {
+      return undefined;
+    }
+    return {
+      files: storedFiles,
+      activeFileId,
+      status: fileStatus,
+      onOpenFile: handleOpenFile,
+      onSaveFile: handleSave,
+      onSaveAsFile: handleSaveAs,
+      onRefresh: refreshFiles,
+    };
+  }, [activeFileId, fileStatus, handleOpenFile, handleSave, handleSaveAs, mode, refreshFiles, storedFiles]);
 
   return {
     activeFileId,
@@ -264,6 +282,7 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
     canRedo,
     fileStatus,
     filesSidebarTab,
+    filesSidebarTabOptions,
     handleSave,
     handleUndo,
     handleRedo,

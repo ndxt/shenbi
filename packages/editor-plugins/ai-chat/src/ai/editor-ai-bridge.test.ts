@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ComponentContract, PageSchema } from '@shenbi/schema';
-import { createEditorAIBridge, type EditorBridgeSnapshot } from './editor-ai-bridge';
+import { createEditorAIBridge, createEditorAIBridgeFromPluginContext, type EditorBridgeSnapshot } from './editor-ai-bridge';
 
 function createSchema(name: string): PageSchema {
   return {
@@ -87,5 +87,52 @@ describe('createEditorAIBridge', () => {
     expect(bridge.getAvailableComponents()).toBe(contracts);
     expect(listener).toHaveBeenCalledWith(snapshot);
     expect(typeof unsubscribe).toBe('function');
+  });
+});
+
+describe('createEditorAIBridgeFromPluginContext', () => {
+  it('prefers document.replaceSchema over command execution', async () => {
+    const replaceSchema = vi.fn();
+    const execute = vi.fn();
+    const bridge = createEditorAIBridgeFromPluginContext({
+      context: {
+        document: {
+          getSchema: () => createSchema('initial'),
+          replaceSchema,
+        },
+        commands: {
+          execute,
+        },
+      },
+      getAvailableComponents: () => [],
+    });
+
+    const result = await bridge.execute('schema.replace', {
+      schema: createSchema('next'),
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(replaceSchema).toHaveBeenCalledWith(createSchema('next'));
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('falls back to command execution when document service is unavailable', async () => {
+    const execute = vi.fn();
+    const bridge = createEditorAIBridgeFromPluginContext({
+      context: {
+        commands: {
+          execute,
+        },
+        getSchema: () => createSchema('initial'),
+      },
+      getAvailableComponents: () => [],
+    });
+
+    const result = await bridge.execute('schema.replace', {
+      schema: createSchema('next'),
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(execute).toHaveBeenCalledWith('schema.replace', { schema: createSchema('next') });
   });
 });

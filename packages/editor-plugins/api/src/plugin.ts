@@ -1,10 +1,11 @@
-import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import {
+  type AuxiliaryPanelContribution,
   mergeContributions,
   type ActivityBarItemContribution,
   type InspectorTabContribution,
   type SidebarTabContribution,
 } from './contributions';
+import type { PluginContext } from './context';
 
 export interface PluginCommandContribution {
   id: string;
@@ -25,28 +26,9 @@ export interface PluginContributes {
   activityBarItems?: ActivityBarItemContribution[];
   sidebarTabs?: SidebarTabContribution[];
   inspectorTabs?: InspectorTabContribution[];
+  auxiliaryPanels?: AuxiliaryPanelContribution[];
   commands?: PluginCommandContribution[];
   shortcuts?: PluginShortcutContribution[];
-}
-
-export interface PluginNotifications {
-  info?: (message: string) => void;
-  success?: (message: string) => void;
-  warning?: (message: string) => void;
-  error?: (message: string) => void;
-}
-
-export interface PluginContext {
-  getSchema?: () => PageSchema;
-  replaceSchema?: (schema: PageSchema) => void;
-  getSelectedNode?: () => SchemaNode | undefined;
-  patchNodeProps?: (patch: Record<string, unknown>) => void;
-  patchNodeColumns?: (columns: unknown[]) => void;
-  patchNodeStyle?: (patch: Record<string, unknown>) => void;
-  patchNodeEvents?: (patch: Record<string, unknown>) => void;
-  patchNodeLogic?: (patch: Record<string, unknown>) => void;
-  executeCommand?: (commandId: string, payload?: unknown) => void | Promise<void>;
-  notify?: PluginNotifications;
 }
 
 export interface EditorPluginManifest {
@@ -63,6 +45,7 @@ export interface ResolvedPluginContributes {
   activityBarItems: ActivityBarItemContribution[];
   sidebarTabs: SidebarTabContribution[];
   inspectorTabs: InspectorTabContribution[];
+  auxiliaryPanels: AuxiliaryPanelContribution[];
   commands: PluginCommandContribution[];
   shortcuts: PluginShortcutContribution[];
 }
@@ -77,6 +60,7 @@ export function collectPluginContributes(
   const activityBarItems: ActivityBarItemContribution[] = [];
   const sidebarTabs: SidebarTabContribution[] = [];
   const inspectorTabs: InspectorTabContribution[] = [];
+  const auxiliaryPanels: AuxiliaryPanelContribution[] = [];
   const commands: PluginCommandContribution[] = [];
   const shortcuts: PluginShortcutContribution[] = [];
 
@@ -88,6 +72,7 @@ export function collectPluginContributes(
     activityBarItems.push(...(contributes.activityBarItems ?? []));
     sidebarTabs.push(...(contributes.sidebarTabs ?? []));
     inspectorTabs.push(...(contributes.inspectorTabs ?? []));
+    auxiliaryPanels.push(...(contributes.auxiliaryPanels ?? []));
     commands.push(...(contributes.commands ?? []));
     shortcuts.push(...(contributes.shortcuts ?? []));
   }
@@ -96,6 +81,7 @@ export function collectPluginContributes(
     activityBarItems: mergeContributions([], activityBarItems),
     sidebarTabs: mergeContributions([], sidebarTabs),
     inspectorTabs: mergeContributions([], inspectorTabs),
+    auxiliaryPanels: mergeContributions([], auxiliaryPanels),
     commands: mergeContributions([], commands),
     shortcuts: mergeContributions([], shortcuts),
   };

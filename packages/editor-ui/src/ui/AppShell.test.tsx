@@ -18,7 +18,6 @@ describe('AppShell', () => {
 
     // Verify regions by presence of characteristic text or roles
     expect(screen.getByText('Components')).toBeInTheDocument();
-    expect(screen.getByText('Props')).toBeInTheDocument();
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('Run')).toBeInTheDocument();
     expect(screen.getByText('Editor UI Package')).toBeInTheDocument();
@@ -83,6 +82,14 @@ describe('AppShell', () => {
               render: () => <div>Plugin Debug Panel</div>,
             },
           ],
+          auxiliaryPanels: [
+            {
+              id: 'plugin-ai',
+              label: 'PluginAI',
+              order: 99,
+              render: () => <div>Plugin AI Panel</div>,
+            },
+          ],
         },
       }),
     ];
@@ -100,5 +107,92 @@ describe('AppShell', () => {
     expect(screen.getByText('Plugin Debug Panel')).toBeInTheDocument();
 
     expect(screen.getByLabelText('Demo')).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle('Toggle AI Assistant'));
+    expect(screen.getByText('Plugin AI Panel')).toBeInTheDocument();
+  });
+
+  it('会在挂载时激活插件并在卸载时清理', () => {
+    const cleanup = vi.fn();
+    const activate = vi.fn(() => cleanup);
+
+    const { unmount } = render(
+      <AppShell
+        pluginContext={{
+          notify: {
+            info: vi.fn(),
+          },
+        }}
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.activate',
+            name: 'Activate Plugin',
+            activate,
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    expect(activate).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it('插件上下文命令总线优先执行插件命令并回退宿主命令', () => {
+    const pluginExecute = vi.fn();
+    const hostExecute = vi.fn();
+
+    render(
+      <AppShell
+        pluginContext={{
+          commands: {
+            execute: hostExecute,
+          },
+        }}
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.commands',
+            name: 'Commands Plugin',
+            contributes: {
+              commands: [
+                {
+                  id: 'plugin.run',
+                  title: 'Plugin Run',
+                  execute: pluginExecute,
+                },
+              ],
+              sidebarTabs: [
+                {
+                  id: 'command-tab',
+                  label: 'CommandTab',
+                  order: 99,
+                  render: ({ pluginContext }) => (
+                    <div>
+                      <button type="button" onClick={() => void pluginContext?.commands?.execute('plugin.run')}>
+                        Run Plugin Command
+                      </button>
+                      <button type="button" onClick={() => void pluginContext?.commands?.execute('host.run')}>
+                        Run Host Command
+                      </button>
+                    </div>
+                  ),
+                },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByText('CommandTab'));
+    fireEvent.click(screen.getByRole('button', { name: 'Run Plugin Command' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run Host Command' }));
+
+    expect(pluginExecute).toHaveBeenCalledTimes(1);
+    expect(hostExecute).toHaveBeenCalledTimes(1);
+    expect(hostExecute).toHaveBeenCalledWith('host.run', undefined);
   });
 });

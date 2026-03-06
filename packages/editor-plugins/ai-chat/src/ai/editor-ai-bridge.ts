@@ -1,4 +1,11 @@
 import type { ComponentContract, PageSchema } from '@shenbi/schema';
+import {
+  executePluginCommand,
+  getPluginSchema,
+  getPluginSelectedNodeId,
+  replacePluginSchema,
+  type PluginContext,
+} from '@shenbi/editor-plugin-api';
 
 export interface EditorBridgeSnapshot {
   schema: PageSchema;
@@ -24,6 +31,12 @@ interface EditorAIBridgeOptions {
   replaceSchema: (schema: PageSchema) => void;
   getAvailableComponents: () => ComponentContract[];
   subscribe: (listener: (snapshot: EditorBridgeSnapshot) => void) => () => void;
+}
+
+export interface EditorAIBridgeFromPluginContextOptions {
+  context: PluginContext;
+  getAvailableComponents: () => ComponentContract[];
+  subscribe?: (listener: (snapshot: EditorBridgeSnapshot) => void) => () => void;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,4 +103,55 @@ export function createEditorAIBridge(options: EditorAIBridgeOptions): EditorAIBr
       return options.subscribe(listener);
     },
   };
+}
+
+export function createEditorAIBridgeFromPluginContext(
+  options: EditorAIBridgeFromPluginContextOptions,
+): EditorAIBridge {
+  const getSnapshot = (): EditorBridgeSnapshot => {
+    const selectedNodeId = getPluginSelectedNodeId(options.context);
+    return {
+      schema: getPluginSchema(options.context) ?? { id: 'plugin-empty-page', body: [] },
+      ...(selectedNodeId ? { selectedNodeId } : {}),
+    };
+  };
+
+  const subscribe = options.subscribe ?? ((listener: (snapshot: EditorBridgeSnapshot) => void) => {
+    const unsubs: Array<() => void> = [];
+    const notify = () => listener(getSnapshot());
+
+    const unsubDocument = options.context.document?.subscribe?.(() => {
+      notify();
+    });
+    if (unsubDocument) {
+      unsubs.push(unsubDocument);
+    }
+
+    const unsubSelection = options.context.selection?.subscribe?.(() => {
+      notify();
+    });
+    if (unsubSelection) {
+      unsubs.push(unsubSelection);
+    }
+
+    notify();
+    return () => {
+      for (const unsub of unsubs) {
+        unsub();
+      }
+    };
+  });
+
+  return createEditorAIBridge({
+    getSnapshot,
+    replaceSchema: (schema) => {
+      if (options.context.document?.replaceSchema || options.context.replaceSchema) {
+        replacePluginSchema(options.context, schema);
+        return;
+      }
+      void executePluginCommand(options.context, 'schema.replace', { schema });
+    },
+    getAvailableComponents: options.getAvailableComponents,
+    subscribe,
+  });
 }
