@@ -12,7 +12,7 @@ import { validateRunRequest } from './validate.ts';
 import { handleError } from '../middleware/error-handler.ts';
 import { logRequest, logger } from '../adapters/logger.ts';
 import type { AgentRuntime } from '../runtime/types.ts';
-import type { RunRequest } from '../adapters/contracts.ts';
+import type { RunRequest } from '@shenbi/ai-contracts';
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 

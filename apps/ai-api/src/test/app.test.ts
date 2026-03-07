@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createApp } from '../app.ts';
 import type { AgentRuntime } from '../runtime/types.ts';
-import type { AgentEvent, RunMetadata } from '../adapters/contracts.ts';
+import type { AgentEvent, RunMetadata } from '@shenbi/ai-contracts';
 
 // ---------------------------------------------------------------------------
 // Helpers

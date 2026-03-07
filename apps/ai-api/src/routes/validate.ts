@@ -2,7 +2,7 @@
  * RunRequest 校验 — 首版必须校验 prompt、context.schemaSummary、context.componentSummary
  */
 import { ValidationError } from '../adapters/errors.ts';
-import type { RunRequest } from '../adapters/contracts.ts';
+import type { RunRequest } from '@shenbi/ai-contracts';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);

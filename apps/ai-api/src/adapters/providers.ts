@@ -1,7 +1,7 @@
 /**
  * 模型列表 — 首版硬编码，预留从 ai-service 动态加载的装配点
  */
-import type { ModelInfo } from './contracts.ts';
+import type { ModelInfo } from '@shenbi/ai-contracts';
 
 export const SUPPORTED_MODELS: ModelInfo[] = [
   {

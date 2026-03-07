@@ -1,16 +1,11 @@
-/**
- * 共享契约类型 — 与 ai-plan.md 冻结基线逐字保持一致
- * SchemaNode / PageSchema 从 @shenbi/schema 导入，不自行定义
- * API Host 只负责透传和序列化，不新增宿主私有字段
- */
-import type { SchemaNode, PageSchema } from '@shenbi/schema';
+import type { PageSchema, SchemaNode } from '@shenbi/schema';
 
 export interface RunRequest {
   prompt: string;
-  plannerModel?: string | undefined;
-  blockModel?: string | undefined;
-  conversationId?: string | undefined;
-  selectedNodeId?: string | undefined;
+  plannerModel?: string;
+  blockModel?: string;
+  conversationId?: string;
+  selectedNodeId?: string;
   context: {
     schemaSummary: string;
     componentSummary: string;
@@ -19,12 +14,12 @@ export interface RunRequest {
 
 export interface RunMetadata {
   sessionId: string;
-  conversationId?: string | undefined;
-  plannerModel?: string | undefined;
-  blockModel?: string | undefined;
-  tokensUsed?: number | undefined;
-  durationMs?: number | undefined;
-  repairs?: Array<{ message: string; path?: string | undefined }> | undefined;
+  conversationId?: string;
+  plannerModel?: string;
+  blockModel?: string;
+  tokensUsed?: number;
+  durationMs?: number;
+  repairs?: Array<{ message: string; path?: string }>;
 }
 
 export interface PagePlan {

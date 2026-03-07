@@ -2,7 +2,7 @@
  * Fake Runtime — 首版用于 SSE 契约验证，不调用真实 LLM
  * 二期：packages/ai-agents 实现 AgentRuntime 接口后在 app.ts 替换
  */
-import type { AgentEvent, RunMetadata, RunRequest } from '../adapters/contracts.ts';
+import type { AgentEvent, RunMetadata, RunRequest } from '@shenbi/ai-contracts';
 import type { AgentRuntime } from './types.ts';
 
 function makeMeta(sessionId: string, req: RunRequest, durationMs: number): RunMetadata {

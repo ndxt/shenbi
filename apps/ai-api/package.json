@@ -8,10 +8,11 @@
     "build": "tsc -p tsconfig.json --noEmit",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
-    "start": "node dist/server.js"
+    "start": "tsx src/server.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
+    "@shenbi/ai-contracts": "workspace:*",
     "@shenbi/schema": "workspace:*",
     "hono": "^4.7.4"
   },
