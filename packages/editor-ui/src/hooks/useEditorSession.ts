@@ -47,14 +47,18 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function useEditorSession(options: UseEditorSessionOptions): UseEditorSessionResult {
+  const { mode, initialShellSchema, updateScenarioSchema, onError, fileStorage, createEditorInstance } = options;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
   const editorRef = useRef<EditorSessionEditor | null>(null);
   if (!editorRef.current) {
-    if (options.createEditorInstance) {
-      editorRef.current = options.createEditorInstance();
+    if (createEditorInstance) {
+      editorRef.current = createEditorInstance();
     } else {
       editorRef.current = createEditor({
-        initialSchema: options.initialShellSchema,
-        fileStorage: options.fileStorage ?? new LocalFileStorageAdapter(),
+        initialSchema: initialShellSchema,
+        fileStorage: fileStorage ?? new LocalFileStorageAdapter(),
       });
     }
   }
@@ -79,20 +83,20 @@ export function useEditorSession(options: UseEditorSessionOptions): UseEditorSes
 
   const executeShellNodeCommand = useCallback((commandId: string, args: Record<string, unknown>) => {
     void editor.commands.execute(commandId, args).catch((error) => {
-      options.onError?.(`节点更新失败: ${getErrorMessage(error)}`);
+      onErrorRef.current?.(`节点更新失败: ${getErrorMessage(error)}`);
     });
-  }, [editor, options]);
+  }, [editor]);
 
   const updateActiveSchema = useCallback((updater: (schema: PageSchema) => PageSchema) => {
-    if (options.mode === 'shell') {
+    if (mode === 'shell') {
       const nextSchema = updater(editor.state.getSchema());
       void editor.commands.execute('schema.replace', { schema: nextSchema }).catch((error) => {
-        options.onError?.(`Schema 更新失败: ${getErrorMessage(error)}`);
+        onErrorRef.current?.(`Schema 更新失败: ${getErrorMessage(error)}`);
       });
       return;
     }
-    options.updateScenarioSchema(updater);
-  }, [editor, options]);
+    updateScenarioSchema(updater);
+  }, [editor, mode, updateScenarioSchema]);
 
   return {
     editor,

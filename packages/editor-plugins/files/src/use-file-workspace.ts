@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SidebarTabContribution } from '@shenbi/editor-plugin-api';
 import type { FilePanelFileItem } from './FilePanel';
 import {
@@ -87,14 +87,30 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
   const canUndo = mode === 'shell' ? snapshot.canUndo : false;
   const canRedo = mode === 'shell' ? snapshot.canRedo : false;
 
+  // Stable refs for frequently-changing callbacks/values to break dependency cascades
+  const commandsRef = useRef(commands);
+  commandsRef.current = commands;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+  const promptFileNameRef = useRef(promptFileName);
+  promptFileNameRef.current = promptFileName;
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
+  const activeFileIdRef = useRef(activeFileId);
+  activeFileIdRef.current = activeFileId;
+  const canUndoRef = useRef(canUndo);
+  canUndoRef.current = canUndo;
+  const canRedoRef = useRef(canRedo);
+  canRedoRef.current = canRedo;
+
   const reportError = useCallback((prefix: string, error: unknown) => {
     const message = `${prefix}: ${getErrorMessage(error)}`;
     setFileStatus(message);
-    onError?.(message);
-  }, [onError]);
+    onErrorRef.current?.(message);
+  }, []);
 
   const refreshFiles = useCallback(() => {
-    void commands.execute('file.listSchemas')
+    void commandsRef.current.execute('file.listSchemas')
       .then((listResult) => {
         const files = normalizeFileMetadataList(listResult);
         const sorted = [...files].sort((left, right) => right.updatedAt - left.updatedAt);
@@ -103,16 +119,16 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       .catch((error) => {
         reportError('文件列表加载失败', error);
       });
-  }, [commands, reportError]);
+  }, [reportError]);
 
   const requestSaveAs = useCallback(() => {
-    const defaultName = snapshot.schemaName?.trim() || 'new-page';
-    const nextName = promptFileName?.(defaultName) ?? null;
+    const defaultName = snapshotRef.current.schemaName?.trim() || 'new-page';
+    const nextName = promptFileNameRef.current?.(defaultName) ?? null;
     if (!nextName || !nextName.trim()) {
       return;
     }
 
-    void commands.execute('file.saveAs', { name: nextName.trim() })
+    void commandsRef.current.execute('file.saveAs', { name: nextName.trim() })
       .then((saveAsResult) => {
         const nextFileId = typeof saveAsResult === 'string' ? saveAsResult : nextName.trim();
         setFileStatus(`已保存: ${nextFileId}`);
@@ -121,10 +137,10 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       .catch((error) => {
         reportError('另存失败', error);
       });
-  }, [commands, promptFileName, refreshFiles, reportError, snapshot.schemaName]);
+  }, [refreshFiles, reportError]);
 
   const handleOpenFile = useCallback((fileId: string) => {
-    void commands.execute('file.openSchema', { fileId })
+    void commandsRef.current.execute('file.openSchema', { fileId })
       .then(() => {
         setFileStatus(`已打开: ${fileId}`);
         refreshFiles();
@@ -132,44 +148,44 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       .catch((error) => {
         reportError('打开失败', error);
       });
-  }, [commands, refreshFiles, reportError]);
+  }, [refreshFiles, reportError]);
 
   const handleSave = useCallback(() => {
-    if (!activeFileId) {
+    if (!activeFileIdRef.current) {
       requestSaveAs();
       return;
     }
-    void commands.execute('file.saveSchema')
+    void commandsRef.current.execute('file.saveSchema')
       .then(() => {
-        setFileStatus(`已保存: ${activeFileId}`);
+        setFileStatus(`已保存: ${activeFileIdRef.current}`);
         refreshFiles();
       })
       .catch((error) => {
         reportError('保存失败', error);
       });
-  }, [activeFileId, commands, refreshFiles, reportError, requestSaveAs]);
+  }, [refreshFiles, reportError, requestSaveAs]);
 
   const handleSaveAs = useCallback(() => {
     requestSaveAs();
   }, [requestSaveAs]);
 
   const handleUndo = useCallback(() => {
-    if (!canUndo) {
+    if (!canUndoRef.current) {
       return;
     }
-    void commands.execute('editor.undo').catch((error) => {
+    void commandsRef.current.execute('editor.undo').catch((error) => {
       reportError('撤销失败', error);
     });
-  }, [canUndo, commands, reportError]);
+  }, [reportError]);
 
   const handleRedo = useCallback(() => {
-    if (!canRedo) {
+    if (!canRedoRef.current) {
       return;
     }
-    void commands.execute('editor.redo').catch((error) => {
+    void commandsRef.current.execute('editor.redo').catch((error) => {
       reportError('重做失败', error);
     });
-  }, [canRedo, commands, reportError]);
+  }, [reportError]);
 
   useEffect(() => {
     if (mode !== 'shell') {
@@ -201,7 +217,7 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       }
 
       if (key === 'z' && !event.shiftKey) {
-        if (!canUndo) {
+        if (!canUndoRef.current) {
           return;
         }
         event.preventDefault();
@@ -210,7 +226,7 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       }
 
       if ((key === 'z' && event.shiftKey) || key === 'y') {
-        if (!canRedo) {
+        if (!canRedoRef.current) {
           return;
         }
         event.preventDefault();
@@ -222,7 +238,7 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [canRedo, canUndo, handleRedo, handleSave, handleUndo, mode]);
+  }, [handleRedo, handleSave, handleUndo, mode]);
 
   useEffect(() => {
     if (mode !== 'shell' || !isDirty) {
@@ -289,3 +305,4 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
     refreshFiles,
   };
 }
+

@@ -112,27 +112,27 @@ export function AppShell({
     assistantPanel: false,
   });
 
-  const toggleMaximize = () => {
-    if (isMaximized) {
-      setShowSidebar(previousPanelState.sidebar);
-      setShowInspector(previousPanelState.inspector);
-      setShowConsole(previousPanelState.console);
-      setShowAssistantPanel(previousPanelState.assistantPanel);
-      setIsMaximized(false);
-    } else {
-      setPreviousPanelState({
-        sidebar: showSidebar,
-        inspector: showInspector,
-        console: showConsole,
-        assistantPanel: showAssistantPanel,
-      });
-      setShowSidebar(false);
-      setShowInspector(false);
-      setShowConsole(false);
-      setShowAssistantPanel(false);
-      setIsMaximized(true);
-    }
-  };
+  const toggleMaximize = React.useCallback(() => {
+    setIsMaximized((prevMaximized) => {
+      if (prevMaximized) {
+        // Restore previous panel state
+        setPreviousPanelState((prev) => {
+          setShowSidebar(prev.sidebar);
+          setShowInspector(prev.inspector);
+          setShowConsole(prev.console);
+          setShowAssistantPanel(prev.assistantPanel);
+          return prev;
+        });
+        return false;
+      }
+      // Save current panel state before maximizing
+      setShowSidebar((prev) => { setPreviousPanelState((s) => ({ ...s, sidebar: prev })); return false; });
+      setShowInspector((prev) => { setPreviousPanelState((s) => ({ ...s, inspector: prev })); return false; });
+      setShowConsole((prev) => { setPreviousPanelState((s) => ({ ...s, console: prev })); return false; });
+      setShowAssistantPanel((prev) => { setPreviousPanelState((s) => ({ ...s, assistantPanel: prev })); return false; });
+      return true;
+    });
+  }, []);
 
   // Panel Size State
   const { size: sidebarSize, startResize: startSidebarResize } = useResize(256, 160, 600);
@@ -414,23 +414,16 @@ export function AppShell({
 
   React.useEffect(() => {
     if (auxiliaryPanels.length === 0) {
-      if (showAssistantPanel) {
-        setShowAssistantPanel(false);
-      }
-      if (activeAuxiliaryPanelId !== undefined) {
-        setActiveAuxiliaryPanelId(undefined);
-      }
+      setShowAssistantPanel(false);
+      setActiveAuxiliaryPanelId(undefined);
       return;
     }
     const fallbackPanel = auxiliaryPanels.find((panel) => panel.defaultOpen) ?? auxiliaryPanels[0];
-    const nextPanelId = activeAuxiliaryPanelId ?? fallbackPanel?.id;
-    if (nextPanelId !== activeAuxiliaryPanelId) {
-      setActiveAuxiliaryPanelId(nextPanelId);
+    setActiveAuxiliaryPanelId((prev) => prev ?? fallbackPanel?.id);
+    if (auxiliaryPanels.some((panel) => panel.defaultOpen)) {
+      setShowAssistantPanel((prev) => prev || true);
     }
-    if (!showAssistantPanel && auxiliaryPanels.some((panel) => panel.defaultOpen)) {
-      setShowAssistantPanel(true);
-    }
-  }, [activeAuxiliaryPanelId, auxiliaryPanels, showAssistantPanel]);
+  }, [auxiliaryPanels]);
 
   React.useEffect(() => {
     const cleanups: EditorPluginCleanup[] = [];
