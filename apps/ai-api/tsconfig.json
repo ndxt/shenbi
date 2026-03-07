@@ -1,8 +1,8 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "lib": ["ES2022"],
@@ -10,6 +10,7 @@
     "jsx": "react-jsx",
     "baseUrl": "../..",
     "paths": {
+      "@shenbi/ai-agents": ["packages/ai-agents/src/index.ts"],
       "@shenbi/ai-contracts": ["packages/ai-contracts/src/index.ts"],
       "@shenbi/schema": ["packages/schema/types/index.ts"]
     }

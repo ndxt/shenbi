@@ -1,10 +1,9 @@
 /**
  * Hono App 装配 — 挂载路由、中间件
  *
- * 装配点：
- * - 当前使用 fakeRuntime
- * - 二期：import { agentRuntime } from 'packages/ai-agents' 替换 fakeRuntime
- *   并通过 AgentRuntimeDeps 注入 ai-service 能力（llm / tools / memory）
+ * 默认装配：
+ * - 当前通过 @shenbi/ai-agents + fake llm/tools 生成真实 AgentEvent 流
+ * - 后续只需要替换 runtime 装配中的 llm/tools/memory，不需要改路由层
  */
 import { Hono } from 'hono';
 import { requestIdMiddleware } from './middleware/request-id.ts';
@@ -17,7 +16,7 @@ import { fakeRuntime } from './runtime/fake-runtime.ts';
 import type { AgentRuntime } from './runtime/types.ts';
 
 export interface AppOptions {
-  /** 二期替换为 packages/ai-agents 实现 */
+  /** 测试时可注入自定义 runtime */
   runtime?: AgentRuntime;
   /** 注入独立限流 store，用于测试隔离 */
   rateLimitStore?: Map<string, { count: number; resetAt: number }>;

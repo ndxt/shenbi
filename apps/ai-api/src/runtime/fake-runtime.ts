@@ -1,87 +1,127 @@
 /**
- * Fake Runtime — 首版用于 SSE 契约验证，不调用真实 LLM
- * 二期：packages/ai-agents 实现 AgentRuntime 接口后在 app.ts 替换
+ * Default runtime assembly — API Host 通过 @shenbi/ai-agents 产出真实事件流，
+ * 底层暂时仍使用 fake llm/tools，后续替换为 ai-service/provider 装配即可。
  */
-import type { AgentEvent, RunMetadata, RunRequest } from '@shenbi/ai-contracts';
+import {
+  createInMemoryAgentMemoryStore,
+  createToolRegistry,
+  runAgent,
+  runAgentStream,
+  type AgentRuntimeDeps,
+  type AssembleSchemaInput,
+  type GenerateBlockInput,
+  type GenerateBlockResult,
+  type PagePlan,
+  type PlanPageInput,
+  type RunMetadata,
+  type RunRequest,
+} from '@shenbi/ai-agents';
+import type { AgentEvent } from '@shenbi/ai-contracts';
+import type { PageSchema } from '@shenbi/schema';
 import type { AgentRuntime } from './types.ts';
 
-function makeMeta(sessionId: string, req: RunRequest, durationMs: number): RunMetadata {
-  const meta: RunMetadata = {
-    sessionId,
-    plannerModel: req.plannerModel ?? 'fake-planner',
-    blockModel: req.blockModel ?? 'fake-block',
-    tokensUsed: 42,
-    durationMs,
+const memory = createInMemoryAgentMemoryStore();
+
+function createPagePlan(input: PlanPageInput): PagePlan {
+  const requestedType = input.context.componentSummary.includes('DataTable') ? 'DataTable' : 'HeroSection';
+  return {
+    pageTitle: 'Fake Page',
+    blocks: [
+      {
+        id: 'block-1',
+        type: requestedType,
+        description: `根据提示生成首页区块: ${input.request.prompt}`,
+        components: [requestedType],
+        priority: 1,
+        complexity: 'simple',
+      },
+    ],
   };
-  if (req.conversationId !== undefined) {
-    meta.conversationId = req.conversationId;
-  }
-  return meta;
 }
 
-function makeEvents(sessionId: string, req: RunRequest): AgentEvent[] {
-  return [
-    { type: 'run:start', data: { sessionId, ...(req.conversationId ? { conversationId: req.conversationId } : {}) } },
-    { type: 'message:start', data: { role: 'assistant' } },
-    { type: 'message:delta', data: { text: `[Fake] 正在根据提示生成页面：${req.prompt}` } },
-    {
-      type: 'plan',
-      data: {
-        pageTitle: 'Fake Page',
-        blocks: [
-          {
-            id: 'block-1',
-            type: 'HeroSection',
-            description: '主标题区块（fake）',
-            components: ['HeroSection'],
-            priority: 1,
-            complexity: 'simple',
-          },
-        ],
+async function generateBlock(input: GenerateBlockInput): Promise<GenerateBlockResult> {
+  return {
+    blockId: input.block.id,
+    node: {
+      component: input.block.components[0] ?? input.block.type,
+      props: {
+        title: input.request.prompt,
+        description: input.block.description,
+        selectedNodeId: input.context.selectedNodeId,
       },
     },
-    {
-      type: 'schema:block',
-      data: {
-        blockId: 'block-1',
-        node: { component: 'HeroSection', props: { title: 'Fake Title' } },
+    summary: `Generated ${input.block.type}`,
+  };
+}
+
+async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
+  return {
+    id: 'fake-page',
+    name: input.plan.pageTitle,
+    body: input.blocks.map((block) => block.node),
+  };
+}
+
+function createRuntimeDeps(): AgentRuntimeDeps {
+  return {
+    llm: {
+      async chat() {
+        return { text: 'Fake chat response' };
+      },
+      async *streamChat(request: unknown) {
+        const prompt = typeof request === 'object' && request && 'prompt' in request
+          ? String((request as { prompt: unknown }).prompt)
+          : 'No prompt';
+        yield { text: `[Fake] ${prompt}` };
       },
     },
-    {
-      type: 'schema:done',
-      data: {
-        schema: {
-          id: 'fake-page',
-          body: [{ component: 'HeroSection', props: { title: 'Fake Title' } }],
+    tools: createToolRegistry([
+      {
+        name: 'planPage',
+        async execute(input: unknown) {
+          return createPagePlan(input as PlanPageInput);
         },
       },
+      {
+        name: 'generateBlock',
+        async execute(input: unknown) {
+          return generateBlock(input as GenerateBlockInput);
+        },
+      },
+      {
+        name: 'assembleSchema',
+        async execute(input: unknown) {
+          return assembleSchema(input as AssembleSchemaInput);
+        },
+      },
+    ]),
+    memory,
+    logger: {
+      info() {
+        // API host already handles request-level logging.
+      },
+      error() {
+        // API host already handles request-level logging.
+      },
     },
-  ];
+  };
 }
 
-async function* streamEvents(events: AgentEvent[], metadata: RunMetadata): AsyncIterable<AgentEvent> {
-  for (const event of events) {
-    yield event;
-    await new Promise<void>((resolve) => setTimeout(resolve, 30));
+function extractMetadata(events: AgentEvent[]): RunMetadata {
+  const doneEvent = [...events].reverse().find((event): event is Extract<AgentEvent, { type: 'done' }> => event.type === 'done');
+  if (!doneEvent) {
+    throw new Error('Agent runtime completed without done metadata');
   }
-  yield { type: 'done', data: { metadata } };
+  return doneEvent.data.metadata;
 }
 
 export const fakeRuntime: AgentRuntime = {
   async run(request) {
-    const sessionId = `fake-${Date.now()}`;
-    const start = Date.now();
-    const events = makeEvents(sessionId, request);
-    const metadata = makeMeta(sessionId, request, Date.now() - start);
-    const allEvents: AgentEvent[] = [...events, { type: 'done', data: { metadata } }];
-    return { events: allEvents, metadata };
+    const events = await runAgent(request, createRuntimeDeps());
+    return { events, metadata: extractMetadata(events) };
   },
 
   async *runStream(request) {
-    const sessionId = `fake-${Date.now()}`;
-    const start = Date.now();
-    const events = makeEvents(sessionId, request);
-    const metadata = makeMeta(sessionId, request, Date.now() - start);
-    yield* streamEvents(events, metadata);
+    yield* runAgentStream(request, createRuntimeDeps());
   },
 };
