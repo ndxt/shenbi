@@ -122,7 +122,14 @@ apps/ai-api/
    - 处理 schema 生成与修复
 
 3. `packages/ai-agents`
-   - 调用 `ai-service` 能力并编排为事件流
+   - 只消费 `AgentRuntimeDeps`
+   - 基于注入的 `llm` / `tools` / `memory` 编排为事件流
+
+装配规则：
+
+- `ai-agents` 不直接 import `ai-service`
+- API Host 负责把 `ai-service` 的能力函数包装成 `AgentTool` 后注入 `AgentRuntimeDeps.tools`
+- 这样 `ai-agents` 可以用 fake deps 独立测试，`ai-service` 也可以独立演进
 
 ## Provider 完整列表
 
@@ -262,7 +269,8 @@ API Host 不重写事件结构，不生成额外宿主私有字段。
 
 - SSE 每 15 秒发送一次 `:heartbeat\n\n`，防止连接被中间代理超时关闭
 - 客户端收到 heartbeat 不做特殊处理，仅用于保活
-- SSE 连接异常关闭时，服务端清理正在进行的 agent 运行（如果有）
+- SSE 连接异常关闭时，服务端只清理连接级资源（如 active connection 计数、日志上下文、stream writer）
+- 首版不把异常断开映射为 Agent Runtime cancel；如需真正中断运行，二期再引入明确的 cancellation contract
 
 ## 首版不做的事
 

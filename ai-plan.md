@@ -164,7 +164,7 @@ interface RunResponse {
   success: true;
   data: {
     events: AgentEvent[];
-    metadata?: RunMetadata;
+    metadata: RunMetadata;
   };
 }
 
