@@ -1,1 +1,0 @@
-export const COMPONENT_CONTRACT_V1_VERSION = '1.0.0';

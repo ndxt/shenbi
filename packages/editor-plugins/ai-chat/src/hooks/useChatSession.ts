@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { AgentEvent, RunMetadata } from '../ai/api-types';
+import type { RunMetadata } from '../ai/api-types';
 
 export interface ChatMessage {
     id: string;

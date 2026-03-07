@@ -106,7 +106,7 @@ describe('createEditorAIBridge', () => {
 });
 
 describe('createEditorAIBridgeFromPluginContext', () => {
-  it('prefers document.replaceSchema over command execution', async () => {
+  it('prefers command execution for schema.replace when commands are available', async () => {
     const replaceSchema = vi.fn();
     const execute = vi.fn();
     const bridge = createEditorAIBridgeFromPluginContext({
@@ -127,8 +127,8 @@ describe('createEditorAIBridgeFromPluginContext', () => {
     });
 
     expect(result).toEqual({ success: true });
-    expect(replaceSchema).toHaveBeenCalledWith(createSchema('next'));
-    expect(execute).not.toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledWith('schema.replace', { schema: createSchema('next') });
+    expect(replaceSchema).not.toHaveBeenCalled();
   });
 
   it('falls back to command execution when document service is unavailable', async () => {

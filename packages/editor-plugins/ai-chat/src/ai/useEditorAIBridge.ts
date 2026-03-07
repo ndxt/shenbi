@@ -50,5 +50,5 @@ export function useEditorAIBridge(options: UseEditorAIBridgeOptions): EditorAIBr
         listenersRef.current.delete(listener);
       };
     },
-  }), [options.getAvailableComponents, options.replaceSchema]);
+  }), [options.execute, options.getAvailableComponents, options.replaceSchema]);
 }

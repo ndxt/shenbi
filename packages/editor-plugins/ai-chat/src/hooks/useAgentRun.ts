@@ -1,12 +1,59 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
-import type { PageSchema, SchemaNode } from '@shenbi/schema';
+import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import { aiClient } from '../ai/sse-client';
-import type { RunRequest, AgentEvent } from '../ai/api-types';
+import type { PagePlan, RunMetadata, RunRequest } from '../ai/api-types';
 
-export interface PlanConfig {
-    title?: string;
-    blocks: Array<{ type: string; description: string }>;
+export type PlanConfig = PagePlan;
+
+function isSchemaNode(value: unknown): value is SchemaNode {
+    return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
+}
+
+function collectSchemaComponents(node: unknown, components: Set<string>): number {
+    if (!node) {
+        return 0;
+    }
+    if (Array.isArray(node)) {
+        return node.reduce((count, child) => count + collectSchemaComponents(child, components), 0);
+    }
+    if (!isSchemaNode(node)) {
+        return 0;
+    }
+
+    let count = 1;
+    components.add(node.component);
+    if (Array.isArray(node.children)) {
+        count += collectSchemaComponents(node.children, components);
+    }
+    return count;
+}
+
+function summarizeSchema(schema: PageSchema): string {
+    const components = new Set<string>();
+    const bodyCount = collectSchemaComponents(schema.body, components);
+    const dialogCount = collectSchemaComponents(schema.dialogs, components);
+    const summaryParts = [
+        `pageId=${schema.id}`,
+        `pageName=${schema.name ?? schema.id}`,
+        `nodeCount=${bodyCount + dialogCount}`,
+        `dialogs=${Array.isArray(schema.dialogs) ? schema.dialogs.length : schema.dialogs ? 1 : 0}`,
+    ];
+    if (components.size > 0) {
+        summaryParts.push(`components=${Array.from(components).slice(0, 20).join(', ')}`);
+    }
+    return summaryParts.join('; ');
+}
+
+function summarizeComponents(contracts: ComponentContract[]): string {
+    return contracts
+        .slice(0, 50)
+        .map((contract) => {
+            const propsCount = Array.isArray(contract.props) ? contract.props.length : 0;
+            const slotsCount = Array.isArray(contract.slots) ? contract.slots.length : 0;
+            return `${contract.componentType}(props:${propsCount},slots:${slotsCount})`;
+        })
+        .join('; ');
 }
 
 export function useAgentRun(bridge: EditorAIBridge | undefined) {
@@ -72,7 +119,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             conversationId: string | undefined,
             onMessageStart: () => string,
             onMessageDelta: (id: string, chunk: string) => void,
-            onDone: (metadata: any) => void,
+            onDone: (metadata: RunMetadata) => void,
             onError: (err: string) => void
         ) => {
             if (!bridge) return;
@@ -89,15 +136,16 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             preGenerationSchemaRef.current = bridge.getSchema();
             await lockHistory();
 
-            const schemaSummary = JSON.stringify(bridge.getSchema());
-            const componentSummary = JSON.stringify(bridge.getAvailableComponents());
+            const schemaSummary = summarizeSchema(bridge.getSchema());
+            const componentSummary = summarizeComponents(bridge.getAvailableComponents());
+            const selectedNodeId = bridge.getSelectedNodeId();
 
             const request: RunRequest = {
                 prompt,
-                conversationId,
-                selectedNodeId: bridge.getSelectedNodeId(),
-                plannerModel,
-                blockModel,
+                ...(conversationId ? { conversationId } : {}),
+                ...(selectedNodeId ? { selectedNodeId } : {}),
+                ...(plannerModel ? { plannerModel } : {}),
+                ...(blockModel ? { blockModel } : {}),
                 context: {
                     schemaSummary,
                     componentSummary,
@@ -107,7 +155,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             let activeMessageId: string | null = null;
 
             try {
-                const stream = aiClient.runStream(request);
+                const stream = aiClient.runStream(request, { signal: ac.signal });
                 for await (const event of stream) {
                     if (ac.signal.aborted) {
                         break;
@@ -122,14 +170,14 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             break;
                         case 'message:delta':
                             if (activeMessageId) {
-                                onMessageDelta(activeMessageId, event.data);
+                                onMessageDelta(activeMessageId, event.data.text);
                             }
                             break;
                         case 'tool:start':
-                            setProgressText(`正在使用工具: ${event.data.name}...`);
+                            setProgressText(`正在使用工具: ${event.data.label ?? event.data.tool}...`);
                             break;
                         case 'tool:result':
-                            setProgressText(`工具: ${event.data.name} 完成. ${event.data.summary}`);
+                            setProgressText(`工具: ${event.data.tool} ${event.data.ok ? '完成' : '失败'}${event.data.summary ? `. ${event.data.summary}` : ''}`);
                             break;
                         case 'plan':
                             setCurrentPlan(event.data);
@@ -137,11 +185,11 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             break;
                         case 'schema:block':
                             setProgressText(`正在插入节点: ${event.data.node.component}`);
-                            await bridge.appendBlock(event.data.node, event.data.parentTreeId);
+                            await bridge.appendBlock(event.data.node);
                             break;
                         case 'schema:done':
                             setProgressText('更新页面 Schema');
-                            bridge.replaceSchema(event.data);
+                            bridge.replaceSchema(event.data.schema);
                             break;
                         case 'done':
                             onDone(event.data.metadata);

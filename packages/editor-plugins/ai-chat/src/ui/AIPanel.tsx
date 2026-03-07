@@ -110,7 +110,7 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
             {currentPlan && (
               <div className="mt-2 border-t border-border-ide pt-2">
                 <div className="text-[10px] text-text-secondary font-bold uppercase mb-1 flex items-center gap-1">
-                  <Info size={10} /> {currentPlan.title || '架构计划'}
+                  <Info size={10} /> {currentPlan.pageTitle || '架构计划'}
                 </div>
                 <ul className="flex flex-col gap-1 pl-2">
                   {currentPlan.blocks.map((b, i) => (

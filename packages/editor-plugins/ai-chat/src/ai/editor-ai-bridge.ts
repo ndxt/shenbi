@@ -82,7 +82,7 @@ export function createEditorAIBridge(options: EditorAIBridgeOptions): EditorAIBr
     },
     replaceSchema(schema) {
       validatePageSchema(schema);
-      options.replaceSchema(schema);
+      void options.execute('schema.replace', { schema });
     },
     async appendBlock(node, parentTreeId) {
       return options.execute('node.append', { node, parentTreeId });
@@ -139,16 +139,19 @@ export function createEditorAIBridgeFromPluginContext(
       if (replacePluginSchema(options.context, schema)) {
         return;
       }
-      void executePluginCommand(options.context, 'schema.replace', { schema });
     },
     execute: async (commandId, args) => {
       try {
+        const hasCommandHandler = Boolean(options.context.commands?.execute || options.context.executeCommand);
+        if (hasCommandHandler) {
+          await executePluginCommand(options.context, commandId, args);
+          return { success: true };
+        }
         if (commandId === 'schema.replace' && args && typeof args === 'object' && 'schema' in args) {
-          if (replacePluginSchema(options.context, (args as any).schema)) {
+          if (replacePluginSchema(options.context, (args as { schema: PageSchema }).schema)) {
             return { success: true };
           }
         }
-        await executePluginCommand(options.context, commandId, args);
         return { success: true };
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
