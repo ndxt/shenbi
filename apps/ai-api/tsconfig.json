@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "baseUrl": "../..",
+    "paths": {
+      "@shenbi/ai-contracts": ["packages/ai-contracts/src/index.ts"],
+      "@shenbi/schema": ["packages/schema/types/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

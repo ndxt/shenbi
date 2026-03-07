@@ -15,7 +15,9 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
+      "@shenbi/ai-contracts": ["packages/ai-contracts/src/index.ts"],
       "@shenbi/schema": ["packages/schema/types/index.ts"],
+      "@shenbi/ai-agents": ["packages/ai-agents/src/index.ts"],
       "@shenbi/engine": ["packages/engine/src/index.ts"],
       "@shenbi/editor-core": ["packages/editor-core/src/index.ts"],
       "@shenbi/editor-ui": ["packages/editor-ui/src/index.ts"],

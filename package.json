@@ -18,7 +18,8 @@
     "test:e2e:preview:headed": "pnpm --filter @shenbi/preview test:e2e:headed",
     "test:e2e:preview:crud": "pnpm --filter @shenbi/preview test:e2e:crud",
     "test:e2e:preview:report": "pnpm --filter @shenbi/preview test:e2e:report",
-    "test:e2e:preview:install": "pnpm --filter @shenbi/preview test:e2e:install"
+    "test:e2e:preview:install": "pnpm --filter @shenbi/preview test:e2e:install",
+    "demo:ai-agents": "pnpm dlx tsx scripts/ai-agents-demo.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2"

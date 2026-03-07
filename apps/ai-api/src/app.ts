@@ -1,0 +1,48 @@
+/**
+ * Hono App 装配 — 挂载路由、中间件
+ *
+ * 装配点：
+ * - 当前使用 fakeRuntime
+ * - 二期：import { agentRuntime } from 'packages/ai-agents' 替换 fakeRuntime
+ *   并通过 AgentRuntimeDeps 注入 ai-service 能力（llm / tools / memory）
+ */
+import { Hono } from 'hono';
+import { requestIdMiddleware } from './middleware/request-id.ts';
+import { createRateLimitMiddleware } from './middleware/rate-limit.ts';
+import { handleError } from './middleware/error-handler.ts';
+import { createRunRoute } from './routes/run.ts';
+import { createRunStreamRoute } from './routes/run-stream.ts';
+import { createModelsRoute } from './routes/models.ts';
+import { fakeRuntime } from './runtime/fake-runtime.ts';
+import type { AgentRuntime } from './runtime/types.ts';
+
+export interface AppOptions {
+  /** 二期替换为 packages/ai-agents 实现 */
+  runtime?: AgentRuntime;
+  /** 注入独立限流 store，用于测试隔离 */
+  rateLimitStore?: Map<string, { count: number; resetAt: number }>;
+}
+
+export function createApp(options: AppOptions = {}): Hono {
+  const runtime = options.runtime ?? fakeRuntime;
+
+  const app = new Hono();
+
+  app.use('*', requestIdMiddleware);
+  app.use(
+    '/api/ai/*',
+    createRateLimitMiddleware(
+      options.rateLimitStore !== undefined ? { store: options.rateLimitStore } : {},
+    ),
+  );
+
+  app.route('/api/ai/run/stream', createRunStreamRoute(runtime));
+  app.route('/api/ai/run', createRunRoute(runtime));
+  app.route('/api/ai/models', createModelsRoute());
+
+  app.get('/health', (c) => c.json({ status: 'ok' }));
+
+  app.onError((err, c) => handleError(err, c));
+
+  return app;
+}

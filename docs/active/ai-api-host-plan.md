@@ -290,7 +290,7 @@ API Host 不重写事件结构，不生成额外宿主私有字段。
 首版测试：
 
 - `POST /run` happy path
-- `GET /run/stream` SSE 序列化
+- `POST /run/stream` SSE 序列化
 - 429 限流响应
 - Provider 错误映射到 503
 - `/models` 与 `/components` 返回结构验证
