@@ -219,6 +219,25 @@ export function App() {
     patchSchemaNodeLogic,
     patchSchemaNodeColumns,
   });
+  const patchSelectedNode = useMemo(() => ({
+    props: handlePatchProps,
+    columns: handlePatchColumns,
+    style: handlePatchStyle,
+    events: handlePatchEvents,
+    logic: handlePatchLogic,
+  }), [
+    handlePatchColumns,
+    handlePatchEvents,
+    handlePatchLogic,
+    handlePatchProps,
+    handlePatchStyle,
+  ]);
+  const notifications = useMemo(() => ({
+    info: (message: string) => antd.message.info(message),
+    success: (message: string) => antd.message.success(message),
+    warning: (message: string) => antd.message.warning(message),
+    error: (message: string) => antd.message.error(message),
+  }), []);
   const promptFileName = useCallback((defaultName: string) => {
     if (typeof window === 'undefined') {
       return null;
@@ -240,20 +259,9 @@ export function App() {
     selectedNode,
     selectedNodeId,
     replaceSchema: (schema) => updateActiveSchema(() => schema),
-    patchSelectedNode: {
-      props: handlePatchProps,
-      columns: handlePatchColumns,
-      style: handlePatchStyle,
-      events: handlePatchEvents,
-      logic: handlePatchLogic,
-    },
+    patchSelectedNode,
     executeCommand: executePluginCommand,
-    notifications: {
-      info: (message) => antd.message.info(message),
-      success: (message) => antd.message.success(message),
-      warning: (message) => antd.message.warning(message),
-      error: (message) => antd.message.error(message),
-    },
+    notifications,
   });
   const plugins = useMemo(() => {
     const registeredPlugins = [

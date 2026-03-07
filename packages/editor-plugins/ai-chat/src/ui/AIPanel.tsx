@@ -53,7 +53,11 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
   }, [bridge]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const target = messagesEndRef.current;
+    if (!target || typeof target.scrollIntoView !== 'function') {
+      return;
+    }
+    target.scrollIntoView({ behavior: 'smooth' });
   }, [messages, progressText]);
 
   const handleSend = (text: string) => {

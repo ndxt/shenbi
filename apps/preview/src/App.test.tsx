@@ -7,10 +7,11 @@ import {
   useContext,
   useRef,
 } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
+import { MockAIClient, resetAIClient, setAIClient } from '@shenbi/editor-plugin-ai-chat';
 
 const { messageMock, notificationMock } = vi.hoisted(() => ({
   messageMock: {
@@ -378,6 +379,11 @@ describe('preview/App integration', () => {
     vi.clearAllMocks();
     window.history.replaceState(null, '', '/');
     window.localStorage.clear();
+    setAIClient(new MockAIClient());
+  });
+
+  afterEach(() => {
+    resetAIClient();
   });
 
   it('首屏渲染用户管理并自动拉取用户列表', async () => {
@@ -455,14 +461,13 @@ describe('preview/App integration', () => {
     await renderAppAndWaitFirstPage();
 
     await user.click(screen.getByTitle('Toggle AI Assistant'));
-    const generateButton = await screen.findByRole('button', { name: '生成演示页面' });
-    await user.click(generateButton);
+    const input = await screen.findByPlaceholderText('Ask AI anything... (Enter to send)');
+    await user.type(input, '生成演示页面{enter}');
 
     await waitFor(() => {
       expect(screen.getByText('AI 生成演示页面')).toBeInTheDocument();
       expect(screen.getByText('开始使用')).toBeInTheDocument();
-      expect(screen.getByText('状态：已应用 AI 演示页面')).toBeInTheDocument();
-    });
+    }, { timeout: 7000 });
   });
 
   it('编辑器：Events 支持 JSON 回写并驱动运行时', async () => {

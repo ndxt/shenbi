@@ -21,6 +21,9 @@ export class EditorState {
   }
 
   setSchema(schema: PageSchema): void {
+    if (this.schema === schema) {
+      return;
+    }
     this.schema = schema;
     this.notify();
   }
@@ -30,6 +33,9 @@ export class EditorState {
   }
 
   setSelectedNodeId(id: string | undefined): void {
+    if (this.selectedNodeId === id) {
+      return;
+    }
     this.selectedNodeId = id;
     this.notify();
   }

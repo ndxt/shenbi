@@ -23,6 +23,28 @@ export interface CreateAIChatPluginOptions extends AIPanelProps {
   subscribe?: (listener: (snapshot: EditorBridgeSnapshot) => void) => () => void;
 }
 
+function AIChatPanelHost(
+  props: Pick<CreateAIChatPluginOptions, 'bridge' | 'getAvailableComponents' | 'subscribe'> & {
+    context: PluginContext;
+  },
+) {
+  const bridge = React.useMemo(() => {
+    if (props.bridge) {
+      return props.bridge;
+    }
+    if (!props.getAvailableComponents) {
+      return undefined;
+    }
+    return createEditorAIBridgeFromPluginContext({
+      context: props.context,
+      getAvailableComponents: props.getAvailableComponents,
+      ...(props.subscribe ? { subscribe: props.subscribe } : {}),
+    });
+  }, [props.bridge, props.context, props.getAvailableComponents, props.subscribe]);
+
+  return <AIPanel {...(bridge ? { bridge } : {})} />;
+}
+
 export function createAIChatPlugin(options: CreateAIChatPluginOptions): EditorPluginManifest {
   const panel = {
     id: options.panelId ?? 'ai-chat',
@@ -31,16 +53,14 @@ export function createAIChatPlugin(options: CreateAIChatPluginOptions): EditorPl
     ...(options.defaultOpen !== undefined ? { defaultOpen: options.defaultOpen } : {}),
     defaultWidth: options.defaultWidth ?? 300,
     render: (context: PluginContext) => {
-      const bridge = options.bridge ?? (
-        options.getAvailableComponents
-          ? createEditorAIBridgeFromPluginContext({
-            context,
-            getAvailableComponents: options.getAvailableComponents,
-            ...(options.subscribe ? { subscribe: options.subscribe } : {}),
-          })
-          : undefined
+      return (
+        <AIChatPanelHost
+          context={context}
+          {...(options.bridge ? { bridge: options.bridge } : {})}
+          {...(options.getAvailableComponents ? { getAvailableComponents: options.getAvailableComponents } : {})}
+          {...(options.subscribe ? { subscribe: options.subscribe } : {})}
+        />
       );
-      return <AIPanel {...(bridge ? { bridge } : {})} />;
     },
   };
 
