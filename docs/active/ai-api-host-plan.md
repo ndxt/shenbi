@@ -82,13 +82,18 @@ apps/ai-api/
 - 调用 `runAgent(...)`
 - 返回 `RunResponse`
 
-### 2. `GET /api/ai/run/stream`
+### 2. `POST /api/ai/run/stream`
 
 职责：
 
-- 读取 query 参数并组装为 `RunRequest`
+- 接收 JSON `RunRequest`
 - 调用 `runAgentStream(...)`
 - 把 `AgentEvent` 序列化为 SSE
+
+说明：
+
+- 首版 `RunRequest` 必须携带 `context.schemaSummary` 和 `context.componentSummary`
+- 因为流式请求需要传递上下文摘要，首版不使用 `EventSource + GET query`，改用 `fetch` + `text/event-stream`
 
 ### 3. `GET /api/ai/models`
 
@@ -289,6 +294,16 @@ API Host 不重写事件结构，不生成额外宿主私有字段。
 - 429 限流响应
 - Provider 错误映射到 503
 - `/models` 与 `/components` 返回结构验证
+
+## 二期规划
+
+- **Cancellation contract**：SSE 异常关闭时通知 Agent Runtime 中断运行，减少无效 LLM 调用
+- **Plan 确认路由**：新增 `POST /api/ai/run/confirm-plan`，接收用户编辑后的 plan 并恢复暂停的生成流
+- **Prompt CRUD**：新增 `GET /api/ai/prompts` / `POST /api/ai/prompts`，支持 Prompt 版本管理
+- **Redis 限流**：从内存限流切换到 Redis，支持多实例部署
+- **任务队列**：引入 BullMQ，长时间生成异步处理
+- **SSE 断点续传**：sessionId + Redis 中间态，客户端重连后从中断点继续推送事件
+- **监控接入**：Prometheus exporter + Grafana dashboard
 
 ## 并行开发说明
 

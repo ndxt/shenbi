@@ -84,6 +84,11 @@ packages/editor-plugins/ai-chat/
 - 直接操作宿主 React state
 - 直接调用 Provider SDK
 
+发起请求前必须先做两步：
+
+- 调用 `bridge.getSchema()`，压缩成 `RunRequest.context.schemaSummary`
+- 调用 `bridge.getAvailableComponents()`，压缩成 `RunRequest.context.componentSummary`
+
 ## AgentEvent 到 UI/Editor 的映射
 
 ### UI 映射
@@ -107,7 +112,8 @@ packages/editor-plugins/ai-chat/
 ### 编辑器映射
 
 - `plan`
-  - 更新进度与占位反馈
+  - 在面板展示只读 block 列表卡片（pageTitle + 每个 block 的 type、description）
+  - 首版不可编辑、不阻塞生成流程，仅作为进度与意图反馈
 - `schema:block`
   - 调用 `bridge.appendBlock(node)`
 - `schema:done`
@@ -134,6 +140,8 @@ packages/editor-plugins/ai-chat/
    - 取消是纯客户端行为，不依赖 Agent Runtime 发出终止事件
 4. 运行成功完成：
    - 调用 `bridge.replaceSchema(finalSchema)`
+5. SSE 意外断开（网络中断等）：
+   - 行为与用户主动取消一致 — 调用 `schema.restore(preGenerationSchema)` 并提示用户重试
 
 ## `plugin.tsx` 装配
 
@@ -176,6 +184,48 @@ interface CreateAIChatPluginOptions {
 - 生成期间 undo/redo 被屏蔽
 - `done` 事件后 metadata 正确存入 session state
 - SSE 连接在卸载时自动关闭
+
+## 首版语义澄清
+
+- **整页生成**：首版每次运行都是整页级别 `schema.replace`，不支持局部更新单个 block
+- **plan 展示**：`plan` 事件到达后，在面板展示只读 block 列表卡片（pageTitle + 各 block 的 type / description），不阻塞生成流程，不可编辑
+- **请求载荷**：每次发送前先把当前 schema 和可用组件压缩成 `RunRequest.context`，再调用 `/run` 或 `/run/stream`
+- **重试**：重新发送同一 prompt 时，以当前页面状态重新运行，不自动 undo 上次生成；可保留同一 `conversationId`
+- **多轮对话**：`conversationId` 用于 prompt 上下文连续性（agent 记忆前几轮对话），每轮仍然是整页重新生成
+- **画布反馈**：生成期间面板展示当前进度（"正在生成第 N 个 block"），画布侧 block 随 `schema:block` 事件逐个出现，首版不做画布自动滚动
+
+## 二期规划
+
+### 局部更新 UI
+
+二期支持"选中 block → 只更新该 block"后，Chat Plugin 需要：
+
+- 输入框展示当前选中节点信息（如"已选中：Hero 区块"）
+- 新增 `schema:update` 事件映射 → `bridge.replaceNode(treeId, newNode)`
+- 局部更新不需要 `preGenerationSchema` 全量快照，undo 粒度 = 单个 `node.replace`
+
+### Plan 确认
+
+- `plan:confirm-required` 事件到达后暂停生成，展示可编辑的 block 列表
+- 用户可删除不想要的 block、调整顺序、修改 description
+- 用户点击"确认"后发送编辑后的 plan，继续 block 生成
+- 用户点击"取消"后终止生成，不产生任何 schema 变更
+
+### 保留部分结果
+
+- 取消时新增选项："回滚全部"或"保留已生成的 block"
+- "保留"时：对已插入的 block 调用 `schema.replace(currentSchema)` 形成 undo 记录，而非 `schema.restore`
+
+### 画布联动
+
+- 生成时画布自动滚动到最新插入的 block
+- 面板展示"正在插入第 N/M 个 block"进度条
+- block 插入时带入场动画（fade-in / slide-up）
+
+### 上下文提示
+
+- 输入框下方展示常用操作模板（"生成登录页"、"添加表单区块"等）
+- 根据当前页面状态（空白 / 已有内容）动态调整模板
 
 ## 并行开发说明
 

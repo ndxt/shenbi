@@ -124,6 +124,10 @@ interface RunRequest {
   blockModel?: string;
   conversationId?: string;
   selectedNodeId?: string;
+  context: {
+    schemaSummary: string;
+    componentSummary: string;
+  };
 }
 
 interface RunMetadata {
@@ -193,6 +197,7 @@ interface FeedbackRequest {
 - `message:delta.text` 内容为 Markdown 格式。Chat Plugin 负责 Markdown 渲染（首版支持纯文本和基础 Markdown）。
 - `schema:done` 只携带最终 schema，不携带 metadata。`done` 是整个运行的总结事件，携带 canonical `RunMetadata`（包含 `tokensUsed`、`durationMs` 等）。
 - 取消是纯客户端行为。Agent Runtime 不保证发出终止事件。Chat Plugin 应基于 SSE 连接关闭（而非特定事件）来判断取消状态。
+- `RunRequest.context` 由 Chat Plugin 侧构造，只传摘要，不传完整 schema/contract 原文。首版至少包含 `schemaSummary` 和 `componentSummary`，供 API Host 侧 runtime 直接消费。
 - `PagePlan` 由 Agent Runtime 产出、Chat Plugin 消费、API Host 透传。类型定义放在 `packages/ai-agents/src/types.ts` 并由基线冻结。`SchemaNode` 和 `PageSchema` 继续从 `@shenbi/schema` 导入。
 
 ## 编辑器侧冻结规则
@@ -239,6 +244,50 @@ AI 相关结构写入统一走 `editor-core`：
 - `scenarios` 模式不作为首版 AI 验收范围，可禁用或降级
 - Prompt 管理、数据库、Redis、任务队列都放二期
 
+### 首版语义澄清
+
+- **整页生成**：首版 AI 每次运行都是整页级别生成，不支持局部更新单个 block
+- **`selectedNodeId`**：首版只作为上下文提示传给 LLM（"用户正在关注这个区域"），不触发局部更新流程
+- **上下文传输**：Chat Plugin 在发起 `/run` 或 `/run/stream` 前，先从 bridge 读取当前 schema 和可用组件，并压缩成 `RunRequest.context`
+- **`plan` 事件**：首版在 Chat 面板展示为只读 block 列表卡片（标题 + 每个 block 的 type 和 description），不可编辑，不阻塞生成流程
+- **重试**：重新发送同一个 prompt 时，以当前页面状态为新起点重新运行，不自动 undo 上次生成；可保留同一 `conversationId`
+- **多轮对话**：`conversationId` 用于 prompt 上下文连续性（记忆之前的对话），每轮仍然是整页重新生成并 `schema.replace`
+
+## 二期规划
+
+### 局部更新链路
+
+首版只支持整页生成。二期需要打通"选中某个 block → 只更新该 block"的完整链路：
+
+| 层 | 新增内容 |
+|----|---------|
+| `editor-core` | `node.replace(treeId, newNode)` 命令，原地替换子节点并保留位置 |
+| `AgentEvent` | `schema:update` 事件：`{ type: 'schema:update'; data: { treeId: string; node: SchemaNode } }` |
+| `EditorAIBridge` | `bridge.replaceNode(treeId, newNode)` 方法 |
+| `ai-agents` 工具 | `updateBlock` 工具：接收已有 block schema + 修改意图，返回修改后的 block |
+| `ai-agents` 编排 | `block-update-orchestrator`：接收 `selectedNodeId`，读取目标 block 上下文，调用 `updateBlock`，输出 `schema:update` |
+| `RunRequest` | 新增 `mode?: 'generate' \| 'update'`，或由 agent 根据 `selectedNodeId` + prompt 自动判断 |
+| History | 局部更新的 undo 粒度 = 单个 `node.replace`，不需要整页 `schema.replace` |
+
+### Chat UI 增强
+
+| 能力 | 说明 |
+|------|------|
+| Plan 确认 | `plan` 事件到达后暂停生成，展示可编辑的 block 列表，用户确认后继续 |
+| 保留部分结果 | 取消时可选"保留已生成的 block" — 只 undo 未完成的部分 |
+| 画布联动 | 生成时画布自动滚动到新 block，面板展示"正在插入第 N/M 个 block"进度 |
+| 上下文提示 | 输入框展示当前选中节点信息，提供常用操作模板 |
+
+### 其他二期内容
+
+- Prompt 版本管理（PostgreSQL + CRUD 路由 + A/B 测试）
+- Redis 缓存（L2 缓存层，替代首版内存缓存）
+- 任务队列（BullMQ，异步处理长时间生成）
+- SSE 断点续传（sessionId + Redis 中间态）
+- Runtime cancellation contract（服务端主动中断 agent 运行）
+- `editor-core` lock/unlock API（替代 UI 层 undo/redo 屏蔽）
+- 监控接入（Prometheus + Grafana）
+
 ## 实施顺序
 
 1. 冻结共享契约
@@ -251,7 +300,7 @@ AI 相关结构写入统一走 `editor-core`：
 
 | 风险 | 首版策略 | 二期方案 |
 |------|---------|---------|
-| SSE 连接中断后已生成 block 丢失 | 提示重新生成；已插入画布的 block 保留 | sessionId + Redis 中间态，支持断点续传 |
+| SSE 连接中断后已生成 block 丢失 | 回滚到 `preGenerationSchema` 并提示重新生成 | sessionId + Redis 中间态，支持断点续传 |
 | 缓存 key 冲突（同 prompt 不同模型/版本） | key = `hash(prompt + models + promptVersion)` | 同 |
 | 组件契约更新后 Prompt 未同步 | `{{componentSchemas}}` 占位符动态注入，每次生成实时获取 | 同 |
 | LLM 费用暴涨 | 限流 10 req/min + 模型分级 | 缓存 60%+ 命中率 + 成本监控告警 |

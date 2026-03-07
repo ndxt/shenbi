@@ -88,8 +88,8 @@ export async function* runAgentStream(
 
 - 当前用户 prompt
 - 已选中节点 id
-- 当前页面 schema 摘要
-- 可用组件摘要
+- `RunRequest.context.schemaSummary`
+- `RunRequest.context.componentSummary`
 
 首版只做摘要，不直接把整个 schema 原样塞进 prompt。
 
@@ -209,6 +209,52 @@ const deps: AgentRuntimeDeps = { llm, tools, memory, logger };
 - tool 调用失败时的 `error` 事件测试
 - memory 注入与回写测试
 - page-builder orchestrator 的 happy path 测试
+
+## 首版语义澄清
+
+- 首版所有运行都是整页生成。`RunRequest.selectedNodeId` 只用于上下文（"用户关注哪个区域"），不触发局部更新
+- 首版 runtime 依赖客户端传入 `RunRequest.context`。如果缺少 `schemaSummary` 或 `componentSummary`，应在 API Host 校验阶段直接返回 `400`
+- 首版不需要 `block-update-orchestrator`，只实现 `page-builder-orchestrator` 和 `chat-orchestrator`
+- 首版事件流只包含 `schema:block`（新增）和 `schema:done`（整页替换），不包含 `schema:update`（原地替换）
+
+## 二期规划
+
+### 局部更新编排
+
+二期新增 `block-update-orchestrator`，流程：
+
+1. 收到 `RunRequest`，检测 `selectedNodeId` 不为空且 prompt 意图为修改
+2. 从当前 schema 中提取目标节点及其上下文
+3. 调用 `updateBlock` 工具（接收已有 block schema + 修改意图，返回新 schema）
+4. 输出 `schema:update` 事件（而非 `schema:block`）
+5. 输出 `done`
+
+新增事件类型：
+
+```typescript
+| { type: 'schema:update'; data: { treeId: string; node: SchemaNode } }
+```
+
+### 意图识别
+
+二期需要在 orchestrator 选择层增加简单的意图识别：
+
+- 有 `selectedNodeId` + prompt 含修改意图词 → `block-update-orchestrator`
+- 无 `selectedNodeId` 或 prompt 含"生成页面"类意图 → `page-builder-orchestrator`
+- 纯对话 → `chat-orchestrator`
+
+首版不做意图识别，统一走 `page-builder-orchestrator`。
+
+### 新增工具
+
+- `updateBlock`：接收 `{ existingNode: SchemaNode; instruction: string; components: ComponentContract[] }`，返回修改后的 `SchemaNode`
+
+### Plan 确认
+
+二期 `page-builder-orchestrator` 在 `plan` 事件后暂停，等待客户端发送确认信号后再继续 block 生成。需要新增：
+
+- `AgentEvent`: `{ type: 'plan:confirm-required'; data: PagePlan }`
+- `RunRequest` 或新接口支持 `confirmPlan(sessionId, editedPlan)` 回调
 
 ## 并行开发说明
 
