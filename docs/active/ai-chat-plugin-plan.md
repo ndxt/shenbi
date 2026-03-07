@@ -89,19 +89,20 @@ packages/editor-plugins/ai-chat/
 ### UI 映射
 
 - `run:start`
-  - 新建本次 run 状态
+  - 新建本次 run 状态，屏蔽 undo/redo 操作（避免中间态与 history 栈冲突）
 - `message:start`
   - 新建 assistant 消息
 - `message:delta`
-  - 追加 assistant 文本
+  - 追加 assistant 文本（Markdown 格式，首版支持纯文本和基础 Markdown 渲染）
 - `tool:start`
-  - 展示“正在分析/生成”状态
+  - 展示"正在分析/生成"状态
 - `tool:result`
   - 展示工具执行结果摘要
 - `error`
-  - 显示错误提示
+  - 显示错误提示，恢复 undo/redo
 - `done`
-  - 收起运行状态
+  - 收起运行状态，恢复 undo/redo
+  - 读取 `done.data.metadata` 存入 session state，用于展示 token 统计、耗时等信息
 
 ### 编辑器映射
 
@@ -110,7 +111,16 @@ packages/editor-plugins/ai-chat/
 - `schema:block`
   - 调用 `bridge.appendBlock(node)`
 - `schema:done`
-  - 调用 `bridge.replaceSchema(schema)`
+  - 调用 `bridge.replaceSchema(schema)`（只携带 schema，不携带 metadata）
+- `done`
+  - 从 `done.data.metadata` 读取 `RunMetadata`，按需在面板展示
+
+### undo/redo 屏蔽规则
+
+- `run:start` 收到后设 `isRunning = true`，此时拦截编辑器的 undo/redo 快捷键和按钮
+- `done` 或 `error` 收到后恢复 `isRunning = false`
+- 屏蔽方式推荐：`bridge.execute('history.lock')` / `bridge.execute('history.unlock')`（需 editor-core 配合暴露）
+- 如果 editor-core 首版不支持 lock API，Chat Plugin 在 UI 层拦截（禁用 undo/redo 按钮 + 忽略快捷键）
 
 ## 取消与回滚
 
@@ -121,6 +131,7 @@ packages/editor-plugins/ai-chat/
 3. 用户点击取消：
    - 关闭 SSE
    - 调用 `bridge.execute('schema.restore', { schema: preGenerationSchema })`
+   - 取消是纯客户端行为，不依赖 Agent Runtime 发出终止事件
 4. 运行成功完成：
    - 调用 `bridge.replaceSchema(finalSchema)`
 
@@ -162,6 +173,8 @@ interface CreateAIChatPluginOptions {
 - `schema:done` -> `bridge.replaceSchema`
 - 取消运行回滚到 `preGenerationSchema`
 - 一次 undo 回退整次生成
+- 生成期间 undo/redo 被屏蔽
+- `done` 事件后 metadata 正确存入 session state
 - SSE 连接在卸载时自动关闭
 
 ## 并行开发说明

@@ -71,6 +71,14 @@ isProject: false
 - HTTP 路由和中间件
 - Provider SDK 细节
 
+依赖规则：
+
+- `ai-agents` 不直接 import `ai-service` 的具体实现
+- 所有能力（LLM 调用、planPage、generateBlock 等）通过 `AgentRuntimeDeps` 注入
+- `ai-agents/src/tools/` 只定义工具接口和事件包装逻辑，不包含实际能力实现
+- API Host 负责把 `ai-service` 的能力函数包装成 tool 实例注入给 runtime
+- 这样 `ai-agents` 可以零依赖 `ai-service` 进行独立开发和测试
+
 ### 2. Chat Plugin
 
 职责：
@@ -128,16 +136,28 @@ interface RunMetadata {
   repairs?: Array<{ message: string; path?: string }>;
 }
 
+interface PagePlan {
+  pageTitle: string;
+  blocks: Array<{
+    id: string;
+    type: string;
+    description: string;
+    components: string[];
+    priority: number;
+    complexity: 'simple' | 'medium' | 'complex';
+  }>;
+}
+
 type AgentEvent =
-  | { type: 'run:start'; data: { sessionId: string } }
+  | { type: 'run:start'; data: { sessionId: string; conversationId?: string } }
   | { type: 'message:start'; data: { role: 'assistant' } }
   | { type: 'message:delta'; data: { text: string } }
   | { type: 'tool:start'; data: { tool: string; label?: string } }
   | { type: 'tool:result'; data: { tool: string; ok: boolean; summary?: string } }
   | { type: 'plan'; data: PagePlan }
   | { type: 'schema:block'; data: { blockId: string; node: SchemaNode } }
-  | { type: 'schema:done'; data: { schema: PageSchema; metadata?: RunMetadata } }
-  | { type: 'done'; data: { metadata?: RunMetadata } }
+  | { type: 'schema:done'; data: { schema: PageSchema } }
+  | { type: 'done'; data: { metadata: RunMetadata } }
   | { type: 'error'; data: { message: string; code?: string } };
 
 interface RunResponse {
@@ -167,6 +187,14 @@ interface FeedbackRequest {
 }
 ```
 
+### 契约规则
+
+- `AgentEvent` 的所有 `data` 字段必须是 JSON 可序列化的。不允许出现函数、Symbol、循环引用、`undefined` 值。API Host 透传时直接 `JSON.stringify`，Chat Plugin 直接 `JSON.parse`。
+- `message:delta.text` 内容为 Markdown 格式。Chat Plugin 负责 Markdown 渲染（首版支持纯文本和基础 Markdown）。
+- `schema:done` 只携带最终 schema，不携带 metadata。`done` 是整个运行的总结事件，携带 canonical `RunMetadata`（包含 `tokensUsed`、`durationMs` 等）。
+- 取消是纯客户端行为。Agent Runtime 不保证发出终止事件。Chat Plugin 应基于 SSE 连接关闭（而非特定事件）来判断取消状态。
+- `PagePlan` 由 Agent Runtime 产出、Chat Plugin 消费、API Host 透传。类型定义放在 `packages/ai-agents/src/types.ts` 并由基线冻结。`SchemaNode` 和 `PageSchema` 继续从 `@shenbi/schema` 导入。
+
 ## 编辑器侧冻结规则
 
 ### 1. 结构命令
@@ -180,9 +208,11 @@ AI 相关结构写入统一走 `editor-core`：
 
 ### 2. History 规则
 
-- 流式中间态命令：`recordHistory: false`
+- 流式中间态命令（`node.append` / `node.insertAt`）：`recordHistory: false`
 - 最终完成：`schema.replace(finalSchema)` 形成唯一 undo 记录
 - 用户取消：`schema.restore(preGenerationSchema)`，不产生新的 undo 记录
+- 生成期间（`isRunning = true`）：Chat Plugin 应屏蔽 undo/redo 触发，避免中间态与 history 栈冲突
+- 取消是纯客户端行为：Chat Plugin 关闭 SSE 后主动调用 `schema.restore`，不依赖 Agent Runtime 发出终止事件
 
 ### 3. 选择态
 
@@ -216,3 +246,15 @@ AI 相关结构写入统一走 `editor-core`：
 3. 并行推进 `ai-agents`、`ai-chat`、`ai-api`
 4. 三层联调
 5. 补 E2E 与回归测试
+
+## 已知风险
+
+| 风险 | 首版策略 | 二期方案 |
+|------|---------|---------|
+| SSE 连接中断后已生成 block 丢失 | 提示重新生成；已插入画布的 block 保留 | sessionId + Redis 中间态，支持断点续传 |
+| 缓存 key 冲突（同 prompt 不同模型/版本） | key = `hash(prompt + models + promptVersion)` | 同 |
+| 组件契约更新后 Prompt 未同步 | `{{componentSchemas}}` 占位符动态注入，每次生成实时获取 | 同 |
+| LLM 费用暴涨 | 限流 10 req/min + 模型分级 | 缓存 60%+ 命中率 + 成本监控告警 |
+| 多 Provider API 格式不统一 | `LLMProvider` 抽象层统一接口 | 同 |
+| 生成期间用户编辑画布导致覆盖 | UI 提示"生成中请勿编辑" + 屏蔽 undo/redo | `editor-core` 增加 lock/unlock API |
+| 并发请求资源争抢 | 限流控制并发量 | 任务队列（BullMQ）异步处理 |

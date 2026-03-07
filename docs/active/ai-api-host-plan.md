@@ -124,6 +124,45 @@ apps/ai-api/
 3. `packages/ai-agents`
    - 调用 `ai-service` 能力并编排为事件流
 
+## Provider 完整列表
+
+首版支持的 LLM Provider：
+
+| Provider | 环境变量 | SDK | 说明 |
+|----------|---------|-----|------|
+| OpenAI | `OPENAI_API_KEY` | `openai` | GPT-4o / GPT-4o-mini |
+| Anthropic | `ANTHROPIC_API_KEY` | `@anthropic-ai/sdk` | Claude 3.5 Sonnet / Claude 3 Haiku |
+| Google | `GOOGLE_API_KEY` | `@google/generative-ai` | Gemini 2.0 Flash |
+| DeepSeek | `DEEPSEEK_API_KEY` | OpenAI 兼容 | DeepSeek V3 / DeepSeek R1 |
+| 阿里云百炼 | `DASHSCOPE_API_KEY` | OpenAI 兼容 | Qwen 系列 |
+
+所有 Provider 统一通过 `LLMProvider` 抽象接口适配：
+
+```typescript
+interface LLMProvider {
+  id: string;
+  chat(request: ChatRequest): Promise<ChatResponse>;
+  streamChat(request: ChatRequest): AsyncIterable<ChatChunk>;
+}
+```
+
+`packages/ai-service/src/llm/providers/` 下每个 Provider 一个文件实现。
+
+## Prompt 路线图
+
+首版 Prompt 管理策略：
+
+- Prompt 模板硬编码在 `packages/ai-service/src/prompts/` 下
+- 使用 `{{placeholder}}` 占位符动态注入上下文（如 `{{componentSchemas}}`、`{{currentSchema}}`）
+- 不引入数据库存储，不引入版本管理 UI
+
+二期 Prompt 路线图：
+
+- 引入 PostgreSQL 存储 Prompt 版本
+- 新增 `POST /api/ai/prompts` / `GET /api/ai/prompts` CRUD 路由
+- 支持 A/B 测试（同 Prompt 多版本对比）
+- 在生成日志中记录 `promptVersion` 用于回溯
+
 ## 首版环境变量
 
 ```bash
@@ -131,6 +170,7 @@ OPENAI_API_KEY=...
 ANTHROPIC_API_KEY=...
 GOOGLE_API_KEY=...
 DEEPSEEK_API_KEY=...
+DASHSCOPE_API_KEY=...
 ```
 
 二期才引入：
@@ -200,6 +240,29 @@ for await (const event of runAgentStream(request, deps)) {
 ```
 
 API Host 不重写事件结构，不生成额外宿主私有字段。
+
+## 监控与可观测
+
+首版至少暴露以下指标（通过日志结构化输出，不强制引入 Prometheus）：
+
+| 指标 | 类型 | 说明 |
+|------|------|------|
+| `ai.request.count` | counter | 按路由、模型、状态（success/fail）分组 |
+| `ai.request.duration_ms` | histogram | 请求耗时 |
+| `ai.tokens.used` | counter | 按模型分组的 token 消耗 |
+| `ai.rate_limit.rejected` | counter | 被限流拒绝的请求数 |
+| `ai.sse.active_connections` | gauge | 当前活跃 SSE 连接数 |
+| `ai.provider.error` | counter | 按 provider、error code 分组 |
+
+首版实现方式：在 `middleware/request-id.ts` 和 `error-handler.ts` 中用结构化 JSON 日志输出以上指标。
+
+二期可接入 Prometheus + Grafana。
+
+## SSE 健壮性
+
+- SSE 每 15 秒发送一次 `:heartbeat\n\n`，防止连接被中间代理超时关闭
+- 客户端收到 heartbeat 不做特殊处理，仅用于保活
+- SSE 连接异常关闭时，服务端清理正在进行的 agent 运行（如果有）
 
 ## 首版不做的事
 

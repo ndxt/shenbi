@@ -115,7 +115,40 @@ export async function* runAgentStream(
 - `assembleSchema`
 - `repairSchema`
 
-这些工具本质上调用 `packages/ai-service` 暴露的能力，不在 runtime 内直接写 provider SDK。
+**依赖注入规则**：
+
+`ai-agents` 不直接 import `ai-service` 的具体实现。工具通过 `AgentRuntimeDeps.tools` 注入：
+
+- `ai-agents/src/tools/` 只定义工具的**接口**（输入/输出类型）和**事件包装逻辑**（把工具结果转换为 `AgentEvent`）
+- 工具的实际能力函数（调用 LLM、生成 schema 等）由 API Host 负责包装并注入
+- 这样 `ai-agents` 零依赖 `ai-service`，可以用 fake tools 独立开发和测试
+
+```typescript
+// ai-agents/src/tools/registry.ts
+interface AgentTool {
+  name: string;
+  execute(input: unknown): Promise<unknown>;
+}
+
+interface AgentToolRegistry {
+  get(name: string): AgentTool | undefined;
+  list(): AgentTool[];
+}
+```
+
+API Host 装配示例：
+
+```typescript
+// apps/ai-api 中
+import { planPage, generateBlock } from '@shenbi/ai-service';
+
+const tools: AgentToolRegistry = createToolRegistry([
+  { name: 'planPage', execute: (input) => planPage(input, llmClient) },
+  { name: 'generateBlock', execute: (input) => generateBlock(input, llmClient) },
+]);
+
+const deps: AgentRuntimeDeps = { llm, tools, memory, logger };
+```
 
 ## 事件流规则
 
@@ -139,27 +172,27 @@ export async function* runAgentStream(
 
 ### 2. Chat/UI 可依赖规则
 
-- `message:delta` 只追加文本，不回撤
+- `message:delta` 只追加文本，不回撤。内容为 Markdown 格式
 - `schema:block` 表示该 block 可增量插入到编辑器
-- `schema:done` 表示最终 schema 已收敛，可用于最终替换
-- `done` 表示整个运行生命周期结束
+- `schema:done` 表示最终 schema 已收敛，可用于最终替换。只携带 schema，不携带 metadata
+- `done` 表示整个运行生命周期结束，携带 canonical `RunMetadata`（tokensUsed、durationMs 等）
+- 取消是客户端行为。Agent Runtime 不保证发出终止事件，不需要处理 cancel 信号
 
 ## 与 `packages/ai-service` 的关系
 
-`ai-agents` 是编排层，`ai-service` 是能力层。
+`ai-agents` 是编排层，`ai-service` 是能力层。二者之间没有直接 import 依赖，通过 `AgentRuntimeDeps` 解耦。
 
-建议边界：
+运行时关系：
 
-- `ai-service` 提供：
-  - `planPage(...)`
-  - `generateBlock(...)`
-  - `assembleSchema(...)`
-  - `repairSchema(...)`
-  - `listModels(...)`
-- `ai-agents` 负责：
-  - 何时调用这些能力
-  - 如何把结果包装成 `AgentEvent`
-  - 如何维护运行时记忆
+- `ai-service` 提供能力函数：`planPage(...)`, `generateBlock(...)`, `assembleSchema(...)`, `repairSchema(...)`, `listModels(...)`
+- API Host 把 `ai-service` 的能力函数包装成 `AgentTool`，注入 `AgentRuntimeDeps.tools`
+- `ai-agents` 只通过 `deps.tools.get('planPage').execute(...)` 调用，不知道具体实现
+
+编译时关系：
+
+- `ai-agents` 的 `package.json` 不依赖 `@shenbi/ai-service`
+- 两者可以完全并行开发
+- 共享类型（`PagePlan`、`SchemaNode`、`PageSchema`）通过 `@shenbi/schema` 和基线契约获取
 
 ## 不要做的事
 
