@@ -1,7 +1,9 @@
 /**
- * 共享契约类型 — 与 ai-plan.md 冻结基线保持一致
- * API Host 只定义自己层用到的类型，AgentEvent 原样透传，不新增宿主私有字段
+ * 共享契约类型 — 与 ai-plan.md 冻结基线逐字保持一致
+ * SchemaNode / PageSchema 从 @shenbi/schema 导入，不自行定义
+ * API Host 只负责透传和序列化，不新增宿主私有字段
  */
+import type { SchemaNode, PageSchema } from '@shenbi/schema';
 
 export interface RunRequest {
   prompt: string;
@@ -44,8 +46,8 @@ export type AgentEvent =
   | { type: 'tool:start'; data: { tool: string; label?: string } }
   | { type: 'tool:result'; data: { tool: string; ok: boolean; summary?: string } }
   | { type: 'plan'; data: PagePlan }
-  | { type: 'schema:block'; data: { blockId: string; node: Record<string, unknown> } }
-  | { type: 'schema:done'; data: { schema: Record<string, unknown> } }
+  | { type: 'schema:block'; data: { blockId: string; node: SchemaNode } }
+  | { type: 'schema:done'; data: { schema: PageSchema } }
   | { type: 'done'; data: { metadata: RunMetadata } }
   | { type: 'error'; data: { message: string; code?: string } };
 
