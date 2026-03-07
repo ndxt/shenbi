@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PagePlan, PageSchema, RunRequest, AgentRuntimeDeps, GenerateBlockResult } from '../types';
+import type { PageSchema } from '@shenbi/schema';
+import type { PagePlan, RunRequest, AgentRuntimeDeps, GenerateBlockResult } from '../types';
 import { runAgent } from './run-agent';
 import { createInMemoryAgentMemoryStore } from '../memory/memory-store';
 import { createToolRegistry } from '../tools/registry';

@@ -1,60 +1,25 @@
 import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
+import type {
+  AgentEvent,
+  FeedbackRequest,
+  ModelInfo,
+  PagePlan as SharedPagePlan,
+  RunMetadata,
+  RunRequest,
+  RunResponse,
+} from '@shenbi/ai-contracts';
 
-export interface RunRequest {
-  prompt: string;
-  plannerModel?: string;
-  blockModel?: string;
-  conversationId?: string;
-  selectedNodeId?: string;
-  context: {
-    schemaSummary: string;
-    componentSummary: string;
-  };
-}
+export type {
+  AgentEvent,
+  FeedbackRequest,
+  ModelInfo,
+  RunMetadata,
+  RunRequest,
+  RunResponse,
+} from '@shenbi/ai-contracts';
 
-export interface RunMetadata {
-  sessionId: string;
-  conversationId?: string;
-  plannerModel?: string;
-  blockModel?: string;
-  tokensUsed?: number;
-  durationMs?: number;
-  repairs?: Array<{ message: string; path?: string }>;
-}
-
-export interface PagePlanBlock {
-  id: string;
-  type: string;
-  description: string;
-  components: string[];
-  priority: number;
-  complexity: 'simple' | 'medium' | 'complex';
-}
-
-export interface PagePlan {
-  pageTitle: string;
-  blocks: PagePlanBlock[];
-}
-
-export type AgentEvent =
-  | { type: 'run:start'; data: { sessionId: string; conversationId?: string } }
-  | { type: 'message:start'; data: { role: 'assistant' } }
-  | { type: 'message:delta'; data: { text: string } }
-  | { type: 'tool:start'; data: { tool: string; label?: string } }
-  | { type: 'tool:result'; data: { tool: string; ok: boolean; summary?: string } }
-  | { type: 'plan'; data: PagePlan }
-  | { type: 'schema:block'; data: { blockId: string; node: SchemaNode } }
-  | { type: 'schema:done'; data: { schema: PageSchema } }
-  | { type: 'done'; data: { metadata: RunMetadata } }
-  | { type: 'error'; data: { message: string; code?: string } };
-
-export interface RunResponse {
-  success: true;
-  data: {
-    events: AgentEvent[];
-    metadata: RunMetadata;
-  };
-}
+export type PagePlan = SharedPagePlan;
+export type PagePlanBlock = PagePlan['blocks'][number];
 
 export interface AgentTool<TInput = unknown, TOutput = unknown> {
   name: string;
