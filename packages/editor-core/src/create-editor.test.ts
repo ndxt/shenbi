@@ -25,6 +25,18 @@ function createSchemaWithCard(name: string): PageSchema {
   };
 }
 
+function createSchemaWithContainer(name: string): PageSchema {
+  return {
+    id: `${name}-id`,
+    name,
+    body: {
+      id: 'container-1',
+      component: 'Container',
+      children: [],
+    },
+  };
+}
+
 function createMemoryStorage(initial: PageSchema = createSchema('loaded')): FileStorageAdapter {
   const files = new Map<string, PageSchema>([['demo', initial]]);
   return {
@@ -57,6 +69,10 @@ describe('createEditor', () => {
   it('registers builtin commands', () => {
     const editor = createEditor();
     expect(editor.commands.has('schema.replace')).toBe(true);
+    expect(editor.commands.has('schema.restore')).toBe(true);
+    expect(editor.commands.has('node.append')).toBe(true);
+    expect(editor.commands.has('node.insertAt')).toBe(true);
+    expect(editor.commands.has('node.remove')).toBe(true);
     expect(editor.commands.has('node.patchProps')).toBe(true);
     expect(editor.commands.has('node.patchEvents')).toBe(true);
     expect(editor.commands.has('node.patchStyle')).toBe(true);
@@ -206,6 +222,71 @@ describe('createEditor', () => {
     expect(card?.props).toMatchObject({ title: 'new-title' });
     expect(editor.state.getIsDirty()).toBe(true);
     expect(editor.history.getSize()).toBe(1);
+  });
+
+  it('node.append appends without recording history', async () => {
+    const editor = createEditor({
+      initialSchema: createSchemaWithContainer('append-target'),
+      fileStorage: createMemoryStorage(),
+    });
+
+    await editor.commands.execute('node.append', {
+      parentTreeId: 'body',
+      node: { id: 'text-1', component: 'Text', children: 'hello' },
+    });
+
+    expect(editor.state.getIsDirty()).toBe(true);
+    expect(editor.history.getSize()).toBe(0);
+    expect(Array.isArray(editor.state.getSchema().body) ? undefined : editor.state.getSchema().body.children).toEqual([
+      { id: 'text-1', component: 'Text', children: 'hello' },
+    ]);
+  });
+
+  it('node.insertAt and node.remove mutate schema without recording history', async () => {
+    const editor = createEditor({
+      initialSchema: {
+        id: 'insert-remove-id',
+        name: 'insert-remove',
+        body: [
+          { id: 'a', component: 'Text' },
+          { id: 'b', component: 'Text' },
+        ],
+      },
+      fileStorage: createMemoryStorage(),
+    });
+
+    await editor.commands.execute('node.insertAt', {
+      index: 1,
+      node: { id: 'mid', component: 'Button' },
+    });
+    await editor.commands.execute('node.remove', { treeId: 'body.0' });
+
+    expect(editor.history.getSize()).toBe(0);
+    expect(editor.state.getSchema().body).toEqual([
+      { id: 'mid', component: 'Button' },
+      { id: 'b', component: 'Text' },
+    ]);
+  });
+
+  it('schema.restore rolls back streamed changes without pushing history', async () => {
+    const initialSchema = createSchemaWithContainer('restore-target');
+    const editor = createEditor({
+      initialSchema,
+      fileStorage: createMemoryStorage(),
+    });
+
+    await editor.commands.execute('node.append', {
+      parentTreeId: 'body',
+      node: { id: 'temp-node', component: 'Text' },
+    });
+    expect(editor.state.getIsDirty()).toBe(true);
+    expect(editor.history.getSize()).toBe(0);
+
+    await editor.commands.execute('schema.restore', { schema: initialSchema });
+
+    expect(editor.state.getSchema()).toBe(initialSchema);
+    expect(editor.state.getIsDirty()).toBe(false);
+    expect(editor.history.getSize()).toBe(0);
   });
 
   it('saveAs clears dirty flag after node patch', async () => {

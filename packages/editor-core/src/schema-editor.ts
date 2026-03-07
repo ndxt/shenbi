@@ -111,12 +111,151 @@ function getValueByPath(root: unknown, path: string): unknown {
   return current;
 }
 
+function getRootContainer(
+  schema: PageSchema,
+  container: 'body' | 'dialogs',
+): SchemaNode[] | undefined {
+  if (container === 'body') {
+    if (Array.isArray(schema.body)) {
+      return schema.body;
+    }
+    schema.body = isSchemaNode(schema.body) ? [schema.body] : [];
+    return schema.body;
+  }
+
+  if (!Array.isArray(schema.dialogs)) {
+    schema.dialogs = [];
+  }
+  return schema.dialogs;
+}
+
+function getNodeChildrenContainer(node: SchemaNode, createIfMissing = false): SchemaNode[] | undefined {
+  if (Array.isArray(node.children)) {
+    return node.children as SchemaNode[];
+  }
+  if (node.children === undefined && createIfMissing) {
+    node.children = [];
+    return node.children as SchemaNode[];
+  }
+  return undefined;
+}
+
+function clampIndex(index: number, length: number): number {
+  if (index < 0) {
+    return 0;
+  }
+  if (index > length) {
+    return length;
+  }
+  return index;
+}
+
 export function getSchemaNodeByTreeId(schema: PageSchema, treeId?: string): SchemaNode | undefined {
   if (!treeId) {
     return undefined;
   }
   const node = getValueByPath(schema, treeId);
   return isSchemaNode(node) ? node : undefined;
+}
+
+export function appendSchemaNode(
+  schema: PageSchema,
+  node: SchemaNode,
+  parentTreeId?: string,
+): PageSchema {
+  const nextSchema = deepCloneSchema(schema);
+
+  if (!parentTreeId) {
+    const body = getRootContainer(nextSchema, 'body');
+    body?.push(node);
+    return nextSchema;
+  }
+
+  if (parentTreeId === 'dialogs') {
+    const dialogs = getRootContainer(nextSchema, 'dialogs');
+    dialogs?.push(node);
+    return nextSchema;
+  }
+
+  const parentNode = getSchemaNodeByTreeId(nextSchema, parentTreeId);
+  if (!parentNode) {
+    return schema;
+  }
+
+  const children = getNodeChildrenContainer(parentNode, true);
+  if (!children) {
+    return schema;
+  }
+  children.push(node);
+  return nextSchema;
+}
+
+export function insertSchemaNodeAt(
+  schema: PageSchema,
+  node: SchemaNode,
+  index: number,
+  parentTreeId?: string,
+): PageSchema {
+  const nextSchema = deepCloneSchema(schema);
+
+  if (!parentTreeId) {
+    const body = getRootContainer(nextSchema, 'body');
+    if (!body) {
+      return schema;
+    }
+    body.splice(clampIndex(index, body.length), 0, node);
+    return nextSchema;
+  }
+
+  if (parentTreeId === 'dialogs') {
+    const dialogs = getRootContainer(nextSchema, 'dialogs');
+    if (!dialogs) {
+      return schema;
+    }
+    dialogs.splice(clampIndex(index, dialogs.length), 0, node);
+    return nextSchema;
+  }
+
+  const parentNode = getSchemaNodeByTreeId(nextSchema, parentTreeId);
+  if (!parentNode) {
+    return schema;
+  }
+
+  const children = getNodeChildrenContainer(parentNode, true);
+  if (!children) {
+    return schema;
+  }
+  children.splice(clampIndex(index, children.length), 0, node);
+  return nextSchema;
+}
+
+export function removeSchemaNode(schema: PageSchema, treeId: string | undefined): PageSchema {
+  if (!treeId) {
+    return schema;
+  }
+
+  const nextSchema = deepCloneSchema(schema);
+
+  if (treeId === 'body' && isSchemaNode(nextSchema.body)) {
+    nextSchema.body = [];
+    return nextSchema;
+  }
+
+  const tokens = treeId.split('.').filter(Boolean);
+  const lastToken = tokens[tokens.length - 1];
+  const parentPath = tokens.slice(0, -1).join('.');
+  const index = Number(lastToken);
+  if (!Number.isInteger(index)) {
+    return schema;
+  }
+
+  const parentValue = getValueByPath(nextSchema, parentPath);
+  if (!Array.isArray(parentValue) || index < 0 || index >= parentValue.length) {
+    return schema;
+  }
+
+  parentValue.splice(index, 1);
+  return nextSchema;
 }
 
 export function getTreeIdBySchemaNodeId(

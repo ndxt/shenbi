@@ -1,4 +1,4 @@
-import type { PageSchema } from '@shenbi/schema';
+import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import { CommandManager } from './command';
 import { EditorState } from './editor-state';
 import { EventBus } from './event-bus';
@@ -6,10 +6,13 @@ import { History } from './history';
 import type { EditorEventMap, EditorStateSnapshot } from './types';
 import { LocalFileStorageAdapter, type FileStorageAdapter } from './adapters/file-storage';
 import {
+  appendSchemaNode,
+  insertSchemaNodeAt,
   patchSchemaNodeColumns,
   patchSchemaNodeEvents,
   patchSchemaNodeLogic,
   patchSchemaNodeProps,
+  removeSchemaNode,
   patchSchemaNodeStyle,
 } from './schema-editor';
 
@@ -74,6 +77,21 @@ function extractSchemaFromArgs(args: unknown): PageSchema {
   return schema;
 }
 
+function extractRestoreArgs(args: unknown): { schema: PageSchema; isDirty?: boolean } {
+  if (!isRecord(args) || !('schema' in args)) {
+    throw new Error('schema.restore expects args: { schema, isDirty?: boolean }');
+  }
+  const schema = args.schema;
+  validatePageSchema(schema);
+  if (Object.prototype.hasOwnProperty.call(args, 'isDirty')) {
+    if (typeof args.isDirty !== 'boolean') {
+      throw new Error('schema.restore expects args: { schema, isDirty?: boolean }');
+    }
+    return { schema, isDirty: args.isDirty };
+  }
+  return { schema };
+}
+
 function extractFileIdFromArgs(args: unknown): string {
   if (!isRecord(args) || typeof args.fileId !== 'string' || args.fileId.trim().length === 0) {
     throw new Error('file command expects args: { fileId: string }');
@@ -119,6 +137,30 @@ function extractColumnsFromArgs(args: unknown): unknown {
   return args.columns;
 }
 
+function extractSchemaNodeFromArgs(args: unknown, commandId: string): SchemaNode {
+  if (!isRecord(args) || !isSchemaNode(args.node)) {
+    throw new Error(`${commandId} expects args: { node: SchemaNode, ... }`);
+  }
+  return args.node as SchemaNode;
+}
+
+function extractOptionalParentTreeIdFromArgs(args: unknown, commandId: string): string | undefined {
+  if (!isRecord(args) || args.parentTreeId === undefined) {
+    return undefined;
+  }
+  if (typeof args.parentTreeId !== 'string' || args.parentTreeId.trim().length === 0) {
+    throw new Error(`${commandId} expects args: { parentTreeId?: string, ... }`);
+  }
+  return args.parentTreeId.trim();
+}
+
+function extractIndexFromArgs(args: unknown, commandId: string): number {
+  if (!isRecord(args) || !Number.isInteger(args.index)) {
+    throw new Error(`${commandId} expects args: { index: number, ... }`);
+  }
+  return Number(args.index);
+}
+
 function registerBuiltinCommands(
   state: EditorState,
   history: History<EditorStateSnapshot>,
@@ -142,6 +184,83 @@ function registerBuiltinCommands(
       currentState.setSchema(schema);
       currentState.setDirty(true);
       eventBus.emit('schema:changed', { schema });
+    },
+  });
+
+  commands.register({
+    id: 'schema.restore',
+    label: 'Restore Schema',
+    recordHistory: false,
+    execute(currentState, args) {
+      const { schema, isDirty } = extractRestoreArgs(args);
+      const currentSnapshot = history.getCurrent();
+      if (currentSnapshot.schema === schema) {
+        currentState.restoreSnapshot({
+          ...currentSnapshot,
+          canUndo: history.canUndo(),
+          canRedo: history.canRedo(),
+        });
+      } else {
+        currentState.setSchema(schema);
+        if (typeof isDirty === 'boolean') {
+          currentState.setDirty(isDirty);
+        }
+      }
+      eventBus.emit('schema:changed', { schema });
+    },
+  });
+
+  commands.register({
+    id: 'node.append',
+    label: 'Append Node',
+    recordHistory: false,
+    execute(currentState, args) {
+      const node = extractSchemaNodeFromArgs(args, 'node.append');
+      const parentTreeId = extractOptionalParentTreeIdFromArgs(args, 'node.append');
+      const previousSchema = currentState.getSchema();
+      const nextSchema = appendSchemaNode(previousSchema, node, parentTreeId);
+      if (nextSchema === previousSchema) {
+        return;
+      }
+      currentState.setSchema(nextSchema);
+      currentState.setDirty(true);
+      eventBus.emit('schema:changed', { schema: nextSchema });
+    },
+  });
+
+  commands.register({
+    id: 'node.insertAt',
+    label: 'Insert Node At',
+    recordHistory: false,
+    execute(currentState, args) {
+      const node = extractSchemaNodeFromArgs(args, 'node.insertAt');
+      const index = extractIndexFromArgs(args, 'node.insertAt');
+      const parentTreeId = extractOptionalParentTreeIdFromArgs(args, 'node.insertAt');
+      const previousSchema = currentState.getSchema();
+      const nextSchema = insertSchemaNodeAt(previousSchema, node, index, parentTreeId);
+      if (nextSchema === previousSchema) {
+        return;
+      }
+      currentState.setSchema(nextSchema);
+      currentState.setDirty(true);
+      eventBus.emit('schema:changed', { schema: nextSchema });
+    },
+  });
+
+  commands.register({
+    id: 'node.remove',
+    label: 'Remove Node',
+    recordHistory: false,
+    execute(currentState, args) {
+      const treeId = extractTreeIdFromArgs(args, 'node.remove');
+      const previousSchema = currentState.getSchema();
+      const nextSchema = removeSchemaNode(previousSchema, treeId);
+      if (nextSchema === previousSchema) {
+        return;
+      }
+      currentState.setSchema(nextSchema);
+      currentState.setDirty(true);
+      eventBus.emit('schema:changed', { schema: nextSchema });
     },
   });
 

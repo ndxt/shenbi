@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { PageSchema } from '@shenbi/schema';
 import {
+  appendSchemaNode,
   getSchemaNodeByTreeId,
   getTreeIdBySchemaNodeId,
+  insertSchemaNodeAt,
   patchSchemaNodeColumns,
   patchSchemaNodeEvents,
   patchSchemaNodeLogic,
   patchSchemaNodeStyle,
+  removeSchemaNode,
 } from './schema-editor';
 
 function createSchema(): PageSchema {
@@ -109,5 +112,42 @@ describe('schema-editor/patchSchemaNodeEvents', () => {
 
     const cleared = patchSchemaNodeColumns(updated, 'body', null);
     expect(getSchemaNodeByTreeId(cleared, 'body')?.columns).toBeUndefined();
+  });
+
+  it('能向根 body 追加节点，且会把单节点 body 提升为数组', () => {
+    const schema = createSchema();
+    const next = appendSchemaNode(schema, {
+      id: 'table-1',
+      component: 'Table',
+    });
+
+    expect(Array.isArray(next.body)).toBe(true);
+    const body = next.body as typeof schema.body & Array<unknown>;
+    expect(body).toHaveLength(2);
+    expect(getSchemaNodeByTreeId(next, 'body.1')?.component).toBe('Table');
+  });
+
+  it('能按 index 插入到父节点 children', () => {
+    const schema = createSchema();
+    const next = insertSchemaNodeAt(
+      schema,
+      {
+        id: 'input-1',
+        component: 'Input',
+      },
+      0,
+      'body',
+    );
+
+    expect(getSchemaNodeByTreeId(next, 'body.children.0')?.component).toBe('Input');
+    expect(getSchemaNodeByTreeId(next, 'body.children.1')?.id).toBe('submit-btn');
+  });
+
+  it('能按 treeId 删除节点', () => {
+    const schema = createSchema();
+    const next = removeSchemaNode(schema, 'body.children.0');
+
+    expect(getSchemaNodeByTreeId(next, 'body.children.0')).toBeUndefined();
+    expect(Array.isArray(getSchemaNodeByTreeId(next, 'body')?.children)).toBe(true);
   });
 });
