@@ -38,6 +38,22 @@ function createRequest(): RunRequest {
 }
 
 describe('FetchAIClient', () => {
+  it('binds the global fetch implementation for browser-safe invocation', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(async () => createStreamResponse([]));
+
+    try {
+      globalThis.fetch = fetchSpy as typeof fetch;
+      const client = new FetchAIClient();
+
+      await Array.fromAsync(client.runStream(createRequest()));
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('posts RunRequest to the stream endpoint and parses AgentEvent payloads', async () => {
     const fetchImplementation = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       expect(init?.method).toBe('POST');

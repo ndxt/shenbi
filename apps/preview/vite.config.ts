@@ -8,8 +8,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3100',
+        changeOrigin: true,
+      },
+    },
+  },
   resolve: {
     alias: {
+      '@shenbi/ai-contracts': path.resolve(__dirname, '../../packages/ai-contracts/src/index.ts'),
       '@shenbi/editor-core': path.resolve(__dirname, '../../packages/editor-core/src/index.ts'),
       '@shenbi/editor-plugin-api': path.resolve(__dirname, '../../packages/editor-plugins/api/src/index.ts'),
       '@shenbi/editor-plugin-files': path.resolve(__dirname, '../../packages/editor-plugins/files/src/index.ts'),

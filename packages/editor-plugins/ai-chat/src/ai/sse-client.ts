@@ -120,7 +120,7 @@ export class FetchAIClient implements AIClient {
 
     constructor(options: FetchAIClientOptions = {}) {
         this.endpoint = options.endpoint ?? DEFAULT_STREAM_ENDPOINT;
-        this.fetchImplementation = options.fetchImplementation ?? fetch;
+        this.fetchImplementation = options.fetchImplementation ?? globalThis.fetch.bind(globalThis);
     }
 
     async *runStream(request: RunRequest, options: RunStreamOptions = {}): AsyncIterable<AgentEvent> {
