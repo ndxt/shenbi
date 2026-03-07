@@ -1,0 +1,224 @@
+import { useState, useCallback, useRef, useEffect } from 'react';
+import type { EditorAIBridge } from '../ai/editor-ai-bridge';
+import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
+import { aiClient } from '../ai/sse-client';
+import type { PagePlan, RunMetadata, RunRequest } from '../ai/api-types';
+
+export type PlanConfig = PagePlan;
+
+function isSchemaNode(value: unknown): value is SchemaNode {
+    return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
+}
+
+function collectSchemaComponents(node: unknown, components: Set<string>): number {
+    if (!node) {
+        return 0;
+    }
+    if (Array.isArray(node)) {
+        return node.reduce((count, child) => count + collectSchemaComponents(child, components), 0);
+    }
+    if (!isSchemaNode(node)) {
+        return 0;
+    }
+
+    let count = 1;
+    components.add(node.component);
+    if (Array.isArray(node.children)) {
+        count += collectSchemaComponents(node.children, components);
+    }
+    return count;
+}
+
+function summarizeSchema(schema: PageSchema): string {
+    const components = new Set<string>();
+    const bodyCount = collectSchemaComponents(schema.body, components);
+    const dialogCount = collectSchemaComponents(schema.dialogs, components);
+    const summaryParts = [
+        `pageId=${schema.id}`,
+        `pageName=${schema.name ?? schema.id}`,
+        `nodeCount=${bodyCount + dialogCount}`,
+        `dialogs=${Array.isArray(schema.dialogs) ? schema.dialogs.length : schema.dialogs ? 1 : 0}`,
+    ];
+    if (components.size > 0) {
+        summaryParts.push(`components=${Array.from(components).slice(0, 20).join(', ')}`);
+    }
+    return summaryParts.join('; ');
+}
+
+function summarizeComponents(contracts: ComponentContract[]): string {
+    return contracts
+        .slice(0, 50)
+        .map((contract) => {
+            const propsCount = Array.isArray(contract.props) ? contract.props.length : 0;
+            const slotsCount = Array.isArray(contract.slots) ? contract.slots.length : 0;
+            return `${contract.componentType}(props:${propsCount},slots:${slotsCount})`;
+        })
+        .join('; ');
+}
+
+export function useAgentRun(bridge: EditorAIBridge | undefined) {
+    const [isRunning, setIsRunning] = useState(false);
+    const [progressText, setProgressText] = useState('');
+    const [currentPlan, setCurrentPlan] = useState<PlanConfig | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    // store preGenerationSchema for rollback
+    const preGenerationSchemaRef = useRef<PageSchema | null>(null);
+
+    // Block undo/redo globally during generation
+    useEffect(() => {
+        if (!isRunning) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const isZ = e.key.toLowerCase() === 'z';
+            const isY = e.key.toLowerCase() === 'y';
+            const isMacCmd = e.metaKey;
+            const isWinCtrl = e.ctrlKey;
+
+            if ((isMacCmd || isWinCtrl) && (isZ || isY)) {
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown, true);
+        return () => window.removeEventListener('keydown', handleKeyDown, true);
+    }, [isRunning]);
+
+    const lockHistory = async () => {
+        if (bridge) {
+            await bridge.execute('history.lock'); // optional execution
+        }
+    };
+
+    const unlockHistory = async () => {
+        if (bridge) {
+            await bridge.execute('history.unlock'); // optional execution
+        }
+    };
+
+    const cancelRun = useCallback(async () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setIsRunning(false);
+        setProgressText('已取消');
+        setCurrentPlan(null);
+        await unlockHistory();
+        if (preGenerationSchemaRef.current && bridge) {
+            await bridge.execute('schema.restore', { schema: preGenerationSchemaRef.current });
+        }
+    }, [bridge]);
+
+    const runAgent = useCallback(
+        async (
+            prompt: string,
+            plannerModel: string,
+            blockModel: string,
+            conversationId: string | undefined,
+            onMessageStart: () => string,
+            onMessageDelta: (id: string, chunk: string) => void,
+            onDone: (metadata: RunMetadata) => void,
+            onError: (err: string) => void
+        ) => {
+            if (!bridge) return;
+            if (isRunning) return;
+
+            setIsRunning(true);
+            setProgressText('初始化...');
+            setCurrentPlan(null);
+
+            const ac = new AbortController();
+            abortControllerRef.current = ac;
+
+            // Pre-run setup
+            preGenerationSchemaRef.current = bridge.getSchema();
+            await lockHistory();
+
+            const schemaSummary = summarizeSchema(bridge.getSchema());
+            const componentSummary = summarizeComponents(bridge.getAvailableComponents());
+            const selectedNodeId = bridge.getSelectedNodeId();
+
+            const request: RunRequest = {
+                prompt,
+                ...(conversationId ? { conversationId } : {}),
+                ...(selectedNodeId ? { selectedNodeId } : {}),
+                ...(plannerModel ? { plannerModel } : {}),
+                ...(blockModel ? { blockModel } : {}),
+                context: {
+                    schemaSummary,
+                    componentSummary,
+                },
+            };
+
+            let activeMessageId: string | null = null;
+
+            try {
+                const stream = aiClient.runStream(request, { signal: ac.signal });
+                for await (const event of stream) {
+                    if (ac.signal.aborted) {
+                        break;
+                    }
+
+                    switch (event.type) {
+                        case 'run:start':
+                            setProgressText('运行开始');
+                            break;
+                        case 'message:start':
+                            activeMessageId = onMessageStart();
+                            break;
+                        case 'message:delta':
+                            if (activeMessageId) {
+                                onMessageDelta(activeMessageId, event.data.text);
+                            }
+                            break;
+                        case 'tool:start':
+                            setProgressText(`正在使用工具: ${event.data.label ?? event.data.tool}...`);
+                            break;
+                        case 'tool:result':
+                            setProgressText(`工具: ${event.data.tool} ${event.data.ok ? '完成' : '失败'}${event.data.summary ? `. ${event.data.summary}` : ''}`);
+                            break;
+                        case 'plan':
+                            setCurrentPlan(event.data);
+                            setProgressText('获取到架构计划');
+                            break;
+                        case 'schema:block':
+                            setProgressText(`正在插入节点: ${event.data.node.component}`);
+                            await bridge.appendBlock(event.data.node);
+                            break;
+                        case 'schema:done':
+                            setProgressText('更新页面 Schema');
+                            bridge.replaceSchema(event.data.schema);
+                            break;
+                        case 'done':
+                            onDone(event.data.metadata);
+                            break;
+                        case 'error':
+                            throw new Error(event.data.message);
+                    }
+                }
+            } catch (err: any) {
+                if (!ac.signal.aborted) {
+                    onError(err.message || '未知错误');
+                    await cancelRun();
+                }
+            } finally {
+                if (!ac.signal.aborted) {
+                    setIsRunning(false);
+                    setProgressText('');
+                    await unlockHistory();
+                }
+            }
+        },
+        [bridge, isRunning, cancelRun]
+    );
+
+    return {
+        isRunning,
+        progressText,
+        currentPlan,
+        runAgent,
+        cancelRun,
+    };
+}

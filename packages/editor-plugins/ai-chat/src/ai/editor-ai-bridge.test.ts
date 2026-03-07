@@ -20,6 +20,13 @@ describe('createEditorAIBridge', () => {
       getSnapshot: () => snapshot,
       replaceSchema,
       getAvailableComponents: () => contracts,
+      execute: async (cmd, args) => {
+        if (cmd === 'schema.replace') {
+          replaceSchema((args as any).schema);
+          return { success: true };
+        }
+        return { success: false, error: 'Unsupported command' };
+      },
       subscribe,
     });
 
@@ -36,6 +43,7 @@ describe('createEditorAIBridge', () => {
       getSnapshot: () => ({ schema: createSchema('initial') }),
       replaceSchema: vi.fn(),
       getAvailableComponents: () => [],
+      execute: async (cmd) => ({ success: false, error: 'Unsupported command' }),
       subscribe: () => () => undefined,
     });
 
@@ -49,6 +57,12 @@ describe('createEditorAIBridge', () => {
       getSnapshot: () => ({ schema: createSchema('initial') }),
       replaceSchema: vi.fn(),
       getAvailableComponents: () => [],
+      execute: async (cmd, args) => {
+        if (cmd === 'schema.replace' && !(args as any).schema.body) {
+          return { success: false, error: 'schema.body is required' };
+        }
+        return { success: true };
+      },
       subscribe: () => () => undefined,
     });
 
@@ -76,6 +90,7 @@ describe('createEditorAIBridge', () => {
       getSnapshot: () => snapshot,
       replaceSchema: vi.fn(),
       getAvailableComponents: () => contracts,
+      execute: async () => ({ success: true }),
       subscribe,
     });
     const listener = vi.fn();
@@ -91,7 +106,7 @@ describe('createEditorAIBridge', () => {
 });
 
 describe('createEditorAIBridgeFromPluginContext', () => {
-  it('prefers document.replaceSchema over command execution', async () => {
+  it('prefers command execution for schema.replace when commands are available', async () => {
     const replaceSchema = vi.fn();
     const execute = vi.fn();
     const bridge = createEditorAIBridgeFromPluginContext({
@@ -112,8 +127,8 @@ describe('createEditorAIBridgeFromPluginContext', () => {
     });
 
     expect(result).toEqual({ success: true });
-    expect(replaceSchema).toHaveBeenCalledWith(createSchema('next'));
-    expect(execute).not.toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledWith('schema.replace', { schema: createSchema('next') });
+    expect(replaceSchema).not.toHaveBeenCalled();
   });
 
   it('falls back to command execution when document service is unavailable', async () => {

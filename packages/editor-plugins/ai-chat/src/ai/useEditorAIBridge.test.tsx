@@ -22,6 +22,7 @@ describe('useEditorAIBridge', () => {
       selectedNodeId: props.selectedNodeId,
       replaceSchema,
       getAvailableComponents,
+      execute: async () => ({ success: true }),
     }), {
       initialProps: { schema: createSchema('first'), selectedNodeId: 'body.0' },
     });
@@ -57,6 +58,12 @@ describe('useEditorAIBridge', () => {
       selectedNodeId: 'body.0',
       replaceSchema,
       getAvailableComponents: () => [],
+      execute: async (cmd, args) => {
+        if (cmd === 'schema.replace') {
+          replaceSchema((args as any).schema);
+        }
+        return { success: true }
+      },
     }));
 
     await act(async () => {

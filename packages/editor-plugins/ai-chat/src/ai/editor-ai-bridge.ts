@@ -1,4 +1,4 @@
-import type { ComponentContract, PageSchema } from '@shenbi/schema';
+import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import {
   executePluginCommand,
   getPluginSchema,
@@ -23,6 +23,8 @@ export interface EditorAIBridge {
   getAvailableComponents(): ComponentContract[];
   execute(commandId: string, args?: unknown): Promise<ExecuteResult>;
   replaceSchema(schema: PageSchema): void;
+  appendBlock(node: SchemaNode, parentTreeId?: string): Promise<ExecuteResult>;
+  removeNode(treeId: string): Promise<ExecuteResult>;
   subscribe(listener: (snapshot: EditorBridgeSnapshot) => void): () => void;
 }
 
@@ -30,6 +32,7 @@ interface EditorAIBridgeOptions {
   getSnapshot: () => EditorBridgeSnapshot;
   replaceSchema: (schema: PageSchema) => void;
   getAvailableComponents: () => ComponentContract[];
+  execute: (commandId: string, args?: unknown) => Promise<ExecuteResult>;
   subscribe: (listener: (snapshot: EditorBridgeSnapshot) => void) => () => void;
 }
 
@@ -63,14 +66,6 @@ function validatePageSchema(schema: unknown): asserts schema is PageSchema {
   }
 }
 
-function extractSchemaFromArgs(args: unknown): PageSchema {
-  if (!isRecord(args) || !('schema' in args)) {
-    throw new Error('schema.replace expects args: { schema }');
-  }
-  validatePageSchema(args.schema);
-  return args.schema;
-}
-
 export function createEditorAIBridge(options: EditorAIBridgeOptions): EditorAIBridge {
   return {
     getSchema() {
@@ -83,21 +78,17 @@ export function createEditorAIBridge(options: EditorAIBridgeOptions): EditorAIBr
       return options.getAvailableComponents();
     },
     async execute(commandId, args) {
-      try {
-        if (commandId === 'schema.replace') {
-          const schema = extractSchemaFromArgs(args);
-          options.replaceSchema(schema);
-          return { success: true };
-        }
-        return { success: false, error: `Unsupported command: ${commandId}` };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return { success: false, error: message };
-      }
+      return options.execute(commandId, args);
     },
     replaceSchema(schema) {
       validatePageSchema(schema);
-      options.replaceSchema(schema);
+      void options.execute('schema.replace', { schema });
+    },
+    async appendBlock(node, parentTreeId) {
+      return options.execute('node.append', { node, parentTreeId });
+    },
+    async removeNode(treeId) {
+      return options.execute('node.remove', { treeId });
     },
     subscribe(listener) {
       return options.subscribe(listener);
@@ -148,7 +139,23 @@ export function createEditorAIBridgeFromPluginContext(
       if (replacePluginSchema(options.context, schema)) {
         return;
       }
-      void executePluginCommand(options.context, 'schema.replace', { schema });
+    },
+    execute: async (commandId, args) => {
+      try {
+        const hasCommandHandler = Boolean(options.context.commands?.execute || options.context.executeCommand);
+        if (hasCommandHandler) {
+          await executePluginCommand(options.context, commandId, args);
+          return { success: true };
+        }
+        if (commandId === 'schema.replace' && args && typeof args === 'object' && 'schema' in args) {
+          if (replacePluginSchema(options.context, (args as { schema: PageSchema }).schema)) {
+            return { success: true };
+          }
+        }
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
     },
     getAvailableComponents: options.getAvailableComponents,
     subscribe,

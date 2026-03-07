@@ -1,39 +1,79 @@
-import React from 'react';
-import { Sparkles, Send } from 'lucide-react';
-import { createAIDemoSchema } from '../ai/demo-schema';
+import React, { useEffect, useRef } from 'react';
+import { Sparkles, Loader2, Info } from 'lucide-react';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
+import { useModels } from '../hooks/useModels';
+import { useChatSession } from '../hooks/useChatSession';
+import { useAgentRun } from '../hooks/useAgentRun';
+import { ChatMessageList } from './ChatMessageList';
+import { ChatInput } from './ChatInput';
+import { ModelSelector } from './ModelSelector';
 
 export interface AIPanelProps {
   bridge?: EditorAIBridge;
+  defaultPlannerModel?: string;
+  defaultBlockModel?: string;
 }
 
-export function AIPanel({ bridge }: AIPanelProps) {
-  const [statusText, setStatusText] = React.useState<string>('等待指令');
-  const [selectedNodeLabel, setSelectedNodeLabel] = React.useState<string>('未选中');
+export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPanelProps) {
+  const {
+    plannerModels,
+    plannerModel,
+    setPlannerModel,
+    blockModels,
+    blockModel,
+    setBlockModel,
+  } = useModels(defaultPlannerModel, defaultBlockModel);
 
-  React.useEffect(() => {
-    if (!bridge) {
-      return undefined;
-    }
+  const {
+    messages,
+    addMessage,
+    updateMessage,
+    conversationId,
+    setConversationId,
+    lastMetadata,
+    setLastMetadata,
+  } = useChatSession();
+
+  const {
+    isRunning,
+    progressText,
+    currentPlan,
+    runAgent,
+    cancelRun,
+  } = useAgentRun(bridge);
+
+  const [selectedNodeLabel, setSelectedNodeLabel] = React.useState<string>('未选中');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!bridge) return;
     return bridge.subscribe((snapshot) => {
       setSelectedNodeLabel(snapshot.selectedNodeId ?? '未选中');
     });
   }, [bridge]);
 
-  const handleGenerateDemo = async () => {
-    if (!bridge) {
-      setStatusText('Bridge 未连接');
-      return;
-    }
-    setStatusText('正在生成...');
-    const result = await bridge.execute('schema.replace', {
-      schema: createAIDemoSchema(),
-    });
-    if (result.success) {
-      setStatusText('已应用 AI 演示页面');
-      return;
-    }
-    setStatusText(`生成失败：${result.error ?? '未知错误'}`);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, progressText]);
+
+  const handleSend = (text: string) => {
+    const currentConvId = conversationId ?? `conv-${Date.now()}`;
+    if (!conversationId) setConversationId(currentConvId);
+
+    addMessage({ role: 'user', content: text });
+
+    void runAgent(
+      text,
+      plannerModel,
+      blockModel,
+      currentConvId,
+      () => addMessage({ role: 'assistant', content: '' }),
+      (id, chunk) => updateMessage(id, (prev) => prev + chunk),
+      (metadata) => {
+        if (metadata) setLastMetadata(metadata);
+      },
+      (err) => addMessage({ role: 'assistant', content: `[Error]: ${err}` })
+    );
   };
 
   return (
@@ -44,47 +84,68 @@ export function AIPanel({ bridge }: AIPanelProps) {
           <span className="text-[11px] font-bold uppercase tracking-wider">AI Assistant</span>
         </div>
       </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-        <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-2">
-          <span className="text-[11px] text-text-secondary">当前选中节点：{selectedNodeLabel}</span>
-          <span className="text-[11px] text-text-secondary">状态：{statusText}</span>
-          <button
-            type="button"
-            onClick={handleGenerateDemo}
-            className="self-start mt-1 h-7 px-3 rounded border border-border-ide bg-bg-activity-bar text-[12px] text-text-primary hover:border-blue-500 transition-colors"
-          >
-            生成演示页面
-          </button>
-        </div>
 
-        {/* Mock Messages */}
-        <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-text-secondary font-semibold">Shenbi AI</span>
-          <div className="bg-bg-canvas border border-border-ide text-text-primary text-[12px] p-2 rounded-md rounded-tl-none leading-relaxed">
-            你好！我是 Shenbi 智能开发助手。您可以让我帮您生成布局、绑定数据、调整样式，甚至是完整生成一个应用页面。有什么我可以帮您的吗？
-          </div>
-        </div>
-        
-        <div className="flex flex-col gap-1 items-end mt-2">
-          <span className="text-[10px] text-text-secondary font-semibold">You</span>
-          <div className="bg-blue-600 text-white text-[12px] p-2 rounded-md rounded-tr-none leading-relaxed shadow-sm">
-            帮我设计一个高级的数据看板页面，带有深色模式支持和响应式。
-          </div>
-        </div>
+      <div className="flex-none p-3 border-b border-border-ide flex gap-4 bg-bg-canvas">
+        <ModelSelector label="Planner" models={plannerModels} value={plannerModel} onChange={setPlannerModel} disabled={isRunning} />
+        <ModelSelector label="Block" models={blockModels} value={blockModel} onChange={setBlockModel} disabled={isRunning} />
       </div>
 
-      <div className="p-3 border-t border-border-ide shrink-0 bg-bg-panel">
-        <div className="relative flex items-center">
-          <input 
-            type="text" 
-            placeholder="Ask AI anything... (Cmd+K)" 
-            className="w-full bg-bg-canvas border border-border-ide text-text-primary text-[12px] rounded-md pl-3 pr-8 py-2 focus:outline-none focus:border-blue-500 transition-colors shadow-inner"
-          />
-          <button className="absolute right-2 p-1 text-text-secondary hover:text-blue-500 transition-colors">
-            <Send size={14} />
-          </button>
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        {messages.length === 0 && (
+          <div className="text-[12px] text-text-secondary text-center py-10 opacity-60">
+            你好！我是 Shenbi 智能开发助手。可以帮您生成布局、绑定数据、调整样式。<br />有什么我可以帮您的吗？
+          </div>
+        )}
+
+        <ChatMessageList messages={messages} />
+
+        {isRunning && (
+          <div className="bg-bg-activity-bar border border-border-ide rounded-md p-3 flex flex-col gap-2 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 left-0 h-1 bg-blue-500 animate-pulse w-full"></div>
+            <div className="flex items-center gap-2 text-[11px] text-text-primary">
+              <Loader2 size={12} className="animate-spin text-blue-500" />
+              <span className="font-semibold text-blue-500">正在生成</span>
+              <span className="opacity-70 ml-auto truncate flex-1 text-right">{progressText}</span>
+            </div>
+            {currentPlan && (
+              <div className="mt-2 border-t border-border-ide pt-2">
+                <div className="text-[10px] text-text-secondary font-bold uppercase mb-1 flex items-center gap-1">
+                  <Info size={10} /> {currentPlan.pageTitle || '架构计划'}
+                </div>
+                <ul className="flex flex-col gap-1 pl-2">
+                  {currentPlan.blocks.map((b, i) => (
+                    <li key={i} className="text-[11px] text-text-primary flex gap-2">
+                      <span className="text-blue-400 font-mono">[{b.type}]</span>
+                      <span className="opacity-80 truncate">{b.description}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {messages.length > 0 && !isRunning && lastMetadata && (
+          <div className="text-[10px] text-text-secondary flex justify-center gap-4 opacity-50">
+            <span>耗时: {lastMetadata.durationMs}ms</span>
+            <span>Tokens: {lastMetadata.tokensUsed}</span>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div className="p-3 border-t border-border-ide shrink-0 bg-bg-canvas flex flex-col gap-2">
+        <div className="text-[10px] text-text-secondary flex justify-between">
+          <span>选中: <span className="text-blue-400">{selectedNodeLabel}</span></span>
+          {!bridge && <span className="text-red-400">Bridge 未连接</span>}
         </div>
+        <ChatInput
+          onSend={handleSend}
+          onCancel={cancelRun}
+          isRunning={isRunning}
+          disabled={!bridge}
+        />
       </div>
     </div>
   );

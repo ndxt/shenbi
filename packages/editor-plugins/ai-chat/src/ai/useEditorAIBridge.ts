@@ -8,9 +8,10 @@ import {
 
 export interface UseEditorAIBridgeOptions {
   schema: PageSchema;
-  selectedNodeId?: string;
+  selectedNodeId?: string | undefined;
   replaceSchema: (schema: PageSchema) => void;
   getAvailableComponents: () => ComponentContract[];
+  execute?: ((commandId: string, args?: unknown) => Promise<{ success: boolean; error?: string }>) | undefined;
 }
 
 export function useEditorAIBridge(options: UseEditorAIBridgeOptions): EditorAIBridge {
@@ -35,6 +36,13 @@ export function useEditorAIBridge(options: UseEditorAIBridgeOptions): EditorAIBr
     getSnapshot: () => snapshotRef.current,
     replaceSchema: options.replaceSchema,
     getAvailableComponents: options.getAvailableComponents,
+    execute: options.execute ?? (async (cmd, args) => {
+      if (cmd === 'schema.replace') {
+        options.replaceSchema((args as any).schema);
+        return { success: true };
+      }
+      return { success: false, error: 'Command not supported in standalone useEditorAIBridge' };
+    }),
     subscribe: (listener) => {
       listenersRef.current.add(listener);
       listener(snapshotRef.current);
@@ -42,5 +50,5 @@ export function useEditorAIBridge(options: UseEditorAIBridgeOptions): EditorAIBr
         listenersRef.current.delete(listener);
       };
     },
-  }), [options.getAvailableComponents, options.replaceSchema]);
+  }), [options.execute, options.getAvailableComponents, options.replaceSchema]);
 }
