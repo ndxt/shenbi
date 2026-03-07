@@ -253,6 +253,33 @@ export function removeSchemaNode(
 
 这样能先覆盖 AI 页面生成最主要的“向 body 逐块插入”场景，避免一次把所有 schema 容器都做复杂。
 
+### 3.1.2 精确定义
+
+为避免实现歧义，首版按以下规则执行：
+
+- `appendSchemaNode(schema, undefined, node)`
+  - 若 `schema.body` 为数组：追加到末尾
+  - 若 `schema.body` 为单个 `SchemaNode`：转换为数组 `[existingBody, node]`
+- `insertSchemaNodeAt(schema, undefined, index, node)`
+  - 若 `schema.body` 为数组：按 `index` 插入
+  - 若 `schema.body` 为单个 `SchemaNode`：先归一化为数组，再插入
+  - `index < 0` 时按 `0` 处理；`index > length` 时按 `length` 处理
+- 对于非顶层父节点：
+  - 仅当目标节点存在且 `children` 为数组时允许插入
+  - `children` 不存在、为表达式、或不是数组时，返回原 schema
+- `removeSchemaNode(schema, treeId)`
+  - `treeId === 'body'` 且 `body` 为单节点时，删除后变为 `[]`
+  - `treeId` 命中 `body.{index}` 时，从顶层数组删除对应项
+  - `treeId` 命中 `*.children.{index}` 时，从对应 `children` 数组删除对应项
+  - 删除后不主动把数组再收缩回单节点，保持结构稳定
+- 所有结构命令遇到非法路径、非法参数或不支持的容器时，统一返回原 schema
+
+### 3.1.3 选择态与 treeId 约定
+
+- `editor-core` 的结构命令只负责 schema 变换，不直接负责选择态修复
+- 选择态回退仍由宿主层沿用当前 `useSelectionSync` 机制处理
+- AI 生成的节点必须带稳定的 `node.id`，便于取消生成、定位节点和后续增量清理
+
 ### 3.2 注册新命令
 
 ```typescript
@@ -305,6 +332,43 @@ commands.register({
 这样用户只需一次 undo 就能回退整次 AI 生成。
 
 **二期可选**：如果需要更精细的控制（比如保留中间 block 的 undo 能力），可在 `CommandManager` 中增加 `beginBatch()` / `endBatch()` 事务模式，将批次内的多次操作合并为一个 history 快照。但首版用 `recordHistory: false` 已足够。
+
+### 3.4 取消生成、回滚与 history 时序
+
+为了让“取消生成”和“整次 AI 生成只需一次 undo”同时成立，首版补充如下时序约束：
+
+1. 开始生成前，AI 插件保存 `preGenerationSchema`
+2. 流式阶段的 `node.append / node.insertAt / node.remove` 一律 `recordHistory: false`
+3. 生成成功时，最终结果通过 `schema.replace` 落盘，形成唯一一条 history 记录
+4. 用户取消生成时，不应直接用会记录 history 的 `schema.replace(preGenerationSchema)` 回滚，否则会产生无意义的 undo 记录
+
+因此首版需要提供一个**无 history 回滚路径**，二选一：
+
+- 方案 A：新增 `schema.restore` 内建命令，语义等同于 `schema.replace`，但 `recordHistory: false`
+- 方案 B：AI 插件跟踪本次插入的节点 id / treeId，取消时按逆序执行 `node.remove` 清理，仍然保持 `recordHistory: false`
+
+推荐采用 **方案 A**，实现更简单、行为更稳定：
+
+```typescript
+commands.register({
+  id: 'schema.restore',
+  label: 'Restore Schema',
+  recordHistory: false,
+  execute(state, args: { schema: PageSchema }) {
+    const schema = extractSchemaFromArgs(args);
+    state.setSchema(schema);
+    state.setDirty(true);
+    eventBus.emit('schema:changed', { schema });
+  },
+});
+```
+
+对应插件时序：
+
+- `start`：保存 `preGenerationSchema`
+- `plan/block`：持续调用 `appendBlock(...)`
+- `cancel`：调用 `schema.restore(preGenerationSchema)`，不产生新的 undo 记录
+- `done`：调用 `schema.replace(finalSchema)`，用户后续一次 undo 即可回到 `preGenerationSchema`
 
 ## 四、editor-plugins/ai-chat 全面改造
 
@@ -474,6 +538,21 @@ interface CreateAIChatPluginOptions {
 - `preview` 可通过 dev proxy 或环境变量访问 `ai-api`
 - 这样也能避免把服务端依赖和密钥管理混进前端预览应用
 
+### 5.0 首版宿主框架选择
+
+首版建议在 `apps/ai-api` 中使用 **Hono** 作为 HTTP 宿主框架：
+
+- 足够轻量，适合只承载 API / SSE
+- 与当前方案中大量使用的 Web `Request` / `Response` / `ReadableStream` 心智模型一致
+- 不强绑定页面层、路由文件系统或全栈运行时
+- 后续若要迁移到 Express / Fastify / Next.js Route Handlers，`packages/ai-service` 不需要改
+
+因此首版默认假设：
+
+- `apps/ai-api` = Node.js + Hono
+- `packages/ai-service` = 框架无关纯逻辑层
+- `apps/preview` = Vite 前端，通过 proxy 调用 `ai-api`
+
 API 路由直接复用设计文档中的定义：
 
 **AI 核心路由**：
@@ -571,6 +650,100 @@ API Key 仅存在于 `apps/ai-api` 服务端，前端不接触。
 - `/api/ai/components` 返回的 `ComponentContract[]`
 
 前端允许先用 mock 数据和 mock SSE 事件流开发；后端只需保证最终契约与 mock 一致即可接入。
+
+### 5.2 契约冻结 - TypeScript 接口
+
+以下接口作为首版唯一契约基线，前后端 mock、联调、测试都以此为准：
+
+```typescript
+interface GenerateRequest {
+  prompt: string;
+  plannerModel?: string;
+  blockModel?: string;
+}
+
+interface GenerateMetadata {
+  sessionId: string;
+  plannerModel: string;
+  blockModel: string;
+  tokensUsed?: number;
+  durationMs?: number;
+  repairs?: Array<{ message: string; path?: string }>;
+}
+
+interface GenerateResponse {
+  success: true;
+  data: {
+    schema: PageSchema;
+    metadata: GenerateMetadata;
+  };
+}
+
+interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  maxTokens?: number;
+  features?: string[];
+  costPer1kTokens?: {
+    input: number;
+    output: number;
+  };
+}
+
+type StreamEvent =
+  | { type: 'plan'; data: PagePlan }
+  | { type: 'block'; data: { blockId: string; node: SchemaNode } }
+  | { type: 'done'; data: { schema: PageSchema; metadata?: GenerateMetadata } }
+  | { type: 'error'; data: { message: string; code?: string } };
+
+interface FeedbackRequest {
+  sessionId: string;
+  rating: 1 | 2 | 3 | 4 | 5;
+  feedback?: string;
+}
+```
+
+### 5.3 `apps/ai-api` 目录与脚本约定
+
+首版宿主按如下目录组织：
+
+```text
+apps/ai-api/
+├── package.json
+├── tsconfig.json
+├── .env
+└── src/
+    ├── index.ts
+    ├── server.ts
+    ├── routes/
+    │   ├── generate.ts
+    │   ├── stream.ts
+    │   ├── models.ts
+    │   ├── components.ts
+    │   ├── validate.ts
+    │   └── feedback.ts
+    ├── middleware/
+    │   ├── rate-limit.ts
+    │   ├── request-id.ts
+    │   └── error-handler.ts
+    └── adapters/
+        ├── env.ts
+        ├── logger.ts
+        └── contracts.ts
+```
+
+推荐脚本：
+
+```json
+{
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "type-check": "tsc -p tsconfig.json --noEmit"
+  }
+}
+```
 
 ## 六、不需要修改的部分
 
