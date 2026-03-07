@@ -1,0 +1,244 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createApp } from '../app.ts';
+import type { AgentRuntime } from '../runtime/types.ts';
+import type { AgentEvent, RunMetadata } from '../adapters/contracts.ts';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const VALID_BODY = {
+  prompt: 'Build a dashboard page',
+  context: {
+    schemaSummary: 'empty page',
+    componentSummary: 'HeroSection, DataTable',
+  },
+};
+
+const FAKE_SESSION = 'test-session-1';
+
+const FAKE_META: RunMetadata = {
+  sessionId: FAKE_SESSION,
+  plannerModel: 'fake',
+  blockModel: 'fake',
+  tokensUsed: 10,
+  durationMs: 5,
+};
+
+const FAKE_EVENTS: AgentEvent[] = [
+  { type: 'run:start', data: { sessionId: FAKE_SESSION } },
+  { type: 'message:delta', data: { text: 'Hello' } },
+  { type: 'done', data: { metadata: FAKE_META } },
+];
+
+function makeRuntime(overrides: Partial<AgentRuntime> = {}): AgentRuntime {
+  return {
+    async run() {
+      return { events: FAKE_EVENTS, metadata: FAKE_META };
+    },
+    async *runStream() {
+      for (const e of FAKE_EVENTS) {
+        yield e;
+      }
+    },
+    ...overrides,
+  };
+}
+
+async function readSSE(response: Response): Promise<AgentEvent[]> {
+  const text = await response.text();
+  const events: AgentEvent[] = [];
+  for (const line of text.split('\n')) {
+    if (line.startsWith('data: ')) {
+      events.push(JSON.parse(line.slice(6)) as AgentEvent);
+    }
+  }
+  return events;
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe('GET /health', () => {
+  it('returns 200', async () => {
+    const app = createApp();
+    const res = await app.request('/health');
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({ status: 'ok' });
+  });
+});
+
+describe('GET /api/ai/models', () => {
+  it('returns model list', async () => {
+    const app = createApp();
+    const res = await app.request('/api/ai/models');
+    expect(res.status).toBe(200);
+    const json = await res.json() as { success: boolean; data: unknown[] };
+    expect(json.success).toBe(true);
+    expect(Array.isArray(json.data)).toBe(true);
+    expect((json.data as Array<{ id: string }>).length).toBeGreaterThan(0);
+    const model = (json.data as Array<{ id: string; provider: string }>)[0];
+    expect(typeof model?.id).toBe('string');
+    expect(typeof model?.provider).toBe('string');
+  });
+});
+
+describe('POST /api/ai/run — happy path', () => {
+  it('returns full RunResponse', async () => {
+    const app = createApp({ runtime: makeRuntime() });
+    const res = await app.request('/api/ai/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(VALID_BODY),
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json() as { success: boolean; data: { events: AgentEvent[]; metadata: RunMetadata } };
+    expect(json.success).toBe(true);
+    expect(Array.isArray(json.data.events)).toBe(true);
+    expect(json.data.metadata.sessionId).toBe(FAKE_SESSION);
+  });
+});
+
+describe('POST /api/ai/run — validation 400', () => {
+  it('rejects missing prompt', async () => {
+    const app = createApp();
+    const res = await app.request('/api/ai/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ context: { schemaSummary: 'x', componentSummary: 'y' } }),
+    });
+    expect(res.status).toBe(400);
+    const json = await res.json() as { success: boolean; error: string };
+    expect(json.success).toBe(false);
+    expect(json.error).toMatch(/prompt/i);
+  });
+
+  it('rejects missing context.schemaSummary', async () => {
+    const app = createApp();
+    const res = await app.request('/api/ai/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'hi', context: { componentSummary: 'y' } }),
+    });
+    expect(res.status).toBe(400);
+    const json = await res.json() as { success: boolean; error: string };
+    expect(json.error).toMatch(/schemaSummary/i);
+  });
+
+  it('rejects missing context.componentSummary', async () => {
+    const app = createApp();
+    const res = await app.request('/api/ai/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'hi', context: { schemaSummary: 'x' } }),
+    });
+    expect(res.status).toBe(400);
+    const json = await res.json() as { success: boolean; error: string };
+    expect(json.error).toMatch(/componentSummary/i);
+  });
+
+  it('rejects non-JSON body', async () => {
+    const app = createApp();
+    const res = await app.request('/api/ai/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: 'not json',
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/ai/run — 503 LLM error', () => {
+  it('maps LLMError to 503', async () => {
+    const { LLMError } = await import('../adapters/errors.ts');
+    const runtime = makeRuntime({
+      async run() {
+        throw new LLMError('Provider unavailable');
+      },
+    });
+    const app = createApp({ runtime });
+    const res = await app.request('/api/ai/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(VALID_BODY),
+    });
+    expect(res.status).toBe(503);
+    const json = await res.json() as { success: boolean; error: string };
+    expect(json.success).toBe(false);
+    expect(json.error).toBe('Provider unavailable');
+  });
+});
+
+describe('POST /api/ai/run — 429 rate limit', () => {
+  it('rejects after exceeding limit', async () => {
+    // 独立 store 确保测试隔离，不受其他用例影响
+    const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+    const app = createApp({ runtime: makeRuntime(), rateLimitStore });
+
+    const results: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      const res = await app.request('/api/ai/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-forwarded-for': '9.9.9.9',
+        },
+        body: JSON.stringify(VALID_BODY),
+      });
+      results.push(res.status);
+    }
+
+    expect(results.filter((s) => s === 429).length).toBeGreaterThan(0);
+    expect(results.filter((s) => s === 200).length).toBe(10);
+  });
+});
+
+describe('POST /api/ai/run/stream — SSE', () => {
+  it('returns text/event-stream with AgentEvents', async () => {
+    const app = createApp({ runtime: makeRuntime() });
+    const res = await app.request('/api/ai/run/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(VALID_BODY),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/event-stream');
+
+    const events = await readSSE(res);
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]?.type).toBe('run:start');
+    expect(events.at(-1)?.type).toBe('done');
+  });
+
+  it('returns 400 for invalid request', async () => {
+    const app = createApp();
+    const res = await app.request('/api/ai/run/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: '' }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('emits error event on stream runtime failure', async () => {
+    const { LLMError } = await import('../adapters/errors.ts');
+    const runtime = makeRuntime({
+      async *runStream() {
+        throw new LLMError('stream blow up');
+      },
+    });
+    const app = createApp({ runtime });
+    const res = await app.request('/api/ai/run/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(VALID_BODY),
+    });
+    expect(res.status).toBe(200);
+    const events = await readSSE(res);
+    const errorEvent = events.find((e) => e.type === 'error');
+    expect(errorEvent).toBeDefined();
+  });
+});
