@@ -20,6 +20,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@shenbi/ai-contracts": "workspace:*",
     "@shenbi/editor-plugin-api": "workspace:*",
     "@shenbi/schema": "workspace:*",
     "lucide-react": "^0.575.0"
