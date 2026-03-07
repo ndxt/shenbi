@@ -62,6 +62,12 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
     const [currentPlan, setCurrentPlan] = useState<PlanConfig | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
+    // Stable refs to avoid unstable callback deps
+    const bridgeRef = useRef(bridge);
+    bridgeRef.current = bridge;
+    const isRunningRef = useRef(isRunning);
+    isRunningRef.current = isRunning;
+
     // store preGenerationSchema for rollback
     const preGenerationSchemaRef = useRef<PageSchema | null>(null);
 
@@ -85,17 +91,17 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         return () => window.removeEventListener('keydown', handleKeyDown, true);
     }, [isRunning]);
 
-    const lockHistory = async () => {
-        if (bridge) {
-            await bridge.execute('history.lock'); // optional execution
+    const lockHistory = useCallback(async () => {
+        if (bridgeRef.current) {
+            await bridgeRef.current.execute('history.lock');
         }
-    };
+    }, []);
 
-    const unlockHistory = async () => {
-        if (bridge) {
-            await bridge.execute('history.unlock'); // optional execution
+    const unlockHistory = useCallback(async () => {
+        if (bridgeRef.current) {
+            await bridgeRef.current.execute('history.unlock');
         }
-    };
+    }, []);
 
     const cancelRun = useCallback(async () => {
         if (abortControllerRef.current) {
@@ -106,10 +112,10 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         setProgressText('已取消');
         setCurrentPlan(null);
         await unlockHistory();
-        if (preGenerationSchemaRef.current && bridge) {
-            await bridge.execute('schema.restore', { schema: preGenerationSchemaRef.current });
+        if (preGenerationSchemaRef.current && bridgeRef.current) {
+            await bridgeRef.current.execute('schema.restore', { schema: preGenerationSchemaRef.current });
         }
-    }, [bridge]);
+    }, [unlockHistory]);
 
     const runAgent = useCallback(
         async (
@@ -122,8 +128,8 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             onDone: (metadata: RunMetadata) => void,
             onError: (err: string) => void
         ) => {
-            if (!bridge) return;
-            if (isRunning) return;
+            if (!bridgeRef.current) return;
+            if (isRunningRef.current) return;
 
             setIsRunning(true);
             setProgressText('初始化...');
@@ -133,12 +139,12 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             abortControllerRef.current = ac;
 
             // Pre-run setup
-            preGenerationSchemaRef.current = bridge.getSchema();
+            preGenerationSchemaRef.current = bridgeRef.current.getSchema();
             await lockHistory();
 
-            const schemaSummary = summarizeSchema(bridge.getSchema());
-            const componentSummary = summarizeComponents(bridge.getAvailableComponents());
-            const selectedNodeId = bridge.getSelectedNodeId();
+            const schemaSummary = summarizeSchema(bridgeRef.current.getSchema());
+            const componentSummary = summarizeComponents(bridgeRef.current.getAvailableComponents());
+            const selectedNodeId = bridgeRef.current.getSelectedNodeId();
 
             const request: RunRequest = {
                 prompt,
@@ -185,11 +191,11 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             break;
                         case 'schema:block':
                             setProgressText(`正在插入节点: ${event.data.node.component}`);
-                            await bridge.appendBlock(event.data.node);
+                            await bridgeRef.current?.appendBlock(event.data.node);
                             break;
                         case 'schema:done':
                             setProgressText('更新页面 Schema');
-                            bridge.replaceSchema(event.data.schema);
+                            bridgeRef.current?.replaceSchema(event.data.schema);
                             break;
                         case 'done':
                             onDone(event.data.metadata);
@@ -211,7 +217,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                 }
             }
         },
-        [bridge, isRunning, cancelRun]
+        [cancelRun, lockHistory, unlockHistory]
     );
 
     return {
