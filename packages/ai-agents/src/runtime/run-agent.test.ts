@@ -144,7 +144,7 @@ describe('runAgent', () => {
     const storedConversation = await deps.memory.getConversation('conv-1');
     expect(storedConversation).toEqual([
       { role: 'user', text: 'Generate an admin page' },
-      { role: 'assistant', text: 'Generate an admin page' },
+      { role: 'assistant', text: 'Planning page structure.' },
     ]);
     expect(await deps.memory.getLastBlockIds('conv-1')).toEqual(['hero', 'table']);
   });

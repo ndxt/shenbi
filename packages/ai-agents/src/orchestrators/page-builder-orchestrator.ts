@@ -88,5 +88,4 @@ export async function* pageBuilderOrchestrator(
   }
 
   yield { type: 'schema:done', data: { schema: finalSchema } };
-  yield { type: 'done', data: { metadata } };
 }

@@ -4,7 +4,7 @@ export async function* chatOrchestrator(
   request: RunRequest,
   context: AgentRuntimeContext,
   deps: AgentRuntimeDeps,
-  metadata: RunMetadata,
+  _metadata: RunMetadata,
 ): AsyncGenerator<AgentEvent> {
   yield { type: 'message:start', data: { role: 'assistant' } };
 
@@ -23,6 +23,4 @@ export async function* chatOrchestrator(
   if (!emittedDelta) {
     yield { type: 'message:delta', data: { text: 'No response generated.' } };
   }
-
-  yield { type: 'done', data: { metadata } };
 }
