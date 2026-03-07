@@ -10,21 +10,21 @@
 import { Hono } from 'hono';
 import { validateRunRequest } from './validate.ts';
 import { handleError } from '../middleware/error-handler.ts';
-import { logRequest } from '../adapters/logger.ts';
-import { logger } from '../adapters/logger.ts';
+import { logRequest, logger } from '../adapters/logger.ts';
 import type { AgentRuntime } from '../runtime/types.ts';
+import type { RunRequest } from '../adapters/contracts.ts';
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
-let activeConnections = 0;
 
 export function createRunStreamRoute(runtime: AgentRuntime): Hono {
+  let activeConnections = 0;
   const app = new Hono();
 
   app.post('/', async (c) => {
     const requestId = (c.get('requestId' as never) as string | undefined) ?? 'unknown';
     const start = Date.now();
 
-    let req;
+    let req: RunRequest;
     try {
       const body = await c.req.json().catch(() => null);
       req = validateRunRequest(body);

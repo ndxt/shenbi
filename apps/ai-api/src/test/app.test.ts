@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createApp } from '../app.ts';
 import type { AgentRuntime } from '../runtime/types.ts';
 import type { AgentEvent, RunMetadata } from '../adapters/contracts.ts';

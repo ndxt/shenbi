@@ -39,10 +39,10 @@ export function logRequest(entry: RequestLogEntry): void {
   const metric = entry.success ? 'ai.request.count[success]' : 'ai.request.count[fail]';
   logger.info(metric, {
     requestId: entry.requestId,
-    sessionId: entry.sessionId,
-    model: entry.model,
-    durationMs: entry.durationMs,
+    ...(entry.sessionId !== undefined ? { sessionId: entry.sessionId } : {}),
+    ...(entry.model !== undefined ? { model: entry.model } : {}),
+    ...(entry.durationMs !== undefined ? { durationMs: entry.durationMs } : {}),
     route: entry.route,
-    ...(entry.errorCode ? { errorCode: entry.errorCode } : {}),
+    ...(entry.errorCode !== undefined ? { errorCode: entry.errorCode } : {}),
   });
 }
