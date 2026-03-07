@@ -57,18 +57,20 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
   }, [messages, progressText]);
 
   const handleSend = (text: string) => {
+    const currentConvId = conversationId ?? `conv-${Date.now()}`;
+    if (!conversationId) setConversationId(currentConvId);
+
     addMessage({ role: 'user', content: text });
 
     void runAgent(
       text,
       plannerModel,
       blockModel,
-      conversationId,
+      currentConvId,
       () => addMessage({ role: 'assistant', content: '' }),
       (id, chunk) => updateMessage(id, (prev) => prev + chunk),
       (metadata) => {
         if (metadata) setLastMetadata(metadata);
-        setConversationId(`conv-${Date.now()}`);
       },
       (err) => addMessage({ role: 'assistant', content: `[Error]: ${err}` })
     );

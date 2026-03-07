@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import { aiClient } from '../ai/sse-client';
@@ -17,6 +17,26 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
 
     // store preGenerationSchema for rollback
     const preGenerationSchemaRef = useRef<PageSchema | null>(null);
+
+    // Block undo/redo globally during generation
+    useEffect(() => {
+        if (!isRunning) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const isZ = e.key.toLowerCase() === 'z';
+            const isY = e.key.toLowerCase() === 'y';
+            const isMacCmd = e.metaKey;
+            const isWinCtrl = e.ctrlKey;
+
+            if ((isMacCmd || isWinCtrl) && (isZ || isY)) {
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown, true);
+        return () => window.removeEventListener('keydown', handleKeyDown, true);
+    }, [isRunning]);
 
     const lockHistory = async () => {
         if (bridge) {
