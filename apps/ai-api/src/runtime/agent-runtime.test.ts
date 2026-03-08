@@ -107,4 +107,11 @@ describe('agent runtime json salvage', () => {
     expect(salvaged).toBe('{"component":"Card","children":[{"component":"Button","children":["确定"]}]}');
     expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Card' });
   });
+
+  it('salvages near-valid json with extra trailing closing braces', () => {
+    const raw = '{"component":"Card","children":[{"component":"Tag","children":["在职"]}]}]}}]}';
+    const salvaged = trySalvageJsonCandidate(raw);
+    expect(salvaged).toBe('{"component":"Card","children":[{"component":"Tag","children":["在职"]}]}');
+    expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Card' });
+  });
 });

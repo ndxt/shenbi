@@ -153,15 +153,37 @@ function trySalvageJsonCandidate(text: string): string | null {
   }
 
   const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start < 0 && end < 0) {
+  if (start < 0) {
     return null;
   }
 
-  const base = (start >= 0 ? text.slice(start) : text).trim();
+  const end = text.lastIndexOf('}');
+  const base = text.slice(start, end >= start ? end + 1 : text.length).trim();
   const openCount = countOutsideStrings(base, '{');
   const closeCount = countOutsideStrings(base, '}');
-  if (openCount <= closeCount || openCount - closeCount > 8) {
+  if (openCount === closeCount) {
+    return base;
+  }
+  if (openCount < closeCount) {
+    let trimmed = base;
+    while (trimmed.length > 0) {
+      const next = trimmed.trimEnd().slice(0, -1);
+      if (!next) {
+        break;
+      }
+      const nextOpenCount = countOutsideStrings(next, '{');
+      const nextCloseCount = countOutsideStrings(next, '}');
+      trimmed = next;
+      if (nextOpenCount === nextCloseCount) {
+        return trimmed.trim();
+      }
+      if (nextCloseCount < nextOpenCount) {
+        break;
+      }
+    }
+    return null;
+  }
+  if (openCount - closeCount > 8) {
     return null;
   }
 
