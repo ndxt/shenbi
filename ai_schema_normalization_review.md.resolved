@@ -1,0 +1,261 @@
+# Schema Normalization 修复审查与统一层建议
+
+## 一、审查结论
+
+**你做的修复方向完全正确，3 次修复本质上属于同一个根因。**
+
+是的，现在已经到了必须引入统一 schema 规范化层的阶段。理由如下：
+
+| 指标 | 现状 |
+|------|------|
+| [agent-runtime.ts](file:///d:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts) 行数 | 336 → **798 行** (+137%)，绝大部分新增都是 normalization 逻辑 |
+| 修复分布 | 3 处独立修复，分别针对 children / props / columns，缺乏统一入口 |
+| 新增函数 | 7 个 normalization 函数混在与 prompt / LLM / tool 无关的文件里 |
+| 可测性 | normalization 逻辑与 LLM client / env 耦合在同一文件，难以单独测试 |
+
+---
+
+## 二、逐处审查
+
+### 修复 1: [normalizeChildrenForComponent](file:///d:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#252-373)（L252-372）
+
+**✅ 做法正确**，按组件类型收敛 children 结构。
+
+具体表现良好的点：
+- Alert / Statistic / Table / Tabs 等 `children: none` 型组件直接 `delete node.children` — 正确
+- Typography / Tag 只保留文本 — 正确
+- Row 自动包 Col — 正确
+- Form 自动包 FormItem — 正确
+- Descriptions 自动包 Descriptions.Item — 正确
+
+**⚠️ 需要注意的问题：**
+
+1. **L329: `child.component === 'Form.Item'` 应该也匹配 `'FormItem'`**
+
+   当前的 supportedComponents 里写的是 `'FormItem'`（L43），但 LLM 有时候会生成 `'Form.Item'`。修复里只判断了 `'Form.Item'`（L329），没有判断 `'FormItem'`。建议两个都判断：
+
+   ```typescript
+   if (child.component === 'FormItem' || child.component === 'Form.Item') {
+     return child;
+   }
+   ```
+
+2. **L272: Typography 的 fallback 链 `node.props?.title || node.props?.label || '内容'`**
+
+   这里如果 `title` 或 `label` 是一个 object 类型（被模型错误生成），就会变成 `[object Object]`。建议也用 [flattenToText](file:///d:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#139-151)：
+
+   ```typescript
+   node.children = [text || flattenToText(node.props?.title) || flattenToText(node.props?.label) || '内容'];
+   ```
+
+3. **`default` 分支 (L360-370) 调用 [normalizeChildrenPayload](file:///d:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#152-160) — 太宽松**
+
+   对不在 switch 里的组件（如 `Space`, `Card`, [Col](file:///d:/Code/lowcode/shenbi-codes/shenbi/packages/schema/types/node.ts#12-24), `Container`），它会把 children 分成"全是 node"和"全是 text"两种情况。但没处理混合情况（node 和 text 混在一起），混合 children 会直接丢失 text 节点。
+
+### 修复 2: [normalizeNodeProps](file:///d:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#161-251)（L161-250）
+
+**✅ 做法正确**，slot-like props 做安全清洗。
+
+**⚠️ 需要注意的问题：**
+
+1. **L167: `textPropKeys = ['title', 'label', 'description', 'extra', 'placeholder']` 是平坦处理**
+
+   但实际上，有些组件的 `title` / [extra](file:///d:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#77-86) 在 contract 里确实是 [SchemaNode](file:///d:/Code/lowcode/shenbi-codes/shenbi/packages/schema/types/node.ts#31-51) 类型（如 Card.title 在 Ant Design 原生支持 ReactNode）。你的引擎是否不支持 SchemaNode 型 props？
+
+   - 如果引擎不支持 → 当前做法正确（全部 flatten）
+   - 如果引擎支持 → 应该按 contract 的 prop type 判断，[SchemaNode](file:///d:/Code/lowcode/shenbi-codes/shenbi/packages/schema/types/node.ts#31-51) 型的保留，`string` 型的 flatten
+
+   **建议**：当前阶段保持 flatten（安全第一），Phase 2 基于 contract 做精确判断。
+
+2. **L189-191: Alert 删除 `action` / `closeText` / `icon`**
+
+   这些字段在 contract 里都是 [SchemaNode](file:///d:/Code/lowcode/shenbi-codes/shenbi/packages/schema/types/node.ts#31-51) 类型。如果模型生成了它们，直接删除会导致语义丢失。更好的做法是：
+   - `icon` → 如果是字符串保留（antd 支持 icon 字符串），如果是对象删除
+   - `action` → 如果是合法 SchemaNode 保留，否则删除
+
+   但当前阶段直接删除是**安全的**，只是不够精细。
+
+3. **L221-223: Tag 直接删除 `icon` prop**
+
+   同理，如果是字符串 icon 名，不需要删。
+
+### 修复 3: Table columns 处理（L225-249）
+
+**✅ 做法正确且关键**。把 `props.columns` 提升到 `node.columns` 让引擎走 ColumnSchema 编译链，这是最正确的处理方式。
+
+具体做得好的点：
+- 删除 object 型 `render` / `editRender` — 正确，避免 "not a function"
+- 补齐 `dataIndex` / `key` / `title` — 正确，保证表格最低可渲染
+- 把处理过的 columns 提升到顶层 `node.columns` — 正确，对接引擎编译链
+
+**⚠️ 没有问题，这个修复是 3 个里最干净的。**
+
+---
+
+## 三、是否应该统一成一个模块？
+
+### 结论：**是的，而且现在就该做。**
+
+原因：
+
+| 现状问题 | 影响 |
+|---------|------|
+| 7 个 normalization 函数散落在 798 行文件里 | 新组件每次报错都要在这里加 if/else，文件会无限膨胀 |
+| 与 prompt / LLM client / env 混在一起 | 无法单独为 normalization 写单元测试 |
+| 路径是 `apps/ai-api/src/runtime/` | 如果别的入口（如测试、CLI）也需要规范化，拿不到 |
+| 纯手写规则 | 新增组件时容易忘记加规则 |
+
+### 推荐模块拆分
+
+```
+apps/ai-api/src/runtime/
+  agent-runtime.ts          ← 只保留 prompt / LLM / tool 注册
+  normalize-schema.ts       ← 统一规范化层（新建）
+  types.ts                  ← 保持不变
+```
+
+`normalize-schema.ts` 统一暴露一个函数：
+
+```typescript
+export function normalizeGeneratedNode(
+  node: SchemaNode,
+  options?: { strict?: boolean }
+): SchemaNode
+```
+
+内部按职责分 4 个阶段：
+
+```
+Stage 1: normalizeComponentName     → 未知组件降级为 Container
+Stage 2: normalizeNodeProps         → slot-like props 安全化
+Stage 3: normalizeChildren          → 按组件 children.type 收敛
+Stage 4: normalizeSpecialComponents → Table columns、Form 嵌套等
+```
+
+### 函数调用关系
+
+```
+agent-runtime.ts
+  └─ generateBlock()
+       └─ validateNode(node)
+            └─ normalizeGeneratedNode(node)   ← 新模块的单一入口
+                 ├─ normalizeComponentName(node)
+                 ├─ normalizeNodeProps(node)
+                 ├─ normalizeChildren(node)
+                 └─ normalizeSpecialComponents(node)
+                      ├─ normalizeTableNode(node)
+                      ├─ normalizeFormNode(node)
+                      ├─ normalizeDescriptionsNode(node)
+                      └─ ...
+```
+
+### Stage 1: 组件名合法化
+
+```typescript
+function normalizeComponentName(node: SchemaNode): void {
+  // HTML 原生标签映射
+  const htmlMapping: Record<string, string> = {
+    div: 'Container', section: 'Container', header: 'Container',
+    footer: 'Container', main: 'Container', nav: 'Container',
+    span: 'Typography.Text', p: 'Typography.Paragraph',
+    h1: 'Typography.Title', h2: 'Typography.Title', h3: 'Typography.Title',
+    a: 'Button', img: 'Image',
+  };
+  
+  if (htmlMapping[node.component]) {
+    node.component = htmlMapping[node.component];
+    return;
+  }
+  if (!supportedComponentSet.has(node.component)) {
+    node.component = 'Container';
+  }
+}
+```
+
+### Stage 2: slot-like props 安全化
+
+保持你当前的 `normalizeNodeProps`，但按组件分组更清晰。
+
+### Stage 3: children 收敛
+
+保持你当前的 `normalizeChildrenForComponent`，但用数据驱动替代 switch-case：
+
+```typescript
+// 数据驱动的 children 规则
+const childrenPolicy: Record<string, 'none' | 'text' | 'nodes'> = {
+  Alert: 'none', Statistic: 'none', Table: 'none',
+  Input: 'none', Select: 'none', DatePicker: 'none',
+  'Typography.Text': 'text', 'Typography.Title': 'text', Tag: 'text',
+  // ... 其余默认 'nodes'
+};
+```
+
+### Stage 4: 复杂组件专用修复
+
+保持你当前的 Table / Form / Descriptions 修复逻辑，独立成小函数。
+
+---
+
+## 四、实施步骤建议
+
+**不要一次大改。分 3 步：**
+
+### Step 1: 提取（不改逻辑，只搬代码）
+
+1. 新建 `apps/ai-api/src/runtime/normalize-schema.ts`
+2. 把以下函数从 `agent-runtime.ts` 搬过去（逻辑不变）：
+   - `flattenToText`
+   - `normalizeChildrenPayload`
+   - `normalizeNodeProps`
+   - `normalizeChildrenForComponent`
+   - `isTextLike`
+   - `isNodeLike`（这个两边都要用，export 出来）
+3. 暴露一个 `normalizeGeneratedNode(node)` 做入口
+4. `agent-runtime.ts` 的 `validateNode` 改为调用 `normalizeGeneratedNode`
+
+**验证**：行为完全不变，如果有现有测试应该仍然通过。
+
+### Step 2: 补单元测试
+
+为 `normalize-schema.ts` 写独立单测：
+
+```typescript
+// normalize-schema.test.ts
+test('div 降级为 Container', () => { ... });
+test('Alert children 被删除', () => { ... });
+test('Typography.Title 只保留文本', () => { ... });
+test('Table columns 提升到 node.columns', () => { ... });
+test('Form 自动包 FormItem', () => { ... });
+test('Descriptions 自动包 Descriptions.Item', () => { ... });
+test('嵌套对象 title 被 flatten 成文本', () => { ... });
+test('未知组件递归降级', () => { ... });
+```
+
+**验证**：`npx vitest run normalize-schema.test` 全部通过。
+
+### Step 3: 修复遗留问题
+
+1. `Form.Item` vs `FormItem` 双写兼容
+2. Typography fallback 链安全化
+3. 混合 children（node + text）的处理
+4. HTML 原生标签映射（div → Container, span → Typography.Text, 等）
+
+---
+
+## 五、对你的问题的直接回答
+
+> 这 3 次错误是否本质上属于同一个根因？
+
+**是的**。根因是：LLM 输出 schema 天然不保证符合引擎组件契约，缺少统一的"契约感知规范化层"。
+
+> 当前这些修复是否应该收敛成一个统一模块？
+
+**是的**。推荐提取为 `normalize-schema.ts`，单一函数入口 `normalizeGeneratedNode`。
+
+> 是否应该直接基于现有 contracts 做通用修复？
+
+**是但分阶段**。当前先基于手写规则（你已经做的很好），Phase 2 再从 contracts 自动提取规则（`children.type`、`prop.type` 等）。原因：contracts 的 prop type 粒度不够精确（大量 `type: 'any'`），完全开放基于 contract 修复会引入新问题。
+
+> 对于 Table / Form / Descriptions / Tabs / Timeline，是否应该建立专门的 repair policy？
+
+**是的**。这些复合组件不能靠通用规则，必须有专用修复。你当前已经做了 Table / Form / Descriptions 的，还需要补 Tabs / Timeline / Collapse。
