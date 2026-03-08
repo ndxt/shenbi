@@ -4,6 +4,7 @@ import {
   getPlannerContractSummary,
   getZoneComponentCandidates,
   getZoneContractSummary,
+  getZoneGoldenExample,
   supportedComponents,
 } from './component-catalog.ts';
 
@@ -20,5 +21,6 @@ describe('component catalog', () => {
     expect(getPlannerContractSummary()).toContain('Group filters-form');
     expect(getZoneComponentCandidates('data-table')).toContain('Table');
     expect(getZoneContractSummary('data-table', ['Table'])).toContain('Table (preferred');
+    expect(getZoneGoldenExample('filter')).toContain('"component":"Card"');
   });
 });

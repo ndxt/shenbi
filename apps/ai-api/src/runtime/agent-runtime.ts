@@ -38,6 +38,7 @@ import {
   getPlannerContractSummary,
   getZoneComponentCandidates,
   getZoneContractSummary,
+  getZoneGoldenExample,
 } from './component-catalog.ts';
 import type { AgentRuntime } from './types.ts';
 
@@ -68,17 +69,128 @@ function summarizeModelOutput(text: string): string {
   return `${compact.slice(0, 320)}...`;
 }
 
+function extractJsonCandidate(text: string): string {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  return (fenced?.[1] ?? text).trim();
+}
+
+function findBalancedJsonObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start < 0) {
+    return null;
+  }
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === '{') {
+      depth += 1;
+      continue;
+    }
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(start, index + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+function countOutsideStrings(text: string, target: string): number {
+  let count = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (const char of text) {
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === target) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function trySalvageJsonCandidate(text: string): string | null {
+  const extracted = findBalancedJsonObject(text);
+  if (extracted) {
+    return extracted;
+  }
+
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 && end < 0) {
+    return null;
+  }
+
+  const base = (start >= 0 ? text.slice(start) : text).trim();
+  const openCount = countOutsideStrings(base, '{');
+  const closeCount = countOutsideStrings(base, '}');
+  if (openCount <= closeCount || openCount - closeCount > 8) {
+    return null;
+  }
+
+  return `${base}${'}'.repeat(openCount - closeCount)}`;
+}
+
 function extractJson<T>(
   text: string,
   source: InvalidJsonSource,
   request: Pick<RunRequest, 'prompt' | 'plannerModel' | 'blockModel' | 'thinking' | 'context'>,
   model: string,
 ): T {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenced?.[1] ?? text;
+  const candidate = extractJsonCandidate(text);
   try {
     return JSON.parse(candidate.trim()) as T;
   } catch {
+    const salvagedCandidate = trySalvageJsonCandidate(candidate);
+    if (salvagedCandidate) {
+      try {
+        logger.warn('ai.model.invalid_json_salvaged', {
+          source,
+          model,
+        });
+        return JSON.parse(salvagedCandidate) as T;
+      } catch {
+        // fall through to debug dump
+      }
+    }
+
     const summarizedOutput = summarizeModelOutput(text);
     const debugFile = writeInvalidJsonDump({
       source,
@@ -271,6 +383,7 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
 function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage[] {
   const zoneCandidates = getZoneComponentCandidates(input.block.type);
   const zoneContractSummary = getZoneContractSummary(input.block.type, input.block.components);
+  const zoneGoldenExample = getZoneGoldenExample(input.block.type);
   return [
     {
       role: 'system',
@@ -280,6 +393,8 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         `For this zone, prioritize these candidate components: ${zoneCandidates.join(', ')}.`,
         'Zone-specific contract summary:',
         zoneContractSummary,
+        'Valid zone example:',
+        zoneGoldenExample,
         'Rules:',
         '- The root node component must be one of the supported components.',
         '- Every child schema node must also use only supported components.',
@@ -302,6 +417,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         '- For Descriptions, include props.column and Descriptions.Item children with label props.',
         '- For Timeline, return Timeline.Item children with short text content.',
         '- Use realistic Chinese B-end copy such as 今日出勤率, 本周迟到人数, 最近考勤记录, 审批状态.',
+        '- Keep braces and brackets balanced. Your answer must be parseable by JSON.parse without any cleanup.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Return exactly this JSON shape:',
         `{"component":"${supportedComponents.join('|')}","id":"string","props":{},"children":[]}`,
