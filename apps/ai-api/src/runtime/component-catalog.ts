@@ -8,7 +8,12 @@ type ComponentGroupName =
   | 'actions'
   | 'filters-form'
   | 'feedback-status'
-  | 'data-display';
+  | 'data-display'
+  | 'navigation'
+  | 'advanced-form'
+  | 'extended-feedback'
+  | 'identity'
+  | 'disclosure';
 
 interface FreeLayoutPattern {
   id: string;
@@ -24,6 +29,22 @@ interface ComponentGroupDefinition {
   name: ComponentGroupName;
   description: string;
   components: string[];
+}
+
+interface ComponentIndexEntry {
+  componentType: string;
+  category: string;
+  groups: ComponentGroupName[];
+  childrenType: string;
+  parentComponent?: string | undefined;
+  childComponents: string[];
+  isComposite: boolean;
+}
+
+interface CompiledLevel0Catalog {
+  byComponent: Record<string, ComponentIndexEntry>;
+  byCategory: Record<string, string[]>;
+  byGroup: Record<ComponentGroupName, string[]>;
 }
 
 interface CompiledComponentSummary {
@@ -42,6 +63,20 @@ interface CompiledComponentGroup {
   description: string;
   components: string[];
   promptSummary: string;
+}
+
+interface CompiledLevel1GroupSummary extends CompiledComponentGroup {
+  typicalZones: ZoneType[];
+  parentChildPatterns: string[];
+}
+
+interface CompiledLevel2ComponentBrief extends CompiledComponentSummary {
+  groups: ComponentGroupName[];
+  parentComponent?: string | undefined;
+  childComponents: string[];
+  miniSkeleton?: string | undefined;
+  itemsWarning?: string | undefined;
+  schemaContract: string;
 }
 
 interface ZoneTemplate {
@@ -369,7 +404,7 @@ const builtinContractMap = Object.fromEntries(
   builtinContracts.map((contract) => [contract.componentType, contract]),
 ) as Record<string, ComponentContract>;
 
-const componentGroupDefinitions: ComponentGroupDefinition[] = [
+const runtimeComponentGroupDefinitions: ComponentGroupDefinition[] = [
   {
     name: 'layout-shell',
     description: 'layout wrappers for page sections and grid composition',
@@ -409,6 +444,45 @@ const componentGroupDefinitions: ComponentGroupDefinition[] = [
       'Timeline',
       'Timeline.Item',
     ],
+  },
+];
+
+const knowledgeComponentGroupDefinitions: ComponentGroupDefinition[] = [
+  ...runtimeComponentGroupDefinitions,
+  {
+    name: 'navigation',
+    description: 'navigation, paging, and progress indication components',
+    components: ['Breadcrumb', 'Pagination', 'Steps', 'Menu'],
+  },
+  {
+    name: 'advanced-form',
+    description: 'advanced data-entry and selection controls',
+    components: [
+      'InputNumber',
+      'Radio',
+      'Radio.Group',
+      'Checkbox',
+      'Checkbox.Group',
+      'Switch',
+      'TimePicker',
+      'AutoComplete',
+      'Cascader',
+    ],
+  },
+  {
+    name: 'extended-feedback',
+    description: 'extended status and progress display components',
+    components: ['Progress', 'Badge', 'Alert', 'Tag'],
+  },
+  {
+    name: 'identity',
+    description: 'identity and lightweight persona display components',
+    components: ['Avatar'],
+  },
+  {
+    name: 'disclosure',
+    description: 'expand/collapse structured content sections',
+    components: ['Collapse', 'Collapse.Panel'],
   },
 ];
 
@@ -486,6 +560,33 @@ function summarizeContract(contract: ComponentContract): CompiledComponentSummar
   };
 }
 
+function collectComponentGroups(
+  componentType: string,
+  definitions: readonly ComponentGroupDefinition[],
+): ComponentGroupName[] {
+  return definitions
+    .filter((group) => group.components.includes(componentType))
+    .map((group) => group.name);
+}
+
+function getParentComponentHint(componentType: string): string | undefined {
+  if (componentType === 'FormItem') return 'Form';
+  if (componentType === 'Descriptions.Item') return 'Descriptions';
+  if (componentType === 'Tabs.TabPane') return 'Tabs';
+  if (componentType === 'Timeline.Item') return 'Timeline';
+  if (componentType === 'Collapse.Panel') return 'Collapse';
+  return undefined;
+}
+
+function getChildComponentHints(componentType: string): string[] {
+  if (componentType === 'Form') return ['FormItem'];
+  if (componentType === 'Descriptions') return ['Descriptions.Item'];
+  if (componentType === 'Tabs') return ['Tabs.TabPane'];
+  if (componentType === 'Timeline') return ['Timeline.Item'];
+  if (componentType === 'Collapse') return ['Collapse.Panel'];
+  return [];
+}
+
 function compileComponentGroup(definition: ComponentGroupDefinition): CompiledComponentGroup {
   const components = definition.components.filter((componentType) => builtinContractMap[componentType]);
   const promptSummary = components
@@ -508,18 +609,26 @@ function compileComponentGroup(definition: ComponentGroupDefinition): CompiledCo
   };
 }
 
-const compiledGroups = componentGroupDefinitions.map(compileComponentGroup);
-const compiledGroupMap = Object.fromEntries(compiledGroups.map((group) => [group.name, group])) as Record<ComponentGroupName, CompiledComponentGroup>;
+const runtimeCompiledGroups = runtimeComponentGroupDefinitions.map(compileComponentGroup);
+const runtimeCompiledGroupMap = Object.fromEntries(runtimeCompiledGroups.map((group) => [group.name, group])) as Record<ComponentGroupName, CompiledComponentGroup>;
+const knowledgeCompiledGroups = knowledgeComponentGroupDefinitions.map(compileComponentGroup);
 
-function uniqueComponents(groups: readonly ComponentGroupName[]): string[] {
-  return [...new Set(groups.flatMap((groupName) => compiledGroupMap[groupName].components))];
+function uniqueComponents(
+  groups: readonly ComponentGroupName[],
+  groupMap: Record<ComponentGroupName, CompiledComponentGroup>,
+): string[] {
+  return [...new Set(groups.flatMap((groupName) => groupMap[groupName]?.components ?? []))];
 }
 
-export const supportedComponents = uniqueComponents(componentGroupDefinitions.map((group) => group.name)) as string[];
+export const supportedComponents = uniqueComponents(
+  runtimeComponentGroupDefinitions.map((group) => group.name),
+  runtimeCompiledGroupMap,
+) as string[];
 export const supportedComponentList = supportedComponents.join(', ');
 export const supportedComponentSet = new Set(supportedComponents);
 export const supportedContracts = builtinContracts.filter((contract) => supportedComponentSet.has(contract.componentType));
-export const componentGroups = compiledGroups;
+export const componentGroups = runtimeCompiledGroups;
+export const knowledgeComponentGroups = knowledgeCompiledGroups;
 export const compiledZoneTemplates = zoneTemplates;
 export const compiledPageSkeletons = pageSkeletons;
 export const compiledFreeLayoutPatterns = freeLayoutPatterns;
@@ -529,8 +638,16 @@ export function getDesignPolicySummary(): string {
 }
 
 export function getPlannerContractSummary(): string {
-  return compiledGroups
-    .map((group) => `Group ${group.name}: ${group.description}\n${group.promptSummary}`)
+  return compiledLevel1Groups
+    .map((group) => {
+      const patterns = group.parentChildPatterns.length > 0
+        ? `\npatterns=${group.parentChildPatterns.join('; ')}`
+        : '';
+      const zones = group.typicalZones.length > 0
+        ? `\nzones=${group.typicalZones.join(', ')}`
+        : '';
+      return `Group ${group.name}: ${group.description}${zones}${patterns}\n${group.promptSummary}`;
+    })
     .join('\n\n');
 }
 
@@ -577,7 +694,7 @@ export function getFreeLayoutPatternSummary(pageType: PageType): string {
 export function getZoneContractSummary(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {
   const groups = zoneGroupMap[zoneType];
   const preferredSet = new Set(preferredComponents);
-  const orderedComponents = uniqueComponents(groups).sort((left, right) => {
+  const orderedComponents = uniqueComponents(groups, runtimeCompiledGroupMap).sort((left, right) => {
     const leftPreferred = preferredSet.has(left) ? 1 : 0;
     const rightPreferred = preferredSet.has(right) ? 1 : 0;
     return rightPreferred - leftPreferred;
@@ -585,11 +702,10 @@ export function getZoneContractSummary(zoneType: ZoneType, preferredComponents: 
 
   return orderedComponents
     .map((componentType) => {
-      const contract = builtinContractMap[componentType];
-      if (!contract) {
+      const summary = compiledLevel2Briefs[componentType];
+      if (!summary) {
         return null;
       }
-      const summary = summarizeContract(contract);
       const props = summary.propSummary.length > 0 ? summary.propSummary.join(', ') : 'minimal props';
       const slots = summary.slotSummary.length > 0 ? `; slots=${summary.slotSummary.join(', ')}` : '';
       const hints = summary.parentHints.length > 0 ? `; hints=${summary.parentHints.join('; ')}` : '';
@@ -604,7 +720,7 @@ export function getZoneLevel2ComponentBrief(zoneType: ZoneType, preferredCompone
   const template = zoneTemplates[zoneType];
   const groups = zoneGroupMap[zoneType];
   const preferredSet = new Set(preferredComponents);
-  const ordered = uniqueComponents(groups)
+  const ordered = uniqueComponents(groups, runtimeCompiledGroupMap)
     .sort((left, right) => {
       const leftPreferred = preferredSet.has(left) ? 1 : 0;
       const rightPreferred = preferredSet.has(right) ? 1 : 0;
@@ -614,17 +730,18 @@ export function getZoneLevel2ComponentBrief(zoneType: ZoneType, preferredCompone
 
   return ordered
     .map((componentType) => {
-      const contract = builtinContractMap[componentType];
-      if (!contract) {
+      const summary = compiledLevel2Briefs[componentType];
+      if (!summary) {
         return null;
       }
-      const summary = summarizeContract(contract);
       const props = summary.propSummary.length > 0 ? summary.propSummary.join(', ') : 'none';
       const slots = summary.slotSummary.length > 0 ? summary.slotSummary.join(', ') : 'none';
       const hints = summary.parentHints.length > 0 ? summary.parentHints.join('; ') : 'none';
+      const groupsSummary = summary.groups.length > 0 ? summary.groups.join(', ') : 'none';
       return [
         `- ${summary.componentType}`,
         `  category: ${summary.category}`,
+        `  groups: ${groupsSummary}`,
         `  children: ${summary.childrenType}`,
         `  props: ${props}`,
         `  slots: ${slots}`,
@@ -646,7 +763,7 @@ export function getZoneGenerationParameters(zoneType: ZoneType): string {
 }
 
 export function getZoneComponentCandidates(zoneType: ZoneType): string[] {
-  return uniqueComponents(zoneGroupMap[zoneType]);
+  return uniqueComponents(zoneGroupMap[zoneType], runtimeCompiledGroupMap);
 }
 
 export function getZoneGoldenExample(zoneType: ZoneType): string {
@@ -733,6 +850,133 @@ const childrenVsItemsWarnings: Record<string, string> = {
   Tabs: 'IMPORTANT: Use children Array with Tabs.TabPane nodes. Do NOT use props.items.',
 };
 
+function buildComponentIndex(
+  contracts: readonly ComponentContract[],
+  definitions: readonly ComponentGroupDefinition[],
+): CompiledLevel0Catalog {
+  const byComponent: Record<string, ComponentIndexEntry> = {};
+  const byCategory: Record<string, string[]> = {};
+  const byGroup = Object.fromEntries(
+    definitions.map((group) => [group.name, [...group.components]]),
+  ) as Record<ComponentGroupName, string[]>;
+
+  contracts.forEach((contract) => {
+    const category = contract.category ?? 'general';
+    const groups = collectComponentGroups(contract.componentType, definitions);
+    const childComponents = getChildComponentHints(contract.componentType);
+    const parentComponent = getParentComponentHint(contract.componentType);
+    const entry: ComponentIndexEntry = {
+      componentType: contract.componentType,
+      category,
+      groups,
+      childrenType: contract.children?.type ?? 'none',
+      parentComponent,
+      childComponents,
+      isComposite: Boolean(parentComponent || childComponents.length > 0),
+    };
+    byComponent[contract.componentType] = entry;
+    byCategory[category] ??= [];
+    byCategory[category].push(contract.componentType);
+  });
+
+  Object.values(byCategory).forEach((componentTypes) => componentTypes.sort());
+  return { byComponent, byCategory, byGroup };
+}
+
+function buildLevel1Groups(groups: readonly CompiledComponentGroup[]): CompiledLevel1GroupSummary[] {
+  return groups.map((group) => {
+    const typicalZones = (Object.entries(zoneGroupMap) as Array<[ZoneType, ComponentGroupName[]]>)
+      .filter(([, groups]) => groups.includes(group.name))
+      .map(([zoneType]) => zoneType);
+    const parentChildPatterns = [...new Set(group.components.flatMap((componentType) => {
+      const childComponents = getChildComponentHints(componentType);
+      if (childComponents.length > 0) {
+        return [`${componentType} > ${childComponents.join(' | ')}`];
+      }
+      const parentComponent = getParentComponentHint(componentType);
+      return parentComponent ? [`${parentComponent} > ${componentType}`] : [];
+    }))];
+
+    return {
+      ...group,
+      typicalZones,
+      parentChildPatterns,
+    };
+  });
+}
+
+function buildSchemaContract(componentType: string): string {
+  const contract = builtinContractMap[componentType];
+  if (!contract) {
+    return '';
+  }
+  const summary = summarizeContract(contract);
+  const skeleton = componentMiniSkeletons[componentType];
+  const warning = childrenVsItemsWarnings[componentType];
+  const lines: string[] = [
+    `## ${componentType}`,
+    `  children: ${summary.childrenType}`,
+  ];
+
+  if (summary.parentHints.length > 0) {
+    lines.push(`  structure: ${summary.parentHints.join('; ')}`);
+  }
+
+  if (summary.propSummary.length > 0) {
+    lines.push(`  valid-props (use ONLY these): ${summary.propSummary.join(', ')}`);
+  }
+
+  if (skeleton) {
+    lines.push(`  schema-example: ${skeleton}`);
+  }
+
+  if (warning) {
+    lines.push(`  ${warning}`);
+  }
+
+  return lines.join('\n');
+}
+
+function buildLevel2Briefs(
+  contracts: readonly ComponentContract[],
+  definitions: readonly ComponentGroupDefinition[],
+): Record<string, CompiledLevel2ComponentBrief> {
+  return Object.fromEntries(
+    contracts.map((contract) => {
+      const summary = summarizeContract(contract);
+      const brief: CompiledLevel2ComponentBrief = {
+        ...summary,
+        groups: collectComponentGroups(contract.componentType, definitions),
+        parentComponent: getParentComponentHint(contract.componentType),
+        childComponents: getChildComponentHints(contract.componentType),
+        miniSkeleton: componentMiniSkeletons[contract.componentType],
+        itemsWarning: childrenVsItemsWarnings[contract.componentType],
+        schemaContract: buildSchemaContract(contract.componentType),
+      };
+      return [contract.componentType, brief];
+    }),
+  ) as Record<string, CompiledLevel2ComponentBrief>;
+}
+
+export const compiledComponentIndex = buildComponentIndex(
+  supportedContracts,
+  runtimeComponentGroupDefinitions,
+);
+export const compiledLevel1Groups = buildLevel1Groups(runtimeCompiledGroups);
+export const compiledLevel2Briefs = buildLevel2Briefs(
+  supportedContracts,
+  runtimeComponentGroupDefinitions,
+);
+export const compiledKnowledgeComponentIndex = buildComponentIndex(
+  builtinContracts,
+  knowledgeComponentGroupDefinitions,
+);
+export const compiledKnowledgeLevel1Groups = buildLevel1Groups(knowledgeCompiledGroups);
+export const compiledKnowledgeLevel2Briefs = buildLevel2Briefs(
+  builtinContracts,
+  knowledgeComponentGroupDefinitions,
+);
+
 /**
  * Generate per-component schema contracts for the given component types.
  * These are injected into block generator prompts so the LLM knows the exact
@@ -750,36 +994,9 @@ export function getComponentSchemaContracts(componentTypes: readonly string[]): 
 
   return [...expanded]
     .map((componentType) => {
-      const contract = builtinContractMap[componentType];
-      if (!contract) return null;
-
-      const summary = summarizeContract(contract);
-      const skeleton = componentMiniSkeletons[componentType];
-      const warning = childrenVsItemsWarnings[componentType];
-
-      const lines: string[] = [
-        `## ${componentType}`,
-        `  children: ${summary.childrenType}`,
-      ];
-
-      if (summary.parentHints.length > 0) {
-        lines.push(`  structure: ${summary.parentHints.join('; ')}`);
-      }
-
-      if (summary.propSummary.length > 0) {
-        // Label as valid-props to reinforce to the model: ONLY these props are allowed
-        lines.push(`  valid-props (use ONLY these): ${summary.propSummary.join(', ')}`);
-      }
-
-      if (skeleton) {
-        lines.push(`  schema-example: ${skeleton}`);
-      }
-
-      if (warning) {
-        lines.push(`  ${warning}`);
-      }
-
-      return lines.join('\n');
+      const brief = compiledLevel2Briefs[componentType];
+      if (!brief) return null;
+      return brief.schemaContract;
     })
     .filter(Boolean)
     .join('\n');

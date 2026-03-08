@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   componentGroups,
+  compiledComponentIndex,
   compiledFreeLayoutPatterns,
+  compiledKnowledgeComponentIndex,
+  compiledLevel1Groups,
+  compiledLevel2Briefs,
+  compiledKnowledgeLevel1Groups,
+  compiledKnowledgeLevel2Briefs,
   compiledPageSkeletons,
   compiledZoneTemplates,
   getDesignPolicySummary,
@@ -27,11 +33,26 @@ describe('component catalog', () => {
     expect(supportedComponents).toContain('Typography.Title');
     expect(supportedComponents).toContain('Divider');
     expect(supportedComponents).not.toContain('HeroSection');
+    expect(supportedComponents).not.toContain('Pagination');
+    expect(compiledComponentIndex.byComponent.Table?.groups).toContain('data-display');
+    expect(compiledComponentIndex.byComponent['Tabs.TabPane']?.parentComponent).toBe('Tabs');
+  });
+
+  it('expands knowledge-layer catalogs without widening runtime supported components', () => {
+    expect(compiledKnowledgeComponentIndex.byComponent.Pagination?.groups).toContain('navigation');
+    expect(compiledKnowledgeComponentIndex.byComponent.Badge?.groups).toContain('extended-feedback');
+    expect(compiledKnowledgeLevel1Groups.find((group) => group.name === 'navigation')?.components).toContain('Pagination');
+    expect(compiledKnowledgeLevel2Briefs.Pagination?.componentType).toBe('Pagination');
+    expect(compiledKnowledgeLevel2Briefs.Avatar?.componentType).toBe('Avatar');
+    expect(supportedComponents).not.toContain('Badge');
+    expect(supportedComponents).not.toContain('Avatar');
   });
 
   it('provides planner and zone summaries from compiled groups', () => {
     expect(componentGroups.length).toBeGreaterThan(0);
     expect(getPlannerContractSummary()).toContain('Group filters-form');
+    expect(getPlannerContractSummary()).toContain('patterns=');
+    expect(compiledLevel1Groups.find((group) => group.name === 'data-display')?.typicalZones).toContain('data-table');
     expect(getZoneComponentCandidates('data-table')).toContain('Table');
     expect(getZoneContractSummary('data-table', ['Table'])).toContain('Table (preferred');
     expect(getZoneGoldenExample('filter')).toContain('"component":"Card"');
@@ -47,7 +68,10 @@ describe('component catalog', () => {
 
   it('compiles level2 briefs and generation parameters for each zone', () => {
     expect(getZoneLevel2ComponentBrief('data-table', ['Table'])).toContain('- Table');
+    expect(getZoneLevel2ComponentBrief('data-table', ['Table'])).toContain('groups: data-display');
     expect(getZoneLevel2ComponentBrief('detail-info', ['Descriptions'])).toContain('hints: parent Descriptions');
+    expect(compiledLevel2Briefs.Descriptions?.childComponents).toContain('Descriptions.Item');
+    expect(compiledLevel2Briefs.Table?.schemaContract).toContain('schema-example:');
     expect(getZoneGenerationParameters('filter')).toContain('maxDepth=');
     expect(getZoneGenerationParameters('filter')).toContain('root should usually be one of:');
   });
