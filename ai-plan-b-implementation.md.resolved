@@ -1,0 +1,430 @@
+# Plan B：Layout 驱动的并行 Block 生成架构
+
+## 背景
+
+当前架构中 Planner 按 zone type（`kpi-row`、`data-table`、`timeline-area` 等）拆分 block，引擎按 zone type 硬编码 wrapper 和约束。实际体验发现 **custom 模式效果明显优于固定 zone**，原因是：
+
+- 固定 zone 切碎了用户意图上下文，每个 block 只看到自己的描述
+- 引擎注入的 wrapper 导致双重包裹
+- zone 约束过于刚性，限制了模型的创造力
+
+Plan B 的核心转变：**Planner 按视觉区域自由拆块 + 输出 layout 描述，block 并行生成，每个 block 获得完整上下文和完整组件契约。**
+
+## 目标
+
+1. **并行加速**：多 block 并行生成（max 5），缩短总耗时
+2. **渐进渲染**：Plan 出来后立刻显示骨架，block 完成一个替换一个
+3. **提升质量**：小 block = 浅 JSON + 少组件 → 传完整契约 + JSON 出错率大幅下降
+4. **聊天体验**：block 列表带 loading/done 状态，实时反馈进度
+
+---
+
+## 设计方案
+
+### 1. Planner 输出格式
+
+#### 新增 `layout` 字段
+
+```json
+{
+  "pageTitle": "事项看板",
+  "pageType": "dashboard",
+  "layout": [
+    { "blocks": ["kpi-stats"] },
+    {
+      "columns": [
+        { "span": 16, "blocks": ["person-table"] },
+        { "span": 8, "blocks": ["latest-timeline"] }
+      ]
+    }
+  ],
+  "blocks": [
+    { "id": "kpi-stats", "description": "全年统计看板：会议数、事项数、完成数、逾期数", "components": ["Statistic"] },
+    { "id": "person-table", "description": "人员看板，显示责任人事项统计", "components": ["Table"] },
+    { "id": "latest-timeline", "description": "右侧最新动态时间线，6条", "components": ["Timeline"] }
+  ]
+}
+```
+
+#### Layout 类型定义
+
+```ts
+type LayoutRow =
+  | { blocks: string[] }                                      // 全宽纵向堆叠
+  | { columns: { span: number; blocks: string[] }[] };        // 横向分栏
+
+// layout 字段可选：省略时所有 blocks 纵向堆叠
+type PagePlan = {
+  pageTitle: string;
+  pageType: string;
+  layout?: LayoutRow[];
+  blocks: PlanBlock[];
+};
+```
+
+#### Layout 覆盖场景
+
+| 场景 | layout 写法 |
+|------|-----------|
+| 纯纵向 | `[{ blocks: ["a", "b", "c"] }]` 或省略 |
+| 左右两栏 | `[{ columns: [{ span:16, blocks:["a"] }, { span:8, blocks:["b"] }] }]` |
+| 顶部满宽 + 下方两栏 | `[{ blocks:["top"] }, { columns:[...] }]` |
+| 三栏 | `[{ columns: [{ span:8,... }, { span:8,... }, { span:8,... }] }]` |
+
+#### Planner Prompt 变更
+
+**blocks 数组**：
+- 去掉 `type` 字段（不再有 zone type）
+- `components` 只列核心数据/功能组件（如 Table、Statistic、Timeline），不列布局/装饰组件
+- 最多 6-8 个 blocks
+
+**新增 layout 规则**：
+```
+输出 layout 字段描述 blocks 的空间排列：
+- layout 是一个数组，每个元素代表一个"行"
+- { blocks: ["id1", "id2"] } 表示全宽纵向堆叠
+- { columns: [{ span: 16, blocks: [...] }, { span: 8, blocks: [...] }] } 表示横向分栏
+- span 总和必须等于 24
+- 如果所有 blocks 纵向堆叠，可省略 layout
+```
+
+---
+
+### 2. 组件推荐：Planner 选主角 + 引擎补配角
+
+#### Planner 职责
+
+只推荐核心数据/功能组件（1-3 个/block）：
+
+```json
+{ "id": "person-table", "components": ["Table"] }
+{ "id": "kpi-stats", "components": ["Statistic"] }
+```
+
+Planner prompt 明确告知：
+```
+components 只列核心数据/功能组件名（如 Table、Statistic、Timeline、Form、Descriptions），
+不需要列布局组件（Row/Col/Container）和装饰组件（Card/Tag/Button）。
+```
+
+#### 引擎自动补充（三层）
+
+```ts
+// 第 1 层：从契约自动推导父子关系
+function deriveChildComponents(comp: string): string[] {
+  // 从 contract.children 自动推导
+  // Timeline → Timeline.Item, Descriptions → Descriptions.Item, etc.
+}
+
+// 第 2 层：基础组件（始终包含）
+const baseComponents = ['Container', 'Card', 'Typography.Text'];
+
+// 第 3 层：业务配对（少量写死）
+const companionMap: Record<string, string[]> = {
+  'Table':        ['Tag', 'Button', 'Typography.Text'],
+  'Statistic':    ['Row', 'Col'],
+  'Form':         ['FormItem', 'Input', 'Select', 'DatePicker', 'Button', 'Space'],
+  'Timeline':     ['Typography.Text'],
+  'Descriptions': ['Tag'],
+  'Tabs':         ['Card'],
+};
+
+// 最终组件列表 = planner推荐 + 子组件 + 配角 + 基础组件
+function expandComponents(plannerComponents: string[]): string[] {
+  const set = new Set(plannerComponents);
+  for (const comp of plannerComponents) {
+    deriveChildComponents(comp).forEach(c => set.add(c));
+    (companionMap[comp] ?? []).forEach(c => set.add(c));
+  }
+  baseComponents.forEach(c => set.add(c));
+  return [...set]; // 通常 6-10 个
+}
+```
+
+#### 完整契约注入
+
+每个 block 最终只有 6-10 个组件 → 可以传送**完整的 prop 列表 + 完整 enum + 简短 description**：
+
+```
+## Table
+  valid-props: dataSource(array!), pagination(object|false), size(string=small|middle|large),
+    scroll(object), rowKey(string), loading(boolean), showHeader(boolean)
+  columns: title(string!), dataIndex(string!), key(string!), width(number),
+    align(string=left|center|right), fixed(string=left|right), ellipsis(boolean)
+  ⚠ columns.render 不允许
+  children: none
+  schema-example: {...}
+```
+
+比现在的 `slice(0, 12)` 摘要模式信息量提升 3-4 倍，token 消耗反而更低（组件数少了）。
+
+---
+
+### 3. Block 生成 Prompt 重设计
+
+#### 每个 block 的 context
+
+```
+[System]
+组件契约（完整版，仅这个 block 用到的 6-10 个组件）
+Rules（简化版，去掉 zone type 相关规则）
+
+[User]
+用户原始需求：看板，分成左上、左下、右侧三个区域...
+你的任务：生成「人员看板，显示责任人事项统计」
+布局位置：16/24 宽的左列，第 2 个区域
+可用组件：Table, Card, Tag, Button, Typography.Text, Container
+```
+
+#### Block 自包装（不再引擎注入 wrapper）
+
+Rules 中加一条建议：
+```
+- 数据/信息类 block 推荐使用 Card 作为根节点并设置 title。
+- KPI 统计类 block 可直接使用 Row > Col > Statistic 结构。
+- 不要生成外层的页面布局（Row/Col 分栏），你只负责自己区域的内容。
+```
+
+Normalize 层兜底：如果 block 根节点是裸露的 Table/Statistic 等，自动包一层 Card。
+
+---
+
+### 4. Assembler 重设计
+
+#### 现有逻辑（复杂，需替换）
+
+```
+检查 zone type → 不同 type 注入不同 wrapper → kpi-row 特殊 Row/Col 处理 → 拼接
+```
+
+#### 新逻辑（简单）
+
+```ts
+function assembleFromLayout(
+  layout: LayoutRow[] | undefined,
+  blockNodes: Map<string, SchemaNode>,
+  gap: number = 16,
+): SchemaNode[] {
+  // 无 layout → 所有 blocks 纵向堆叠
+  if (!layout) {
+    return [...blockNodes.values()];
+  }
+
+  return layout.map((row, rowIndex) => {
+    if ('blocks' in row) {
+      // 全宽行：blocks 纵向堆叠
+      if (row.blocks.length === 1) {
+        return blockNodes.get(row.blocks[0]!)!;
+      }
+      return {
+        id: `layout-row-${rowIndex}`,
+        component: 'Container',
+        props: { direction: 'column', gap },
+        children: row.blocks.map(id => blockNodes.get(id)!).filter(Boolean),
+      };
+    }
+
+    // 分栏行：Row > Col
+    return {
+      id: `layout-row-${rowIndex}`,
+      component: 'Row',
+      props: { gutter: [gap, gap] },
+      children: row.columns.map((col, colIndex) => ({
+        id: `layout-col-${rowIndex}-${colIndex}`,
+        component: 'Col',
+        props: { span: col.span },
+        children: col.blocks.length === 1
+          ? [blockNodes.get(col.blocks[0]!)!]
+          : [{
+              id: `layout-col-${rowIndex}-${colIndex}-inner`,
+              component: 'Container',
+              props: { direction: 'column', gap },
+              children: col.blocks.map(id => blockNodes.get(id)!).filter(Boolean),
+            }],
+      })),
+    };
+  });
+}
+```
+
+**删除的代码**：
+- [assembleSchema](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#751-898) 中所有 zone type 分支判断
+- 所有 wrapper 注入逻辑（`zoneTemplate.wrapper`）
+- [validateBlockOutput](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#871-957) 中大部分 zone 边界校验
+
+---
+
+### 5. 并行执行 + SSE 事件
+
+#### 新增事件类型
+
+```ts
+// types.ts
+type AgentEvent =
+  | { type: 'schema:skeleton'; data: { schema: PageSchema } }     // NEW: 骨架 schema
+  | { type: 'schema:block:start'; data: { blockId: string; description: string } }  // NEW
+  | { type: 'schema:block'; data: { blockId: string; node: SchemaNode } }  // 已有
+  | { type: 'schema:done'; data: { schema: PageSchema } }         // 已有
+  // ... 其他已有事件
+```
+
+#### Orchestrator 并行改造
+
+```ts
+// page-builder-orchestrator.ts（核心改动）
+async function* pageBuilderOrchestrator(...) {
+  // 1. Plan
+  const plan = await planPage.execute({ request, context });
+  yield { type: 'plan', data: plan };
+
+  // 2. 骨架 → 立刻推送
+  const skeletonSchema = buildSkeletonFromLayout(plan);
+  yield { type: 'schema:skeleton', data: { schema: skeletonSchema } };
+
+  // 3. 并行生成 blocks（max 5 并发）
+  const blockResults = new Map<string, GenerateBlockResult>();
+  const pending: Promise<{ blockId: string; result: GenerateBlockResult }>[] = [];
+  const semaphore = createSemaphore(5);
+
+  for (const block of plan.blocks) {
+    yield { type: 'schema:block:start', data: { blockId: block.id, description: block.description } };
+
+    pending.push(semaphore.acquire().then(async (release) => {
+      try {
+        const result = await generateBlock.execute({ block, request, context, pageTitle: plan.pageTitle });
+        return { blockId: block.id, result };
+      } finally {
+        release();
+      }
+    }));
+  }
+
+  // 4. 竞速等待，先完成先 yield
+  const remaining = new Set(pending);
+  while (remaining.size > 0) {
+    const completed = await Promise.race(remaining);
+    remaining.delete(/* completed promise */);
+    blockResults.set(completed.blockId, completed.result);
+    yield { type: 'schema:block', data: { blockId: completed.blockId, node: completed.result.node } };
+  }
+
+  // 5. 最终组装
+  const finalSchema = await assembleSchema.execute({ plan, blocks: [...blockResults.values()], request });
+  yield { type: 'schema:done', data: { schema: finalSchema } };
+}
+```
+
+> [!NOTE]
+> `AsyncGenerator` 不能在 Promise 回调中 yield，上述代码为伪代码。实际实现需要用事件队列模式：block 完成时 push 到队列，主循环从队列 shift 并 yield。
+
+#### 骨架生成
+
+```ts
+function buildSkeletonFromLayout(plan: PagePlan): PageSchema {
+  // 按 layout 生成 Row/Col 骨架结构
+  // 每个 block 位置放 antd Skeleton 占位节点
+  const skeletonNode = (blockId: string, desc: string) => ({
+    id: `${blockId}-skeleton`,
+    component: 'Card',
+    props: { title: desc },
+    children: [{
+      id: `${blockId}-skeleton-body`,
+      component: 'Skeleton',  // antd Skeleton 组件
+      props: { active: true, paragraph: { rows: 4 } },
+    }],
+  });
+
+  // 用 assembleFromLayout 拼装，只是 blockNodes 是 skeleton
+  const blockNodes = new Map(plan.blocks.map(b => [b.id, skeletonNode(b.id, b.description)]));
+  return wrapInPageRoot(assembleFromLayout(plan.layout, blockNodes));
+}
+```
+
+---
+
+### 6. 前端改动
+
+#### 页面渲染侧
+
+```
+schema:skeleton    → setSchema(skeletonSchema) → 页面立刻渲染骨架占位
+schema:block       → 热替换 blockId 对应节点 → 加 fadeIn 动画
+schema:done        → 全量替换最终 schema（兜底一致性）
+```
+
+热替换逻辑：深度遍历 schema tree，找到 `id === blockId + "-skeleton"` 的节点，用 block 的真实 node 替换。
+
+#### 聊天窗口侧
+
+```
+plan               → 渲染 block 列表，每个 block 显示描述 + ⏳
+schema:block:start → 对应 block 变为 🔄 生成中 (Spin)
+schema:block       → 对应 block 变为 ✅ 完成
+全部完成            → 列表收起或淡出
+```
+
+状态管理：`Map<blockId, 'waiting' | 'generating' | 'done'>`
+
+---
+
+## 文件改动清单
+
+### 后端
+
+| 文件 | 改动 | 规模 |
+|------|------|------|
+| [types.ts](file:///D:/Code/lowcode/shenbi-codes/shenbi/packages/ai-agents/src/types.ts) | 新增 `LayoutRow` 类型；新增 `schema:skeleton`、`schema:block:start` 事件；[PlanBlock](file:///D:/Code/lowcode/shenbi-codes/shenbi/packages/ai-agents/src/types.ts#26-27) 去掉 `type` 字段 | 小 |
+| [page-builder-orchestrator.ts](file:///D:/Code/lowcode/shenbi-codes/shenbi/packages/ai-agents/src/orchestrators/page-builder-orchestrator.ts) | 串行→并行 + 骨架推送 + 新事件 yield | 中 |
+| [agent-runtime.ts](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts) | Planner prompt 改造 + Block prompt 改造 + [assembleSchema](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#751-898) 用 layout 拼装替代 zone wrapper + `buildSkeletonFromLayout` + `expandComponents` | **大**（核心重构） |
+| [component-catalog.ts](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/component-catalog.ts) | `companionMap` + `expandComponents` + `getFullComponentContracts`（完整版契约输出）+ 删除 zone template wrapper 配置 | 中 |
+| [normalize-schema.ts](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/normalize-schema.ts) | 新增裸节点自动包 Card 兜底 | 小 |
+
+### 前端
+
+| 文件 | 改动 | 规模 |
+|------|------|------|
+| SSE 事件处理层 | 处理 `schema:skeleton`、`schema:block:start`、`schema:block` 热替换 | 中 |
+| 页面渲染组件 | 骨架→真实节点热替换 + fadeIn 动画 | 中 |
+| 聊天 AI 组件 | block 进度列表 UI | 中 |
+
+---
+
+## 迁移策略
+
+### Phase 1：后端核心（不影响前端）
+
+1. 新增 `LayoutRow` 类型和新事件类型
+2. 改造 Planner prompt → 输出 layout + 无 zone type 的 blocks
+3. 实现 `expandComponents` + 完整契约注入
+4. 改造 Block prompt → 带完整 context、无 zone 约束
+5. 实现 `assembleFromLayout` 替代旧 assembler
+6. Orchestrator 改为并行
+
+> **兼容处理**：Planner 如果没输出 layout，fallback 为纵向堆叠（与当前行为一致）。Block 如果返回了 zone-type 格式的结果，normalize 层正常处理。
+
+### Phase 2：前端体验
+
+7. 处理 `schema:skeleton` → 渲染骨架
+8. 处理 `schema:block` → 热替换 + 动画
+9. 聊天窗口 block 进度列表
+
+### Phase 3：清理
+
+10. 删除 zone template wrapper 相关代码
+11. 删除 [validateBlockOutput](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#871-957) 的 zone 边界校验
+12. 清理测试用例
+
+---
+
+## 验证计划
+
+### 自动测试
+- [agent-runtime.test.ts](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.test.ts)：更新 assembler 测试用例，覆盖各种 layout 组合
+- [component-catalog.test.ts](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/component-catalog.test.ts)：测试 `expandComponents` 逻辑
+- [normalize-schema.test.ts](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/normalize-schema.test.ts)：测试裸节点自动包 Card
+
+### 手动验证
+- 使用相同的 prompt（"看板，分成左上、左下、右侧三个区域"）对比 Plan A（当前）和 Plan B 的生成效果
+- 验证 JSON 错误率：用"展示所有组件"这类复杂 prompt 测试
+- 验证并行性能：对比串行 vs 并行的总耗时
+- 验证前端骨架渲染和渐进填充效果
