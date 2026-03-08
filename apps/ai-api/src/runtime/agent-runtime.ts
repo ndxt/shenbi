@@ -132,6 +132,153 @@ function isNodeLike(value: unknown): value is GenerateBlockResult['node'] {
   return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
 }
 
+function isTextLike(value: unknown): value is string | number | boolean {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+}
+
+function flattenToText(value: unknown): string {
+  if (isTextLike(value)) {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(flattenToText).filter(Boolean).join(' ').trim();
+  }
+  if (isNodeLike(value)) {
+    return flattenToText(value.children);
+  }
+  return '';
+}
+
+function normalizeChildrenPayload(children: unknown[]): GenerateBlockResult['node']['children'] {
+  const nodeChildren = children.filter(isNodeLike);
+  if (nodeChildren.length > 0) {
+    return nodeChildren;
+  }
+  const text = children.filter(isTextLike).map(String).join(' ').trim();
+  return text || undefined;
+}
+
+function normalizeChildrenForComponent(node: GenerateBlockResult['node']): GenerateBlockResult['node'] {
+  const children = Array.isArray(node.children) ? node.children : [];
+
+  switch (node.component) {
+    case 'Alert':
+    case 'DatePicker':
+    case 'Input':
+    case 'Select':
+    case 'Statistic':
+    case 'Table':
+    case 'Tabs': {
+      delete node.children;
+      return node;
+    }
+    case 'Typography.Text':
+    case 'Typography.Title':
+    case 'Typography.Paragraph':
+    case 'Tag': {
+      const text = flattenToText(children);
+      node.children = [text || node.props?.title || node.props?.label || '内容'];
+      return node;
+    }
+    case 'Row': {
+      node.children = children
+        .filter((child) => isNodeLike(child) || isTextLike(child))
+        .map((child, index) => {
+          if (isNodeLike(child) && child.component === 'Col') {
+            return child;
+          }
+          return {
+            id: `${node.id}-col-${index + 1}`,
+            component: 'Col',
+            props: { span: 24 },
+            children: [
+              isNodeLike(child)
+                ? child
+                : {
+                    id: `${node.id}-col-${index + 1}-text`,
+                    component: 'Typography.Text',
+                    props: {},
+                    children: [String(child)],
+                  },
+            ],
+          };
+        });
+      return node;
+    }
+    case 'Descriptions': {
+      node.children = children
+        .filter((child) => isNodeLike(child) || isTextLike(child))
+        .map((child, index) => {
+          if (isNodeLike(child) && child.component === 'Descriptions.Item') {
+            return child;
+          }
+          return {
+            id: `${node.id}-item-${index + 1}`,
+            component: 'Descriptions.Item',
+            props: { label: `字段${index + 1}` },
+            children: [
+              isNodeLike(child)
+                ? child
+                : {
+                    id: `${node.id}-item-${index + 1}-text`,
+                    component: 'Typography.Text',
+                    props: {},
+                    children: [String(child)],
+                  },
+            ],
+          };
+        });
+      return node;
+    }
+    case 'Form': {
+      node.children = children
+        .filter((child) => isNodeLike(child))
+        .map((child, index) => {
+          if (child.component === 'Form.Item') {
+            return child;
+          }
+          return {
+            id: `${node.id}-form-item-${index + 1}`,
+            component: 'FormItem',
+            props: {
+              label: `字段${index + 1}`,
+              name: `field${index + 1}`,
+            },
+            children: [child],
+          };
+        });
+      return node;
+    }
+    case 'FormItem': {
+      const nodeChildren = children.filter(isNodeLike);
+      const firstChild = nodeChildren[0];
+      node.children = firstChild
+        ? [firstChild]
+        : [
+            {
+              id: `${node.id}-input`,
+              component: 'Input',
+              props: {
+                placeholder: String(node.props?.label ?? '请输入'),
+              },
+            },
+          ];
+      return node;
+    }
+    default: {
+      if (Array.isArray(node.children)) {
+        const normalizedChildren = normalizeChildrenPayload(children);
+        if (normalizedChildren === undefined) {
+          delete node.children;
+        } else {
+          node.children = normalizedChildren;
+        }
+      }
+      return node;
+    }
+  }
+}
+
 function normalizePlan(plan: PagePlan): PagePlan {
   if (!plan.pageTitle || !Array.isArray(plan.blocks) || plan.blocks.length === 0) {
     throw new LLMError('Planner returned an empty page plan', 'EMPTY_PAGE_PLAN');
@@ -177,7 +324,7 @@ function validateNode(node: GenerateBlockResult['node']): GenerateBlockResult['n
     }
   }
 
-  return node;
+  return normalizeChildrenForComponent(node);
 }
 
 function getRequestedChatModel(request: unknown): string | undefined {
