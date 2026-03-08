@@ -78,7 +78,7 @@ function normalizeNodeProps(node: SchemaNode): void {
     return;
   }
 
-  const textPropKeys = ['title', 'label', 'description', 'extra', 'placeholder'];
+  const textPropKeys = ['title', 'label', 'description', 'placeholder'];
   for (const key of textPropKeys) {
     if (key in props) {
       const value = props[key];
@@ -124,6 +124,52 @@ function normalizeNodeProps(node: SchemaNode): void {
     if ('bordered' in props) {
       props.variant = props.variant ?? (props.bordered ? 'outlined' : 'borderless');
       delete props.bordered;
+    }
+  }
+
+  if (node.component === 'Avatar') {
+    delete props.icon;
+    if (Array.isArray(node.children)) {
+      const text = flattenToText(node.children);
+      node.children = text ? text.slice(0, 2) : undefined;
+    } else if (typeof node.children === 'string') {
+      node.children = node.children.slice(0, 2);
+    }
+  }
+
+  if (node.component === 'Badge') {
+    if (isNodeLike(props.text) || Array.isArray(props.text)) {
+      const text = flattenToText(props.text);
+      if (text) {
+        props.text = text;
+      } else {
+        delete props.text;
+      }
+    }
+    if (isNodeLike(props.count) || Array.isArray(props.count)) {
+      const count = flattenToText(props.count);
+      if (count) {
+        props.count = count;
+      } else {
+        delete props.count;
+      }
+    }
+  }
+
+  if (node.component === 'Badge.Ribbon') {
+    if (isNodeLike(props.text) || Array.isArray(props.text)) {
+      const text = flattenToText(props.text);
+      if (text) {
+        props.text = text;
+      } else {
+        delete props.text;
+      }
+    }
+  }
+
+  if (node.component === 'Empty') {
+    if (isNodeLike(props.image) || Array.isArray(props.image) || typeof props.image === 'object') {
+      delete props.image;
     }
   }
 
@@ -239,6 +285,13 @@ function normalizeNodeProps(node: SchemaNode): void {
     }
   }
 
+  if (node.component === 'Result') {
+    if (isNodeLike(props.subTitle) || Array.isArray(props.subTitle)) {
+      props.subTitle = flattenToText(props.subTitle) || '结果说明';
+    }
+    delete props.icon;
+  }
+
   if (node.component === 'Statistic') {
     if (isNodeLike(props.title) || Array.isArray(props.title)) {
       props.title = flattenToText(props.title) || '指标';
@@ -330,6 +383,7 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
     case 'Input':
     case 'Pagination':
     case 'Progress':
+    case 'Result':
     case 'Select':
     case 'Statistic':
     case 'Steps':
@@ -364,6 +418,24 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
         }
       }
       delete node.children;
+      return node;
+    }
+    case 'Avatar.Group': {
+      node.children = children
+        .filter((child) => isNodeLike(child) || isTextLike(child))
+        .map((child, index) => {
+          if (isNodeLike(child) && child.component === 'Avatar') {
+            return child;
+          }
+          return {
+            id: `${node.id ?? 'avatar-group'}-avatar-${index + 1}`,
+            component: 'Avatar',
+            props: {},
+            children: isNodeLike(child)
+              ? flattenToText(child) || '人'
+              : String(child).slice(0, 2),
+          };
+        });
       return node;
     }
     case 'Typography.Text':

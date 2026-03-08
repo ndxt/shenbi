@@ -40,10 +40,18 @@ describe('component catalog', () => {
     expect(supportedComponents).toContain('Breadcrumb');
     expect(supportedComponents).toContain('Steps');
     expect(supportedComponents).toContain('Progress');
+    expect(supportedComponents).toContain('Avatar');
+    expect(supportedComponents).toContain('Avatar.Group');
+    expect(supportedComponents).toContain('Badge');
+    expect(supportedComponents).toContain('Badge.Ribbon');
+    expect(supportedComponents).toContain('Empty');
+    expect(supportedComponents).toContain('Result');
     expect(supportedComponents).not.toContain('HeroSection');
     expect(compiledComponentIndex.byComponent.Table?.groups).toContain('data-display');
     expect(compiledComponentIndex.byComponent.Pagination?.groups).toContain('navigation');
     expect(compiledComponentIndex.byComponent.Progress?.groups).toContain('feedback-status');
+    expect(compiledComponentIndex.byComponent.Avatar?.groups).toContain('data-display');
+    expect(compiledComponentIndex.byComponent.Result?.groups).toContain('feedback-status');
     expect(compiledComponentIndex.byComponent['Tabs.TabPane']?.parentComponent).toBe('Tabs');
   });
 
@@ -58,8 +66,6 @@ describe('component catalog', () => {
     expect(compiledKnowledgeLevel2Briefs.Collapse?.childComponents).toContain('Collapse.Panel');
     expect(knowledgeSupportedComponents).toContain('Progress');
     expect(knowledgeSupportedComponents).toContain('ColorPicker');
-    expect(supportedComponents).not.toContain('Badge');
-    expect(supportedComponents).not.toContain('Avatar');
     expect(supportedComponents).not.toContain('Collapse');
     expect(supportedComponents).not.toContain('ColorPicker');
   });
@@ -76,6 +82,8 @@ describe('component catalog', () => {
     expect(getZoneContractSummary('data-table', ['Table'])).toContain('Table (preferred');
     expect(getZoneContractSummary('data-table', ['Pagination'])).toContain('Pagination (preferred');
     expect(getZoneContractSummary('page-header', ['Breadcrumb'])).toContain('Breadcrumb (preferred');
+    expect(getZoneContractSummary('detail-info', ['Avatar', 'Badge'])).toContain('Avatar (preferred');
+    expect(getZoneContractSummary('empty-state', ['Empty', 'Result'])).toContain('Empty (preferred');
     expect(getKnowledgeZoneContractSummary('data-table', ['Pagination'])).toContain('Pagination (preferred');
     expect(getZoneGoldenExample('filter')).toContain('"component":"Card"');
   });
@@ -95,6 +103,8 @@ describe('component catalog', () => {
     expect(getZoneLevel2ComponentBrief('data-table', ['Pagination'])).toContain('- Pagination');
     expect(getZoneLevel2ComponentBrief('page-header', ['Breadcrumb'])).toContain('- Breadcrumb');
     expect(getZoneLevel2ComponentBrief('chart-area', ['Progress'])).toContain('- Progress');
+    expect(getZoneLevel2ComponentBrief('detail-info', ['Avatar', 'Badge'])).toContain('- Avatar');
+    expect(getZoneLevel2ComponentBrief('empty-state', ['Empty', 'Result'])).toContain('- Result');
     expect(getKnowledgeZoneLevel2ComponentBrief('detail-info', ['Collapse'])).toContain('- Collapse');
     expect(getKnowledgeZoneLevel2ComponentBrief('data-table', ['Pagination'])).toContain('- Pagination');
     expect(compiledLevel2Briefs.Descriptions?.childComponents).toContain('Descriptions.Item');

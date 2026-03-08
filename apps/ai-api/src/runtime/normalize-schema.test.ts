@@ -168,6 +168,77 @@ describe('normalizeGeneratedNode', () => {
     expect(success?.strokeColor).toBeUndefined();
   });
 
+  it('normalizes avatar text and strips unsafe avatar icon', () => {
+    const node: SchemaNode = {
+      component: 'Avatar',
+      props: {
+        icon: { component: 'Tag', children: 'bad' } as any,
+      },
+      children: ['张三丰'],
+    };
+
+    const normalized = normalizeGeneratedNode(node);
+    expect(normalized.props?.icon).toBeUndefined();
+    expect(normalized.children).toBe('张三');
+  });
+
+  it('wraps avatar group children into avatars', () => {
+    const node: SchemaNode = {
+      component: 'Avatar.Group',
+      children: ['张三', { component: 'Avatar', children: '李四' }],
+    };
+
+    const normalized = normalizeGeneratedNode(node);
+    expect(Array.isArray(normalized.children)).toBe(true);
+    const children = normalized.children as SchemaNode[];
+    expect(children[0]?.component).toBe('Avatar');
+    expect(children[1]?.component).toBe('Avatar');
+  });
+
+  it('normalizes badge and result text props safely', () => {
+    const node: SchemaNode = {
+      component: 'Result',
+      props: {
+        title: { component: 'Typography.Text', children: '成功' } as any,
+        subTitle: [{ component: 'Typography.Text', children: '已保存' }] as any,
+        icon: { component: 'Tag', children: 'bad' } as any,
+        extra: { component: 'Button', children: '返回' } as any,
+      },
+    };
+
+    const normalized = normalizeGeneratedNode(node);
+    expect(normalized.props?.title).toBe('成功');
+    expect(normalized.props?.subTitle).toBe('已保存');
+    expect(normalized.props?.icon).toBeUndefined();
+    expect(normalized.props?.extra).toBeDefined();
+  });
+
+  it('normalizes badge text and empty image safely', () => {
+    const badgeNode: SchemaNode = {
+      component: 'Badge',
+      props: {
+        text: { component: 'Typography.Text', children: '审批中' } as any,
+        count: [{ component: 'Typography.Text', children: '8' }] as any,
+      },
+      children: [{ component: 'Button', children: '查看' }],
+    };
+
+    const normalizedBadge = normalizeGeneratedNode(badgeNode);
+    expect(normalizedBadge.props?.text).toBe('审批中');
+    expect(normalizedBadge.props?.count).toBe('8');
+
+    const emptyNode: SchemaNode = {
+      component: 'Empty',
+      props: {
+        image: { component: 'Typography.Text', children: 'bad' } as any,
+        description: { component: 'Typography.Text', children: '暂无数据' } as any,
+      },
+    };
+    const normalizedEmpty = normalizeGeneratedNode(emptyNode);
+    expect(normalizedEmpty.props?.image).toBeUndefined();
+    expect(normalizedEmpty.props?.description).toBe('暂无数据');
+  });
+
   it('wraps row children into cols', () => {
     const node: SchemaNode = {
       component: 'Row',

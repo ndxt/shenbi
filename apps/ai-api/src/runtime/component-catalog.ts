@@ -428,13 +428,16 @@ const runtimeComponentGroupDefinitions: ComponentGroupDefinition[] = [
   {
     name: 'feedback-status',
     description: 'status emphasis, alerts, and labels',
-    components: ['Alert', 'Tag', 'Progress'],
+    components: ['Alert', 'Tag', 'Progress', 'Badge', 'Badge.Ribbon', 'Empty', 'Result'],
   },
   {
     name: 'data-display',
     description: 'cards, data views, detail blocks, tabs, and timelines',
     components: [
+      'Avatar',
+      'Avatar.Group',
       'Card',
+      'Empty',
       'Statistic',
       'Table',
       'Descriptions',
@@ -522,7 +525,7 @@ const zoneGroupMap: Record<ZoneType, ComponentGroupName[]> = {
   'chart-area': ['data-display', 'typography', 'feedback-status'],
   'timeline-area': ['data-display', 'typography'],
   'side-info': ['data-display', 'typography', 'feedback-status'],
-  'empty-state': ['data-display', 'typography', 'actions'],
+  'empty-state': ['data-display', 'typography', 'actions', 'feedback-status'],
   custom: ['layout-shell', 'typography', 'actions', 'data-display'],
 };
 
@@ -947,12 +950,17 @@ const componentMiniSkeletons: Record<string, string> = {
   Button: '{"component":"Button","id":"..","props":{"type":"primary"},"children":["按钮文字"]}',
 
   // Data Display
+  Avatar: '{"component":"Avatar","id":"..","props":{"shape":"circle","size":"default"},"children":"李"}',
+  'Avatar.Group': '{"component":"Avatar.Group","id":"..","props":{"size":"default"},"children":[{"component":"Avatar","id":"..","children":"李"},{"component":"Avatar","id":"..","children":"王"}]}',
   Card: '{"component":"Card","id":"..","props":{"title":"卡片标题"},"children":[...]}',
+  Empty: '{"component":"Empty","id":"..","props":{"description":"暂无数据"},"children":[{"component":"Button","id":"..","props":{"type":"primary"},"children":["立即创建"]}]}',
   Statistic: '{"component":"Statistic","id":"..","props":{"title":"指标名","value":42}}',
   Table: '{"component":"Table","id":"..","props":{"dataSource":[{"key":"1","name":"张三"}],"pagination":{"pageSize":10}},"columns":[{"title":"姓名","dataIndex":"name","key":"name"}]}',
   Pagination: '{"component":"Pagination","id":"..","props":{"current":1,"pageSize":10,"total":120,"showSizeChanger":true}}',
   Breadcrumb: '{"component":"Breadcrumb","id":"..","props":{"items":[{"title":"员工管理"},{"title":"员工详情"}]}}',
   Steps: '{"component":"Steps","id":"..","props":{"current":1,"items":[{"title":"提交申请","description":"员工发起申请"},{"title":"主管审批","description":"等待审批"},{"title":"处理完成","description":"流程完成"}]}}',
+  Badge: '{"component":"Badge","id":"..","props":{"status":"processing","text":"审批中"},"children":[{"component":"Typography.Text","id":"..","children":"订单状态"}]}',
+  'Badge.Ribbon': '{"component":"Badge.Ribbon","id":"..","props":{"text":"重点","placement":"end"},"children":[{"component":"Card","id":"..","props":{"title":"卡片标题"},"children":[{"component":"Typography.Text","id":"..","children":"缎带卡片内容"}]}]}',
 
   // Descriptions: use children with Descriptions.Item, NOT props.items
   Descriptions: '{"component":"Descriptions","id":"..","props":{"column":2},"children":[{"component":"Descriptions.Item","id":"..","props":{"label":"字段名"},"children":["字段值"]}]}',
@@ -977,6 +985,7 @@ const componentMiniSkeletons: Record<string, string> = {
   Alert: '{"component":"Alert","id":"..","props":{"type":"info","message":"提示信息","showIcon":true}}',
   Tag: '{"component":"Tag","id":"..","props":{"color":"blue"},"children":["标签"]}',
   Progress: '{"component":"Progress","id":"..","props":{"percent":68,"status":"active","showInfo":true}}',
+  Result: '{"component":"Result","id":"..","props":{"status":"success","title":"操作成功","subTitle":"任务已完成","extra":{"component":"Button","id":"..","props":{"type":"primary"},"children":["返回列表"]}}}',
 };
 
 /**
