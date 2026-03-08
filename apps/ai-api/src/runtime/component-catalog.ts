@@ -428,7 +428,7 @@ const runtimeComponentGroupDefinitions: ComponentGroupDefinition[] = [
   {
     name: 'feedback-status',
     description: 'status emphasis, alerts, and labels',
-    components: ['Alert', 'Tag'],
+    components: ['Alert', 'Tag', 'Progress'],
   },
   {
     name: 'data-display',
@@ -445,6 +445,11 @@ const runtimeComponentGroupDefinitions: ComponentGroupDefinition[] = [
       'Timeline.Item',
     ],
   },
+  {
+    name: 'navigation',
+    description: 'navigation, paging, and progress indication components',
+    components: ['Breadcrumb', 'Pagination', 'Steps'],
+  },
 ];
 
 const knowledgeComponentGroupDefinitions: ComponentGroupDefinition[] = [
@@ -452,32 +457,52 @@ const knowledgeComponentGroupDefinitions: ComponentGroupDefinition[] = [
   {
     name: 'navigation',
     description: 'navigation, paging, and progress indication components',
-    components: ['Breadcrumb', 'Pagination', 'Steps', 'Menu'],
+    components: ['Anchor', 'Breadcrumb', 'Pagination', 'Steps', 'Menu'],
   },
   {
     name: 'advanced-form',
     description: 'advanced data-entry and selection controls',
     components: [
-      'InputNumber',
-      'Radio',
-      'Radio.Group',
-      'Checkbox',
-      'Checkbox.Group',
-      'Switch',
-      'TimePicker',
       'AutoComplete',
       'Cascader',
+      'Checkbox',
+      'Checkbox.Group',
+      'ColorPicker',
+      'InputNumber',
+      'Mentions',
+      'Radio',
+      'Radio.Group',
+      'Rate',
+      'Slider',
+      'Switch',
+      'TimePicker',
     ],
   },
   {
     name: 'extended-feedback',
     description: 'extended status and progress display components',
-    components: ['Progress', 'Badge', 'Alert', 'Tag'],
+    components: [
+      'Alert',
+      'Badge',
+      'Badge.Ribbon',
+      'Empty',
+      'Popconfirm',
+      'Popover',
+      'Progress',
+      'Result',
+      'Skeleton',
+      'Skeleton.Button',
+      'Skeleton.Image',
+      'Skeleton.Input',
+      'Spin',
+      'Tag',
+      'Tooltip',
+    ],
   },
   {
     name: 'identity',
     description: 'identity and lightweight persona display components',
-    components: ['Avatar'],
+    components: ['Avatar', 'Avatar.Group'],
   },
   {
     name: 'disclosure',
@@ -487,11 +512,11 @@ const knowledgeComponentGroupDefinitions: ComponentGroupDefinition[] = [
 ];
 
 const zoneGroupMap: Record<ZoneType, ComponentGroupName[]> = {
-  'page-header': ['layout-shell', 'typography', 'actions'],
+  'page-header': ['layout-shell', 'typography', 'actions', 'navigation'],
   filter: ['data-display', 'filters-form', 'layout-shell', 'actions'],
   'kpi-row': ['layout-shell', 'data-display', 'feedback-status'],
-  'data-table': ['data-display', 'actions', 'feedback-status'],
-  'detail-info': ['data-display', 'typography', 'feedback-status'],
+  'data-table': ['data-display', 'actions', 'feedback-status', 'navigation'],
+  'detail-info': ['data-display', 'typography', 'feedback-status', 'navigation'],
   'form-body': ['data-display', 'filters-form'],
   'form-actions': ['layout-shell', 'actions'],
   'chart-area': ['data-display', 'typography', 'feedback-status'],
@@ -499,6 +524,31 @@ const zoneGroupMap: Record<ZoneType, ComponentGroupName[]> = {
   'side-info': ['data-display', 'typography', 'feedback-status'],
   'empty-state': ['data-display', 'typography', 'actions'],
   custom: ['layout-shell', 'typography', 'actions', 'data-display'],
+};
+
+const knowledgeZoneGroupMap: Record<ZoneType, ComponentGroupName[]> = {
+  'page-header': ['layout-shell', 'typography', 'actions', 'navigation', 'identity'],
+  filter: ['data-display', 'filters-form', 'advanced-form', 'layout-shell', 'actions'],
+  'kpi-row': ['layout-shell', 'data-display', 'feedback-status', 'extended-feedback'],
+  'data-table': ['data-display', 'actions', 'feedback-status', 'navigation', 'extended-feedback'],
+  'detail-info': ['data-display', 'typography', 'feedback-status', 'identity', 'disclosure'],
+  'form-body': ['data-display', 'filters-form', 'advanced-form', 'extended-feedback'],
+  'form-actions': ['layout-shell', 'actions'],
+  'chart-area': ['data-display', 'typography', 'feedback-status', 'extended-feedback'],
+  'timeline-area': ['data-display', 'typography', 'extended-feedback'],
+  'side-info': ['data-display', 'typography', 'feedback-status', 'identity', 'extended-feedback'],
+  'empty-state': ['data-display', 'typography', 'actions', 'extended-feedback'],
+  custom: [
+    'layout-shell',
+    'typography',
+    'actions',
+    'data-display',
+    'navigation',
+    'advanced-form',
+    'extended-feedback',
+    'identity',
+    'disclosure',
+  ],
 };
 
 function summarizeContract(contract: ComponentContract): CompiledComponentSummary {
@@ -629,6 +679,10 @@ export const supportedComponentSet = new Set(supportedComponents);
 export const supportedContracts = builtinContracts.filter((contract) => supportedComponentSet.has(contract.componentType));
 export const componentGroups = runtimeCompiledGroups;
 export const knowledgeComponentGroups = knowledgeCompiledGroups;
+export const knowledgeSupportedComponents = uniqueComponents(
+  knowledgeComponentGroupDefinitions.map((group) => group.name),
+  Object.fromEntries(knowledgeCompiledGroups.map((group) => [group.name, group])) as Record<ComponentGroupName, CompiledComponentGroup>,
+) as string[];
 export const compiledZoneTemplates = zoneTemplates;
 export const compiledPageSkeletons = pageSkeletons;
 export const compiledFreeLayoutPatterns = freeLayoutPatterns;
@@ -639,6 +693,20 @@ export function getDesignPolicySummary(): string {
 
 export function getPlannerContractSummary(): string {
   return compiledLevel1Groups
+    .map((group) => {
+      const patterns = group.parentChildPatterns.length > 0
+        ? `\npatterns=${group.parentChildPatterns.join('; ')}`
+        : '';
+      const zones = group.typicalZones.length > 0
+        ? `\nzones=${group.typicalZones.join(', ')}`
+        : '';
+      return `Group ${group.name}: ${group.description}${zones}${patterns}\n${group.promptSummary}`;
+    })
+    .join('\n\n');
+}
+
+export function getKnowledgePlannerContractSummary(): string {
+  return compiledKnowledgeLevel1Groups
     .map((group) => {
       const patterns = group.parentChildPatterns.length > 0
         ? `\npatterns=${group.parentChildPatterns.join('; ')}`
@@ -716,6 +784,34 @@ export function getZoneContractSummary(zoneType: ZoneType, preferredComponents: 
     .join('\n');
 }
 
+export function getKnowledgeZoneContractSummary(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {
+  const groups = knowledgeZoneGroupMap[zoneType];
+  const preferredSet = new Set(preferredComponents);
+  const knowledgeCompiledGroupMap = Object.fromEntries(
+    knowledgeCompiledGroups.map((group) => [group.name, group]),
+  ) as Record<ComponentGroupName, CompiledComponentGroup>;
+  const orderedComponents = uniqueComponents(groups, knowledgeCompiledGroupMap).sort((left, right) => {
+    const leftPreferred = preferredSet.has(left) ? 1 : 0;
+    const rightPreferred = preferredSet.has(right) ? 1 : 0;
+    return rightPreferred - leftPreferred;
+  });
+
+  return orderedComponents
+    .map((componentType) => {
+      const summary = compiledKnowledgeLevel2Briefs[componentType];
+      if (!summary) {
+        return null;
+      }
+      const props = summary.propSummary.length > 0 ? summary.propSummary.join(', ') : 'minimal props';
+      const slots = summary.slotSummary.length > 0 ? `; slots=${summary.slotSummary.join(', ')}` : '';
+      const hints = summary.parentHints.length > 0 ? `; hints=${summary.parentHints.join('; ')}` : '';
+      const preferred = preferredSet.has(componentType) ? 'preferred' : 'knowledge';
+      return `${summary.componentType} (${preferred}, ${summary.category}, children=${summary.childrenType}, ${props}${slots}${hints})`;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
 export function getZoneLevel2ComponentBrief(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {
   const template = zoneTemplates[zoneType];
   const groups = zoneGroupMap[zoneType];
@@ -731,6 +827,45 @@ export function getZoneLevel2ComponentBrief(zoneType: ZoneType, preferredCompone
   return ordered
     .map((componentType) => {
       const summary = compiledLevel2Briefs[componentType];
+      if (!summary) {
+        return null;
+      }
+      const props = summary.propSummary.length > 0 ? summary.propSummary.join(', ') : 'none';
+      const slots = summary.slotSummary.length > 0 ? summary.slotSummary.join(', ') : 'none';
+      const hints = summary.parentHints.length > 0 ? summary.parentHints.join('; ') : 'none';
+      const groupsSummary = summary.groups.length > 0 ? summary.groups.join(', ') : 'none';
+      return [
+        `- ${summary.componentType}`,
+        `  category: ${summary.category}`,
+        `  groups: ${groupsSummary}`,
+        `  children: ${summary.childrenType}`,
+        `  props: ${props}`,
+        `  slots: ${slots}`,
+        `  hints: ${hints}`,
+      ].join('\n');
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function getKnowledgeZoneLevel2ComponentBrief(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {
+  const template = zoneTemplates[zoneType];
+  const groups = knowledgeZoneGroupMap[zoneType];
+  const preferredSet = new Set(preferredComponents);
+  const knowledgeCompiledGroupMap = Object.fromEntries(
+    knowledgeCompiledGroups.map((group) => [group.name, group]),
+  ) as Record<ComponentGroupName, CompiledComponentGroup>;
+  const ordered = uniqueComponents(groups, knowledgeCompiledGroupMap)
+    .sort((left, right) => {
+      const leftPreferred = preferredSet.has(left) ? 1 : 0;
+      const rightPreferred = preferredSet.has(right) ? 1 : 0;
+      return rightPreferred - leftPreferred;
+    })
+    .slice(0, Math.max(template.preferredComponents.length + 4, 12));
+
+  return ordered
+    .map((componentType) => {
+      const summary = compiledKnowledgeLevel2Briefs[componentType];
       if (!summary) {
         return null;
       }
@@ -815,6 +950,9 @@ const componentMiniSkeletons: Record<string, string> = {
   Card: '{"component":"Card","id":"..","props":{"title":"卡片标题"},"children":[...]}',
   Statistic: '{"component":"Statistic","id":"..","props":{"title":"指标名","value":42}}',
   Table: '{"component":"Table","id":"..","props":{"dataSource":[{"key":"1","name":"张三"}],"pagination":{"pageSize":10}},"columns":[{"title":"姓名","dataIndex":"name","key":"name"}]}',
+  Pagination: '{"component":"Pagination","id":"..","props":{"current":1,"pageSize":10,"total":120,"showSizeChanger":true}}',
+  Breadcrumb: '{"component":"Breadcrumb","id":"..","props":{"items":[{"title":"员工管理"},{"title":"员工详情"}]}}',
+  Steps: '{"component":"Steps","id":"..","props":{"current":1,"items":[{"title":"提交申请","description":"员工发起申请"},{"title":"主管审批","description":"等待审批"},{"title":"处理完成","description":"流程完成"}]}}',
 
   // Descriptions: use children with Descriptions.Item, NOT props.items
   Descriptions: '{"component":"Descriptions","id":"..","props":{"column":2},"children":[{"component":"Descriptions.Item","id":"..","props":{"label":"字段名"},"children":["字段值"]}]}',
@@ -838,6 +976,7 @@ const componentMiniSkeletons: Record<string, string> = {
   // Feedback
   Alert: '{"component":"Alert","id":"..","props":{"type":"info","message":"提示信息","showIcon":true}}',
   Tag: '{"component":"Tag","id":"..","props":{"color":"blue"},"children":["标签"]}',
+  Progress: '{"component":"Progress","id":"..","props":{"percent":68,"status":"active","showInfo":true}}',
 };
 
 /**
@@ -848,6 +987,8 @@ const childrenVsItemsWarnings: Record<string, string> = {
   Timeline: 'IMPORTANT: Use children Array with Timeline.Item nodes. Do NOT use props.items.',
   Descriptions: 'IMPORTANT: Use children Array with Descriptions.Item nodes. Do NOT use props.items.',
   Tabs: 'IMPORTANT: Use children Array with Tabs.TabPane nodes. Do NOT use props.items.',
+  Breadcrumb: 'IMPORTANT: Use props.items with simple text titles. Do NOT use children nodes or itemRender functions.',
+  Steps: 'IMPORTANT: Use props.items with plain title/description strings. Do NOT use children nodes.',
 };
 
 function buildComponentIndex(

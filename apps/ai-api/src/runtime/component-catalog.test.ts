@@ -8,6 +8,10 @@ import {
   compiledLevel2Briefs,
   compiledKnowledgeLevel1Groups,
   compiledKnowledgeLevel2Briefs,
+  getKnowledgePlannerContractSummary,
+  getKnowledgeZoneContractSummary,
+  getKnowledgeZoneLevel2ComponentBrief,
+  knowledgeSupportedComponents,
   compiledPageSkeletons,
   compiledZoneTemplates,
   getDesignPolicySummary,
@@ -32,29 +36,47 @@ describe('component catalog', () => {
     expect(supportedComponents).toContain('Form');
     expect(supportedComponents).toContain('Typography.Title');
     expect(supportedComponents).toContain('Divider');
+    expect(supportedComponents).toContain('Pagination');
+    expect(supportedComponents).toContain('Breadcrumb');
+    expect(supportedComponents).toContain('Steps');
+    expect(supportedComponents).toContain('Progress');
     expect(supportedComponents).not.toContain('HeroSection');
-    expect(supportedComponents).not.toContain('Pagination');
     expect(compiledComponentIndex.byComponent.Table?.groups).toContain('data-display');
+    expect(compiledComponentIndex.byComponent.Pagination?.groups).toContain('navigation');
+    expect(compiledComponentIndex.byComponent.Progress?.groups).toContain('feedback-status');
     expect(compiledComponentIndex.byComponent['Tabs.TabPane']?.parentComponent).toBe('Tabs');
   });
 
   it('expands knowledge-layer catalogs without widening runtime supported components', () => {
     expect(compiledKnowledgeComponentIndex.byComponent.Pagination?.groups).toContain('navigation');
     expect(compiledKnowledgeComponentIndex.byComponent.Badge?.groups).toContain('extended-feedback');
+    expect(compiledKnowledgeComponentIndex.byComponent.Collapse?.groups).toContain('disclosure');
+    expect(compiledKnowledgeComponentIndex.byComponent['Avatar.Group']?.groups).toContain('identity');
     expect(compiledKnowledgeLevel1Groups.find((group) => group.name === 'navigation')?.components).toContain('Pagination');
     expect(compiledKnowledgeLevel2Briefs.Pagination?.componentType).toBe('Pagination');
     expect(compiledKnowledgeLevel2Briefs.Avatar?.componentType).toBe('Avatar');
+    expect(compiledKnowledgeLevel2Briefs.Collapse?.childComponents).toContain('Collapse.Panel');
+    expect(knowledgeSupportedComponents).toContain('Progress');
+    expect(knowledgeSupportedComponents).toContain('ColorPicker');
     expect(supportedComponents).not.toContain('Badge');
     expect(supportedComponents).not.toContain('Avatar');
+    expect(supportedComponents).not.toContain('Collapse');
+    expect(supportedComponents).not.toContain('ColorPicker');
   });
 
   it('provides planner and zone summaries from compiled groups', () => {
     expect(componentGroups.length).toBeGreaterThan(0);
     expect(getPlannerContractSummary()).toContain('Group filters-form');
+    expect(getPlannerContractSummary()).toContain('Group navigation');
     expect(getPlannerContractSummary()).toContain('patterns=');
+    expect(getKnowledgePlannerContractSummary()).toContain('Group navigation');
+    expect(getKnowledgePlannerContractSummary()).toContain('Group disclosure');
     expect(compiledLevel1Groups.find((group) => group.name === 'data-display')?.typicalZones).toContain('data-table');
     expect(getZoneComponentCandidates('data-table')).toContain('Table');
     expect(getZoneContractSummary('data-table', ['Table'])).toContain('Table (preferred');
+    expect(getZoneContractSummary('data-table', ['Pagination'])).toContain('Pagination (preferred');
+    expect(getZoneContractSummary('page-header', ['Breadcrumb'])).toContain('Breadcrumb (preferred');
+    expect(getKnowledgeZoneContractSummary('data-table', ['Pagination'])).toContain('Pagination (preferred');
     expect(getZoneGoldenExample('filter')).toContain('"component":"Card"');
   });
 
@@ -70,6 +92,11 @@ describe('component catalog', () => {
     expect(getZoneLevel2ComponentBrief('data-table', ['Table'])).toContain('- Table');
     expect(getZoneLevel2ComponentBrief('data-table', ['Table'])).toContain('groups: data-display');
     expect(getZoneLevel2ComponentBrief('detail-info', ['Descriptions'])).toContain('hints: parent Descriptions');
+    expect(getZoneLevel2ComponentBrief('data-table', ['Pagination'])).toContain('- Pagination');
+    expect(getZoneLevel2ComponentBrief('page-header', ['Breadcrumb'])).toContain('- Breadcrumb');
+    expect(getZoneLevel2ComponentBrief('chart-area', ['Progress'])).toContain('- Progress');
+    expect(getKnowledgeZoneLevel2ComponentBrief('detail-info', ['Collapse'])).toContain('- Collapse');
+    expect(getKnowledgeZoneLevel2ComponentBrief('data-table', ['Pagination'])).toContain('- Pagination');
     expect(compiledLevel2Briefs.Descriptions?.childComponents).toContain('Descriptions.Item');
     expect(compiledLevel2Briefs.Table?.schemaContract).toContain('schema-example:');
     expect(getZoneGenerationParameters('filter')).toContain('maxDepth=');

@@ -161,6 +161,84 @@ function normalizeNodeProps(node: SchemaNode): void {
     delete props.items;
   }
 
+  if (node.component === 'Breadcrumb') {
+    if (isNodeLike(props.separator) || Array.isArray(props.separator)) {
+      const separator = flattenToText(props.separator);
+      if (separator) {
+        props.separator = separator;
+      } else {
+        delete props.separator;
+      }
+    }
+    if (typeof props.itemRender !== 'function') {
+      delete props.itemRender;
+    }
+    if (Array.isArray(props.items)) {
+      (props as Record<string, unknown>).items = props.items
+        .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+        .map((item, index) => {
+          const entry = { ...(item as Record<string, unknown>) };
+          const title = flattenToText(entry.title);
+          entry.title = title || `路径${index + 1}`;
+          if (entry.menu && typeof entry.menu === 'object') {
+            delete entry.menu;
+          }
+          if (entry.overlay && typeof entry.overlay === 'object') {
+            delete entry.overlay;
+          }
+          return entry;
+        });
+    }
+  }
+
+  if (node.component === 'Steps') {
+    if (typeof props.progressDot !== 'boolean') {
+      delete props.progressDot;
+    }
+    if (Array.isArray(props.items)) {
+      (props as Record<string, unknown>).items = props.items
+        .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+        .map((item, index) => {
+          const entry = { ...(item as Record<string, unknown>) };
+          entry.title = flattenToText(entry.title) || `步骤${index + 1}`;
+          if ('description' in entry) {
+            const description = flattenToText(entry.description);
+            if (description) {
+              entry.description = description;
+            } else {
+              delete entry.description;
+            }
+          }
+          if ('subTitle' in entry) {
+            const subTitle = flattenToText(entry.subTitle);
+            if (subTitle) {
+              entry.subTitle = subTitle;
+            } else {
+              delete entry.subTitle;
+            }
+          }
+          delete entry.icon;
+          return entry;
+        });
+    }
+  }
+
+  if (node.component === 'Progress') {
+    if (typeof props.format !== 'function') {
+      delete props.format;
+    }
+    if (props.success && typeof props.success === 'object' && !Array.isArray(props.success)) {
+      const success = { ...(props.success as Record<string, unknown>) };
+      if (typeof success.format !== 'function') {
+        delete success.format;
+      }
+      if ('strokeColor' in success && typeof success.strokeColor === 'object') {
+        delete success.strokeColor;
+      }
+      (props as Record<string, unknown>).success = success;
+    }
+  }
+
   if (node.component === 'Statistic') {
     if (isNodeLike(props.title) || Array.isArray(props.title)) {
       props.title = flattenToText(props.title) || '指标';
@@ -247,12 +325,44 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
 
   switch (node.component) {
     case 'Alert':
+    case 'Breadcrumb':
     case 'DatePicker':
     case 'Input':
+    case 'Pagination':
+    case 'Progress':
     case 'Select':
     case 'Statistic':
+    case 'Steps':
     case 'Table':
     case 'Tabs': {
+      if (node.component === 'Breadcrumb' && !Array.isArray(node.props?.items)) {
+        const breadcrumbItems = children
+          .map((child, index) => {
+            const title = flattenToText(child);
+            if (!title) {
+              return null;
+            }
+            return { title, key: `${node.id ?? 'breadcrumb'}-item-${index + 1}` };
+          })
+          .filter(Boolean);
+        if (breadcrumbItems.length > 0) {
+          node.props = { ...(node.props ?? {}), items: breadcrumbItems };
+        }
+      }
+      if (node.component === 'Steps' && !Array.isArray(node.props?.items)) {
+        const stepItems = children
+          .map((child, index) => {
+            const title = flattenToText(child);
+            if (!title) {
+              return null;
+            }
+            return { title, key: `${node.id ?? 'steps'}-item-${index + 1}` };
+          })
+          .filter(Boolean);
+        if (stepItems.length > 0) {
+          node.props = { ...(node.props ?? {}), items: stepItems };
+        }
+      }
       delete node.children;
       return node;
     }

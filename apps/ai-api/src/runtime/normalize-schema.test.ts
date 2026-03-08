@@ -88,6 +88,86 @@ describe('normalizeGeneratedNode', () => {
     ).toBeUndefined();
   });
 
+  it('normalizes breadcrumb items and drops unsafe breadcrumb props', () => {
+    const node: SchemaNode = {
+      component: 'Breadcrumb',
+      props: {
+        separator: { component: 'Typography.Text', children: '>' },
+        itemRender: { component: 'Button', children: 'bad' } as any,
+        items: [
+          { title: { component: 'Typography.Text', children: '员工管理' } },
+          { title: ['员工详情'] },
+        ],
+      },
+    };
+
+    const normalized = normalizeGeneratedNode(node);
+    expect(normalized.props?.separator).toBe('>');
+    expect(normalized.props?.itemRender).toBeUndefined();
+    expect(Array.isArray(normalized.props?.items)).toBe(true);
+    const items = normalized.props?.items as Array<Record<string, unknown>>;
+    expect(items[0]?.title).toBe('员工管理');
+    expect(items[1]?.title).toBe('员工详情');
+  });
+
+  it('builds breadcrumb items from text children when items are missing', () => {
+    const node: SchemaNode = {
+      component: 'Breadcrumb',
+      children: ['员工管理', '员工详情'],
+    };
+
+    const normalized = normalizeGeneratedNode(node);
+    expect(normalized.children).toBeUndefined();
+    expect(Array.isArray(normalized.props?.items)).toBe(true);
+    const items = normalized.props?.items as Array<Record<string, unknown>>;
+    expect(items.map((item) => item.title)).toEqual(['员工管理', '员工详情']);
+  });
+
+  it('normalizes steps items and drops unsafe step props', () => {
+    const node: SchemaNode = {
+      component: 'Steps',
+      props: {
+        progressDot: { component: 'Button', children: 'bad' } as any,
+        items: [
+          {
+            title: { component: 'Typography.Text', children: '提交申请' },
+            description: ['员工发起申请'],
+            icon: { component: 'Tag', children: 'bad' },
+          },
+        ],
+      },
+    };
+
+    const normalized = normalizeGeneratedNode(node);
+    expect(normalized.props?.progressDot).toBeUndefined();
+    expect(Array.isArray(normalized.props?.items)).toBe(true);
+    const items = normalized.props?.items as Array<Record<string, unknown>>;
+    expect(items[0]?.title).toBe('提交申请');
+    expect(items[0]?.description).toBe('员工发起申请');
+    expect(items[0]?.icon).toBeUndefined();
+  });
+
+  it('drops unsafe progress formatter props', () => {
+    const node: SchemaNode = {
+      component: 'Progress',
+      props: {
+        percent: 80,
+        format: { component: 'Typography.Text', children: '80%' } as any,
+        success: {
+          percent: 60,
+          format: { component: 'Typography.Text', children: 'done' },
+          strokeColor: { bad: true },
+        },
+      },
+    };
+
+    const normalized = normalizeGeneratedNode(node);
+    expect(normalized.props?.format).toBeUndefined();
+    const success = normalized.props?.success as Record<string, unknown> | undefined;
+    expect(success?.format).toBeUndefined();
+    expect(success?.strokeColor).toBeUndefined();
+  });
+
   it('wraps row children into cols', () => {
     const node: SchemaNode = {
       component: 'Row',
