@@ -1,6 +1,6 @@
 import type { ZoneType } from '@shenbi/ai-agents';
 import type { ComponentContract } from '@shenbi/schema';
-import { builtinContracts, builtinContractMap } from '../../../../packages/schema/contracts/index.ts';
+import * as schemaContractsModule from '../../../../packages/schema/contracts/index.ts';
 
 type ComponentGroupName =
   | 'layout-shell'
@@ -30,6 +30,15 @@ interface CompiledComponentGroup {
   components: string[];
   promptSummary: string;
 }
+
+const builtinContracts =
+  (schemaContractsModule as { builtinContracts?: ComponentContract[] }).builtinContracts
+  ?? (schemaContractsModule as { default?: { builtinContracts?: ComponentContract[] } }).default?.builtinContracts
+  ?? [];
+
+const builtinContractMap = Object.fromEntries(
+  builtinContracts.map((contract) => [contract.componentType, contract]),
+) as Record<string, ComponentContract>;
 
 const componentGroupDefinitions: ComponentGroupDefinition[] = [
   {
