@@ -11,12 +11,61 @@ function findBalancedJsonObject(text: string): string | null {
     return null;
   }
 
+  const { chars } = normalizeMismatchedClosers(text.slice(start));
   const stack: string[] = [];
   let inString = false;
   let escaped = false;
 
-  for (let index = start; index < text.length; index += 1) {
-    const char = text[index];
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === '{' || char === '[') {
+      stack.push(char);
+      continue;
+    }
+    if (char === '}') {
+      if (stack.at(-1) !== '{') {
+        return null;
+      }
+      stack.pop();
+      if (stack.length === 0) {
+        return chars.slice(0, index + 1).join('');
+      }
+      continue;
+    }
+    if (char === ']') {
+      if (stack.at(-1) !== '[') {
+        return null;
+      }
+      stack.pop();
+    }
+  }
+
+  return null;
+}
+
+function normalizeMismatchedClosers(text: string): { text: string; chars: string[] } {
+  const stack: string[] = [];
+  const chars = text.split('');
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index];
     if (inString) {
       if (escaped) {
         escaped = false;
@@ -41,24 +90,32 @@ function findBalancedJsonObject(text: string): string | null {
       continue;
     }
     if (char === '}') {
-      if (stack.at(-1) !== '{') {
-        return null;
+      if (stack.at(-1) === '[') {
+        chars[index] = ']';
+        stack.pop();
+        continue;
       }
-      stack.pop();
-      if (stack.length === 0) {
-        return text.slice(start, index + 1);
+      if (stack.at(-1) === '{') {
+        stack.pop();
       }
       continue;
     }
     if (char === ']') {
-      if (stack.at(-1) !== '[') {
-        return null;
+      if (stack.at(-1) === '{') {
+        chars[index] = '}';
+        stack.pop();
+        continue;
       }
-      stack.pop();
+      if (stack.at(-1) === '[') {
+        stack.pop();
+      }
     }
   }
 
-  return null;
+  return {
+    text: chars.join(''),
+    chars,
+  };
 }
 
 function countOutsideStrings(text: string, target: string): number {
@@ -116,7 +173,7 @@ function trySalvageJsonCandidate(text: string): string | null {
     return null;
   }
 
-  const fullBase = text.slice(start).trim();
+  const fullBase = normalizeMismatchedClosers(text.slice(start).trim()).text;
   const fullOpenCount = countOutsideStrings(fullBase, '{');
   const fullCloseCount = countOutsideStrings(fullBase, '}');
   if (fullOpenCount > fullCloseCount) {
@@ -185,5 +242,14 @@ describe('agent runtime json salvage', () => {
     const salvaged = trySalvageJsonCandidate(raw);
     expect(salvaged).toBe('{"component":"Container","children":[{"component":"Typography.Text","children":["ok"]}]}');
     expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Container' });
+  });
+
+  it('salvages near-valid json with mismatched closing token inside array', () => {
+    const raw = '{"component":"Descriptions.Item","props":{"label":"工作地点"},"children":["北京市朝阳区科技园区A座15层"}';
+    const salvaged = trySalvageJsonCandidate(raw);
+    const parsed = JSON.parse(salvaged!);
+    expect(parsed).toMatchObject({ component: 'Descriptions.Item' });
+    expect(Array.isArray(parsed.children)).toBe(true);
+    expect(parsed.children[0]).toBe('北京市朝阳区科技园区A座15层');
   });
 });
