@@ -31,7 +31,32 @@ import type { AgentRuntime } from './types.ts';
 
 const memory = createInMemoryAgentMemoryStore();
 const env = loadEnv();
-const supportedComponents = ['Card', 'Container', 'Button', 'Table', 'Alert'] as const;
+const supportedComponents = [
+  'Alert',
+  'Button',
+  'Card',
+  'Container',
+  'DatePicker',
+  'Descriptions',
+  'Descriptions.Item',
+  'Form',
+  'FormItem',
+  'Input',
+  'Row',
+  'Col',
+  'Select',
+  'Space',
+  'Statistic',
+  'Table',
+  'Tabs',
+  'Tabs.TabPane',
+  'Tag',
+  'Timeline',
+  'Timeline.Item',
+  'Typography.Paragraph',
+  'Typography.Text',
+  'Typography.Title',
+] as const;
 const supportedComponentList = supportedComponents.join(', ');
 const supportedPageTypes = ['dashboard', 'list', 'form', 'detail', 'statistics', 'custom'] as const;
 const supportedZoneTypes = [
@@ -199,20 +224,30 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         '- block.type is a zone type, not a component name.',
         '- block.type must be exactly one of: page-header, filter, kpi-row, data-table, detail-info, form-body, form-actions, chart-area, timeline-area, side-info, empty-state, custom.',
         '- block.components must be a non-empty array.',
-        '- Every item in block.components must be exactly one of: Card, Container, Button, Table, Alert.',
+        `- Every item in block.components must be chosen from: ${supportedComponentList}.`,
         '- If the page is a dashboard, use pageType "dashboard" and prefer zones page-header, kpi-row, chart-area, data-table, timeline-area.',
         '- If the page is a list page, use pageType "list" and prefer zones page-header, filter, data-table.',
-        '- If the page is a form page, use pageType "form" and prefer zones page-header, form-body, form-actions.',
+        '- If the page is a form page, use pageType "form" and prefer zones page-header, form-body, form-actions, side-info.',
         '- If the page is a detail page, use pageType "detail" and prefer zones page-header, detail-info, data-table or timeline-area.',
         '- If the page is a statistics page, use pageType "statistics" and prefer zones page-header, kpi-row, chart-area, data-table.',
+        '- For page-header, prefer Container + Typography.Title + Typography.Text + Space + Button.',
+        '- For filter, prefer Card + Form + FormItem + Input + Select + DatePicker + Space + Button.',
+        '- For kpi-row, prefer Row + Col + Card + Statistic + Tag + Alert.',
+        '- For data-table, prefer Card + Table + Button + Tag.',
+        '- For detail-info, prefer Card + Descriptions + Descriptions.Item + Tag + Typography.Text.',
+        '- For form-body, prefer Card + Form + FormItem + Input + Select + DatePicker.',
+        '- For form-actions, prefer Space + Button + Container.',
+        '- For timeline-area, prefer Card + Timeline + Timeline.Item.',
+        '- For chart-area, if no chart component is available, use Card with Typography.Title/Typography.Paragraph and supporting Statistic blocks.',
         '- Never put semantic aliases like hero, recent-records, summary-panel, alert-summary, dashboard-header, banner, widget into type or components.',
         '- Business meaning belongs only in id and description.',
         '- If unsure, choose Card with components ["Card"].',
+        '- Favor clean B2B admin layouts: clear page title, concise helper text, grouped filters, summary cards, primary data area, moderate whitespace.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Valid example 1:',
-        '{"pageTitle":"考勤首页","pageType":"dashboard","blocks":[{"id":"header","type":"page-header","description":"页面标题与主要操作","components":["Container","Button"],"priority":1,"complexity":"simple"},{"id":"alert-summary","type":"kpi-row","description":"展示今日考勤提醒和关键统计","components":["Alert","Card"],"priority":2,"complexity":"simple"}]}',
+        '{"pageTitle":"考勤首页","pageType":"dashboard","blocks":[{"id":"header","type":"page-header","description":"页面标题、描述和主要操作","components":["Container","Typography.Title","Typography.Text","Space","Button"],"priority":1,"complexity":"simple"},{"id":"attendance-kpis","type":"kpi-row","description":"展示今日出勤、迟到、请假等关键指标","components":["Row","Col","Card","Statistic","Tag"],"priority":2,"complexity":"simple"},{"id":"attendance-table","type":"data-table","description":"展示最近考勤记录","components":["Card","Table","Tag"],"priority":3,"complexity":"medium"}]}',
         'Valid example 2:',
-        '{"pageTitle":"用户列表","pageType":"list","blocks":[{"id":"header","type":"page-header","description":"页面标题与新建按钮","components":["Container","Button"],"priority":1,"complexity":"simple"},{"id":"filters","type":"filter","description":"搜索和筛选区域","components":["Container","Button"],"priority":2,"complexity":"simple"},{"id":"recent-records","type":"data-table","description":"展示最近考勤记录","components":["Table","Card"],"priority":3,"complexity":"simple"}]}',
+        '{"pageTitle":"用户列表","pageType":"list","blocks":[{"id":"header","type":"page-header","description":"页面标题、统计和新建按钮","components":["Container","Typography.Title","Typography.Text","Button"],"priority":1,"complexity":"simple"},{"id":"filters","type":"filter","description":"搜索、角色筛选和日期筛选","components":["Card","Form","FormItem","Input","Select","DatePicker","Space","Button"],"priority":2,"complexity":"medium"},{"id":"recent-records","type":"data-table","description":"展示最近用户数据和状态标签","components":["Card","Table","Tag","Button"],"priority":3,"complexity":"medium"}]}',
         'Invalid example:',
         '{"pageTitle":"考勤首页","pageType":"dashboard","blocks":[{"id":"recent-records","type":"recent-records","description":"...","components":["recent-records"],"priority":1,"complexity":"simple"}]}',
         'Return exactly this JSON shape:',
@@ -242,17 +277,27 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         '- The root node component must be one of the supported components.',
         '- Every child schema node must also use only supported components.',
         '- children may contain schema nodes or plain text only.',
-        '- page-header zones should usually use Container and Button, with text children for title/subtitle.',
-        '- filter zones should usually use Container with Button or plain text placeholders.',
-        '- kpi-row zones should usually use Card or Alert and concise content.',
-        '- data-table zones should use Table or Card wrapping table-like content.',
-        '- detail-info zones should prefer Card or Container with structured text.',
-        '- form-actions zones should prefer Container and Button.',
+        '- Build polished B2B admin blocks with clear hierarchy, balanced spacing, and concise business copy.',
+        '- page-header zones should usually use Container or Space with Typography.Title, Typography.Text, and Button.',
+        '- filter zones should usually use Card containing Form, FormItem, Input, Select, DatePicker, Space, and Button.',
+        '- kpi-row zones should usually use Row + Col + Card + Statistic + Tag. Four concise KPI cards are better than one oversized block.',
+        '- data-table zones should use Card wrapping Table and optional action buttons or tags.',
+        '- detail-info zones should prefer Card + Descriptions + Descriptions.Item + Tag.',
+        '- form-body zones should prefer Card + Form + FormItem + Input/Select/DatePicker.',
+        '- form-actions zones should prefer Space and Button.',
+        '- timeline-area zones should prefer Card + Timeline + Timeline.Item.',
+        '- chart-area zones should prefer Card with Typography.Title, Typography.Paragraph, Statistic, Tag or supporting summary content when no chart component exists.',
+        '- side-info zones should prefer Card + Typography.Text or Descriptions.',
         '- Never use raw HTML tags like div, span, section, header, footer. Use Container instead of div/section/header/footer.',
         '- For Table, include sample data in props.dataSource and props.columns.',
+        '- For Statistic, include props.title and props.value.',
+        '- For FormItem, include a label prop and exactly one input-like child when possible.',
+        '- For Descriptions, include props.column and Descriptions.Item children with label props.',
+        '- For Timeline, return Timeline.Item children with short text content.',
+        '- Use realistic Chinese B-end copy such as 今日出勤率, 本周迟到人数, 最近考勤记录, 审批状态.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Return exactly this JSON shape:',
-        '{"component":"Card|Table|Container|Button|Alert","id":"string","props":{},"children":[]}',
+        `{"component":"${supportedComponents.join('|')}","id":"string","props":{},"children":[]}`,
       ].join('\n'),
     },
     {
@@ -283,6 +328,8 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
   const headerBlock = input.blocks.find((block) => block.blockId === 'header' || input.plan.blocks.find((planBlock) => planBlock.id === block.blockId)?.type === 'page-header');
   const contentBlocks = input.blocks.filter((block) => block !== headerBlock);
 
+  const contentGap = input.plan.pageType === 'dashboard' || input.plan.pageType === 'statistics' ? 24 : 16;
+
   const contentChildren = contentBlocks.map((block) => {
     const blockPlan = input.plan.blocks.find((planBlock) => planBlock.id === block.blockId);
     const zoneType = blockPlan?.type ?? 'custom';
@@ -290,10 +337,30 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
     if (zoneType === 'kpi-row') {
       return {
         id: `${block.blockId}-section`,
-        component: 'Container',
+        component: 'Row',
         props: {
-          direction: 'row',
-          gap: 16,
+          gutter: [16, 16],
+        },
+        children: [
+          {
+            id: `${block.blockId}-col`,
+            component: 'Col',
+            props: {
+              span: 24,
+            },
+            children: [block.node],
+          },
+        ],
+      };
+    }
+
+    if (zoneType === 'filter') {
+      return {
+        id: `${block.blockId}-section`,
+        component: 'Card',
+        props: {
+          bordered: true,
+          size: 'small',
         },
         children: [block.node],
       };
@@ -305,6 +372,18 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
         component: 'Card',
         props: {
           title: blockPlan?.description ?? '数据区域',
+          bordered: true,
+        },
+        children: [block.node],
+      };
+    }
+
+    if (zoneType === 'detail-info' || zoneType === 'form-body' || zoneType === 'timeline-area' || zoneType === 'chart-area' || zoneType === 'side-info') {
+      return {
+        id: `${block.blockId}-section`,
+        component: 'Card',
+        props: {
+          title: blockPlan?.description ?? '内容区域',
           bordered: true,
         },
         children: [block.node],
@@ -323,10 +402,11 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
         component: 'Container',
         props: {
           direction: 'column',
-          gap: input.plan.pageType === 'dashboard' || input.plan.pageType === 'statistics' ? 24 : 16,
+          gap: contentGap,
           style: {
             width: '100%',
             padding: 24,
+            background: '#f5f7fa',
           },
         },
         children: [
@@ -335,7 +415,13 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
             component: 'Container',
             props: {
               direction: 'column',
-              gap: 8,
+              gap: 10,
+              style: {
+                padding: 20,
+                borderRadius: 16,
+                background: '#ffffff',
+                boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
+              },
             },
             children: headerBlock
               ? [headerBlock.node]
@@ -345,9 +431,26 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
                     component: 'Container',
                     props: {
                       direction: 'column',
-                      gap: 4,
+                      gap: 6,
                     },
-                    children: [input.plan.pageTitle, `${input.plan.pageType} page`],
+                    children: [
+                      {
+                        id: 'page-title-fallback-title',
+                        component: 'Typography.Title',
+                        props: {
+                          level: 2,
+                        },
+                        children: [input.plan.pageTitle],
+                      },
+                      {
+                        id: 'page-title-fallback-desc',
+                        component: 'Typography.Text',
+                        props: {
+                          type: 'secondary',
+                        },
+                        children: [`${input.plan.pageType} page`],
+                      },
+                    ],
                   },
                 ],
           },
@@ -356,7 +459,7 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
             component: 'Container',
             props: {
               direction: 'column',
-              gap: input.plan.pageType === 'dashboard' || input.plan.pageType === 'statistics' ? 24 : 16,
+              gap: contentGap,
             },
             children: contentChildren,
           },
