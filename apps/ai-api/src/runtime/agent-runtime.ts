@@ -45,13 +45,12 @@ import {
   getPageSkeletonSummary,
   getPlannerContractSummary,
   getZoneComponentCandidates,
-  getZoneContractSummary,
   getZoneGoldenExample,
   getZoneGenerationParameters,
-  getZoneLevel2ComponentBrief,
   getZoneTemplate,
   getZoneTemplateSummary,
   getPlannerZoneTemplateSummary,
+  getComponentSchemaContracts,
 } from './component-catalog.ts';
 import type { AgentRuntime } from './types.ts';
 
@@ -388,13 +387,57 @@ function trySalvageJsonCandidate(text: string): { candidate: string; strategy: J
   return null;
 }
 
+function stripArrowFunctions(text: string): { text: string; stripped: boolean } {
+  // LLMs sometimes emit JS arrow functions in JSON, e.g.:
+  //   "render": (text) => `<Tag color='orange'>${text}</Tag>`
+  //   "render": (text) => text > 0 ? `<Tag>...</Tag>` : `<Tag>0</Tag>`
+  // These are not valid JSON. Replace the entire value with null.
+  // Pattern: matches from an arrow function start "(..." through "=>" to the
+  // next property boundary (a comma followed by a key, or a closing }).
+  const arrowPattern = /:\s*\([^)]*\)\s*=>/g;
+  let match: RegExpExecArray | null;
+  const chunks: string[] = [];
+  let lastEnd = 0;
+  arrowPattern.lastIndex = 0;
+  while ((match = arrowPattern.exec(text)) !== null) {
+    const colonIdx = match.index;
+    let pos = match.index + match[0].length;
+    let inBacktick = false;
+    while (pos < text.length) {
+      const ch = text[pos];
+      if (inBacktick) { if (ch === '`') inBacktick = false; pos++; continue; }
+      if (ch === '`') { inBacktick = true; pos++; continue; }
+      if (ch === ',' || ch === '}' || ch === ']') break;
+      pos++;
+    }
+    chunks.push(text.slice(lastEnd, colonIdx), ': null');
+    lastEnd = pos;
+  }
+  if (chunks.length === 0) return { text, stripped: false };
+  chunks.push(text.slice(lastEnd));
+  const result = chunks.join('');
+  return { text: result, stripped: true };
+}
+
 function extractJson<T>(
   text: string,
   source: InvalidJsonSource,
   request: Pick<RunRequest, 'prompt' | 'plannerModel' | 'blockModel' | 'thinking' | 'context'>,
   model: string,
 ): T {
-  const candidate = extractJsonCandidate(text);
+  let candidate = extractJsonCandidate(text);
+
+  // Pre-process: strip JS arrow functions that LLMs sometimes inject
+  const arrowResult = stripArrowFunctions(candidate);
+  if (arrowResult.stripped) {
+    candidate = arrowResult.text;
+    logger.warn('ai.model.invalid_json_salvaged', {
+      source,
+      model,
+      strategy: 'stripped_arrow_functions',
+    });
+  }
+
   try {
     return JSON.parse(candidate.trim()) as T;
   } catch {
@@ -649,6 +692,8 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         '- If unsure, choose Card with components ["Card"].',
         `- For this request, prefer pageType "${suggestedPageType}" unless the user clearly asks for a custom mixed layout.`,
         '- IMPORTANT: If you include a "custom" layout block that already provides the full page layout (e.g. left-right split with Row/Col), do NOT also include leaf zones like detail-info, data-table, timeline-area for the same content. Either plan ONE custom layout block that contains everything, OR plan individual leaf zones that the assembler will stack vertically — never both.',
+        '- CRITICAL: When the user describes spatial/positional layout (e.g. 左/右, 上/下, 左上/左下/右侧, 双栏, 三栏, 左边...右边...), you MUST use a SINGLE block with type "custom" containing ALL described areas. Do NOT split spatially-related areas into separate blocks (kpi-row, data-table, timeline-area) — that destroys the intended layout by stacking them vertically. The custom block generator will use Row/Col to implement the spatial arrangement.',
+        '- Only use separate leaf zones (kpi-row, data-table, etc.) when the user does NOT describe spatial positioning and content should simply flow top-to-bottom.',
         '- Favor clean B2B admin layouts: clear page title, concise helper text, grouped filters, summary cards, primary data area, moderate whitespace.',
         '- Page skeletons and zone templates are references, not prison rules. You may adapt order or composition when it improves clarity and aesthetics.',
         '- Use free-layout patterns when they create a stronger composition, especially for custom or mixed business pages.',
@@ -678,8 +723,7 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
 
 function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage[] {
   const zoneCandidates = getZoneComponentCandidates(input.block.type);
-  const zoneContractSummary = getZoneContractSummary(input.block.type, input.block.components);
-  const zoneLevel2Brief = getZoneLevel2ComponentBrief(input.block.type, input.block.components);
+  const componentSchemaContracts = getComponentSchemaContracts(input.block.components);
   const zoneGenerationParameters = getZoneGenerationParameters(input.block.type);
   const zoneGoldenExample = getZoneGoldenExample(input.block.type);
   const zoneTemplateSummary = getZoneTemplateSummary(input.block.type);
@@ -697,10 +741,8 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         zoneGenerationParameters,
         'Design policy:',
         designPolicySummary,
-        'Zone-specific contract summary:',
-        zoneContractSummary,
-        'Level-2 component briefs:',
-        zoneLevel2Brief,
+        'Component schema contracts (MUST follow these exact structures):',
+        componentSchemaContracts,
         'Valid zone example:',
         zoneGoldenExample,
         'Free-layout composition references:',
@@ -730,6 +772,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         '- If the zone is detail-info, return detail-focused content only. Do not include tabs, tables, timelines, or page-level split layouts.',
         '- Only custom zones may own a full mixed layout such as left/right split content.',
         '- Never use raw HTML tags like div, span, section, header, footer. Use Container instead of div/section/header/footer.',
+        '- When a Col has multiple children stacked vertically, wrap them in a Container with direction="column" and gap=16 for proper spacing.',
         '- For Table, include sample data in props.dataSource and props.columns.',
         '- For Statistic, include props.title and props.value.',
         '- For FormItem, include a label prop and exactly one input-like child when possible.',
@@ -746,7 +789,14 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
     {
       role: 'user',
       content: [
-        `Prompt: ${input.request.prompt}`,
+        // Custom zones need the full prompt to understand whole-page layout intent.
+        // Non-custom zones only see their own scoped description to prevent
+        // the model from re-generating full-page layouts triggered by keywords
+        // like "双栏", "左边...右边..." in the original prompt.
+        // But include the page title for context so headers aren't generic.
+        input.block.type === 'custom'
+          ? `Prompt: ${input.request.prompt}`
+          : `Prompt: Generate the "${input.block.description}" section for a page titled "${input.pageTitle ?? 'Untitled'}".`,
         `Block Type: ${input.block.type}`,
         `Block Description: ${input.block.description}`,
         `Suggested Components: ${input.block.components.join(', ')}`,
@@ -978,7 +1028,6 @@ async function assembleSchema(input: AssembleSchemaInput, trace?: RunTraceRecord
       || zoneType === 'chart-area'
       || zoneType === 'side-info'
       || zoneType === 'empty-state'
-      || zoneType === 'custom'
     )) {
       return {
         id: `${block.blockId}-section`,
@@ -1011,50 +1060,23 @@ async function assembleSchema(input: AssembleSchemaInput, trace?: RunTraceRecord
           },
         },
         children: [
-          {
-            id: 'page-header-shell',
-            component: 'Container',
-            props: {
-              direction: 'column',
-              gap: 10,
-              style: {
-                padding: 20,
-                borderRadius: 16,
-                background: '#ffffff',
-                boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
-              },
-            },
-            children: headerBlock
-              ? [headerBlock.node]
-              : [
-                {
-                  id: 'page-title-fallback',
-                  component: 'Container',
-                  props: {
-                    direction: 'column',
-                    gap: 6,
-                  },
-                  children: [
-                    {
-                      id: 'page-title-fallback-title',
-                      component: 'Typography.Title',
-                      props: {
-                        level: 2,
-                      },
-                      children: [input.plan.pageTitle],
-                    },
-                    {
-                      id: 'page-title-fallback-desc',
-                      component: 'Typography.Text',
-                      props: {
-                        type: 'secondary',
-                      },
-                      children: [`${input.plan.pageType} page`],
-                    },
-                  ],
+          ...(headerBlock
+            ? [{
+              id: 'page-header-shell',
+              component: 'Container',
+              props: {
+                direction: 'column',
+                gap: 10,
+                style: {
+                  padding: 20,
+                  borderRadius: 16,
+                  background: '#ffffff',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
                 },
-              ],
-          },
+              },
+              children: [headerBlock.node],
+            }]
+            : []),
           {
             id: 'page-content-shell',
             component: 'Container',

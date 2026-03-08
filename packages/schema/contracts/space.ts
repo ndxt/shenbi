@@ -9,6 +9,7 @@ export const spaceContract: ComponentContract = {
   runtimeType: 'antd.Space',
   category: 'layout',
   icon: 'GripHorizontal',
+  usageScenario: '控制相邻元素间距（如按钮组、标签组），不适合用作动态/历史记录列表容器',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     align: {

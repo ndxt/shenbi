@@ -34,6 +34,7 @@ interface CompiledComponentSummary {
   eventSummary: string[];
   slotSummary: string[];
   parentHints: string[];
+  usageScenario?: string | undefined;
 }
 
 interface CompiledComponentGroup {
@@ -202,7 +203,7 @@ const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
     wrapper: {
       component: 'Card',
       props: {
-        bordered: true,
+        variant: 'outlined',
         size: 'small',
       },
     },
@@ -229,7 +230,7 @@ const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
     wrapper: {
       component: 'Card',
       props: {
-        bordered: true,
+        variant: 'outlined',
       },
       useDescriptionAsTitle: true,
     },
@@ -246,7 +247,7 @@ const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
     wrapper: {
       component: 'Card',
       props: {
-        bordered: true,
+        variant: 'outlined',
       },
       useDescriptionAsTitle: true,
     },
@@ -263,7 +264,7 @@ const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
     wrapper: {
       component: 'Card',
       props: {
-        bordered: true,
+        variant: 'outlined',
       },
       useDescriptionAsTitle: true,
     },
@@ -290,7 +291,7 @@ const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
     wrapper: {
       component: 'Card',
       props: {
-        bordered: true,
+        variant: 'outlined',
       },
       useDescriptionAsTitle: true,
     },
@@ -307,7 +308,7 @@ const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
     wrapper: {
       component: 'Card',
       props: {
-        bordered: true,
+        variant: 'outlined',
       },
       useDescriptionAsTitle: true,
     },
@@ -324,7 +325,7 @@ const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
     wrapper: {
       component: 'Card',
       props: {
-        bordered: true,
+        variant: 'outlined',
       },
       useDescriptionAsTitle: true,
     },
@@ -341,7 +342,7 @@ const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
     wrapper: {
       component: 'Card',
       props: {
-        bordered: true,
+        variant: 'outlined',
       },
     },
   },
@@ -354,13 +355,8 @@ const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
     maxDepth: 3,
     maxChildrenPerArray: 4,
     skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"自定义模块"},"children":[{"component":"Typography.Paragraph","id":"__TEXT_ID__","props":{},"children":["请使用受支持组件构建清晰的后台业务区块。"]}]}',
-    wrapper: {
-      component: 'Card',
-      props: {
-        bordered: true,
-      },
-      useDescriptionAsTitle: true,
-    },
+    // custom zones manage their own layout structure (Row/Col etc.),
+    // no outer Card wrapper needed.
   },
 };
 
@@ -485,6 +481,7 @@ function summarizeContract(contract: ComponentContract): CompiledComponentSummar
     eventSummary,
     slotSummary,
     parentHints,
+    usageScenario: contract.usageScenario,
   };
 }
 
@@ -497,7 +494,8 @@ function compileComponentGroup(definition: ComponentGroupDefinition): CompiledCo
       const eventPart = summary.eventSummary.length > 0 ? `events=${summary.eventSummary.join(', ')}` : 'events=none';
       const slotPart = summary.slotSummary.length > 0 ? `slots=${summary.slotSummary.join(', ')}` : 'slots=none';
       const hintPart = summary.parentHints.length > 0 ? `hints=${summary.parentHints.join('; ')}` : 'hints=general';
-      return `${summary.componentType} [${summary.category}] children=${summary.childrenType}; ${propPart}; ${eventPart}; ${slotPart}; ${hintPart}`;
+      const usePart = summary.usageScenario ? `; use=${summary.usageScenario}` : '';
+      return `${summary.componentType} [${summary.category}] children=${summary.childrenType}; ${propPart}; ${eventPart}; ${slotPart}; ${hintPart}${usePart}`;
     })
     .join('\n');
 
@@ -669,4 +667,118 @@ export function getZoneTemplateSummary(zoneType: ZoneType): string {
     `maxChildrenPerArray: ${template.maxChildrenPerArray}`,
     `skeleton: ${template.skeleton}`,
   ].join('\n');
+}
+
+// ===== Per-Component Schema Contracts =====
+
+/**
+ * Mini-skeleton examples keyed by component type.
+ * These show the LLM the EXACT JSON shape expected in our schema format,
+ * eliminating ambiguity between Ant Design's native API and our schema convention.
+ */
+const componentMiniSkeletons: Record<string, string> = {
+  // Layout
+  Row: '{"component":"Row","id":"..","props":{"gutter":[16,16]},"children":[<Col children>]}',
+  Col: '{"component":"Col","id":"..","props":{"span":12},"children":[<single child or Container with gap for multiple>]}',
+  Container: '{"component":"Container","id":"..","props":{"direction":"column","gap":16},"children":[...]}',
+  Space: '{"component":"Space","id":"..","props":{"size":"middle"},"children":[...]}',
+  Flex: '{"component":"Flex","id":"..","props":{"gap":16,"justify":"space-between"},"children":[...]}',
+  Divider: '{"component":"Divider","id":"..","props":{"type":"horizontal"}}',
+
+  // Typography
+  'Typography.Title': '{"component":"Typography.Title","id":"..","props":{"level":2},"children":["标题文字"]}',
+  'Typography.Text': '{"component":"Typography.Text","id":"..","props":{"type":"secondary"},"children":["正文文字"]}',
+  'Typography.Paragraph': '{"component":"Typography.Paragraph","id":"..","props":{},"children":["段落内容"]}',
+
+  // Actions
+  Button: '{"component":"Button","id":"..","props":{"type":"primary"},"children":["按钮文字"]}',
+
+  // Data Display
+  Card: '{"component":"Card","id":"..","props":{"title":"卡片标题"},"children":[...]}',
+  Statistic: '{"component":"Statistic","id":"..","props":{"title":"指标名","value":42}}',
+  Table: '{"component":"Table","id":"..","props":{"dataSource":[{"key":"1","name":"张三"}],"pagination":{"pageSize":10}},"columns":[{"title":"姓名","dataIndex":"name","key":"name"}]}',
+
+  // Descriptions: use children with Descriptions.Item, NOT props.items
+  Descriptions: '{"component":"Descriptions","id":"..","props":{"column":2},"children":[{"component":"Descriptions.Item","id":"..","props":{"label":"字段名"},"children":["字段值"]}]}',
+  'Descriptions.Item': '{"component":"Descriptions.Item","id":"..","props":{"label":"字段名"},"children":["字段值"]}',
+
+  // Timeline: use children with Timeline.Item, NOT props.items
+  Timeline: '{"component":"Timeline","id":"..","props":{},"children":[{"component":"Timeline.Item","id":"..","props":{},"children":["09:20 事件描述"]}]}',
+  'Timeline.Item': '{"component":"Timeline.Item","id":"..","props":{},"children":["事件描述文本"]}',
+
+  // Tabs: use children with Tabs.TabPane, NOT props.items
+  Tabs: '{"component":"Tabs","id":"..","props":{},"children":[{"component":"Tabs.TabPane","id":"..","props":{"tab":"标签名","key":"tab1"},"children":[...]}]}',
+  'Tabs.TabPane': '{"component":"Tabs.TabPane","id":"..","props":{"tab":"标签名","key":"tab1"},"children":[...]}',
+
+  // Form
+  Form: '{"component":"Form","id":"..","props":{"layout":"vertical"},"children":[<FormItem children>]}',
+  FormItem: '{"component":"FormItem","id":"..","props":{"label":"字段名","name":"fieldName"},"children":[<one input child>]}',
+  Input: '{"component":"Input","id":"..","props":{"placeholder":"请输入"}}',
+  Select: '{"component":"Select","id":"..","props":{"placeholder":"请选择"}}',
+  DatePicker: '{"component":"DatePicker","id":"..","props":{}}',
+
+  // Feedback
+  Alert: '{"component":"Alert","id":"..","props":{"type":"info","message":"提示信息","showIcon":true}}',
+  Tag: '{"component":"Tag","id":"..","props":{"color":"blue"},"children":["标签"]}',
+};
+
+/**
+ * Components that commonly confuse LLMs about children vs props.items structure.
+ * For these, we add an explicit warning in the contract output.
+ */
+const childrenVsItemsWarnings: Record<string, string> = {
+  Timeline: 'IMPORTANT: Use children Array with Timeline.Item nodes. Do NOT use props.items.',
+  Descriptions: 'IMPORTANT: Use children Array with Descriptions.Item nodes. Do NOT use props.items.',
+  Tabs: 'IMPORTANT: Use children Array with Tabs.TabPane nodes. Do NOT use props.items.',
+};
+
+/**
+ * Generate per-component schema contracts for the given component types.
+ * These are injected into block generator prompts so the LLM knows the exact
+ * JSON structure expected for each component, scoped by the planner's block.components.
+ */
+export function getComponentSchemaContracts(componentTypes: readonly string[]): string {
+  // Expand to include child component types (e.g. Timeline needs Timeline.Item)
+  const expanded = new Set(componentTypes);
+  for (const comp of componentTypes) {
+    if (comp === 'Timeline') expanded.add('Timeline.Item');
+    if (comp === 'Descriptions') expanded.add('Descriptions.Item');
+    if (comp === 'Tabs') expanded.add('Tabs.TabPane');
+    if (comp === 'Form') expanded.add('FormItem');
+  }
+
+  return [...expanded]
+    .map((componentType) => {
+      const contract = builtinContractMap[componentType];
+      if (!contract) return null;
+
+      const summary = summarizeContract(contract);
+      const skeleton = componentMiniSkeletons[componentType];
+      const warning = childrenVsItemsWarnings[componentType];
+
+      const lines: string[] = [
+        `## ${componentType}`,
+        `  children: ${summary.childrenType}`,
+      ];
+
+      if (summary.parentHints.length > 0) {
+        lines.push(`  structure: ${summary.parentHints.join('; ')}`);
+      }
+
+      if (summary.propSummary.length > 0) {
+        lines.push(`  key-props: ${summary.propSummary.join(', ')}`);
+      }
+
+      if (skeleton) {
+        lines.push(`  schema-example: ${skeleton}`);
+      }
+
+      if (warning) {
+        lines.push(`  ${warning}`);
+      }
+
+      return lines.join('\n');
+    })
+    .filter(Boolean)
+    .join('\n');
 }

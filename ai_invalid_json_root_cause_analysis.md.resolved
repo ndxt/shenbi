@@ -1,0 +1,252 @@
+# Invalid JSON Root Cause Analysis & Remediation Plan
+
+## 1. 现状总结
+
+### 当前 salvage 管线
+
+```mermaid
+flowchart LR
+    A[model raw text] --> B[extractJsonCandidate\n去 code fence]
+    B --> C{JSON.parse}
+    C -->|ok| D[normalizePlan / validateNode]
+    C -->|fail| E[trySalvageJsonCandidate]
+    E --> F{JSON.parse}
+    F -->|ok| D
+    F -->|fail| G[writeInvalidJsonDump\n+ throw LLMError]
+```
+
+salvage 内部管线：[findBalancedJsonObject](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.test.ts#8-60) → 尾部 trim 最多 24 字符 → [normalizeMismatchedClosers](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.test.ts#61-120) + 补尾 `}` → 裁尾多余 `}`
+
+### 6 份 Debug Dump 的共性
+
+| 维度 | 观察 |
+|---|---|
+| **source** | 全部 6/6 是 `block`，0 是 `planner` |
+| **model** | 全部 `GLM-4.6` |
+| **prompt** | 集中在"员工详情页"和"用户列表页" |
+| **输出长度** | 1.5 KB – 4.0 KB 不等 |
+| **失败模式** | 全部 near-valid，基本结构正确 |
+
+### 实际失败 Pattern 归类
+
+拆开 6 个 `rawOutput`，手工 parse 后归类：
+
+| # | 文件时间戳 | 具体失败原因 |
+|---|---|---|
+| 1 | `08:39:41` | `Form.Item` → 不在 supportedComponents 里，但 JSON 本身合法。**这条其实不是 JSON 解析失败，是后续 normalize 抛错** |
+| 2 | `08:46:26` | `children` 数组的最后一个 Descriptions.Item 用 `}` 关闭了 `[`，即 `..."在职"]}]}}]}`，多了一个 `}` |
+| 3 | `08:54:13` | Timeline 子数组末尾用 `}}]}` 关闭，多了一个 `}` |
+| 4 | `08:59:35` | `split` prop 里直接内联了一个 component node（`{"component":"Typography.Text","props":{"children":"|"}}`），但 JSON 本身其实是合法的。这条也不是 parse 失败 |
+| 5 | `09:07:37` | 同 #4，`split` prop 内联 node + `"children":"|"` 导致 children 是 string 而非 array。JSON **可能合法** |
+| 6 | `09:46:23` | 最后一个 Descriptions.Item 用 `}` 关闭了 `[`，`...朝阳区科技园区A座15层"}]}]}]}`→ 少了一个 `]`、多了一个 `}` |
+
+> [!IMPORTANT]
+> **关键发现：6 个 dump 中，真正因为 bracket mismatch 导致 `JSON.parse` 失败的只有 3 个（#2, #3, #6）。另外 3 个的 rawOutput 其实是合法 JSON，但被 salvage 后仍然过不了后续的 normalize/validate 校验，或者 salvage 本身误判。**
+>
+> 这意味着问题分两层：
+> 1. **纯 JSON 语法层**：bracket mismatch，3/6
+> 2. **语义层**：JSON 合法但内容不符合 schema contract，3/6
+
+---
+
+## 2. 根因诊断
+
+### 根因 1：GLM-4.6 在深嵌套 JSON 中丢失 bracket 追踪
+
+GLM-4.6 不是 JSON-native 模型。在 3-4 层嵌套以上时，它容易把 `]` 写成 `}`、把关闭位置搞错一两个字符。这是 **token-by-token 生成** 的固有缺陷：模型在生成第 N 个 token 时并没有维护一个显式的 bracket stack，只靠 attention 来"记住"之前打开了什么。嵌套越深，attention 越弱。
+
+**证据**：全部 3 个纯 bracket 导致的失败都发生在 ≥3 层嵌套深度处。
+
+### 根因 2：prompt 过于「自由」，缺少结构锚点
+
+当前 [createBlockMessages](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#496-550) 的 system prompt 给了模型**一个扁平的 JSON shape 示例 + 一个 golden example**，然后让模型自由填充 children 嵌套。模型需要同时做两件事：
+1. 决策组件树结构（选 components、决定嵌套层次）
+2. 生成严格合法的 deep-nested JSON
+
+这两个任务耦合在一起，压力全在一次生成中完成。
+
+### 根因 3：没有使用 provider 的 structured output 能力
+
+当前 [openai-compatible.ts](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/adapters/openai-compatible.ts) 的 [chat()](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#721-734) 方法只发送 `{ model, messages, temperature, stream }`，**完全没有传 `response_format`**。
+
+OpenAI-compatible API 通常支持 `response_format: { type: "json_object" }` 或更强的 `response_format: { type: "json_schema", json_schema: {...} }`。即使 GLM 系列对此支持程度不一，至少 `json_object` 模式可以让模型更坚定地只输出 JSON。
+
+### 根因 4：单个 block 的输出体积未做上限控制
+
+一个 block（如 detail-info zone）可能包含 6+ 个 Descriptions.Item，每个里面还嵌 Tag，导致一次 generate 输出 3000-4000 字符的紧凑 JSON。输出越长，在尾部犯错的概率越高——这是所有 autoregressive 模型的共性。
+
+当前系统没有 `max_tokens` 限制，也没有对 block 复杂度做拆分。
+
+---
+
+## 3. Salvage 的合理边界判断
+
+### 安全的修正（应保留）
+
+| 修正类型 | 风险 | 理由 |
+|---|---|---|
+| 去 code fence | ✅ 零风险 | 不改变内容 |
+| 提取首个平衡 JSON 对象 | ✅ 低风险 | 只丢弃尾部噪音 |
+| 尾部缺 ≤3 个 `}` 时自动补齐 | ✅ 低风险 | 结构上几乎确定 |
+| 尾部 trim ≤24 字符 | ✅ 低风险 | 渐进式探测 |
+
+### 有限度的修正（应保留但需监控）
+
+| 修正类型 | 风险 | 理由 |
+|---|---|---|
+| [normalizeMismatchedClosers](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.test.ts#61-120)（单字符 `]`↔`}` 互换） | ⚠️ 中等风险 | 当前实现是结构匹配的（根据 stack 决定该 swap 什么），但如果模型同时犯了两处错误，修正第一处可能让第二处的判断也错 |
+| 尾部缺 4-8 个 `}` 时补齐 | ⚠️ 中等风险 | 差距太大说明模型可能"跑飞"了，补出来的 JSON 可能结构上合法但语义上缺失了大量 children |
+
+### 过于冒险的修正（应考虑拒绝）
+
+| 修正类型 | 风险 | 理由 |
+|---|---|---|
+| 中间位置的 bracket 修正 | ❌ 高风险 | 可能改变语义树结构，让通的 children 搬到错误的 parent 下 |
+| 任何试图"补全中间断裂内容"的操作 | ❌ 高风险 | 补出来的数据一定是猜测 |
+
+> [!WARNING]
+> 当前 [normalizeMismatchedClosers](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.test.ts#61-120) 是**全局扫描**的，它会修正所有不匹配的 closer——包括中间位置的。这意味着它已经在做"中间位置 bracket 修正"，只是单字符级别的。这是目前最危险的边界。建议限制为只修正最后 N 个 closer。
+
+---
+
+## 4. 根治优先级建议
+
+### Phase A：立即做 — 能明显减少 invalid JSON
+
+预估工作量：**1-2 小时**，对主线侵入极小。
+
+#### A1. 在 request body 中加 `response_format: { type: "json_object" }`
+
+修改 [openai-compatible.ts](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/adapters/openai-compatible.ts#L79-L109) 的 [chat()](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#721-734) 方法，在 `body` 中加入 `response_format`：
+
+```diff
+ body: JSON.stringify({
+   model,
+   messages,
+   temperature: 0.2,
+   stream: false,
++  response_format: { type: 'json_object' },
+   ...(thinking ? { thinking } : {}),
+ }),
+```
+
+**为什么最值回票价**：这是 1 行代码的改动，但它从根本上告诉 provider "我只要 JSON"。大多数 OpenAI-compatible provider（包括 GLM 系列）支持此字段。即使不支持，provider 会忽略它，不会报错。
+
+> [!TIP]
+> 如果 GLM provider 支持 `json_schema` 模式，那值得后续做 Phase C 级别的 schema-constrained 输出。但 `json_object` 是零风险的第一步。
+
+#### A2. 减少 planner prompt 冗余，加强 block prompt 的结构锚
+
+当前 block prompt 的 system message 接近 **40 行规则文本**。模型越"忙"，越容易丢 bracket。建议：
+
+1. **删除重复规则**：很多规则在 zone contract summary 和 golden example 中已经暗含了（例如"filter zones should usually use Card containing Form"在 golden example 里已经完整展示了）。这些重复的规则文本只增加了 input token 的压力，不增加信息量
+2. **在 prompt 结尾加强 JSON 格式锚**：在 user message 末尾追加一行 `Your response must start with { and end with }. No other text.`
+
+#### A3. 统计 salvage 成功率并分类
+
+在 [extractJson](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#284-327) 中，针对 salvage 成功的情况，增加一个 `logger.info` 记录修正类型（是补 `}` 了、是 trim 了、还是做了 bracket swap），方便后续分析哪些修正最有用。
+
+---
+
+### Phase B：中期做 — 降低 token/长度/复杂度
+
+预估工作量：**3-5 小时**，需要调整 block 生成逻辑。
+
+#### B1. 限制单个 block 的 children 嵌套深度和宽度
+
+在 [createBlockMessages](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#L496-L549) 中明确告诉模型：
+
+```
+- Maximum 3 levels of nesting.
+- Maximum 6 items per children array.
+- If the content is complex, split into multiple sibling Cards instead of deep nesting.
+```
+
+**为什么有效**：debug dump 中的失败都发生在 ≥3 层深、6+ item 的地方。限制深度和宽度可以显著降低 bracket 丢失的概率。
+
+#### B2. 给每个 zone 提供更精确的骨架模板
+
+当前 golden example 是"完整的 JSON"，模型看到后会模仿它的结构再生成一个完整的。但更好的做法是提供一个**带 placeholder 的骨架**：
+
+```json
+{
+  "component": "Card",
+  "id": "__ZONE_ID__",
+  "props": { "title": "__TITLE__" },
+  "children": [
+    { "component": "__CHILD_COMPONENT__", "id": "__CHILD_ID__", "props": {}, "children": [] }
+  ]
+}
+```
+
+让模型"填空"而非"自由创作"，可以大幅减少结构性错误。
+
+#### B3. 添加 `max_tokens` 限制
+
+在 [chat()](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#721-734) 请求中添加 `max_tokens`（比如 4096），防止模型"跑飞"生成超长输出。如果输出被截断，至少 salvage 补尾 `}` 的逻辑可以兜底。
+
+---
+
+### Phase C：长期做 — 彻底把自由 JSON 生成改成更可控的模式
+
+预估工作量：**1-2 天**，需要重新设计 block 生成流程。
+
+#### C1. 分层生成：先骨架后填充
+
+将 block 生成拆成两步：
+
+1. **骨架生成**：让模型输出一个扁平的组件数组（只有 `component` + [id](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#404-407) + 父子关系标记），不需要 props 和 children 的具体内容
+2. **填充生成**：对每个叶子组件，单独调一次模型填充 `props`
+
+这样每次模型输出都是浅层 JSON（1-2 层嵌套），基本消除 bracket mismatch 问题。
+
+**权衡**：增加了 API 调用次数，但每次调用更短更可靠。可以并行调用来控制延迟。
+
+#### C2. JSON Schema-constrained 输出（如果 provider 支持）
+
+如果 GLM 或未来切换到的 provider 支持 `response_format: { type: "json_schema", json_schema: { ... } }`，为每种 zone type 定义一个精确的 JSON Schema，从根本上让模型的 token sampling 被 schema 约束。
+
+这是理论上最干净的解决方案，但依赖 provider 支持程度。
+
+#### C3. 使用 tool-call / function-calling 风格
+
+将 block 生成改为 tool call 模式：定义一个 [generateBlock](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.ts#551-564) function，其 parameters 就是 block schema。模型通过 function calling 返回结构化数据，provider 层面会做 schema validation。
+
+这比 `json_schema` 模式更普遍地被 OpenAI-compatible provider 支持。
+
+---
+
+## 5. 推荐行动路径
+
+```mermaid
+gantt
+    title Invalid JSON 治理路径
+    dateFormat YYYY-MM-DD
+    section Phase A (立即做)
+    A1 response_format json_object  :a1, 2026-03-09, 1d
+    A2 精简 prompt + 锚格式      :a2, 2026-03-09, 1d
+    A3 salvage 统计日志           :a3, 2026-03-09, 1d
+    section Phase B (中期做)
+    B1 限制嵌套深度宽度           :b1, after a1, 2d
+    B2 骨架模板替代 golden example :b2, after a1, 2d
+    B3 添加 max_tokens            :b3, after a1, 1d
+    section Phase C (长期做)
+    C1 分层生成                   :c1, after b1, 3d
+    C2 JSON Schema constrained    :c2, after b1, 2d
+    C3 Tool-call 模式             :c3, after b1, 3d
+```
+
+### 最值回票价的一步
+
+**A1 (`response_format: json_object`)**。1 行代码，零侵入，直接告诉 provider "只给我 JSON"。对于 bracket mismatch 这类"模型在文本和 JSON 之间摇摆"的问题，这一步可能直接消灭 50%+ 的失败。
+
+### 真正根治的一步
+
+**C1（分层生成：先骨架后填充）**。只有把单次 JSON 生成的嵌套深度压到 1-2 层，才能从根本上消除 autoregressive 模型在深嵌套 JSON 中丢 bracket 的问题。所有其他方案都是在"降低概率"而不是"消除可能"。
+
+### Salvage 是否保留
+
+**保留，但收窄边界**：
+- 保留 code fence 剥离、balanced object extraction、尾部 trim、尾部 ≤3 个 `}` 补齐
+- [normalizeMismatchedClosers](file:///D:/Code/lowcode/shenbi-codes/shenbi/apps/ai-api/src/runtime/agent-runtime.test.ts#61-120) 改为只修正**最后 N 个 closer**，不做全局修正
+- 增加 salvage 统计，如果连续 3 次以上都靠 salvage 通过，自动降级并 warn

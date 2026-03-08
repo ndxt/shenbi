@@ -71,6 +71,47 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 }
 
+// ===== Page-level ErrorBoundary =====
+
+interface PageErrorBoundaryState {
+  error: Error | null;
+}
+
+/**
+ * Top-level error boundary for the entire page.
+ * Catches any uncaught rendering errors and shows a user-friendly message
+ * instead of crashing to a black screen.
+ */
+export class PageErrorBoundary extends Component<{ children?: ReactNode }, PageErrorBoundaryState> {
+  state: PageErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return createElement('div', {
+        style: {
+          padding: 24,
+          margin: 16,
+          background: '#fff2f0',
+          border: '1px solid #ffccc7',
+          borderRadius: 8,
+          color: '#cf1322',
+          fontFamily: 'monospace',
+          fontSize: 13,
+        },
+      },
+        createElement('div', { style: { fontWeight: 600, marginBottom: 8, fontSize: 15 } }, '⚠ 页面渲染出错'),
+        createElement('div', { style: { color: '#595959', marginBottom: 8 } }, '页面组件在渲染时发生异常，请检查 schema 结构或联系开发者。'),
+        createElement('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf1322' } }, String(this.state.error)),
+      );
+    }
+    return this.props.children;
+  }
+}
+
 interface FormRuntimeBinderProps {
   Comp: any;
   resolvedProps: Record<string, any>;
@@ -370,6 +411,47 @@ export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRende
     });
 
     resolvedProps.items = items;
+  }
+
+  // Step 10.6: Sanitize pre-existing items on items-based components.
+  // When the LLM places schema-like objects directly in props.items (e.g.
+  // Timeline items with children: [{component: "Typography.Text", ...}]),
+  // React will crash with "Objects are not valid as a React child".
+  // Fix: detect and convert schema-like children to rendered ReactElements.
+  if (isItemsBased && Array.isArray(resolvedProps.items)) {
+    resolvedProps.items = resolvedProps.items.map((item: any, i: number) => {
+      if (!item || typeof item !== 'object') return item;
+      // Check if item.children contains schema-like objects
+      if (Array.isArray(item.children)) {
+        const hasSchemaNodes = item.children.some(
+          (c: any) => c && typeof c === 'object' && typeof c.component === 'string',
+        );
+        if (hasSchemaNodes) {
+          return {
+            ...item,
+            key: item.key ?? item.id ?? `item-${i}`,
+            children: item.children.map((c: any, j: number) => {
+              if (c && typeof c === 'object' && typeof c.component === 'string') {
+                // This is a schema node in the items — render as a simple element
+                const Comp = resolver.resolve(c.component);
+                if (Comp) {
+                  const itemChildren = Array.isArray(c.children)
+                    ? c.children.map((gc: any) =>
+                      gc && typeof gc === 'object' && typeof gc.component === 'string'
+                        ? createElement(resolver.resolve(gc.component) ?? Fragment, { key: gc.id ?? j, ...gc.props }, ...(Array.isArray(gc.children) ? gc.children.filter((x: any) => typeof x === 'string') : typeof gc.children === 'string' ? [gc.children] : []))
+                        : gc,
+                    )
+                    : typeof c.children === 'string' ? [c.children] : [];
+                  return createElement(Comp, { key: c.id ?? `schema-item-${i}-${j}`, ...c.props }, ...itemChildren);
+                }
+              }
+              return c;
+            }),
+          };
+        }
+      }
+      return item;
+    });
   }
 
   // Step 11: children

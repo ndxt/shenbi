@@ -57,7 +57,7 @@ export async function* pageBuilderOrchestrator(
   const blocks: GenerateBlockResult[] = [];
   for (const block of plan.blocks) {
     yield { type: 'tool:start', data: { tool: 'generateBlock', label: `Generating ${block.type}` } };
-    const generated = await generateBlock.execute({ block, request, context });
+    const generated = await generateBlock.execute({ block, request, context, pageTitle: plan.pageTitle });
     blocks.push(generated);
     yield {
       type: 'tool:result',

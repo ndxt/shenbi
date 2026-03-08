@@ -2,7 +2,7 @@ import { createElement, useMemo, type ReactElement } from 'react';
 import type { PageSchema } from '@shenbi/schema';
 import type { ComponentResolver, PageRuntime, CompiledNode } from '../types/contracts';
 import { compileSchema } from '../compiler/schema';
-import { ShenbiContext, NodeRenderer } from './node-renderer';
+import { ShenbiContext, NodeRenderer, PageErrorBoundary } from './node-renderer';
 
 export interface ShenbiPageProps {
   schema: PageSchema;
@@ -26,8 +26,8 @@ export function ShenbiPage({
 
   const bodyElements = Array.isArray(compiledBody)
     ? compiledBody.map((node, i) =>
-        createElement(NodeRenderer, { key: node.id ?? i, node }),
-      )
+      createElement(NodeRenderer, { key: node.id ?? i, node }),
+    )
     : createElement(NodeRenderer, { node: compiledBody });
 
   const resolvedDialogs = useMemo<CompiledNode[] | undefined>(() => {
@@ -58,9 +58,13 @@ export function ShenbiPage({
 
   // React 19: 直接用 <ShenbiContext> 作为 Provider
   return createElement(
-    ShenbiContext,
-    { value: contextValue },
-    bodyElements,
-    dialogElements,
+    PageErrorBoundary,
+    null,
+    createElement(
+      ShenbiContext,
+      { value: contextValue },
+      bodyElements,
+      dialogElements,
+    ),
   );
 }

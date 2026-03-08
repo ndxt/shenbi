@@ -396,6 +396,7 @@ export const stepsContract: ComponentContract = {
   runtimeType: 'antd.Steps',
   category: 'navigation',
   icon: 'ListOrdered',
+  usageScenario: '展示流程步骤、审批进度、任务完成阶段',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     current: {

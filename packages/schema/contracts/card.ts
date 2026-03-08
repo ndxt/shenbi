@@ -8,6 +8,7 @@ export const cardContract: ComponentContract = {
   runtimeType: 'antd.Card',
   category: 'data-display',
   icon: 'CreditCard',
+  usageScenario: '通用内容容器、信息分组卡片、KPI展示块',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     title: {

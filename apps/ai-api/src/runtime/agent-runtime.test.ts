@@ -265,6 +265,59 @@ describe('agent runtime json salvage', () => {
   });
 });
 
+// ── stripArrowFunctions ──
+
+function stripArrowFunctions(text: string): { text: string; stripped: boolean } {
+  const arrowPattern = /:\s*\([^)]*\)\s*=>/g;
+  let match: RegExpExecArray | null;
+  const chunks: string[] = [];
+  let lastEnd = 0;
+  arrowPattern.lastIndex = 0;
+  while ((match = arrowPattern.exec(text)) !== null) {
+    const colonIdx = match.index;
+    let pos = match.index + match[0].length;
+    let inBacktick = false;
+    while (pos < text.length) {
+      const ch = text[pos];
+      if (inBacktick) { if (ch === '`') inBacktick = false; pos++; continue; }
+      if (ch === '`') { inBacktick = true; pos++; continue; }
+      if (ch === ',' || ch === '}' || ch === ']') break;
+      pos++;
+    }
+    chunks.push(text.slice(lastEnd, colonIdx), ': null');
+    lastEnd = pos;
+  }
+  if (chunks.length === 0) return { text, stripped: false };
+  chunks.push(text.slice(lastEnd));
+  const result = chunks.join('');
+  return { text: result, stripped: true };
+}
+
+describe('stripArrowFunctions', () => {
+  it('strips simple arrow function in render field', () => {
+    const input = '{"title":"逾期数","render":(text)=> text > 0}';
+    const result = stripArrowFunctions(input);
+    expect(result.stripped).toBe(true);
+    expect(JSON.parse(result.text)).toMatchObject({ title: '逾期数', render: null });
+  });
+
+  it('strips arrow function with template literal', () => {
+    const input = '{"render":(text)=> `<Tag>${text}</Tag>`,"next":"ok"}';
+    const result = stripArrowFunctions(input);
+    expect(result.stripped).toBe(true);
+    const parsed = JSON.parse(result.text);
+    expect(parsed.render).toBeNull();
+    expect(parsed.next).toBe('ok');
+  });
+
+  it('does not modify valid JSON without arrow functions', () => {
+    const input = '{"title":"test","value":42}';
+    const result = stripArrowFunctions(input);
+    expect(result.stripped).toBe(false);
+    expect(result.text).toBe(input);
+  });
+});
+
 // ── resolvePlanConflicts ──
 
 type ZoneType = 'page-header' | 'filter' | 'kpi-row' | 'data-table' | 'detail-info' | 'form-body' | 'form-actions' | 'chart-area' | 'timeline-area' | 'side-info' | 'empty-state' | 'custom';

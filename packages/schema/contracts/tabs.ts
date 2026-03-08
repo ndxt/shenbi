@@ -9,6 +9,7 @@ export const tabsContract: ComponentContract = {
   runtimeType: 'antd.Tabs',
   category: 'navigation',
   icon: 'Columns2',
+  usageScenario: '多视图内容切换、分类内容展示（如全部/进行中/已完成）',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     activeKey: {

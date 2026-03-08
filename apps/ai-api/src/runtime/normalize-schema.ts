@@ -112,6 +112,32 @@ function normalizeNodeProps(node: SchemaNode): void {
     if (isNodeLike(props.extra) || Array.isArray(props.extra)) {
       props.extra = flattenToText(props.extra);
     }
+    // antd v5: bordered is deprecated, use variant instead
+    if ('bordered' in props) {
+      props.variant = props.variant ?? (props.bordered ? 'outlined' : 'borderless');
+      delete props.bordered;
+    }
+  }
+
+  if (node.component === 'Timeline') {
+    // antd v5: Timeline.Item as children is deprecated; convert to items array
+    const timelineChildren = node.children;
+    if (Array.isArray(timelineChildren)) {
+      const items = timelineChildren
+        .filter((c): c is SchemaNode => isNodeLike(c) && c.component === 'Timeline.Item')
+        .map((item) => {
+          const itemProps = { ...(item.props ?? {}) };
+          // 'children' key is the content field for antd v5 Timeline items
+          const content = Array.isArray(item.children) && item.children.filter(isNodeLike).length > 0
+            ? item.children
+            : (flattenToText(item.children) || undefined);
+          return { ...itemProps, children: content };
+        });
+      if (items.length > 0) {
+        (props as Record<string, unknown>).items = items;
+        node.children = undefined;
+      }
+    }
   }
 
   if (node.component === 'Descriptions.Item') {
@@ -283,14 +309,14 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
       node.children = firstChild
         ? [firstChild]
         : [
-            {
-              id: `${node.id ?? 'form-item'}-input`,
-              component: 'Input',
-              props: {
-                placeholder: String(node.props?.label ?? '请输入'),
-              },
+          {
+            id: `${node.id ?? 'form-item'}-input`,
+            component: 'Input',
+            props: {
+              placeholder: String(node.props?.label ?? '请输入'),
             },
-          ];
+          },
+        ];
       return node;
     }
     default: {

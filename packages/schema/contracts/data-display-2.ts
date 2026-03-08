@@ -332,6 +332,7 @@ export const statisticContract: ComponentContract = {
   runtimeType: 'antd.Statistic',
   category: 'data-display',
   icon: 'BarChart3',
+  usageScenario: '展示KPI数值、汇总指标、数字看板（如会议数、完成率）',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     decimalSeparator: {
@@ -525,6 +526,7 @@ export const timelineContract: ComponentContract = {
   runtimeType: 'antd.Timeline',
   category: 'data-display',
   icon: 'GitCommitVertical',
+  usageScenario: '展示时序动态、操作日志、历史记录、最新动态列表',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     items: {
@@ -557,8 +559,8 @@ export const timelineContract: ComponentContract = {
   events: {},
   slots: {},
   children: {
-    type: 'none',
-    description: '使用 items 配置',
+    type: 'nodes',
+    description: 'Timeline.Item 子节点',
   },
 };
 

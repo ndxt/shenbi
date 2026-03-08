@@ -87,12 +87,14 @@ export interface AgentRuntimeContext {
 export interface PlanPageInput {
   request: RunRequest;
   context: AgentRuntimeContext;
+  pageTitle?: string;
 }
 
 export interface GenerateBlockInput {
   block: PagePlanBlock;
   request: RunRequest;
   context: AgentRuntimeContext;
+  pageTitle?: string;
 }
 
 export interface GenerateBlockResult {

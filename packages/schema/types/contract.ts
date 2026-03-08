@@ -50,6 +50,7 @@ export interface ComponentContractV1 {
   runtimeType?: string;
   category?: string;
   icon?: string;
+  usageScenario?: string;
   props?: Record<string, ContractProp>;
   events?: Record<string, ContractEvent>;
   slots?: Record<string, ContractSlot>;

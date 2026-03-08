@@ -8,6 +8,7 @@ export const tableContract: ComponentContract = {
   runtimeType: 'antd.Table',
   category: 'data-display',
   icon: 'Table',
+  usageScenario: '展示多行结构化数据列表，支持分页、排序、筛选',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     rowKey: {

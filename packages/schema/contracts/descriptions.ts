@@ -9,6 +9,7 @@ export const descriptionsContract: ComponentContract = {
   runtimeType: 'antd.Descriptions',
   category: 'data-display',
   icon: 'AlignJustify',
+  usageScenario: '展示详情键值对信息（如事项基本信息、订单详情）',
   version: COMPONENT_CONTRACT_V1_VERSION,
   props: {
     title: {
