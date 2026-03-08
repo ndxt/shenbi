@@ -9,7 +9,6 @@ import type {
   RunMetadata,
   RunRequest,
   RunResponse,
-  ZoneType,
 } from '@shenbi/ai-contracts';
 
 export type {
@@ -21,7 +20,6 @@ export type {
   RunMetadata,
   RunRequest,
   RunResponse,
-  ZoneType,
 } from '@shenbi/ai-contracts';
 
 export type PagePlan = SharedPagePlan;

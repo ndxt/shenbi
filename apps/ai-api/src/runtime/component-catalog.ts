@@ -1,4 +1,4 @@
-import type { PageType, ZoneType } from '@shenbi/ai-agents';
+import type { PageType } from '@shenbi/ai-agents';
 import type { ComponentContract } from '@shenbi/schema';
 import * as schemaContractsModule from '../../../../packages/schema/contracts/index.ts';
 
@@ -66,7 +66,7 @@ interface CompiledComponentGroup {
 }
 
 interface CompiledLevel1GroupSummary extends CompiledComponentGroup {
-  typicalZones: ZoneType[];
+  typicalZones: LegacyZoneType[];
   parentChildPatterns: string[];
 }
 
@@ -80,7 +80,7 @@ interface CompiledLevel2ComponentBrief extends CompiledComponentSummary {
 }
 
 interface ZoneTemplate {
-  zoneType: ZoneType;
+  zoneType: LegacyZoneType;
   intent: string;
   layoutPattern: string;
   preferredGroups: ComponentGroupName[];
@@ -99,11 +99,27 @@ interface PageSkeleton {
   pageType: PageType;
   intent: string;
   layoutPattern: string;
-  recommendedZones: ZoneType[];
-  optionalZones: ZoneType[];
+  recommendedZones: LegacyZoneType[];
+  optionalZones: LegacyZoneType[];
 }
 
-const zoneGoldenExamples: Record<ZoneType, string> = {
+type LegacyZoneType =
+  | 'page-header'
+  | 'filter'
+  | 'kpi-row'
+  | 'data-table'
+  | 'detail-info'
+  | 'form-body'
+  | 'form-actions'
+  | 'chart-area'
+  | 'timeline-area'
+  | 'side-info'
+  | 'empty-state'
+  | 'custom';
+
+// Legacy zone references are retained only as background design material for
+// planner/group summaries. They are no longer part of the runtime main path.
+const legacyZoneGoldenExamples: Record<LegacyZoneType, string> = {
   'page-header': '{"component":"Container","id":"page-header","props":{"direction":"column","gap":8},"children":[{"component":"Typography.Title","id":"page-title","props":{"level":2},"children":["用户列表"]},{"component":"Typography.Text","id":"page-desc","props":{"type":"secondary"},"children":["管理用户信息、角色与状态"]},{"component":"Space","id":"page-actions","props":{"size":"small"},"children":[{"component":"Button","id":"create-user","props":{"type":"primary"},"children":["新建用户"]}]}]}',
   filter: '{"component":"Card","id":"user-filter","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"filter-form","props":{"layout":"inline"},"children":[{"component":"FormItem","id":"filter-name","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"filter-name-input","props":{"placeholder":"请输入姓名"}}]},{"component":"FormItem","id":"filter-role","props":{"label":"角色","name":"role"},"children":[{"component":"Select","id":"filter-role-select","props":{"placeholder":"请选择角色"}}]},{"component":"FormItem","id":"filter-date","props":{"label":"日期","name":"date"},"children":[{"component":"DatePicker","id":"filter-date-picker","props":{}}]},{"component":"Space","id":"filter-actions","props":{"size":"small"},"children":[{"component":"Button","id":"submit","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"reset","props":{},"children":["重置"]}]}]}]}',
   'kpi-row': '{"component":"Row","id":"attendance-kpis","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"kpi-1-col","props":{"span":6},"children":[{"component":"Card","id":"kpi-1-card","props":{},"children":[{"component":"Statistic","id":"kpi-1","props":{"title":"今日出勤率","value":96}}]}]},{"component":"Col","id":"kpi-2-col","props":{"span":6},"children":[{"component":"Card","id":"kpi-2-card","props":{},"children":[{"component":"Statistic","id":"kpi-2","props":{"title":"迟到人数","value":12}}]}]}]}',
@@ -215,7 +231,7 @@ const freeLayoutPatterns: FreeLayoutPattern[] = [
   },
 ];
 
-const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
+const legacyZoneTemplates: Record<LegacyZoneType, ZoneTemplate> = {
   'page-header': {
     zoneType: 'page-header',
     intent: '页面标题、说明信息和主要操作按钮区域',
@@ -514,7 +530,7 @@ const knowledgeComponentGroupDefinitions: ComponentGroupDefinition[] = [
   },
 ];
 
-const zoneGroupMap: Record<ZoneType, ComponentGroupName[]> = {
+const legacyZoneGroupMap: Record<LegacyZoneType, ComponentGroupName[]> = {
   'page-header': ['layout-shell', 'typography', 'actions', 'navigation'],
   filter: ['data-display', 'filters-form', 'layout-shell', 'actions'],
   'kpi-row': ['layout-shell', 'data-display', 'feedback-status'],
@@ -529,7 +545,7 @@ const zoneGroupMap: Record<ZoneType, ComponentGroupName[]> = {
   custom: ['layout-shell', 'typography', 'actions', 'data-display'],
 };
 
-const knowledgeZoneGroupMap: Record<ZoneType, ComponentGroupName[]> = {
+const legacyKnowledgeZoneGroupMap: Record<LegacyZoneType, ComponentGroupName[]> = {
   'page-header': ['layout-shell', 'typography', 'actions', 'navigation', 'identity'],
   filter: ['data-display', 'filters-form', 'advanced-form', 'layout-shell', 'actions'],
   'kpi-row': ['layout-shell', 'data-display', 'feedback-status', 'extended-feedback'],
@@ -686,7 +702,6 @@ export const knowledgeSupportedComponents = uniqueComponents(
   knowledgeComponentGroupDefinitions.map((group) => group.name),
   Object.fromEntries(knowledgeCompiledGroups.map((group) => [group.name, group])) as Record<ComponentGroupName, CompiledComponentGroup>,
 ) as string[];
-export const compiledZoneTemplates = zoneTemplates;
 export const compiledPageSkeletons = pageSkeletons;
 export const compiledFreeLayoutPatterns = freeLayoutPatterns;
 
@@ -722,15 +737,6 @@ export function getKnowledgePlannerContractSummary(): string {
     .join('\n\n');
 }
 
-export function getPlannerZoneTemplateSummary(): string {
-  return Object.values(zoneTemplates)
-    .map((template) => {
-      const components = template.preferredComponents.join(', ');
-      return `${template.zoneType}: ${template.intent}; layout=${template.layoutPattern}; groups=${template.preferredGroups.join(', ')}; prefer=${components}; maxDepth=${template.maxDepth}; maxChildren=${template.maxChildrenPerArray}`;
-    })
-    .join('\n');
-}
-
 export function getPageSkeleton(pageType: PageType): PageSkeleton {
   return pageSkeletons[pageType];
 }
@@ -762,8 +768,8 @@ export function getFreeLayoutPatternSummary(pageType: PageType): string {
     .join('\n\n');
 }
 
-export function getZoneContractSummary(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {
-  const groups = zoneGroupMap[zoneType];
+function getLegacyZoneContractSummary(zoneType: LegacyZoneType, preferredComponents: readonly string[] = []): string {
+  const groups = legacyZoneGroupMap[zoneType];
   const preferredSet = new Set(preferredComponents);
   const orderedComponents = uniqueComponents(groups, runtimeCompiledGroupMap).sort((left, right) => {
     const leftPreferred = preferredSet.has(left) ? 1 : 0;
@@ -787,8 +793,8 @@ export function getZoneContractSummary(zoneType: ZoneType, preferredComponents: 
     .join('\n');
 }
 
-export function getKnowledgeZoneContractSummary(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {
-  const groups = knowledgeZoneGroupMap[zoneType];
+function getKnowledgeLegacyZoneContractSummary(zoneType: LegacyZoneType, preferredComponents: readonly string[] = []): string {
+  const groups = legacyKnowledgeZoneGroupMap[zoneType];
   const preferredSet = new Set(preferredComponents);
   const knowledgeCompiledGroupMap = Object.fromEntries(
     knowledgeCompiledGroups.map((group) => [group.name, group]),
@@ -815,9 +821,9 @@ export function getKnowledgeZoneContractSummary(zoneType: ZoneType, preferredCom
     .join('\n');
 }
 
-export function getZoneLevel2ComponentBrief(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {
-  const template = zoneTemplates[zoneType];
-  const groups = zoneGroupMap[zoneType];
+function getLegacyZoneLevel2ComponentBrief(zoneType: LegacyZoneType, preferredComponents: readonly string[] = []): string {
+  const template = legacyZoneTemplates[zoneType];
+  const groups = legacyZoneGroupMap[zoneType];
   const preferredSet = new Set(preferredComponents);
   const ordered = uniqueComponents(groups, runtimeCompiledGroupMap)
     .sort((left, right) => {
@@ -851,9 +857,9 @@ export function getZoneLevel2ComponentBrief(zoneType: ZoneType, preferredCompone
     .join('\n');
 }
 
-export function getKnowledgeZoneLevel2ComponentBrief(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {
-  const template = zoneTemplates[zoneType];
-  const groups = knowledgeZoneGroupMap[zoneType];
+function getKnowledgeLegacyZoneLevel2ComponentBrief(zoneType: LegacyZoneType, preferredComponents: readonly string[] = []): string {
+  const template = legacyZoneTemplates[zoneType];
+  const groups = legacyKnowledgeZoneGroupMap[zoneType];
   const preferredSet = new Set(preferredComponents);
   const knowledgeCompiledGroupMap = Object.fromEntries(
     knowledgeCompiledGroups.map((group) => [group.name, group]),
@@ -890,8 +896,8 @@ export function getKnowledgeZoneLevel2ComponentBrief(zoneType: ZoneType, preferr
     .join('\n');
 }
 
-export function getZoneGenerationParameters(zoneType: ZoneType): string {
-  const template = zoneTemplates[zoneType];
+function getLegacyZoneGenerationParameters(zoneType: LegacyZoneType): string {
+  const template = legacyZoneTemplates[zoneType];
   return [
     `root should usually be one of: ${template.preferredComponents.slice(0, 3).join(', ')}`,
     `maxDepth=${template.maxDepth}`,
@@ -900,20 +906,20 @@ export function getZoneGenerationParameters(zoneType: ZoneType): string {
   ].join('\n');
 }
 
-export function getZoneComponentCandidates(zoneType: ZoneType): string[] {
-  return uniqueComponents(zoneGroupMap[zoneType], runtimeCompiledGroupMap);
+function getLegacyZoneComponentCandidates(zoneType: LegacyZoneType): string[] {
+  return uniqueComponents(legacyZoneGroupMap[zoneType], runtimeCompiledGroupMap);
 }
 
-export function getZoneGoldenExample(zoneType: ZoneType): string {
-  return zoneGoldenExamples[zoneType];
+function getLegacyZoneGoldenExample(zoneType: LegacyZoneType): string {
+  return legacyZoneGoldenExamples[zoneType];
 }
 
-export function getZoneTemplate(zoneType: ZoneType): ZoneTemplate {
-  return zoneTemplates[zoneType];
+function getLegacyZoneTemplate(zoneType: LegacyZoneType): ZoneTemplate {
+  return legacyZoneTemplates[zoneType];
 }
 
-export function getZoneTemplateSummary(zoneType: ZoneType): string {
-  const template = zoneTemplates[zoneType];
+function getLegacyZoneTemplateSummary(zoneType: LegacyZoneType): string {
+  const template = legacyZoneTemplates[zoneType];
   return [
     `intent: ${template.intent}`,
     `layoutPattern: ${template.layoutPattern}`,
@@ -1051,7 +1057,7 @@ function buildComponentIndex(
 
 function buildLevel1Groups(groups: readonly CompiledComponentGroup[]): CompiledLevel1GroupSummary[] {
   return groups.map((group) => {
-    const typicalZones = (Object.entries(zoneGroupMap) as Array<[ZoneType, ComponentGroupName[]]>)
+    const typicalZones = (Object.entries(legacyZoneGroupMap) as Array<[LegacyZoneType, ComponentGroupName[]]>)
       .filter(([, groups]) => groups.includes(group.name))
       .map(([zoneType]) => zoneType);
     const parentChildPatterns = [...new Set(group.components.flatMap((componentType) => {

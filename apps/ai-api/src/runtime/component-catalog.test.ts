@@ -9,24 +9,13 @@ import {
   compiledKnowledgeLevel1Groups,
   compiledKnowledgeLevel2Briefs,
   getKnowledgePlannerContractSummary,
-  getKnowledgeZoneContractSummary,
-  getKnowledgeZoneLevel2ComponentBrief,
   knowledgeSupportedComponents,
   compiledPageSkeletons,
-  compiledZoneTemplates,
   getDesignPolicySummary,
   getFreeLayoutPatternSummary,
   getPageSkeleton,
   getPageSkeletonSummary,
   getPlannerContractSummary,
-  getPlannerZoneTemplateSummary,
-  getZoneComponentCandidates,
-  getZoneContractSummary,
-  getZoneGenerationParameters,
-  getZoneGoldenExample,
-  getZoneLevel2ComponentBrief,
-  getZoneTemplate,
-  getZoneTemplateSummary,
   supportedComponents,
 } from './component-catalog.ts';
 
@@ -70,7 +59,7 @@ describe('component catalog', () => {
     expect(supportedComponents).not.toContain('ColorPicker');
   });
 
-  it('provides planner and zone summaries from compiled groups', () => {
+  it('provides planner summaries from compiled groups', () => {
     expect(componentGroups.length).toBeGreaterThan(0);
     expect(getPlannerContractSummary()).toContain('Group filters-form');
     expect(getPlannerContractSummary()).toContain('Group navigation');
@@ -78,39 +67,14 @@ describe('component catalog', () => {
     expect(getKnowledgePlannerContractSummary()).toContain('Group navigation');
     expect(getKnowledgePlannerContractSummary()).toContain('Group disclosure');
     expect(compiledLevel1Groups.find((group) => group.name === 'data-display')?.typicalZones).toContain('data-table');
-    expect(getZoneComponentCandidates('data-table')).toContain('Table');
-    expect(getZoneContractSummary('data-table', ['Table'])).toContain('Table (preferred');
-    expect(getZoneContractSummary('data-table', ['Pagination'])).toContain('Pagination (preferred');
-    expect(getZoneContractSummary('page-header', ['Breadcrumb'])).toContain('Breadcrumb (preferred');
-    expect(getZoneContractSummary('detail-info', ['Avatar', 'Badge'])).toContain('Avatar (preferred');
-    expect(getZoneContractSummary('empty-state', ['Empty', 'Result'])).toContain('Empty (preferred');
-    expect(getKnowledgeZoneContractSummary('data-table', ['Pagination'])).toContain('Pagination (preferred');
-    expect(getZoneGoldenExample('filter')).toContain('"component":"Card"');
   });
 
-  it('exposes explicit zone templates for planner and block prompts', () => {
-    expect(getPlannerZoneTemplateSummary()).toContain('page-header:');
-    expect(getPlannerZoneTemplateSummary()).toContain('data-table:');
-    expect(getZoneTemplateSummary('detail-info')).toContain('preferredComponents: Card, Descriptions, Descriptions.Item, Tag, Typography.Text');
-    expect(getZoneTemplate('form-body').maxDepth).toBeGreaterThan(2);
-    expect(compiledZoneTemplates['data-table'].wrapper?.useDescriptionAsTitle).toBe(true);
-  });
-
-  it('compiles level2 briefs and generation parameters for each zone', () => {
-    expect(getZoneLevel2ComponentBrief('data-table', ['Table'])).toContain('- Table');
-    expect(getZoneLevel2ComponentBrief('data-table', ['Table'])).toContain('groups: data-display');
-    expect(getZoneLevel2ComponentBrief('detail-info', ['Descriptions'])).toContain('hints: parent Descriptions');
-    expect(getZoneLevel2ComponentBrief('data-table', ['Pagination'])).toContain('- Pagination');
-    expect(getZoneLevel2ComponentBrief('page-header', ['Breadcrumb'])).toContain('- Breadcrumb');
-    expect(getZoneLevel2ComponentBrief('chart-area', ['Progress'])).toContain('- Progress');
-    expect(getZoneLevel2ComponentBrief('detail-info', ['Avatar', 'Badge'])).toContain('- Avatar');
-    expect(getZoneLevel2ComponentBrief('empty-state', ['Empty', 'Result'])).toContain('- Result');
-    expect(getKnowledgeZoneLevel2ComponentBrief('detail-info', ['Collapse'])).toContain('- Collapse');
-    expect(getKnowledgeZoneLevel2ComponentBrief('data-table', ['Pagination'])).toContain('- Pagination');
+  it('compiles level2 briefs for runtime and knowledge layers', () => {
     expect(compiledLevel2Briefs.Descriptions?.childComponents).toContain('Descriptions.Item');
     expect(compiledLevel2Briefs.Table?.schemaContract).toContain('schema-example:');
-    expect(getZoneGenerationParameters('filter')).toContain('maxDepth=');
-    expect(getZoneGenerationParameters('filter')).toContain('root should usually be one of:');
+    expect(compiledKnowledgeLevel2Briefs.Collapse?.childComponents).toContain('Collapse.Panel');
+    expect(compiledKnowledgeLevel2Briefs.Pagination?.groups).toContain('navigation');
+    expect(compiledKnowledgeLevel2Briefs.Avatar?.componentType).toBe('Avatar');
   });
 
   it('provides page skeleton summaries for classifier-guided planning', () => {
