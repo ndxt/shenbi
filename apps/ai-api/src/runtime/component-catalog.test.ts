@@ -6,7 +6,9 @@ import {
   getPlannerZoneTemplateSummary,
   getZoneComponentCandidates,
   getZoneContractSummary,
+  getZoneGenerationParameters,
   getZoneGoldenExample,
+  getZoneLevel2ComponentBrief,
   getZoneTemplate,
   getZoneTemplateSummary,
   supportedComponents,
@@ -34,5 +36,12 @@ describe('component catalog', () => {
     expect(getZoneTemplateSummary('detail-info')).toContain('preferredComponents: Card, Descriptions, Descriptions.Item, Tag, Typography.Text');
     expect(getZoneTemplate('form-body').maxDepth).toBeGreaterThan(2);
     expect(compiledZoneTemplates['data-table'].wrapper?.useDescriptionAsTitle).toBe(true);
+  });
+
+  it('compiles level2 briefs and generation parameters for each zone', () => {
+    expect(getZoneLevel2ComponentBrief('data-table', ['Table'])).toContain('- Table');
+    expect(getZoneLevel2ComponentBrief('detail-info', ['Descriptions'])).toContain('hints: parent Descriptions');
+    expect(getZoneGenerationParameters('filter')).toContain('maxDepth=');
+    expect(getZoneGenerationParameters('filter')).toContain('root should usually be one of:');
   });
 });

@@ -22,6 +22,8 @@ interface CompiledComponentSummary {
   childrenType: string;
   propSummary: string[];
   eventSummary: string[];
+  slotSummary: string[];
+  parentHints: string[];
 }
 
 interface CompiledComponentGroup {
@@ -316,11 +318,49 @@ const zoneGroupMap: Record<ZoneType, ComponentGroupName[]> = {
 
 function summarizeContract(contract: ComponentContract): CompiledComponentSummary {
   const propSummary = Object.entries(contract.props ?? {})
-    .slice(0, 4)
-    .map(([name, prop]) => `${name}:${prop.type}`);
+    .filter(([, prop]) => !prop.deprecated)
+    .slice(0, 6)
+    .map(([name, prop]) => {
+      const required = prop.required ? '!' : '';
+      const enumHint = Array.isArray(prop.enum) && prop.enum.length > 0
+        ? `=${prop.enum.slice(0, 3).join('|')}`
+        : '';
+      return `${name}:${prop.type}${required}${enumHint}`;
+    });
   const eventSummary = Object.keys(contract.events ?? {})
     .slice(0, 3)
     .map((name) => name);
+  const slotSummary = Object.entries(contract.slots ?? {})
+    .slice(0, 3)
+    .map(([name, slot]) => `${name}${slot.multiple ? '[]' : ''}`);
+  const parentHints: string[] = [];
+  if (contract.componentType === 'Form') {
+    parentHints.push('children prefer FormItem');
+  }
+  if (contract.componentType === 'FormItem') {
+    parentHints.push('parent Form; child one input-like node');
+  }
+  if (contract.componentType === 'Descriptions') {
+    parentHints.push('children prefer Descriptions.Item');
+  }
+  if (contract.componentType === 'Descriptions.Item') {
+    parentHints.push('parent Descriptions');
+  }
+  if (contract.componentType === 'Tabs') {
+    parentHints.push('children prefer Tabs.TabPane');
+  }
+  if (contract.componentType === 'Tabs.TabPane') {
+    parentHints.push('parent Tabs');
+  }
+  if (contract.componentType === 'Timeline') {
+    parentHints.push('children prefer Timeline.Item');
+  }
+  if (contract.componentType === 'Timeline.Item') {
+    parentHints.push('parent Timeline');
+  }
+  if (contract.componentType === 'Table') {
+    parentHints.push('use columns at schema root or props.columns; render callbacks not allowed');
+  }
 
   return {
     componentType: contract.componentType,
@@ -328,6 +368,8 @@ function summarizeContract(contract: ComponentContract): CompiledComponentSummar
     childrenType: contract.children?.type ?? 'none',
     propSummary,
     eventSummary,
+    slotSummary,
+    parentHints,
   };
 }
 
@@ -338,7 +380,9 @@ function compileComponentGroup(definition: ComponentGroupDefinition): CompiledCo
       const summary = summarizeContract(builtinContractMap[componentType]!);
       const propPart = summary.propSummary.length > 0 ? `props=${summary.propSummary.join(', ')}` : 'props=minimal';
       const eventPart = summary.eventSummary.length > 0 ? `events=${summary.eventSummary.join(', ')}` : 'events=none';
-      return `${summary.componentType} [${summary.category}] children=${summary.childrenType}; ${propPart}; ${eventPart}`;
+      const slotPart = summary.slotSummary.length > 0 ? `slots=${summary.slotSummary.join(', ')}` : 'slots=none';
+      const hintPart = summary.parentHints.length > 0 ? `hints=${summary.parentHints.join('; ')}` : 'hints=general';
+      return `${summary.componentType} [${summary.category}] children=${summary.childrenType}; ${propPart}; ${eventPart}; ${slotPart}; ${hintPart}`;
     })
     .join('\n');
 
@@ -396,11 +440,58 @@ export function getZoneContractSummary(zoneType: ZoneType, preferredComponents: 
       }
       const summary = summarizeContract(contract);
       const props = summary.propSummary.length > 0 ? summary.propSummary.join(', ') : 'minimal props';
+      const slots = summary.slotSummary.length > 0 ? `; slots=${summary.slotSummary.join(', ')}` : '';
+      const hints = summary.parentHints.length > 0 ? `; hints=${summary.parentHints.join('; ')}` : '';
       const preferred = preferredSet.has(componentType) ? 'preferred' : 'allowed';
-      return `${summary.componentType} (${preferred}, ${summary.category}, children=${summary.childrenType}, ${props})`;
+      return `${summary.componentType} (${preferred}, ${summary.category}, children=${summary.childrenType}, ${props}${slots}${hints})`;
     })
     .filter(Boolean)
     .join('\n');
+}
+
+export function getZoneLevel2ComponentBrief(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {
+  const template = zoneTemplates[zoneType];
+  const groups = zoneGroupMap[zoneType];
+  const preferredSet = new Set(preferredComponents);
+  const ordered = uniqueComponents(groups)
+    .sort((left, right) => {
+      const leftPreferred = preferredSet.has(left) ? 1 : 0;
+      const rightPreferred = preferredSet.has(right) ? 1 : 0;
+      return rightPreferred - leftPreferred;
+    })
+    .slice(0, Math.max(template.preferredComponents.length + 2, 8));
+
+  return ordered
+    .map((componentType) => {
+      const contract = builtinContractMap[componentType];
+      if (!contract) {
+        return null;
+      }
+      const summary = summarizeContract(contract);
+      const props = summary.propSummary.length > 0 ? summary.propSummary.join(', ') : 'none';
+      const slots = summary.slotSummary.length > 0 ? summary.slotSummary.join(', ') : 'none';
+      const hints = summary.parentHints.length > 0 ? summary.parentHints.join('; ') : 'none';
+      return [
+        `- ${summary.componentType}`,
+        `  category: ${summary.category}`,
+        `  children: ${summary.childrenType}`,
+        `  props: ${props}`,
+        `  slots: ${slots}`,
+        `  hints: ${hints}`,
+      ].join('\n');
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function getZoneGenerationParameters(zoneType: ZoneType): string {
+  const template = zoneTemplates[zoneType];
+  return [
+    `root should usually be one of: ${template.preferredComponents.slice(0, 3).join(', ')}`,
+    `maxDepth=${template.maxDepth}`,
+    `maxChildrenPerArray=${template.maxChildrenPerArray}`,
+    `layoutPattern=${template.layoutPattern}`,
+  ].join('\n');
 }
 
 export function getZoneComponentCandidates(zoneType: ZoneType): string[] {

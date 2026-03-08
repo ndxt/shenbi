@@ -39,6 +39,8 @@ import {
   getZoneComponentCandidates,
   getZoneContractSummary,
   getZoneGoldenExample,
+  getZoneGenerationParameters,
+  getZoneLevel2ComponentBrief,
   getZoneTemplate,
   getZoneTemplateSummary,
   getPlannerZoneTemplateSummary,
@@ -525,6 +527,8 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
 function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage[] {
   const zoneCandidates = getZoneComponentCandidates(input.block.type);
   const zoneContractSummary = getZoneContractSummary(input.block.type, input.block.components);
+  const zoneLevel2Brief = getZoneLevel2ComponentBrief(input.block.type, input.block.components);
+  const zoneGenerationParameters = getZoneGenerationParameters(input.block.type);
   const zoneGoldenExample = getZoneGoldenExample(input.block.type);
   const zoneTemplateSummary = getZoneTemplateSummary(input.block.type);
   return [
@@ -536,8 +540,12 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         `For this zone, prioritize these candidate components: ${zoneCandidates.join(', ')}.`,
         'Zone template:',
         zoneTemplateSummary,
+        'Zone generation parameters:',
+        zoneGenerationParameters,
         'Zone-specific contract summary:',
         zoneContractSummary,
+        'Level-2 component briefs:',
+        zoneLevel2Brief,
         'Valid zone example:',
         zoneGoldenExample,
         'Rules:',
@@ -545,6 +553,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         '- Every child schema node must also use only supported components.',
         '- children may contain schema nodes or plain text only.',
         '- Follow the zone template skeleton and fill it; do not invent a totally different top-level shape unless the prompt explicitly requires it.',
+        '- Stay within the declared maxDepth and maxChildrenPerArray.',
         '- Build polished B2B admin blocks with clear hierarchy, balanced spacing, and concise business copy.',
         '- page-header zones should usually use layout-shell + typography + actions components.',
         '- filter zones should usually use Card containing Form, FormItem, Input, Select, DatePicker, Space, and Button.',
