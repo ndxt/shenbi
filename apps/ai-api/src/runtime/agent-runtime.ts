@@ -35,6 +35,8 @@ import {
   supportedComponentList,
 } from './normalize-schema.ts';
 import {
+  getDesignPolicySummary,
+  getFreeLayoutPatternSummary,
   getPageSkeleton,
   getPageSkeletonSummary,
   getPlannerContractSummary,
@@ -73,6 +75,7 @@ const supportedZoneTypes = [
 ] as const;
 const plannerContractSummary = getPlannerContractSummary();
 const plannerZoneTemplateSummary = getPlannerZoneTemplateSummary();
+const designPolicySummary = getDesignPolicySummary();
 
 function classifyPromptToPageType(prompt: string): PageType {
   const normalized = prompt.toLowerCase();
@@ -511,6 +514,7 @@ function getThinkingFromUnknown(request: unknown): OpenAICompatibleThinking | un
 function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] {
   const suggestedPageType = classifyPromptToPageType(input.request.prompt);
   const suggestedSkeletonSummary = getPageSkeletonSummary(suggestedPageType);
+  const freeLayoutPatternSummary = getFreeLayoutPatternSummary(suggestedPageType);
   return [
     {
       role: 'system',
@@ -522,10 +526,14 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         `Use only these zone types: ${supportedZoneTypes.join(', ')}.`,
         'Available component groups and contract summaries:',
         plannerContractSummary,
+        'Design policy:',
+        designPolicySummary,
         'Zone templates:',
         plannerZoneTemplateSummary,
-        'Suggested page skeleton for this request:',
+        'Reference page skeleton for this request:',
         suggestedSkeletonSummary,
+        'Free-layout patterns you may borrow from when they improve clarity:',
+        freeLayoutPatternSummary,
         'Hard rules:',
         '- pageTitle must be a concise human-readable title.',
         '- pageType must be exactly one of: dashboard, list, form, detail, statistics, custom.',
@@ -554,7 +562,8 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         '- If unsure, choose Card with components ["Card"].',
         `- For this request, prefer pageType "${suggestedPageType}" unless the user clearly asks for a custom mixed layout.`,
         '- Favor clean B2B admin layouts: clear page title, concise helper text, grouped filters, summary cards, primary data area, moderate whitespace.',
-        '- Prefer blocks that match the zone template layout instead of inventing new structure patterns.',
+        '- Page skeletons and zone templates are references, not prison rules. You may adapt order or composition when it improves clarity and aesthetics.',
+        '- Use free-layout patterns when they create a stronger composition, especially for custom or mixed business pages.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Valid example 1:',
         '{"pageTitle":"考勤首页","pageType":"dashboard","blocks":[{"id":"header","type":"page-header","description":"页面标题、描述和主要操作","components":["Container","Typography.Title","Typography.Text","Space","Button"],"priority":1,"complexity":"simple"},{"id":"attendance-kpis","type":"kpi-row","description":"展示今日出勤、迟到、请假等关键指标","components":["Row","Col","Card","Statistic","Tag"],"priority":2,"complexity":"simple"},{"id":"attendance-table","type":"data-table","description":"展示最近考勤记录","components":["Card","Table","Tag"],"priority":3,"complexity":"medium"}]}',
@@ -586,6 +595,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
   const zoneGenerationParameters = getZoneGenerationParameters(input.block.type);
   const zoneGoldenExample = getZoneGoldenExample(input.block.type);
   const zoneTemplateSummary = getZoneTemplateSummary(input.block.type);
+  const freeLayoutPatternSummary = getFreeLayoutPatternSummary(classifyPromptToPageType(input.request.prompt));
   return [
     {
       role: 'system',
@@ -597,19 +607,24 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         zoneTemplateSummary,
         'Zone generation parameters:',
         zoneGenerationParameters,
+        'Design policy:',
+        designPolicySummary,
         'Zone-specific contract summary:',
         zoneContractSummary,
         'Level-2 component briefs:',
         zoneLevel2Brief,
         'Valid zone example:',
         zoneGoldenExample,
+        'Free-layout composition references:',
+        freeLayoutPatternSummary,
         'Rules:',
         '- The root node component must be one of the supported components.',
         '- Every child schema node must also use only supported components.',
         '- children may contain schema nodes or plain text only.',
-        '- Follow the zone template skeleton and fill it; do not invent a totally different top-level shape unless the prompt explicitly requires it.',
+        '- Use the zone template skeleton as a starting point, but adapt composition when a cleaner free layout improves readability.',
         '- Stay within the declared maxDepth and maxChildrenPerArray.',
         '- Build polished B2B admin blocks with clear hierarchy, balanced spacing, and concise business copy.',
+        '- Prefer layout primitives such as Row, Col, Space, Flex, and Divider to create rhythm, spacing, and asymmetric but balanced compositions.',
         '- page-header zones should usually use layout-shell + typography + actions components.',
         '- filter zones should usually use Card containing Form, FormItem, Input, Select, DatePicker, Space, and Button.',
         '- kpi-row zones should usually use Row + Col + Card + Statistic + Tag. Four concise KPI cards are better than one oversized block.',
@@ -627,6 +642,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         '- For Descriptions, include props.column and Descriptions.Item children with label props.',
         '- For Timeline, return Timeline.Item children with short text content.',
         '- Use realistic Chinese B-end copy such as 今日出勤率, 本周迟到人数, 最近考勤记录, 审批状态.',
+        '- For custom, dashboard, or detail prompts, prefer stronger composition patterns like main-content-plus-side-info, summary-then-detail, or split-context-and-data when appropriate.',
         '- Keep braces and brackets balanced. Your answer must be parseable by JSON.parse without any cleanup.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Return exactly this JSON shape:',

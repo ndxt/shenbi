@@ -10,6 +10,16 @@ type ComponentGroupName =
   | 'feedback-status'
   | 'data-display';
 
+interface FreeLayoutPattern {
+  id: string;
+  appliesTo: PageType[];
+  title: string;
+  intent: string;
+  composition: string;
+  guidance: string[];
+  example: string;
+}
+
 interface ComponentGroupDefinition {
   name: ComponentGroupName;
   description: string;
@@ -116,6 +126,58 @@ const pageSkeletons: Record<PageType, PageSkeleton> = {
     optionalZones: ['filter', 'kpi-row', 'data-table', 'detail-info', 'form-body', 'form-actions', 'chart-area', 'timeline-area', 'side-info', 'empty-state'],
   },
 };
+
+const designPolicy = [
+  'Build polished B-end admin pages with clear information hierarchy, steady alignment, and moderate whitespace.',
+  'Prefer one primary content focus per zone; avoid mixing table, form, timeline, and detail semantics into one block.',
+  'Use Row, Col, Space, Flex, and Divider to organize rhythm and spacing instead of deeply nesting Containers.',
+  'Make action placement predictable: primary actions near the title or at the end of filters/forms; secondary actions nearby but visually quieter.',
+  'Use cards to group related business information, but do not wrap every tiny element in a card.',
+  'Favor concise Chinese business copy and short labels. Titles should be strong, descriptions should be short, and supporting text should be secondary.',
+  'For free layouts, prefer asymmetric but balanced compositions such as main content + side info, summary cards above details, or left text + right data.',
+].join('\n');
+
+const freeLayoutPatterns: FreeLayoutPattern[] = [
+  {
+    id: 'main-with-side-info',
+    appliesTo: ['dashboard', 'detail', 'custom'],
+    title: '主区 + 侧信息',
+    intent: '让页面保持明显主次关系，主区承载关键内容，侧区承载补充说明、提醒或简要统计。',
+    composition: 'Use Row with two Col children. Main column span 16-18, side column span 6-8. Main column contains one or two larger cards. Side column contains one compact card or descriptions block.',
+    guidance: [
+      'Keep the main column visually heavier and the side column concise.',
+      'Avoid placing large tables in the side column.',
+      'Use Typography.Text or Descriptions for side notes instead of repeating another table.',
+    ],
+    example: '{"component":"Row","id":"layout-main-side","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"layout-main","props":{"span":17},"children":[{"component":"Card","id":"main-card","props":{"title":"核心内容"},"children":[{"component":"Typography.Paragraph","id":"main-copy","props":{},"children":["主区展示列表、详情或表单主体。"]}]}]},{"component":"Col","id":"layout-side","props":{"span":7},"children":[{"component":"Card","id":"side-card","props":{"title":"补充信息"},"children":[{"component":"Typography.Text","id":"side-copy","props":{"type":"secondary"},"children":["侧区用于说明、提醒或状态补充。"]}]}]}]}',
+  },
+  {
+    id: 'summary-then-detail',
+    appliesTo: ['dashboard', 'statistics', 'list', 'custom'],
+    title: '摘要卡片 + 明细主体',
+    intent: '先快速传达全局状态，再进入更重的业务明细。',
+    composition: 'Top area uses Row/Col or Flex for 3-4 compact summary cards. Lower area uses one large Card for table, timeline, or detailed analysis.',
+    guidance: [
+      'Summary cards should be compact and data-forward.',
+      'The lower detail card should occupy most of the width.',
+      'Use one clear gap rhythm between top summaries and lower detail area.',
+    ],
+    example: '{"component":"Container","id":"layout-summary-detail","props":{"direction":"column","gap":16},"children":[{"component":"Row","id":"summary-row","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"summary-col-1","props":{"span":8},"children":[{"component":"Card","id":"summary-card-1","props":{},"children":[{"component":"Statistic","id":"summary-stat-1","props":{"title":"待处理事项","value":12}}]}]},{"component":"Col","id":"summary-col-2","props":{"span":8},"children":[{"component":"Card","id":"summary-card-2","props":{},"children":[{"component":"Statistic","id":"summary-stat-2","props":{"title":"今日完成","value":48}}]}]}]},{"component":"Card","id":"detail-card","props":{"title":"明细数据"},"children":[{"component":"Typography.Paragraph","id":"detail-desc","props":{},"children":["下方区域展示主要业务明细，例如列表、趋势或时间线。"]}]}]}',
+  },
+  {
+    id: 'split-context-and-data',
+    appliesTo: ['detail', 'form', 'custom'],
+    title: '左文右数 / 左表右文',
+    intent: '让页面既有业务说明，也有结构化数据，适合详情页、运营页和混合页面。',
+    composition: 'Use a two-column row. One side emphasizes Typography/Descriptions/Form, the other side emphasizes Table, Timeline, or KPI Cards.',
+    guidance: [
+      'One side should carry explanation or structure, the other should carry denser data.',
+      'Do not mirror identical card density on both sides.',
+      'Use Divider only when you need a subtle sectional split, not as the main layout tool.',
+    ],
+    example: '{"component":"Row","id":"layout-split-context-data","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"context-col","props":{"span":10},"children":[{"component":"Card","id":"context-card","props":{"title":"业务说明"},"children":[{"component":"Typography.Title","id":"context-title","props":{"level":4},"children":["页面背景"]},{"component":"Typography.Paragraph","id":"context-copy","props":{},"children":["左侧展示说明、详情或表单上下文。"]}]}]},{"component":"Col","id":"data-col","props":{"span":14},"children":[{"component":"Card","id":"data-card","props":{"title":"结构化数据"},"children":[{"component":"Table","id":"data-table","props":{"dataSource":[{"key":"1","name":"张三","status":"正常"}],"pagination":{"pageSize":5}},"columns":[{"key":"name","dataIndex":"name","title":"姓名"},{"key":"status","dataIndex":"status","title":"状态"}]}]}]}]}',
+  },
+];
 
 const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
   'page-header': {
@@ -315,7 +377,7 @@ const componentGroupDefinitions: ComponentGroupDefinition[] = [
   {
     name: 'layout-shell',
     description: 'layout wrappers for page sections and grid composition',
-    components: ['Container', 'Space', 'Row', 'Col'],
+    components: ['Container', 'Space', 'Row', 'Col', 'Flex', 'Divider'],
   },
   {
     name: 'typography',
@@ -461,6 +523,11 @@ export const supportedContracts = builtinContracts.filter((contract) => supporte
 export const componentGroups = compiledGroups;
 export const compiledZoneTemplates = zoneTemplates;
 export const compiledPageSkeletons = pageSkeletons;
+export const compiledFreeLayoutPatterns = freeLayoutPatterns;
+
+export function getDesignPolicySummary(): string {
+  return designPolicy;
+}
 
 export function getPlannerContractSummary(): string {
   return compiledGroups
@@ -490,6 +557,22 @@ export function getPageSkeletonSummary(pageType: PageType): string {
     `recommendedZones: ${skeleton.recommendedZones.join(', ')}`,
     `optionalZones: ${skeleton.optionalZones.join(', ')}`,
   ].join('\n');
+}
+
+export function getFreeLayoutPatternSummary(pageType: PageType): string {
+  return freeLayoutPatterns
+    .filter((pattern) => pattern.appliesTo.includes(pageType) || pattern.appliesTo.includes('custom'))
+    .map((pattern) => {
+      const guidance = pattern.guidance.map((item) => `- ${item}`).join('\n');
+      return [
+        `${pattern.id}: ${pattern.title}`,
+        `intent: ${pattern.intent}`,
+        `composition: ${pattern.composition}`,
+        `guidance:\n${guidance}`,
+        `example: ${pattern.example}`,
+      ].join('\n');
+    })
+    .join('\n\n');
 }
 
 export function getZoneContractSummary(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   componentGroups,
+  compiledFreeLayoutPatterns,
   compiledPageSkeletons,
   compiledZoneTemplates,
+  getDesignPolicySummary,
+  getFreeLayoutPatternSummary,
   getPageSkeleton,
   getPageSkeletonSummary,
   getPlannerContractSummary,
@@ -22,6 +25,7 @@ describe('component catalog', () => {
     expect(supportedComponents).toContain('Table');
     expect(supportedComponents).toContain('Form');
     expect(supportedComponents).toContain('Typography.Title');
+    expect(supportedComponents).toContain('Divider');
     expect(supportedComponents).not.toContain('HeroSection');
   });
 
@@ -52,5 +56,12 @@ describe('component catalog', () => {
     expect(getPageSkeleton('list').recommendedZones).toEqual(['page-header', 'filter', 'data-table']);
     expect(getPageSkeletonSummary('detail')).toContain('recommendedZones: page-header, detail-info');
     expect(compiledPageSkeletons.dashboard.optionalZones).toContain('timeline-area');
+  });
+
+  it('exposes design policy and free-layout patterns for softer layout guidance', () => {
+    expect(getDesignPolicySummary()).toContain('Use Row, Col, Space, Flex, and Divider');
+    expect(getFreeLayoutPatternSummary('detail')).toContain('main-with-side-info');
+    expect(getFreeLayoutPatternSummary('custom')).toContain('split-context-and-data');
+    expect(compiledFreeLayoutPatterns.length).toBeGreaterThan(1);
   });
 });
