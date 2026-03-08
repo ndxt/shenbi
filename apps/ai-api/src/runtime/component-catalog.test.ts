@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   componentGroups,
+  compiledZoneTemplates,
   getPlannerContractSummary,
+  getPlannerZoneTemplateSummary,
   getZoneComponentCandidates,
   getZoneContractSummary,
   getZoneGoldenExample,
+  getZoneTemplate,
+  getZoneTemplateSummary,
   supportedComponents,
 } from './component-catalog.ts';
 
@@ -22,5 +26,13 @@ describe('component catalog', () => {
     expect(getZoneComponentCandidates('data-table')).toContain('Table');
     expect(getZoneContractSummary('data-table', ['Table'])).toContain('Table (preferred');
     expect(getZoneGoldenExample('filter')).toContain('"component":"Card"');
+  });
+
+  it('exposes explicit zone templates for planner and block prompts', () => {
+    expect(getPlannerZoneTemplateSummary()).toContain('page-header:');
+    expect(getPlannerZoneTemplateSummary()).toContain('data-table:');
+    expect(getZoneTemplateSummary('detail-info')).toContain('preferredComponents: Card, Descriptions, Descriptions.Item, Tag, Typography.Text');
+    expect(getZoneTemplate('form-body').maxDepth).toBeGreaterThan(2);
+    expect(compiledZoneTemplates['data-table'].wrapper?.useDescriptionAsTitle).toBe(true);
   });
 });

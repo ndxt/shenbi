@@ -31,6 +31,22 @@ interface CompiledComponentGroup {
   promptSummary: string;
 }
 
+interface ZoneTemplate {
+  zoneType: ZoneType;
+  intent: string;
+  layoutPattern: string;
+  preferredGroups: ComponentGroupName[];
+  preferredComponents: string[];
+  maxDepth: number;
+  maxChildrenPerArray: number;
+  skeleton: string;
+  wrapper?: {
+    component: string;
+    props?: Record<string, unknown>;
+    useDescriptionAsTitle?: boolean;
+  };
+}
+
 const zoneGoldenExamples: Record<ZoneType, string> = {
   'page-header': '{"component":"Container","id":"page-header","props":{"direction":"column","gap":8},"children":[{"component":"Typography.Title","id":"page-title","props":{"level":2},"children":["用户列表"]},{"component":"Typography.Text","id":"page-desc","props":{"type":"secondary"},"children":["管理用户信息、角色与状态"]},{"component":"Space","id":"page-actions","props":{"size":"small"},"children":[{"component":"Button","id":"create-user","props":{"type":"primary"},"children":["新建用户"]}]}]}',
   filter: '{"component":"Card","id":"user-filter","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"filter-form","props":{"layout":"inline"},"children":[{"component":"FormItem","id":"filter-name","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"filter-name-input","props":{"placeholder":"请输入姓名"}}]},{"component":"FormItem","id":"filter-role","props":{"label":"角色","name":"role"},"children":[{"component":"Select","id":"filter-role-select","props":{"placeholder":"请选择角色"}}]},{"component":"FormItem","id":"filter-date","props":{"label":"日期","name":"date"},"children":[{"component":"DatePicker","id":"filter-date-picker","props":{}}]},{"component":"Space","id":"filter-actions","props":{"size":"small"},"children":[{"component":"Button","id":"submit","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"reset","props":{},"children":["重置"]}]}]}]}',
@@ -44,6 +60,191 @@ const zoneGoldenExamples: Record<ZoneType, string> = {
   'side-info': '{"component":"Card","id":"side-info-card","props":{"title":"提示信息"},"children":[{"component":"Typography.Text","id":"side-info-text","props":{"type":"secondary"},"children":["可在此区域展示说明、统计补充或审批提醒。"]}]}',
   'empty-state': '{"component":"Card","id":"empty-state-card","props":{"title":"暂无数据"},"children":[{"component":"Alert","id":"empty-alert","props":{"type":"info","message":"当前条件下暂无记录","showIcon":true}}]}',
   custom: '{"component":"Card","id":"custom-block","props":{"title":"自定义模块"},"children":[{"component":"Typography.Paragraph","id":"custom-copy","props":{},"children":["请使用受支持组件构建清晰的后台业务区块。"]}]}',
+};
+
+const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
+  'page-header': {
+    zoneType: 'page-header',
+    intent: '页面标题、说明信息和主要操作按钮区域',
+    layoutPattern: 'title-first, helper-text second, actions last; favor vertical composition with a trailing action row',
+    preferredGroups: ['layout-shell', 'typography', 'actions'],
+    preferredComponents: ['Container', 'Typography.Title', 'Typography.Text', 'Space', 'Button'],
+    maxDepth: 3,
+    maxChildrenPerArray: 4,
+    skeleton: '{"component":"Container","id":"__ZONE_ID__","props":{"direction":"column","gap":8},"children":[{"component":"Typography.Title","id":"__TITLE_ID__","props":{"level":2},"children":["__TITLE__"]},{"component":"Typography.Text","id":"__DESC_ID__","props":{"type":"secondary"},"children":["__DESC__"]},{"component":"Space","id":"__ACTION_ID__","props":{"size":"small"},"children":[{"component":"Button","id":"__PRIMARY_ACTION__","props":{"type":"primary"},"children":["__PRIMARY_ACTION_TEXT__"]}]}]}',
+  },
+  filter: {
+    zoneType: 'filter',
+    intent: '搜索、筛选、时间范围和查询操作区域',
+    layoutPattern: 'compact card wrapper, inline or vertical form, action buttons aligned at the end',
+    preferredGroups: ['data-display', 'filters-form', 'layout-shell', 'actions'],
+    preferredComponents: ['Card', 'Form', 'FormItem', 'Input', 'Select', 'DatePicker', 'Space', 'Button'],
+    maxDepth: 4,
+    maxChildrenPerArray: 6,
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"__FORM_ID__","props":{"layout":"inline"},"children":[{"component":"FormItem","id":"__FIELD_ID__","props":{"label":"关键词","name":"keyword"},"children":[{"component":"Input","id":"__INPUT_ID__","props":{"placeholder":"请输入关键词"}}]},{"component":"Space","id":"__ACTION_ID__","props":{"size":"small"},"children":[{"component":"Button","id":"__QUERY_ID__","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"__RESET_ID__","props":{},"children":["重置"]}]}]}]}',
+    wrapper: {
+      component: 'Card',
+      props: {
+        bordered: true,
+        size: 'small',
+      },
+    },
+  },
+  'kpi-row': {
+    zoneType: 'kpi-row',
+    intent: '展示关键业务指标，通常为 3-4 张统计卡片',
+    layoutPattern: '24-grid row with 3-4 equal columns, each column contains one concise KPI card',
+    preferredGroups: ['layout-shell', 'data-display', 'feedback-status'],
+    preferredComponents: ['Row', 'Col', 'Card', 'Statistic', 'Tag'],
+    maxDepth: 4,
+    maxChildrenPerArray: 4,
+    skeleton: '{"component":"Row","id":"__ZONE_ID__","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"__COL_1__","props":{"span":6},"children":[{"component":"Card","id":"__CARD_1__","props":{},"children":[{"component":"Statistic","id":"__STAT_1__","props":{"title":"__METRIC_TITLE__","value":96}}]}]}]}',
+  },
+  'data-table': {
+    zoneType: 'data-table',
+    intent: '主数据列表区域，包含标题、表格和可能的操作说明',
+    layoutPattern: 'card wrapper with clear title, optional helper text, one primary table',
+    preferredGroups: ['data-display', 'actions', 'feedback-status'],
+    preferredComponents: ['Card', 'Table', 'Tag', 'Button'],
+    maxDepth: 3,
+    maxChildrenPerArray: 5,
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"__TITLE__"},"children":[{"component":"Table","id":"__TABLE_ID__","props":{"dataSource":[{"key":"1","name":"张三","status":"启用"}],"pagination":{"pageSize":10}},"columns":[{"key":"name","dataIndex":"name","title":"姓名"},{"key":"status","dataIndex":"status","title":"状态"}]}]}',
+    wrapper: {
+      component: 'Card',
+      props: {
+        bordered: true,
+      },
+      useDescriptionAsTitle: true,
+    },
+  },
+  'detail-info': {
+    zoneType: 'detail-info',
+    intent: '键值对详情信息展示区域',
+    layoutPattern: 'card wrapper containing Descriptions grouped into concise sections, avoid deeply nested decorations',
+    preferredGroups: ['data-display', 'typography', 'feedback-status'],
+    preferredComponents: ['Card', 'Descriptions', 'Descriptions.Item', 'Tag', 'Typography.Text'],
+    maxDepth: 4,
+    maxChildrenPerArray: 6,
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"__TITLE__"},"children":[{"component":"Descriptions","id":"__DESCRIPTIONS_ID__","props":{"column":2},"children":[{"component":"Descriptions.Item","id":"__ITEM_1__","props":{"label":"姓名"},"children":["张三"]},{"component":"Descriptions.Item","id":"__ITEM_2__","props":{"label":"部门"},"children":["技术部"]}]}]}',
+    wrapper: {
+      component: 'Card',
+      props: {
+        bordered: true,
+      },
+      useDescriptionAsTitle: true,
+    },
+  },
+  'form-body': {
+    zoneType: 'form-body',
+    intent: '表单主体区域，负责录入和编辑业务数据',
+    layoutPattern: 'card wrapper + vertical form + grouped fields, each FormItem contains exactly one input-like child',
+    preferredGroups: ['data-display', 'filters-form'],
+    preferredComponents: ['Card', 'Form', 'FormItem', 'Input', 'Select', 'DatePicker'],
+    maxDepth: 4,
+    maxChildrenPerArray: 6,
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"__TITLE__"},"children":[{"component":"Form","id":"__FORM_ID__","props":{"layout":"vertical"},"children":[{"component":"FormItem","id":"__FIELD_1__","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"__INPUT_1__","props":{"placeholder":"请输入姓名"}}]},{"component":"FormItem","id":"__FIELD_2__","props":{"label":"部门","name":"department"},"children":[{"component":"Select","id":"__SELECT_1__","props":{"placeholder":"请选择部门"}}]}]}]}',
+    wrapper: {
+      component: 'Card',
+      props: {
+        bordered: true,
+      },
+      useDescriptionAsTitle: true,
+    },
+  },
+  'form-actions': {
+    zoneType: 'form-actions',
+    intent: '表单提交、取消、暂存等操作区域',
+    layoutPattern: 'single horizontal action row with one primary button and one secondary button',
+    preferredGroups: ['layout-shell', 'actions'],
+    preferredComponents: ['Space', 'Button'],
+    maxDepth: 2,
+    maxChildrenPerArray: 4,
+    skeleton: '{"component":"Space","id":"__ZONE_ID__","props":{"size":"small"},"children":[{"component":"Button","id":"__PRIMARY_ACTION__","props":{"type":"primary"},"children":["保存"]},{"component":"Button","id":"__SECONDARY_ACTION__","props":{},"children":["取消"]}]}',
+  },
+  'chart-area': {
+    zoneType: 'chart-area',
+    intent: '趋势、分布或图表替代的统计概览区域',
+    layoutPattern: 'card wrapper with one concise heading, one narrative paragraph, and 1-2 supporting stats',
+    preferredGroups: ['data-display', 'typography', 'feedback-status'],
+    preferredComponents: ['Card', 'Typography.Title', 'Typography.Paragraph', 'Statistic', 'Tag'],
+    maxDepth: 3,
+    maxChildrenPerArray: 5,
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"__TITLE__"},"children":[{"component":"Typography.Paragraph","id":"__SUMMARY_ID__","props":{},"children":["本周出勤趋势整体稳定。"]},{"component":"Statistic","id":"__STAT_ID__","props":{"title":"平均出勤率","value":94}}]}',
+    wrapper: {
+      component: 'Card',
+      props: {
+        bordered: true,
+      },
+      useDescriptionAsTitle: true,
+    },
+  },
+  'timeline-area': {
+    zoneType: 'timeline-area',
+    intent: '操作日志、审批流程或近期动态时间线',
+    layoutPattern: 'card wrapper with one vertical timeline and short text-only items',
+    preferredGroups: ['data-display', 'typography'],
+    preferredComponents: ['Card', 'Timeline', 'Timeline.Item', 'Typography.Text'],
+    maxDepth: 3,
+    maxChildrenPerArray: 6,
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"__TITLE__"},"children":[{"component":"Timeline","id":"__TIMELINE_ID__","props":{},"children":[{"component":"Timeline.Item","id":"__ITEM_1__","props":{},"children":["09:20 张三提交补卡申请"]},{"component":"Timeline.Item","id":"__ITEM_2__","props":{},"children":["10:15 李四完成审批"]}]}]}',
+    wrapper: {
+      component: 'Card',
+      props: {
+        bordered: true,
+      },
+      useDescriptionAsTitle: true,
+    },
+  },
+  'side-info': {
+    zoneType: 'side-info',
+    intent: '补充提示、摘要说明、辅助统计',
+    layoutPattern: 'compact side card with short helper text or secondary stats',
+    preferredGroups: ['data-display', 'typography', 'feedback-status'],
+    preferredComponents: ['Card', 'Typography.Text', 'Descriptions', 'Tag'],
+    maxDepth: 3,
+    maxChildrenPerArray: 4,
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"__TITLE__"},"children":[{"component":"Typography.Text","id":"__TEXT_ID__","props":{"type":"secondary"},"children":["请在此展示补充说明、审批提醒或状态提示。"]}]}',
+    wrapper: {
+      component: 'Card',
+      props: {
+        bordered: true,
+      },
+      useDescriptionAsTitle: true,
+    },
+  },
+  'empty-state': {
+    zoneType: 'empty-state',
+    intent: '空数据、无结果、待初始化状态提示',
+    layoutPattern: 'single calm feedback card with concise message and optional action',
+    preferredGroups: ['data-display', 'typography', 'actions'],
+    preferredComponents: ['Card', 'Alert', 'Button', 'Typography.Text'],
+    maxDepth: 3,
+    maxChildrenPerArray: 3,
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"暂无数据"},"children":[{"component":"Alert","id":"__ALERT_ID__","props":{"type":"info","message":"当前条件下暂无记录","showIcon":true}}]}',
+    wrapper: {
+      component: 'Card',
+      props: {
+        bordered: true,
+      },
+    },
+  },
+  custom: {
+    zoneType: 'custom',
+    intent: '自由组合区块，仍需遵守后台页面的层级和留白规范',
+    layoutPattern: 'prefer one clear card/container with one primary purpose instead of many mixed fragments',
+    preferredGroups: ['layout-shell', 'typography', 'actions', 'data-display'],
+    preferredComponents: ['Card', 'Container', 'Typography.Paragraph', 'Button'],
+    maxDepth: 3,
+    maxChildrenPerArray: 4,
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"自定义模块"},"children":[{"component":"Typography.Paragraph","id":"__TEXT_ID__","props":{},"children":["请使用受支持组件构建清晰的后台业务区块。"]}]}',
+    wrapper: {
+      component: 'Card',
+      props: {
+        bordered: true,
+      },
+      useDescriptionAsTitle: true,
+    },
+  },
 };
 
 const builtinContracts =
@@ -161,11 +362,21 @@ export const supportedComponentList = supportedComponents.join(', ');
 export const supportedComponentSet = new Set(supportedComponents);
 export const supportedContracts = builtinContracts.filter((contract) => supportedComponentSet.has(contract.componentType));
 export const componentGroups = compiledGroups;
+export const compiledZoneTemplates = zoneTemplates;
 
 export function getPlannerContractSummary(): string {
   return compiledGroups
     .map((group) => `Group ${group.name}: ${group.description}\n${group.promptSummary}`)
     .join('\n\n');
+}
+
+export function getPlannerZoneTemplateSummary(): string {
+  return Object.values(zoneTemplates)
+    .map((template) => {
+      const components = template.preferredComponents.join(', ');
+      return `${template.zoneType}: ${template.intent}; layout=${template.layoutPattern}; groups=${template.preferredGroups.join(', ')}; prefer=${components}; maxDepth=${template.maxDepth}; maxChildren=${template.maxChildrenPerArray}`;
+    })
+    .join('\n');
 }
 
 export function getZoneContractSummary(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {
@@ -198,4 +409,21 @@ export function getZoneComponentCandidates(zoneType: ZoneType): string[] {
 
 export function getZoneGoldenExample(zoneType: ZoneType): string {
   return zoneGoldenExamples[zoneType];
+}
+
+export function getZoneTemplate(zoneType: ZoneType): ZoneTemplate {
+  return zoneTemplates[zoneType];
+}
+
+export function getZoneTemplateSummary(zoneType: ZoneType): string {
+  const template = zoneTemplates[zoneType];
+  return [
+    `intent: ${template.intent}`,
+    `layoutPattern: ${template.layoutPattern}`,
+    `preferredGroups: ${template.preferredGroups.join(', ')}`,
+    `preferredComponents: ${template.preferredComponents.join(', ')}`,
+    `maxDepth: ${template.maxDepth}`,
+    `maxChildrenPerArray: ${template.maxChildrenPerArray}`,
+    `skeleton: ${template.skeleton}`,
+  ].join('\n');
 }

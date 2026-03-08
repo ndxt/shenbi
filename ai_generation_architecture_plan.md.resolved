@@ -382,6 +382,142 @@ const formSkeleton: PageSkeleton = {
 - 对话记忆
 ```
 
+### 5.4 可选治理：Invalid JSON 与输出长度控制
+
+> [!NOTE]
+> 这一节来自 `ai_invalid_json_root_cause_analysis.md.resolved` 的 `Phase B / Phase C`，作为**并行治理建议**加入。
+> 它不改变当前主线架构方向，但对真实模型稳定性、返回速度、以及后续全量契约覆盖都有直接帮助。
+
+#### Phase B（中期优化，建议在主线推进中穿插落地）
+
+目标：**降低 block 输出长度、嵌套深度和格式漂移概率**，减少 `invalid JSON` 和运行时 repair 成本。
+
+##### B1. 限制单个 block 的嵌套深度和宽度
+
+在 block generator prompt 中增加明确约束：
+
+```text
+- Maximum 3 levels of nesting.
+- Maximum 6 items per children array.
+- If content is complex, split into multiple sibling Cards instead of deep nesting.
+```
+
+作用：
+- 减少 autoregressive 模型在深嵌套 JSON 中丢 bracket 的概率
+- 间接提升返回速度，因为输出更短、更规整
+
+##### B2. 用骨架模板替代“自由生成完整 block”
+
+当前 `golden example` 已经在发挥作用，但仍然是“让模型模仿完整 JSON”。下一步建议改成：
+- 为每类 zone 提供 **带 placeholder 的 skeleton**
+- 模型负责“填空”，而不是自由组织整棵树
+
+示例：
+
+```json
+{
+  "component": "Card",
+  "id": "__ZONE_ID__",
+  "props": { "title": "__TITLE__" },
+  "children": [
+    { "component": "__PRIMARY_COMPONENT__", "id": "__PRIMARY_ID__", "props": {}, "children": [] }
+  ]
+}
+```
+
+作用：
+- 显著降低 JSON 结构错误率
+- 让 block generator 更像“参数填充器”，而不是“自由创作器”
+
+##### B3. 增加 `max_tokens`/输出上限控制
+
+对于 `planner` 和 `block` 调用，建议在 provider 请求层加入合理上限：
+- planner：偏短，结构化输出
+- block：按 zone 类型动态给上限，避免 detail/form block 一次生成过长
+
+作用：
+- 防止模型“跑飞”生成超长响应
+- 与 `response_format/json_object` 一起构成低成本稳定性增强
+
+#### Phase C（长期治理，作为架构升级方向）
+
+目标：**从根本上降低 invalid JSON 和深嵌套结构错误**，让生成从“自由 JSON”演进为“受控结构化生成”。
+
+##### C1. 分层生成：先骨架后填充
+
+将当前单次 block 生成进一步拆成两步：
+
+1. **骨架生成**
+- 输出浅层结构
+- 只决定组件树主干、父子关系、id、区域分块
+
+2. **内容填充**
+- 对叶子组件或局部 props 单独生成
+- 例如表单项 label、Descriptions.Item 值、表格列、按钮文案
+
+作用：
+- 单次生成的 JSON 深度从 3-4 层降到 1-2 层
+- 这是减少 bracket mismatch 的最有效长期手段
+
+##### C2. 引入更强的 Structured Output
+
+如果 provider 能稳定支持，优先级如下：
+
+1. `response_format: { type: "json_object" }`
+2. `response_format: { type: "json_schema", ... }`
+3. tool-call / function-calling
+
+长期建议：
+- 对 `planner` 使用较严格的 schema 约束
+- 对 `block` 使用按 zone 类型定制的 schema/tool 参数
+
+作用：
+- 从“提示模型输出 JSON”升级为“由 provider 约束 JSON”
+- 能从根本上降低 salvage 依赖度
+
+##### C3. 将 block generator 收敛为“模板填空 / tool 参数填充”
+
+最终目标不是让模型直接自由写完整 `SchemaNode` 树，而是：
+- 先选模板
+- 再填参数
+- 最后由 assembler/repair 代码生成最终 schema
+
+对应演进方向：
+- `ZoneTemplate`
+- `ComponentGroup`
+- `ContractSummary`
+- `TemplateParams`
+
+作用：
+- 同时兼顾：
+  - 页面审美稳定
+  - 契约覆盖扩大
+  - token 与时延可控
+
+##### Salvage 的长期定位
+
+结论：**salvage 要保留，但只能是最后一道保底，不应继续成为主能力来源。**
+
+合理边界：
+- 保留 code fence 剥离
+- 保留 balanced object extraction
+- 保留尾部 trim / 少量闭合符补齐
+
+不建议继续扩大的方向：
+- 中间位置大范围 bracket 修复
+- 语义级猜测补全
+- 将非法 JSON “修到能 parse 就算成功”
+
+因此，在主任务推进时，对 invalid JSON 的长期治理建议是：
+
+```text
+Phase A: response_format + prompt anchor + salvage logging   (已做)
+Phase B: nesting/width limits + zone skeleton + output cap
+Phase C: layered generation + structured output + template filling
+```
+
+这条治理线建议作为主任务的**并行质量保障路线**存在，而不是替代主任务本身。
+
 ---
 
 ## 六、数据结构定义

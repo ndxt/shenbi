@@ -39,6 +39,9 @@ import {
   getZoneComponentCandidates,
   getZoneContractSummary,
   getZoneGoldenExample,
+  getZoneTemplate,
+  getZoneTemplateSummary,
+  getPlannerZoneTemplateSummary,
 } from './component-catalog.ts';
 import type { AgentRuntime } from './types.ts';
 
@@ -65,6 +68,7 @@ const supportedZoneTypes = [
   'custom',
 ] as const;
 const plannerContractSummary = getPlannerContractSummary();
+const plannerZoneTemplateSummary = getPlannerZoneTemplateSummary();
 
 function summarizeModelOutput(text: string): string {
   const compact = text.replace(/\s+/g, ' ').trim();
@@ -464,6 +468,8 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         `Use only these zone types: ${supportedZoneTypes.join(', ')}.`,
         'Available component groups and contract summaries:',
         plannerContractSummary,
+        'Zone templates:',
+        plannerZoneTemplateSummary,
         'Hard rules:',
         '- pageTitle must be a concise human-readable title.',
         '- pageType must be exactly one of: dashboard, list, form, detail, statistics, custom.',
@@ -491,6 +497,7 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         '- Business meaning belongs only in id and description.',
         '- If unsure, choose Card with components ["Card"].',
         '- Favor clean B2B admin layouts: clear page title, concise helper text, grouped filters, summary cards, primary data area, moderate whitespace.',
+        '- Prefer blocks that match the zone template layout instead of inventing new structure patterns.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Valid example 1:',
         '{"pageTitle":"考勤首页","pageType":"dashboard","blocks":[{"id":"header","type":"page-header","description":"页面标题、描述和主要操作","components":["Container","Typography.Title","Typography.Text","Space","Button"],"priority":1,"complexity":"simple"},{"id":"attendance-kpis","type":"kpi-row","description":"展示今日出勤、迟到、请假等关键指标","components":["Row","Col","Card","Statistic","Tag"],"priority":2,"complexity":"simple"},{"id":"attendance-table","type":"data-table","description":"展示最近考勤记录","components":["Card","Table","Tag"],"priority":3,"complexity":"medium"}]}',
@@ -519,6 +526,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
   const zoneCandidates = getZoneComponentCandidates(input.block.type);
   const zoneContractSummary = getZoneContractSummary(input.block.type, input.block.components);
   const zoneGoldenExample = getZoneGoldenExample(input.block.type);
+  const zoneTemplateSummary = getZoneTemplateSummary(input.block.type);
   return [
     {
       role: 'system',
@@ -526,6 +534,8 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         'You generate one low-code block as valid JSON.',
         `Only use supported components: ${supportedComponentList}.`,
         `For this zone, prioritize these candidate components: ${zoneCandidates.join(', ')}.`,
+        'Zone template:',
+        zoneTemplateSummary,
         'Zone-specific contract summary:',
         zoneContractSummary,
         'Valid zone example:',
@@ -534,6 +544,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         '- The root node component must be one of the supported components.',
         '- Every child schema node must also use only supported components.',
         '- children may contain schema nodes or plain text only.',
+        '- Follow the zone template skeleton and fill it; do not invent a totally different top-level shape unless the prompt explicitly requires it.',
         '- Build polished B2B admin blocks with clear hierarchy, balanced spacing, and concise business copy.',
         '- page-header zones should usually use layout-shell + typography + actions components.',
         '- filter zones should usually use Card containing Form, FormItem, Input, Select, DatePicker, Space, and Button.',
@@ -594,6 +605,8 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
   const contentChildren = contentBlocks.map((block) => {
     const blockPlan = input.plan.blocks.find((planBlock) => planBlock.id === block.blockId);
     const zoneType = blockPlan?.type ?? 'custom';
+    const zoneTemplate = getZoneTemplate(zoneType);
+    const wrapperTitle = zoneTemplate.wrapper?.useDescriptionAsTitle ? blockPlan?.description : undefined;
 
     if (zoneType === 'kpi-row') {
       return {
@@ -615,37 +628,34 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
       };
     }
 
-    if (zoneType === 'filter') {
+    if (zoneTemplate.wrapper && zoneType === 'filter') {
       return {
         id: `${block.blockId}-section`,
-        component: 'Card',
+        component: zoneTemplate.wrapper.component,
         props: {
-          bordered: true,
-          size: 'small',
+          ...(zoneTemplate.wrapper.props ?? {}),
+          ...(wrapperTitle ? { title: wrapperTitle } : {}),
         },
         children: [block.node],
       };
     }
 
-    if (zoneType === 'data-table') {
+    if (zoneTemplate.wrapper && (
+      zoneType === 'data-table'
+      || zoneType === 'detail-info'
+      || zoneType === 'form-body'
+      || zoneType === 'timeline-area'
+      || zoneType === 'chart-area'
+      || zoneType === 'side-info'
+      || zoneType === 'empty-state'
+      || zoneType === 'custom'
+    )) {
       return {
         id: `${block.blockId}-section`,
-        component: 'Card',
+        component: zoneTemplate.wrapper.component,
         props: {
-          title: blockPlan?.description ?? '数据区域',
-          bordered: true,
-        },
-        children: [block.node],
-      };
-    }
-
-    if (zoneType === 'detail-info' || zoneType === 'form-body' || zoneType === 'timeline-area' || zoneType === 'chart-area' || zoneType === 'side-info') {
-      return {
-        id: `${block.blockId}-section`,
-        component: 'Card',
-        props: {
-          title: blockPlan?.description ?? '内容区域',
-          bordered: true,
+          ...(zoneTemplate.wrapper.props ?? {}),
+          ...(wrapperTitle ? { title: wrapperTitle } : {}),
         },
         children: [block.node],
       };
