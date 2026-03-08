@@ -22,6 +22,8 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
     blockModels,
     blockModel,
     setBlockModel,
+    isLoading: isLoadingModels,
+    error: modelsError,
   } = useModels(defaultPlannerModel, defaultBlockModel);
 
   const {
@@ -44,6 +46,8 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
 
   const [selectedNodeLabel, setSelectedNodeLabel] = React.useState<string>('未选中');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const modelsReady = plannerModels.length > 0 && blockModels.length > 0;
+  const modelSelectionBlocked = isLoadingModels || Boolean(modelsError) || !modelsReady;
 
   useEffect(() => {
     if (!bridge) return;
@@ -61,6 +65,11 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
   }, [messages, progressText]);
 
   const handleSend = (text: string) => {
+    if (modelSelectionBlocked) {
+      addMessage({ role: 'assistant', content: `[Error]: ${modelsError ?? '模型列表尚未加载完成'}` });
+      return;
+    }
+
     const currentConvId = conversationId ?? `conv-${Date.now()}`;
     if (!conversationId) setConversationId(currentConvId);
 
@@ -90,9 +99,21 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
       </div>
 
       <div className="flex-none p-3 border-b border-border-ide flex gap-4 bg-bg-canvas">
-        <ModelSelector label="Planner" models={plannerModels} value={plannerModel} onChange={setPlannerModel} disabled={isRunning} />
-        <ModelSelector label="Block" models={blockModels} value={blockModel} onChange={setBlockModel} disabled={isRunning} />
+        <ModelSelector label="Planner" models={plannerModels} value={plannerModel} onChange={setPlannerModel} disabled={isRunning || modelSelectionBlocked} />
+        <ModelSelector label="Block" models={blockModels} value={blockModel} onChange={setBlockModel} disabled={isRunning || modelSelectionBlocked} />
       </div>
+
+      {isLoadingModels && (
+        <div className="px-4 py-2 text-[11px] text-text-secondary border-b border-border-ide bg-bg-canvas">
+          正在加载模型列表...
+        </div>
+      )}
+
+      {modelsError && (
+        <div className="px-4 py-2 text-[11px] text-red-400 border-b border-border-ide bg-bg-canvas">
+          模型列表加载失败: {modelsError}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
         {messages.length === 0 && (
@@ -148,7 +169,7 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
           onSend={handleSend}
           onCancel={cancelRun}
           isRunning={isRunning}
-          disabled={!bridge}
+          disabled={!bridge || modelSelectionBlocked}
         />
       </div>
     </div>

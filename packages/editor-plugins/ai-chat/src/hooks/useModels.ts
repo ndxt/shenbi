@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 
-/** Fallback model lists used while the API response is loading or if the fetch fails. */
 const FALLBACK_PLANNER_MODELS = ['GLM-4.7', 'GLM-4.6', 'GLM-5'];
 const FALLBACK_BLOCK_MODELS = ['GLM-4.6', 'GLM-4.7', 'GLM-5'];
+const DEFAULT_PLANNER_MODEL = FALLBACK_PLANNER_MODELS[0]!;
+const DEFAULT_BLOCK_MODEL = FALLBACK_BLOCK_MODELS[0]!;
 
 interface ModelInfo {
     id: string;
@@ -11,12 +12,16 @@ interface ModelInfo {
 }
 
 export function useModels(defaultPlannerModel?: string, defaultBlockModel?: string) {
-    const [plannerModel, setPlannerModel] = useState(defaultPlannerModel ?? FALLBACK_PLANNER_MODELS[0]);
-    const [blockModel, setBlockModel] = useState(defaultBlockModel ?? FALLBACK_BLOCK_MODELS[0]);
+    const [plannerModel, setPlannerModel] = useState<string>(defaultPlannerModel ?? DEFAULT_PLANNER_MODEL);
+    const [blockModel, setBlockModel] = useState<string>(defaultBlockModel ?? DEFAULT_BLOCK_MODEL);
     const [availableModels, setAvailableModels] = useState<string[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
+        setIsLoading(true);
+        setError(null);
 
         fetch('/api/ai/models')
             .then((res) => {
@@ -29,13 +34,23 @@ export function useModels(defaultPlannerModel?: string, defaultBlockModel?: stri
                 if (cancelled) return;
                 if (body.success && Array.isArray(body.data)) {
                     const ids = body.data.map((m) => m.id);
-                    if (ids.length > 0) {
-                        setAvailableModels(ids);
+                    if (ids.length === 0) {
+                        throw new Error('Model list is empty');
                     }
+                    setAvailableModels(ids);
+                    return;
                 }
+                throw new Error('Model list response is invalid');
             })
-            .catch(() => {
-                // Use fallback models on fetch failure — no silent crash.
+            .catch((err: unknown) => {
+                if (cancelled) return;
+                setAvailableModels([]);
+                setError(err instanceof Error ? err.message : 'Failed to load models');
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
             });
 
         return () => {
@@ -43,7 +58,7 @@ export function useModels(defaultPlannerModel?: string, defaultBlockModel?: stri
         };
     }, []);
 
-    const models = availableModels.length > 0 ? availableModels : FALLBACK_PLANNER_MODELS;
+    const models = availableModels.length > 0 ? availableModels : [];
 
     return {
         plannerModels: models,
@@ -52,5 +67,7 @@ export function useModels(defaultPlannerModel?: string, defaultBlockModel?: stri
         blockModels: models,
         blockModel,
         setBlockModel,
+        isLoading,
+        error,
     };
 }
