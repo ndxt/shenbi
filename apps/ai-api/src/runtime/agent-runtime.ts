@@ -158,7 +158,73 @@ function normalizeChildrenPayload(children: unknown[]): GenerateBlockResult['nod
   return text || undefined;
 }
 
+function normalizeNodeProps(node: GenerateBlockResult['node']): void {
+  const props = node.props;
+  if (!props || typeof props !== 'object') {
+    return;
+  }
+
+  const textPropKeys = ['title', 'label', 'description', 'extra', 'placeholder'];
+  for (const key of textPropKeys) {
+    if (key in props) {
+      const value = props[key];
+      if (isNodeLike(value) || Array.isArray(value)) {
+        const text = flattenToText(value);
+        if (text) {
+          props[key] = text;
+        } else {
+          delete props[key];
+        }
+      }
+    }
+  }
+
+  if (node.component === 'Alert') {
+    if (isNodeLike(props.title) || Array.isArray(props.title)) {
+      props.title = flattenToText(props.title) || '提示';
+    }
+    if (isNodeLike(props.description) || Array.isArray(props.description)) {
+      props.description = flattenToText(props.description);
+    }
+    delete props.action;
+    delete props.closeText;
+    delete props.icon;
+  }
+
+  if (node.component === 'Card') {
+    if (isNodeLike(props.title) || Array.isArray(props.title)) {
+      props.title = flattenToText(props.title) || '内容卡片';
+    }
+    if (isNodeLike(props.extra) || Array.isArray(props.extra)) {
+      props.extra = flattenToText(props.extra);
+    }
+  }
+
+  if (node.component === 'Descriptions.Item') {
+    if (isNodeLike(props.label) || Array.isArray(props.label)) {
+      props.label = flattenToText(props.label) || '字段';
+    }
+  }
+
+  if (node.component === 'Statistic') {
+    if (isNodeLike(props.title) || Array.isArray(props.title)) {
+      props.title = flattenToText(props.title) || '指标';
+    }
+    if (isNodeLike(props.prefix) || Array.isArray(props.prefix)) {
+      delete props.prefix;
+    }
+    if (isNodeLike(props.suffix) || Array.isArray(props.suffix)) {
+      props.suffix = flattenToText(props.suffix) || undefined;
+    }
+  }
+
+  if (node.component === 'Tag') {
+    delete props.icon;
+  }
+}
+
 function normalizeChildrenForComponent(node: GenerateBlockResult['node']): GenerateBlockResult['node'] {
+  normalizeNodeProps(node);
   const children = Array.isArray(node.children) ? node.children : [];
 
   switch (node.component) {
