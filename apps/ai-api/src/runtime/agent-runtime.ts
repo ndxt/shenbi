@@ -370,17 +370,17 @@ function trySalvageJsonCandidate(text: string): { candidate: string; strategy: J
       if (!next) {
         break;
       }
-        const nextOpenCount = countOutsideStrings(next, '{');
-        const nextCloseCount = countOutsideStrings(next, '}');
-        trimmed = next;
-        if (nextOpenCount === nextCloseCount) {
-          return {
-            candidate: trimmed.trim(),
-            strategy: 'trimmed_extra_closing_braces',
-          };
-        }
-        if (nextCloseCount < nextOpenCount) {
-          break;
+      const nextOpenCount = countOutsideStrings(next, '{');
+      const nextCloseCount = countOutsideStrings(next, '}');
+      trimmed = next;
+      if (nextOpenCount === nextCloseCount) {
+        return {
+          candidate: trimmed.trim(),
+          strategy: 'trimmed_extra_closing_braces',
+        };
+      }
+      if (nextCloseCount < nextOpenCount) {
+        break;
       }
     }
     return null;
@@ -477,6 +477,46 @@ function isSupportedZoneType(value: unknown): value is ZoneType {
   return typeof value === 'string' && supportedZoneTypes.includes(value as ZoneType);
 }
 
+/** Leaf zone types that should not coexist with a custom layout block covering the same content. */
+const leafZoneTypes: ReadonlySet<ZoneType> = new Set<ZoneType>([
+  'detail-info', 'data-table', 'timeline-area', 'chart-area', 'side-info',
+  'kpi-row', 'filter', 'form-body', 'form-actions', 'empty-state',
+]);
+
+/**
+ * Detect and resolve conflicts where the planner produced both a "custom" layout
+ * block (containing Row/Col/Tabs — i.e. it already owns the full page layout)
+ * AND separate leaf zones for the same content.
+ *
+ * Resolution: keep page-header + custom layout blocks, drop redundant leaf zones.
+ */
+function resolvePlanConflicts(blocks: PagePlan['blocks']): PagePlan['blocks'] {
+  const customLayoutBlocks = blocks.filter((block) =>
+    block.type === 'custom'
+    && (block.components.includes('Row') || block.components.includes('Col') || block.components.includes('Tabs')),
+  );
+
+  if (customLayoutBlocks.length === 0) {
+    return blocks;
+  }
+
+  const hasLeafZones = blocks.some((block) => leafZoneTypes.has(block.type));
+  if (!hasLeafZones) {
+    return blocks;
+  }
+
+  // Conflict detected: custom layout + leaf zones coexist.
+  // Keep page-header and custom, drop leaf zones.
+  logger.warn('ai.plan.conflict_resolved', {
+    customBlocks: customLayoutBlocks.map((b) => b.id),
+    droppedLeafZones: blocks.filter((b) => leafZoneTypes.has(b.type)).map((b) => `${b.id}(${b.type})`),
+  });
+
+  return blocks.filter((block) =>
+    block.type === 'page-header' || block.type === 'custom',
+  );
+}
+
 function normalizePlan(plan: PagePlan): PagePlan {
   if (!plan.pageTitle || !Array.isArray(plan.blocks) || plan.blocks.length === 0) {
     throw new LLMError('Planner returned an empty page plan', 'EMPTY_PAGE_PLAN');
@@ -487,50 +527,40 @@ function normalizePlan(plan: PagePlan): PagePlan {
 
   const seenBlockIds = new Map<string, number>();
   const normalizedBlocks: PagePlan['blocks'] = plan.blocks.map((block, index) => {
-      if (!isSupportedZoneType(block.type)) {
-        throw new LLMError(`Planner returned unsupported zone type: ${String(block.type)}`, 'UNSUPPORTED_ZONE_TYPE');
-      }
+    if (!isSupportedZoneType(block.type)) {
+      throw new LLMError(`Planner returned unsupported zone type: ${String(block.type)}`, 'UNSUPPORTED_ZONE_TYPE');
+    }
 
-      const components = Array.isArray(block.components) ? block.components.filter(isSupportedComponent) : [];
-      if (components.length === 0) {
-        throw new LLMError(`Planner returned no supported components for block: ${block.id || `block-${index + 1}`}`, 'UNSUPPORTED_BLOCK_COMPONENTS');
-      }
+    const components = Array.isArray(block.components) ? block.components.filter(isSupportedComponent) : [];
+    if (components.length === 0) {
+      throw new LLMError(`Planner returned no supported components for block: ${block.id || `block-${index + 1}`}`, 'UNSUPPORTED_BLOCK_COMPONENTS');
+    }
 
-      const rawId = String(block.id || `block-${index + 1}`);
-      const safeBaseId = rawId
-        .trim()
-        .replace(/[^a-zA-Z0-9_-]+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '') || `block-${index + 1}`;
-      const nextCount = (seenBlockIds.get(safeBaseId) ?? 0) + 1;
-      seenBlockIds.set(safeBaseId, nextCount);
+    const rawId = String(block.id || `block-${index + 1}`);
+    const safeBaseId = rawId
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || `block-${index + 1}`;
+    const nextCount = (seenBlockIds.get(safeBaseId) ?? 0) + 1;
+    seenBlockIds.set(safeBaseId, nextCount);
 
-      const complexity: PagePlan['blocks'][number]['complexity'] =
-        block.complexity === 'medium' || block.complexity === 'complex'
-          ? block.complexity
-          : 'simple';
+    const complexity: PagePlan['blocks'][number]['complexity'] =
+      block.complexity === 'medium' || block.complexity === 'complex'
+        ? block.complexity
+        : 'simple';
 
-      return {
-        ...block,
-        id: nextCount === 1 ? safeBaseId : `${safeBaseId}-${nextCount}`,
-        type: block.type,
-        components,
-        priority: Number.isFinite(block.priority) ? block.priority : index + 1,
-        complexity,
-      };
-    });
+    return {
+      ...block,
+      id: nextCount === 1 ? safeBaseId : `${safeBaseId}-${nextCount}`,
+      type: block.type,
+      components,
+      priority: Number.isFinite(block.priority) ? block.priority : index + 1,
+      complexity,
+    };
+  });
 
-  const hasCustomDetailLayout = plan.pageType === 'detail'
-    && normalizedBlocks.some((block) =>
-      block.type === 'custom'
-      && (block.components.includes('Row') || block.components.includes('Col'))
-    );
-
-  const dedupedBlocks = hasCustomDetailLayout
-    ? normalizedBlocks.filter((block) =>
-      block.type === 'page-header' || block.type === 'custom'
-    )
-    : normalizedBlocks;
+  const dedupedBlocks = resolvePlanConflicts(normalizedBlocks);
 
   return orderBlocksBySkeleton({
     ...plan,
@@ -618,6 +648,7 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         '- Business meaning belongs only in id and description.',
         '- If unsure, choose Card with components ["Card"].',
         `- For this request, prefer pageType "${suggestedPageType}" unless the user clearly asks for a custom mixed layout.`,
+        '- IMPORTANT: If you include a "custom" layout block that already provides the full page layout (e.g. left-right split with Row/Col), do NOT also include leaf zones like detail-info, data-table, timeline-area for the same content. Either plan ONE custom layout block that contains everything, OR plan individual leaf zones that the assembler will stack vertically — never both.',
         '- Favor clean B2B admin layouts: clear page title, concise helper text, grouped filters, summary cards, primary data area, moderate whitespace.',
         '- Page skeletons and zone templates are references, not prison rules. You may adapt order or composition when it improves clarity and aesthetics.',
         '- Use free-layout patterns when they create a stronger composition, especially for custom or mixed business pages.',
@@ -725,13 +756,160 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
   ];
 }
 
+/**
+ * Zone types that accept Row as a legitimate root.
+ * kpi-row genuinely needs Row>Col layout; custom zones may have any layout;
+ * form-actions is too small to need checking.
+ */
+const rowAllowedZones: ReadonlySet<ZoneType> = new Set<ZoneType>(['custom', 'kpi-row', 'form-actions']);
+
+/**
+ * Components that each non-custom zone "wants" — the first match in a deep tree
+ * is extracted when the block generator violated its zone ownership.
+ */
+const zoneSignatureComponents: Partial<Record<ZoneType, ReadonlySet<string>>> = {
+  'data-table': new Set(['Table']),
+  'timeline-area': new Set(['Timeline']),
+  'detail-info': new Set(['Descriptions']),
+  'chart-area': new Set(['Statistic']),
+  filter: new Set(['Form']),
+  'side-info': new Set(['Descriptions', 'Typography.Text']),
+};
+
+interface SchemaNodeLike {
+  component: string;
+  id?: string;
+  props?: Record<string, unknown>;
+  children?: unknown;
+  columns?: unknown;
+  [key: string]: unknown;
+}
+
+function isSchemaNodeLike(value: unknown): value is SchemaNodeLike {
+  return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
+}
+
+/**
+ * Walk a node tree depth-first and return the first Card/Container that contains
+ * a signature component matching the target zone type.
+ */
+function findZoneSubtree(
+  node: SchemaNodeLike,
+  signatureComponents: ReadonlySet<string>,
+): SchemaNodeLike | null {
+  // If the node itself IS a signature component, return its parent wrapper.
+  // But we need the Card wrapper — check children first.
+  const children = Array.isArray(node.children) ? node.children.filter(isSchemaNodeLike) : [];
+
+  // Check if any immediate child is a signature component
+  if (children.some((child) => signatureComponents.has(child.component))) {
+    return node;
+  }
+
+  // Recurse into children
+  for (const child of children) {
+    const found = findZoneSubtree(child, signatureComponents);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Enforce zone ownership on a block's generated output.
+ *
+ * If a non-custom zone generated a top-level Row/Col page layout (violation),
+ * attempt to extract the subtree that actually matches this zone's purpose.
+ * Falls back to the original node if extraction fails.
+ */
+function validateBlockOutput(
+  node: SchemaNodeLike,
+  zoneType: ZoneType,
+  blockId: string,
+): SchemaNodeLike {
+  // Custom zones and zones that legitimately use Row are exempt.
+  if (rowAllowedZones.has(zoneType)) {
+    return node;
+  }
+
+  // Detect violation: top-level Row with multiple Col children.
+  const isTopLevelRowLayout =
+    node.component === 'Row'
+    && Array.isArray(node.children)
+    && node.children.filter(isSchemaNodeLike).filter((c) => c.component === 'Col').length > 1;
+
+  // Detect violation: top-level Tabs in a non-custom zone.
+  const isTopLevelTabs = node.component === 'Tabs';
+
+  if (!isTopLevelRowLayout && !isTopLevelTabs) {
+    return node;
+  }
+
+  // Zone boundary violated. Try to extract the matching subtree.
+  const signature = zoneSignatureComponents[zoneType];
+  if (signature) {
+    const subtree = findZoneSubtree(node, signature);
+    if (subtree && subtree !== node) {
+      logger.warn('ai.block.zone_violation_corrected', {
+        blockId,
+        zoneType,
+        originalRoot: node.component,
+        extractedRoot: subtree.component,
+      });
+      return subtree;
+    }
+  }
+
+  // Fallback: if the row layout has Col children, try to return the first Col's
+  // children as a Container — this at least removes the split-layout.
+  if (isTopLevelRowLayout && Array.isArray(node.children)) {
+    const cols = node.children.filter(isSchemaNodeLike).filter((c) => c.component === 'Col');
+    if (cols.length > 0) {
+      const firstCol = cols[0]!;
+      const colChildren = Array.isArray(firstCol.children)
+        ? firstCol.children.filter(isSchemaNodeLike)
+        : [];
+      if (colChildren.length === 1) {
+        logger.warn('ai.block.zone_violation_fallback', {
+          blockId,
+          zoneType,
+          fallback: 'first_col_single_child',
+        });
+        return colChildren[0]!;
+      }
+      if (colChildren.length > 1) {
+        logger.warn('ai.block.zone_violation_fallback', {
+          blockId,
+          zoneType,
+          fallback: 'first_col_container',
+        });
+        return {
+          component: 'Container',
+          id: `${blockId}-corrected`,
+          props: { direction: 'column', gap: 16 },
+          children: colChildren,
+        };
+      }
+    }
+  }
+
+  // No extraction possible — keep original and log warning.
+  logger.warn('ai.block.zone_violation_unresolved', {
+    blockId,
+    zoneType,
+    rootComponent: node.component,
+  });
+  return node;
+}
+
 async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord): Promise<GenerateBlockResult> {
   const client = createClient();
   const model = requireModel(input.request.blockModel ?? env.AI_BLOCK_MODEL, 'block');
   const text = await client.chat(model, createBlockMessages(input), getThinking(input.request));
-  const node = validateNode(
-    extractJson<GenerateBlockResult['node']>(text, 'block', input.request, model),
-  );
+  const rawNode = extractJson<GenerateBlockResult['node']>(text, 'block', input.request, model);
+  const correctedNode = validateBlockOutput(rawNode, input.block.type, input.block.id);
+  const node = validateNode(correctedNode as GenerateBlockResult['node']);
   trace?.blocks.push({
     blockId: input.block.id,
     zoneType: input.block.type,
@@ -849,33 +1027,33 @@ async function assembleSchema(input: AssembleSchemaInput, trace?: RunTraceRecord
             children: headerBlock
               ? [headerBlock.node]
               : [
-                  {
-                    id: 'page-title-fallback',
-                    component: 'Container',
-                    props: {
-                      direction: 'column',
-                      gap: 6,
-                    },
-                    children: [
-                      {
-                        id: 'page-title-fallback-title',
-                        component: 'Typography.Title',
-                        props: {
-                          level: 2,
-                        },
-                        children: [input.plan.pageTitle],
-                      },
-                      {
-                        id: 'page-title-fallback-desc',
-                        component: 'Typography.Text',
-                        props: {
-                          type: 'secondary',
-                        },
-                        children: [`${input.plan.pageType} page`],
-                      },
-                    ],
+                {
+                  id: 'page-title-fallback',
+                  component: 'Container',
+                  props: {
+                    direction: 'column',
+                    gap: 6,
                   },
-                ],
+                  children: [
+                    {
+                      id: 'page-title-fallback-title',
+                      component: 'Typography.Title',
+                      props: {
+                        level: 2,
+                      },
+                      children: [input.plan.pageTitle],
+                    },
+                    {
+                      id: 'page-title-fallback-desc',
+                      component: 'Typography.Text',
+                      props: {
+                        type: 'secondary',
+                      },
+                      children: [`${input.plan.pageType} page`],
+                    },
+                  ],
+                },
+              ],
           },
           {
             id: 'page-content-shell',
