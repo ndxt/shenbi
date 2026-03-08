@@ -21,7 +21,11 @@ import {
 import type { AgentEvent } from '@shenbi/ai-contracts';
 import type { PageSchema } from '@shenbi/schema';
 import { LLMError } from '../adapters/errors.ts';
-import { writeInvalidJsonDump, type InvalidJsonSource } from '../adapters/debug-dump.ts';
+import {
+  writeInvalidJsonDump,
+  writeTraceDump,
+  type InvalidJsonSource,
+} from '../adapters/debug-dump.ts';
 import { loadEnv } from '../adapters/env.ts';
 import { logger } from '../adapters/logger.ts';
 import {
@@ -76,6 +80,30 @@ const supportedZoneTypes = [
 const plannerContractSummary = getPlannerContractSummary();
 const plannerZoneTemplateSummary = getPlannerZoneTemplateSummary();
 const designPolicySummary = getDesignPolicySummary();
+
+interface RunTraceRecord {
+  request: RunRequest;
+  suggestedPageType?: PageType;
+  planner?: {
+    model: string;
+    rawOutput: string;
+    normalizedPlan?: PagePlan;
+  };
+  blocks: Array<{
+    blockId: string;
+    zoneType: ZoneType;
+    description: string;
+    suggestedComponents: string[];
+    model: string;
+    rawOutput: string;
+    normalizedNode?: GenerateBlockResult['node'];
+  }>;
+  finalSchema?: PageSchema;
+  error?: {
+    message: string;
+    stack?: string;
+  };
+}
 
 function classifyPromptToPageType(prompt: string): PageType {
   const normalized = prompt.toLowerCase();
@@ -662,13 +690,22 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
   ];
 }
 
-async function generateBlock(input: GenerateBlockInput): Promise<GenerateBlockResult> {
+async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord): Promise<GenerateBlockResult> {
   const client = createClient();
   const model = requireModel(input.request.blockModel ?? env.AI_BLOCK_MODEL, 'block');
   const text = await client.chat(model, createBlockMessages(input), getThinking(input.request));
   const node = validateNode(
     extractJson<GenerateBlockResult['node']>(text, 'block', input.request, model),
   );
+  trace?.blocks.push({
+    blockId: input.block.id,
+    zoneType: input.block.type,
+    description: input.block.description,
+    suggestedComponents: input.block.components,
+    model,
+    rawOutput: text,
+    normalizedNode: node,
+  });
   return {
     blockId: input.block.id,
     node,
@@ -676,7 +713,7 @@ async function generateBlock(input: GenerateBlockInput): Promise<GenerateBlockRe
   };
 }
 
-async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
+async function assembleSchema(input: AssembleSchemaInput, trace?: RunTraceRecord): Promise<PageSchema> {
   const headerBlock = input.blocks.find((block) => block.blockId === 'header' || input.plan.blocks.find((planBlock) => planBlock.id === block.blockId)?.type === 'page-header');
   const contentBlocks = input.blocks.filter((block) => block !== headerBlock);
 
@@ -744,7 +781,7 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
     return block.node;
   });
 
-  return {
+  const schema: PageSchema = {
     id: 'ai-generated-page',
     name: input.plan.pageTitle,
     body: [
@@ -818,17 +855,29 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
       },
     ],
   };
+  if (trace) {
+    trace.finalSchema = schema;
+  }
+  return schema;
 }
 
-async function planWithModel(input: PlanPageInput): Promise<PagePlan> {
+async function planWithModel(input: PlanPageInput, trace?: RunTraceRecord): Promise<PagePlan> {
   const client = createClient();
   const model = requireModel(input.request.plannerModel ?? env.AI_PLANNER_MODEL, 'planner');
   const text = await client.chat(model, createPlannerMessages(input), getThinking(input.request));
   const plan = extractJson<PagePlan>(text, 'planner', input.request, model);
-  return normalizePlan(plan);
+  const normalizedPlan = normalizePlan(plan);
+  if (trace) {
+    trace.planner = {
+      model,
+      rawOutput: text,
+      normalizedPlan,
+    };
+  }
+  return normalizedPlan;
 }
 
-function createRuntimeDeps(): AgentRuntimeDeps {
+function createRuntimeDeps(trace?: RunTraceRecord): AgentRuntimeDeps {
   return {
     llm: {
       async chat(request: unknown) {
@@ -861,19 +910,19 @@ function createRuntimeDeps(): AgentRuntimeDeps {
       {
         name: 'planPage',
         async execute(input: unknown) {
-          return planWithModel(input as PlanPageInput);
+          return planWithModel(input as PlanPageInput, trace);
         },
       },
       {
         name: 'generateBlock',
         async execute(input: unknown) {
-          return generateBlock(input as GenerateBlockInput);
+          return generateBlock(input as GenerateBlockInput, trace);
         },
       },
       {
         name: 'assembleSchema',
         async execute(input: unknown) {
-          return assembleSchema(input as AssembleSchemaInput);
+          return assembleSchema(input as AssembleSchemaInput, trace);
         },
       },
     ]),
@@ -897,13 +946,87 @@ function extractMetadata(events: AgentEvent[]): RunMetadata {
   return doneEvent.data.metadata;
 }
 
+function createTrace(request: RunRequest): RunTraceRecord {
+  return {
+    request,
+    suggestedPageType: classifyPromptToPageType(request.prompt),
+    blocks: [],
+  };
+}
+
+function finalizeTrace(
+  trace: RunTraceRecord,
+  status: 'success' | 'error',
+  metadata?: RunMetadata,
+  error?: unknown,
+): string {
+  if (error) {
+    trace.error = {
+      message: error instanceof Error ? error.message : String(error),
+      ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+    };
+  }
+  const debugFile = writeTraceDump({ status, trace });
+  if (metadata) {
+    metadata.debugFile = debugFile;
+  }
+  return debugFile;
+}
+
 export const agentRuntime: AgentRuntime = {
   async run(request) {
-    const events = await runAgent(request, createRuntimeDeps());
-    return { events, metadata: extractMetadata(events) };
+    const trace = createTrace(request);
+    try {
+      const events = await runAgent(request, createRuntimeDeps(trace));
+      const metadata = extractMetadata(events);
+      finalizeTrace(trace, 'success', metadata);
+      return { events, metadata };
+    } catch (error) {
+      const debugFile = finalizeTrace(trace, 'error', undefined, error);
+      throw new LLMError(
+        `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
+        'RUNTIME_TRACE_ERROR',
+      );
+    }
   },
 
   async *runStream(request) {
-    yield* runAgentStream(request, createRuntimeDeps());
+    const trace = createTrace(request);
+    const generator = runAgentStream(request, createRuntimeDeps(trace));
+    let terminalEvent: AgentEvent | undefined;
+
+    try {
+      for await (const event of generator) {
+        if (event.type === 'done' || event.type === 'error') {
+          terminalEvent = event;
+          continue;
+        }
+        yield event;
+      }
+
+      if (terminalEvent?.type === 'done') {
+        const metadata = terminalEvent.data.metadata;
+        finalizeTrace(trace, 'success', metadata);
+        yield terminalEvent;
+        return;
+      }
+
+      if (terminalEvent?.type === 'error') {
+        const debugFile = finalizeTrace(trace, 'error', undefined, terminalEvent.data.message);
+        yield {
+          type: 'error',
+          data: {
+            ...terminalEvent.data,
+            message: `${terminalEvent.data.message}. Trace file: ${debugFile}`,
+          },
+        };
+      }
+    } catch (error) {
+      const debugFile = finalizeTrace(trace, 'error', undefined, error);
+      throw new LLMError(
+        `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
+        'RUNTIME_TRACE_ERROR',
+      );
+    }
   },
 };

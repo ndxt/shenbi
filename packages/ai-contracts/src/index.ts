@@ -39,6 +39,7 @@ export interface RunMetadata {
   blockModel?: string;
   tokensUsed?: number;
   durationMs?: number;
+  debugFile?: string;
   repairs?: Array<{ message: string; path?: string }>;
 }
 

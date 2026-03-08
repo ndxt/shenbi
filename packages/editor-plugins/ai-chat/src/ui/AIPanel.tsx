@@ -166,9 +166,14 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
         )}
 
         {messages.length > 0 && !isRunning && lastMetadata && (
-          <div className="text-[10px] text-text-secondary flex justify-center gap-4 opacity-50">
+          <div className="text-[10px] text-text-secondary flex flex-col items-center gap-1 opacity-50">
+            <div className="flex justify-center gap-4">
             <span>耗时: {lastMetadata.durationMs}ms</span>
             <span>Tokens: {lastMetadata.tokensUsed}</span>
+            </div>
+            {lastMetadata.debugFile && (
+              <span className="font-mono break-all text-center">Debug file: {lastMetadata.debugFile}</span>
+            )}
           </div>
         )}
 

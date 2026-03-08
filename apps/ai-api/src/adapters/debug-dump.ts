@@ -23,6 +23,11 @@ interface ErrorDumpInput {
   request?: unknown;
 }
 
+interface TraceDumpInput {
+  status: 'success' | 'error';
+  trace: unknown;
+}
+
 function toSafeStamp(date: Date): string {
   return date.toISOString().replace(/[:.]/g, '-');
 }
@@ -108,4 +113,28 @@ export function writeErrorDump(input: ErrorDumpInput): string {
   );
 
   return join('.ai-debug', 'errors', filename);
+}
+
+export function writeTraceDump(input: TraceDumpInput): string {
+  const dumpDir = join(process.cwd(), '.ai-debug', 'traces');
+  mkdirSync(dumpDir, { recursive: true });
+
+  const filename = `${toSafeStamp(new Date())}-${input.status}.json`;
+  const fullpath = join(dumpDir, filename);
+
+  writeFileSync(
+    fullpath,
+    JSON.stringify(
+      {
+        ts: new Date().toISOString(),
+        status: input.status,
+        trace: toSerializable(input.trace),
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  );
+
+  return join('.ai-debug', 'traces', filename);
 }
