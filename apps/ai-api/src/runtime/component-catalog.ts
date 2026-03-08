@@ -430,11 +430,12 @@ const zoneGroupMap: Record<ZoneType, ComponentGroupName[]> = {
 function summarizeContract(contract: ComponentContract): CompiledComponentSummary {
   const propSummary = Object.entries(contract.props ?? {})
     .filter(([, prop]) => !prop.deprecated)
-    .slice(0, 6)
+    .slice(0, 12)
     .map(([name, prop]) => {
       const required = prop.required ? '!' : '';
+      // Output ALL enum values so the model sees the complete whitelist
       const enumHint = Array.isArray(prop.enum) && prop.enum.length > 0
-        ? `=${prop.enum.slice(0, 3).join('|')}`
+        ? `=${prop.enum.join('|')}`
         : '';
       return `${name}:${prop.type}${required}${enumHint}`;
     });
@@ -766,7 +767,8 @@ export function getComponentSchemaContracts(componentTypes: readonly string[]): 
       }
 
       if (summary.propSummary.length > 0) {
-        lines.push(`  key-props: ${summary.propSummary.join(', ')}`);
+        // Label as valid-props to reinforce to the model: ONLY these props are allowed
+        lines.push(`  valid-props (use ONLY these): ${summary.propSummary.join(', ')}`);
       }
 
       if (skeleton) {

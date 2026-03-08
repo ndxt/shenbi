@@ -748,6 +748,8 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         'Free-layout composition references:',
         freeLayoutPatternSummary,
         'Rules:',
+        '- STRICT CONTRACT COMPLIANCE: Only use props that appear in the "Component schema contracts" section above. Do NOT add extra props from memory, from antd v4, or from any other source.',
+        '- STRICT ENUM VALUES: For any prop that has a defined enum, use ONLY the exact values listed in the contract. Do not invent or substitute alternative values.',
         '- The root node component must be one of the supported components.',
         '- Every child schema node must also use only supported components.',
         '- children may contain schema nodes or plain text only.',

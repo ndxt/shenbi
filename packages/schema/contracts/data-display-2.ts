@@ -536,10 +536,10 @@ export const timelineContract: ComponentContract = {
     },
     mode: {
       type: 'enum',
-      enum: ['left', 'alternate', 'right'],
-      default: 'left',
+      enum: ['start', 'alternate', 'end'],
+      default: 'start',
       allowExpression: true,
-      description: '通过设置 mode 可以改变时间轴和内容的相对位置',
+      description: '通过设置 mode 可以改变时间轴和内容的相对位置（start=左对齐，end=右对齐，alternate=交替）',
     },
     pending: {
       type: 'SchemaNode',

@@ -105,6 +105,14 @@ function normalizeNodeProps(node: SchemaNode): void {
     delete props.icon;
   }
 
+  if (node.component === 'Col') {
+    // When both `span` and `flex` are set, `flex` (fixed px) overrides `span` (proportional grid),
+    // causing columns to not fill available space. Drop `flex` when `span` is present.
+    if ('span' in props && props.span != null && 'flex' in props) {
+      delete props.flex;
+    }
+  }
+
   if (node.component === 'Card') {
     if (isNodeLike(props.title) || Array.isArray(props.title)) {
       props.title = flattenToText(props.title) || '内容卡片';
@@ -138,6 +146,9 @@ function normalizeNodeProps(node: SchemaNode): void {
         node.children = undefined;
       }
     }
+    // antd v5: mode='left'/'right' are deprecated, use 'start'/'end' instead
+    if (props.mode === 'left') props.mode = 'start';
+    if (props.mode === 'right') props.mode = 'end';
   }
 
   if (node.component === 'Descriptions.Item') {
@@ -164,6 +175,14 @@ function normalizeNodeProps(node: SchemaNode): void {
       } else {
         delete props.suffix;
       }
+    }
+    // antd v5: valueStyle is deprecated, use styles.content instead
+    if ('valueStyle' in props && props.valueStyle && typeof props.valueStyle === 'object') {
+      const existingStyles = (props.styles && typeof props.styles === 'object'
+        ? props.styles
+        : {}) as Record<string, unknown>;
+      props.styles = { ...existingStyles, content: props.valueStyle };
+      delete props.valueStyle;
     }
   }
 
