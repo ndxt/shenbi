@@ -44,6 +44,11 @@ import type { AgentRuntime } from './types.ts';
 
 const memory = createInMemoryAgentMemoryStore();
 const env = loadEnv();
+type JsonSalvageStrategy =
+  | 'balanced_object'
+  | 'trimmed_trailing_noise'
+  | 'appended_missing_braces'
+  | 'trimmed_extra_closing_braces';
 const supportedPageTypes = ['dashboard', 'list', 'form', 'detail', 'statistics', 'custom'] as const;
 const supportedZoneTypes = [
   'page-header',
@@ -217,10 +222,13 @@ function countOutsideStrings(text: string, target: string): number {
   return count;
 }
 
-function trySalvageJsonCandidate(text: string): string | null {
+function trySalvageJsonCandidate(text: string): { candidate: string; strategy: JsonSalvageStrategy } | null {
   const extracted = findBalancedJsonObject(text);
   if (extracted) {
-    return extracted;
+    return {
+      candidate: extracted,
+      strategy: 'balanced_object',
+    };
   }
 
   const trimmed = text.trim();
@@ -231,7 +239,10 @@ function trySalvageJsonCandidate(text: string): string | null {
     }
     try {
       JSON.parse(candidate);
-      return candidate;
+      return {
+        candidate,
+        strategy: 'trimmed_trailing_noise',
+      };
     } catch {
       // continue trimming
     }
@@ -249,7 +260,10 @@ function trySalvageJsonCandidate(text: string): string | null {
     if (fullOpenCount - fullCloseCount > 8) {
       return null;
     }
-    return `${fullBase}${'}'.repeat(fullOpenCount - fullCloseCount)}`;
+    return {
+      candidate: `${fullBase}${'}'.repeat(fullOpenCount - fullCloseCount)}`,
+      strategy: 'appended_missing_braces',
+    };
   }
 
   const end = text.lastIndexOf('}');
@@ -257,7 +271,10 @@ function trySalvageJsonCandidate(text: string): string | null {
   const openCount = countOutsideStrings(base, '{');
   const closeCount = countOutsideStrings(base, '}');
   if (openCount === closeCount) {
-    return base;
+    return {
+      candidate: base,
+      strategy: 'balanced_object',
+    };
   }
   if (openCount < closeCount) {
     let trimmed = base;
@@ -266,14 +283,17 @@ function trySalvageJsonCandidate(text: string): string | null {
       if (!next) {
         break;
       }
-      const nextOpenCount = countOutsideStrings(next, '{');
-      const nextCloseCount = countOutsideStrings(next, '}');
-      trimmed = next;
-      if (nextOpenCount === nextCloseCount) {
-        return trimmed.trim();
-      }
-      if (nextCloseCount < nextOpenCount) {
-        break;
+        const nextOpenCount = countOutsideStrings(next, '{');
+        const nextCloseCount = countOutsideStrings(next, '}');
+        trimmed = next;
+        if (nextOpenCount === nextCloseCount) {
+          return {
+            candidate: trimmed.trim(),
+            strategy: 'trimmed_extra_closing_braces',
+          };
+        }
+        if (nextCloseCount < nextOpenCount) {
+          break;
       }
     }
     return null;
@@ -291,14 +311,15 @@ function extractJson<T>(
   try {
     return JSON.parse(candidate.trim()) as T;
   } catch {
-    const salvagedCandidate = trySalvageJsonCandidate(candidate);
-    if (salvagedCandidate) {
+    const salvaged = trySalvageJsonCandidate(candidate);
+    if (salvaged) {
       try {
         logger.warn('ai.model.invalid_json_salvaged', {
           source,
           model,
+          strategy: salvaged.strategy,
         });
-        return JSON.parse(salvagedCandidate) as T;
+        return JSON.parse(salvaged.candidate) as T;
       } catch {
         // fall through to debug dump
       }
@@ -488,6 +509,7 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         `Schema Summary: ${input.context.schemaSummary}`,
         `Component Summary: ${input.context.componentSummary}`,
         `Selected Node: ${input.context.selectedNodeId ?? 'none'}`,
+        'Your response must start with { and end with }. No other text.',
       ].join('\n'),
     },
   ];
@@ -543,6 +565,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         `Block Type: ${input.block.type}`,
         `Block Description: ${input.block.description}`,
         `Suggested Components: ${input.block.components.join(', ')}`,
+        'Your response must start with { and end with }. No other text.',
       ].join('\n'),
     },
   ];

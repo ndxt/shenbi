@@ -148,10 +148,10 @@ function countOutsideStrings(text: string, target: string): number {
   return count;
 }
 
-function trySalvageJsonCandidate(text: string): string | null {
+function trySalvageJsonCandidate(text: string): { candidate: string; strategy: string } | null {
   const extracted = findBalancedJsonObject(text);
   if (extracted) {
-    return extracted;
+    return { candidate: extracted, strategy: 'balanced_object' };
   }
 
   const trimmed = text.trim();
@@ -162,7 +162,7 @@ function trySalvageJsonCandidate(text: string): string | null {
     }
     try {
       JSON.parse(candidate);
-      return candidate;
+      return { candidate, strategy: 'trimmed_trailing_noise' };
     } catch {
       // continue trimming
     }
@@ -180,7 +180,10 @@ function trySalvageJsonCandidate(text: string): string | null {
     if (fullOpenCount - fullCloseCount > 8) {
       return null;
     }
-    return `${fullBase}${'}'.repeat(fullOpenCount - fullCloseCount)}`;
+    return {
+      candidate: `${fullBase}${'}'.repeat(fullOpenCount - fullCloseCount)}`,
+      strategy: 'appended_missing_braces',
+    };
   }
 
   const end = text.lastIndexOf('}');
@@ -188,7 +191,7 @@ function trySalvageJsonCandidate(text: string): string | null {
   const openCount = countOutsideStrings(base, '{');
   const closeCount = countOutsideStrings(base, '}');
   if (openCount === closeCount) {
-    return base;
+    return { candidate: base, strategy: 'balanced_object' };
   }
   if (openCount < closeCount) {
     let truncated = base;
@@ -200,7 +203,10 @@ function trySalvageJsonCandidate(text: string): string | null {
       const nextOpenCount = countOutsideStrings(truncated, '{');
       const nextCloseCount = countOutsideStrings(truncated, '}');
       if (nextOpenCount === nextCloseCount) {
-        return truncated.trim();
+        return {
+          candidate: truncated.trim(),
+          strategy: 'trimmed_extra_closing_braces',
+        };
       }
       if (nextCloseCount < nextOpenCount) {
         break;
@@ -217,7 +223,8 @@ describe('agent runtime json salvage', () => {
     const raw = '```json\n{"component":"Card","children":[{"component":"Button","children":["确定"]}]\n```';
     const candidate = extractJsonCandidate(raw);
     const salvaged = trySalvageJsonCandidate(candidate);
-    const parsed = JSON.parse(salvaged!);
+    expect(salvaged?.strategy).toBe('appended_missing_braces');
+    const parsed = JSON.parse(salvaged!.candidate);
     expect(parsed).toMatchObject({ component: 'Card' });
     expect(Array.isArray(parsed.children)).toBe(true);
     expect(parsed.children).toHaveLength(1);
@@ -226,28 +233,32 @@ describe('agent runtime json salvage', () => {
   it('salvages near-valid json with extra trailing closing braces', () => {
     const raw = '{"component":"Card","children":[{"component":"Tag","children":["在职"]}]}]}}]}';
     const salvaged = trySalvageJsonCandidate(raw);
-    expect(salvaged).toBe('{"component":"Card","children":[{"component":"Tag","children":["在职"]}]}');
-    expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Card' });
+    expect(salvaged?.candidate).toBe('{"component":"Card","children":[{"component":"Tag","children":["在职"]}]}');
+    expect(salvaged?.strategy).toBe('balanced_object');
+    expect(JSON.parse(salvaged!.candidate)).toMatchObject({ component: 'Card' });
   });
 
   it('salvages near-valid json with extra trailing mixed brackets', () => {
     const raw = '{"component":"Card","children":[{"component":"Timeline","children":[{"component":"Timeline.Item","children":["持续发展"]}]}]}}]}';
     const salvaged = trySalvageJsonCandidate(raw);
-    expect(salvaged).toBe('{"component":"Card","children":[{"component":"Timeline","children":[{"component":"Timeline.Item","children":["持续发展"]}]}]}');
-    expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Card' });
+    expect(salvaged?.candidate).toBe('{"component":"Card","children":[{"component":"Timeline","children":[{"component":"Timeline.Item","children":["持续发展"]}]}]}');
+    expect(salvaged?.strategy).toBe('balanced_object');
+    expect(JSON.parse(salvaged!.candidate)).toMatchObject({ component: 'Card' });
   });
 
   it('salvages near-valid json with extra trailing tokens after valid object', () => {
     const raw = '{"component":"Container","children":[{"component":"Typography.Text","children":["ok"]}]}]}';
     const salvaged = trySalvageJsonCandidate(raw);
-    expect(salvaged).toBe('{"component":"Container","children":[{"component":"Typography.Text","children":["ok"]}]}');
-    expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Container' });
+    expect(salvaged?.candidate).toBe('{"component":"Container","children":[{"component":"Typography.Text","children":["ok"]}]}');
+    expect(salvaged?.strategy).toBe('balanced_object');
+    expect(JSON.parse(salvaged!.candidate)).toMatchObject({ component: 'Container' });
   });
 
   it('salvages near-valid json with mismatched closing token inside array', () => {
     const raw = '{"component":"Descriptions.Item","props":{"label":"工作地点"},"children":["北京市朝阳区科技园区A座15层"}';
     const salvaged = trySalvageJsonCandidate(raw);
-    const parsed = JSON.parse(salvaged!);
+    expect(salvaged?.strategy).toBe('appended_missing_braces');
+    const parsed = JSON.parse(salvaged!.candidate);
     expect(parsed).toMatchObject({ component: 'Descriptions.Item' });
     expect(Array.isArray(parsed.children)).toBe(true);
     expect(parsed.children[0]).toBe('北京市朝阳区科技园区A座15层');
