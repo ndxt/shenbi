@@ -9,11 +9,6 @@ export interface Env {
   AI_OPENAI_COMPAT_API_KEY?: string | undefined;
   AI_PLANNER_MODEL?: string | undefined;
   AI_BLOCK_MODEL?: string | undefined;
-  OPENAI_API_KEY?: string | undefined;
-  ANTHROPIC_API_KEY?: string | undefined;
-  GOOGLE_API_KEY?: string | undefined;
-  DEEPSEEK_API_KEY?: string | undefined;
-  DASHSCOPE_API_KEY?: string | undefined;
 }
 
 function parseEnvFile(filePath: string): Record<string, string> {
@@ -73,7 +68,7 @@ export function loadEnv(): Env {
 
   return {
     PORT: parseInt(readEnvValue(loaded, ['PORT']) ?? '3100', 10),
-    AI_PROVIDER: readEnvValue(loaded, ['AI_PROVIDER']) ?? 'fake',
+    AI_PROVIDER: readEnvValue(loaded, ['AI_PROVIDER']) ?? '',
     AI_OPENAI_COMPAT_BASE_URL: readEnvValue(loaded, [
       'AI_OPENAI_COMPAT_BASE_URL',
       'OPENAI_BASE_URL',
@@ -94,10 +89,5 @@ export function loadEnv(): Env {
       'OPENAI_BLOCK_MODEL',
       'VITE_OPENAI_BLOCK_MODEL',
     ]),
-    OPENAI_API_KEY: readEnvValue(loaded, ['OPENAI_API_KEY']),
-    ANTHROPIC_API_KEY: readEnvValue(loaded, ['ANTHROPIC_API_KEY']),
-    GOOGLE_API_KEY: readEnvValue(loaded, ['GOOGLE_API_KEY']),
-    DEEPSEEK_API_KEY: readEnvValue(loaded, ['DEEPSEEK_API_KEY']),
-    DASHSCOPE_API_KEY: readEnvValue(loaded, ['DASHSCOPE_API_KEY']),
   };
 }

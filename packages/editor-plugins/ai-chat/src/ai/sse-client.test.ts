@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentEvent, RunRequest } from './api-types';
-import { FetchAIClient, MockAIClient } from './sse-client';
+import { FetchAIClient } from './sse-client';
+import { MockAIClient } from './mock-ai-client';
 
 function createStreamResponse(events: AgentEvent[]): Response {
   const payload = events

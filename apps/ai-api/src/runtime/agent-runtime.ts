@@ -37,7 +37,15 @@ function extractJson<T>(text: string): T {
   }
 }
 
+let _client: OpenAICompatibleClient | null = null;
+
 function createClient(): OpenAICompatibleClient {
+  if (_client) {
+    return _client;
+  }
+  if (!env.AI_PROVIDER) {
+    throw new LLMError('AI_PROVIDER is not configured. Set AI_PROVIDER in .env.local.', 'MISSING_PROVIDER');
+  }
   if (env.AI_PROVIDER !== 'openai-compatible') {
     throw new LLMError(`Unsupported AI provider: ${env.AI_PROVIDER}`, 'UNSUPPORTED_PROVIDER');
   }
@@ -47,10 +55,11 @@ function createClient(): OpenAICompatibleClient {
   if (!env.AI_OPENAI_COMPAT_API_KEY) {
     throw new LLMError('Missing AI_OPENAI_COMPAT_API_KEY', 'MISSING_PROVIDER_API_KEY');
   }
-  return new OpenAICompatibleClient({
+  _client = new OpenAICompatibleClient({
     baseUrl: env.AI_OPENAI_COMPAT_BASE_URL,
     apiKey: env.AI_OPENAI_COMPAT_API_KEY,
   });
+  return _client;
 }
 
 function requireModel(model: string | undefined, kind: 'planner' | 'block' | 'chat'): string {

@@ -20,6 +20,19 @@ interface ChatCompletionResponse {
   choices?: ChatCompletionChoice[];
 }
 
+interface StreamDelta {
+  content?: string | null;
+}
+
+interface StreamChoice {
+  delta?: StreamDelta;
+  finish_reason?: string | null;
+}
+
+interface StreamChunk {
+  choices?: StreamChoice[];
+}
+
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, '');
 }
@@ -87,7 +100,96 @@ export class OpenAICompatibleClient {
   }
 
   async *streamChat(model: string, messages: OpenAICompatibleMessage[]): AsyncIterable<{ text: string }> {
-    const text = await this.chat(model, messages);
-    yield { text };
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.2,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new LLMError(await readErrorMessage(response), 'OPENAI_COMPAT_ERROR');
+    }
+
+    if (!response.body) {
+      throw new LLMError('Provider returned no streaming body', 'OPENAI_COMPAT_EMPTY');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        // Keep the last (potentially incomplete) line in the buffer
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(':')) {
+            continue;
+          }
+          if (trimmed === 'data: [DONE]') {
+            return;
+          }
+          if (!trimmed.startsWith('data:')) {
+            continue;
+          }
+
+          const jsonStr = trimmed.slice('data:'.length).trim();
+          if (!jsonStr) {
+            continue;
+          }
+
+          try {
+            const chunk = JSON.parse(jsonStr) as StreamChunk;
+            const content = chunk.choices?.[0]?.delta?.content;
+            if (content) {
+              yield { text: content };
+            }
+          } catch {
+            // Skip malformed SSE lines — some providers send non-JSON heartbeats
+          }
+        }
+      }
+
+      // Process any remaining data in the buffer
+      buffer += decoder.decode();
+      if (buffer.trim() && buffer.trim() !== 'data: [DONE]') {
+        const trimmed = buffer.trim();
+        if (trimmed.startsWith('data:')) {
+          const jsonStr = trimmed.slice('data:'.length).trim();
+          if (jsonStr) {
+            try {
+              const chunk = JSON.parse(jsonStr) as StreamChunk;
+              const content = chunk.choices?.[0]?.delta?.content;
+              if (content) {
+                yield { text: content };
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 }
+

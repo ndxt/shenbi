@@ -23,6 +23,6 @@ export async function* chatOrchestrator(
   }
 
   if (!emittedDelta) {
-    yield { type: 'message:delta', data: { text: 'No response generated.' } };
+    yield { type: 'message:delta', data: { text: '未生成有效回复。' } };
   }
 }
