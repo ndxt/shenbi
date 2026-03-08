@@ -522,7 +522,7 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
     }
     default: {
       if (Array.isArray(node.children)) {
-        const normalizedChildren = normalizeChildrenPayload(children, node.id ?? node.component.toLowerCase());
+        const normalizedChildren = normalizeChildrenPayload(children, node.id ?? (typeof node.component === 'string' && node.component ? node.component.toLowerCase() : 'node'));
         if (normalizedChildren === undefined) {
           delete node.children;
         } else {
@@ -535,6 +535,10 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
 }
 
 function normalizeComponentName(node: SchemaNode): void {
+  if (typeof node.component !== 'string' || !node.component) {
+    node.component = 'Container';
+    return;
+  }
   const mapped = htmlComponentMapping[node.component.toLowerCase()];
   if (mapped) {
     node.component = mapped;
@@ -549,7 +553,7 @@ function ensureUniqueNodeIds(node: SchemaNode, seen: Set<string>, fallbackBase =
   const baseId = toSafeIdSegment(
     typeof node.id === 'string' && node.id
       ? node.id
-      : `${fallbackBase}-${node.component.toLowerCase()}`
+      : `${fallbackBase}-${typeof node.component === 'string' && node.component ? node.component.toLowerCase() : 'node'}`
   );
   let nextId = baseId;
   let suffix = 2;
