@@ -11,6 +11,8 @@ export async function* chatOrchestrator(
   let emittedDelta = false;
   for await (const chunk of deps.llm.streamChat({
     prompt: request.prompt,
+    plannerModel: request.plannerModel,
+    blockModel: request.blockModel,
     context,
   })) {
     if (!chunk.text) {

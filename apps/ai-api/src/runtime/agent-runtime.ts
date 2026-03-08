@@ -1,6 +1,6 @@
 /**
  * Default runtime assembly — API Host 通过 @shenbi/ai-agents 产出真实事件流，
- * 底层暂时仍使用 fake llm/tools，后续替换为 ai-service/provider 装配即可。
+ * 底层直接调用真实 provider；provider/模型异常时明确抛错。
  */
 import {
   createInMemoryAgentMemoryStore,
@@ -18,6 +18,7 @@ import {
 } from '@shenbi/ai-agents';
 import type { AgentEvent } from '@shenbi/ai-contracts';
 import type { PageSchema } from '@shenbi/schema';
+import { LLMError } from '../adapters/errors.ts';
 import { loadEnv } from '../adapters/env.ts';
 import { OpenAICompatibleClient, type OpenAICompatibleMessage } from '../adapters/openai-compatible.ts';
 import type { AgentRuntime } from './types.ts';
@@ -29,21 +30,101 @@ const supportedComponents = ['Card', 'Container', 'Button', 'Table', 'Alert'] as
 function extractJson<T>(text: string): T {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced?.[1] ?? text;
-  return JSON.parse(candidate.trim()) as T;
+  try {
+    return JSON.parse(candidate.trim()) as T;
+  } catch {
+    throw new LLMError('Model returned invalid JSON', 'MODEL_INVALID_JSON');
+  }
 }
 
-function createClient(): OpenAICompatibleClient | undefined {
-  if (
-    env.AI_PROVIDER !== 'openai-compatible'
-    || !env.AI_OPENAI_COMPAT_BASE_URL
-    || !env.AI_OPENAI_COMPAT_API_KEY
-  ) {
-    return undefined;
+function createClient(): OpenAICompatibleClient {
+  if (env.AI_PROVIDER !== 'openai-compatible') {
+    throw new LLMError(`Unsupported AI provider: ${env.AI_PROVIDER}`, 'UNSUPPORTED_PROVIDER');
+  }
+  if (!env.AI_OPENAI_COMPAT_BASE_URL) {
+    throw new LLMError('Missing AI_OPENAI_COMPAT_BASE_URL', 'MISSING_PROVIDER_BASE_URL');
+  }
+  if (!env.AI_OPENAI_COMPAT_API_KEY) {
+    throw new LLMError('Missing AI_OPENAI_COMPAT_API_KEY', 'MISSING_PROVIDER_API_KEY');
   }
   return new OpenAICompatibleClient({
     baseUrl: env.AI_OPENAI_COMPAT_BASE_URL,
     apiKey: env.AI_OPENAI_COMPAT_API_KEY,
   });
+}
+
+function requireModel(model: string | undefined, kind: 'planner' | 'block' | 'chat'): string {
+  if (!model) {
+    throw new LLMError(`Missing ${kind} model configuration`, 'MISSING_MODEL');
+  }
+  return model;
+}
+
+function isSupportedComponent(value: unknown): value is (typeof supportedComponents)[number] {
+  return typeof value === 'string' && supportedComponents.includes(value as (typeof supportedComponents)[number]);
+}
+
+function isNodeLike(value: unknown): value is GenerateBlockResult['node'] {
+  return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
+}
+
+function normalizePlan(plan: PagePlan): PagePlan {
+  if (!plan.pageTitle || !Array.isArray(plan.blocks) || plan.blocks.length === 0) {
+    throw new LLMError('Planner returned an empty page plan', 'EMPTY_PAGE_PLAN');
+  }
+
+  return {
+    ...plan,
+    blocks: plan.blocks.map((block, index) => {
+      if (!isSupportedComponent(block.type)) {
+        throw new LLMError(`Planner returned unsupported block type: ${String(block.type)}`, 'UNSUPPORTED_BLOCK_TYPE');
+      }
+
+      const components = Array.isArray(block.components) ? block.components.filter(isSupportedComponent) : [];
+      if (components.length === 0) {
+        throw new LLMError(`Planner returned no supported components for block: ${block.id || `block-${index + 1}`}`, 'UNSUPPORTED_BLOCK_COMPONENTS');
+      }
+
+      return {
+        ...block,
+        id: block.id || `block-${index + 1}`,
+        type: block.type,
+        components,
+        priority: Number.isFinite(block.priority) ? block.priority : index + 1,
+        complexity: block.complexity === 'medium' || block.complexity === 'complex' ? block.complexity : 'simple',
+      };
+    }),
+  };
+}
+
+function validateNode(node: GenerateBlockResult['node']): GenerateBlockResult['node'] {
+  if (!isSupportedComponent(node.component)) {
+    throw new LLMError(`Block generator returned unsupported component: ${String(node.component)}`, 'UNSUPPORTED_COMPONENT');
+  }
+
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      if (isNodeLike(child)) {
+        validateNode(child);
+      }
+    }
+  }
+
+  return node;
+}
+
+function getRequestedChatModel(request: unknown): string | undefined {
+  if (!request || typeof request !== 'object') {
+    return undefined;
+  }
+  const candidate = request as { plannerModel?: unknown; blockModel?: unknown };
+  if (typeof candidate.plannerModel === 'string' && candidate.plannerModel) {
+    return candidate.plannerModel;
+  }
+  if (typeof candidate.blockModel === 'string' && candidate.blockModel) {
+    return candidate.blockModel;
+  }
+  return undefined;
 }
 
 function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] {
@@ -97,126 +178,21 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
   ];
 }
 
-function createPagePlan(input: PlanPageInput): PagePlan {
-  const prompt = input.request.prompt;
-  return {
-    pageTitle: `${prompt}页面`,
-    blocks: [
-      {
-        id: 'summary-card',
-        type: 'Card',
-        description: `根据提示生成摘要卡片: ${prompt}`,
-        components: ['Card', 'Button'],
-        priority: 1,
-        complexity: 'simple',
-      },
-      {
-        id: 'attendance-table',
-        type: 'Table',
-        description: `根据提示生成数据表格: ${prompt}`,
-        components: ['Table'],
-        priority: 2,
-        complexity: 'simple',
-      },
-    ],
-  };
-}
-
 async function generateBlock(input: GenerateBlockInput): Promise<GenerateBlockResult> {
   const client = createClient();
-  const model = input.request.blockModel ?? env.AI_BLOCK_MODEL;
-
-  if (client && model) {
-    try {
-      const text = await client.chat(model, createBlockMessages(input));
-      const node = extractJson<GenerateBlockResult['node']>(text);
-      return {
-        blockId: input.block.id,
-        node,
-        summary: `Generated ${input.block.type} via ${model}`,
-      };
-    } catch {
-      // Fall through to deterministic fallback.
-    }
-  }
-
-  if (input.block.type === 'Card') {
-    return {
-      blockId: input.block.id,
-      node: {
-        id: 'attendance-summary-card',
-        component: 'Card',
-        props: {
-          title: input.request.prompt,
-          bordered: true,
-        },
-        children: [
-          {
-            id: 'attendance-summary-container',
-            component: 'Container',
-            props: {
-              direction: 'column',
-              gap: 12,
-            },
-            children: [
-              {
-                id: 'attendance-summary-action',
-                component: 'Button',
-                props: {
-                  type: 'primary',
-                },
-                children: '开始查看',
-              },
-            ],
-          },
-        ],
-      },
-      summary: 'Generated Card',
-    };
-  }
-
-  if (input.block.type === 'Table') {
-    return {
-      blockId: input.block.id,
-      node: {
-        id: 'attendance-table',
-        component: 'Table',
-        props: {
-          rowKey: 'id',
-          bordered: true,
-          pagination: false,
-          dataSource: [
-            { id: 1, name: '张三', department: '研发', status: '正常', checkIn: '09:01' },
-            { id: 2, name: '李四', department: '运营', status: '迟到', checkIn: '09:23' },
-          ],
-          columns: [
-            { title: '姓名', dataIndex: 'name', key: 'name' },
-            { title: '部门', dataIndex: 'department', key: 'department' },
-            { title: '状态', dataIndex: 'status', key: 'status' },
-            { title: '签到时间', dataIndex: 'checkIn', key: 'checkIn' },
-          ],
-        },
-      },
-      summary: 'Generated Table',
-    };
-  }
-
+  const model = requireModel(input.request.blockModel ?? env.AI_BLOCK_MODEL, 'block');
+  const text = await client.chat(model, createBlockMessages(input));
+  const node = validateNode(extractJson<GenerateBlockResult['node']>(text));
   return {
     blockId: input.block.id,
-    node: {
-      component: 'Container',
-      props: {
-        direction: 'column',
-        gap: 8,
-      },
-    },
-    summary: `Generated ${input.block.type}`,
+    node,
+    summary: `Generated ${input.block.type} via ${model}`,
   };
 }
 
 async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
   return {
-    id: 'fake-page',
+    id: 'ai-generated-page',
     name: input.plan.pageTitle,
     body: input.blocks.map((block) => block.node),
   };
@@ -224,33 +200,10 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
 
 async function planWithModel(input: PlanPageInput): Promise<PagePlan> {
   const client = createClient();
-  const model = input.request.plannerModel ?? env.AI_PLANNER_MODEL;
-  if (!client || !model) {
-    return createPagePlan(input);
-  }
-
-  try {
-    const text = await client.chat(model, createPlannerMessages(input));
-    const plan = extractJson<PagePlan>(text);
-    if (!plan.pageTitle || !Array.isArray(plan.blocks) || plan.blocks.length === 0) {
-      return createPagePlan(input);
-    }
-    return {
-      ...plan,
-      blocks: plan.blocks.map((block, index) => ({
-        ...block,
-        id: block.id || `block-${index + 1}`,
-        type: supportedComponents.includes(block.type as (typeof supportedComponents)[number]) ? block.type : 'Card',
-        components: Array.isArray(block.components) && block.components.length > 0
-          ? block.components.filter((component): component is string => supportedComponents.includes(component as (typeof supportedComponents)[number]))
-          : ['Card'],
-        priority: Number.isFinite(block.priority) ? block.priority : index + 1,
-        complexity: block.complexity === 'medium' || block.complexity === 'complex' ? block.complexity : 'simple',
-      })),
-    };
-  } catch {
-    return createPagePlan(input);
-  }
+  const model = requireModel(input.request.plannerModel ?? env.AI_PLANNER_MODEL, 'planner');
+  const text = await client.chat(model, createPlannerMessages(input));
+  const plan = extractJson<PagePlan>(text);
+  return normalizePlan(plan);
 }
 
 function createRuntimeDeps(): AgentRuntimeDeps {
@@ -258,33 +211,26 @@ function createRuntimeDeps(): AgentRuntimeDeps {
     llm: {
       async chat(request: unknown) {
         const client = createClient();
-        const model = env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL;
+        const model = requireModel(getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL, 'chat');
         const prompt = typeof request === 'object' && request && 'prompt' in request
           ? String((request as { prompt: unknown }).prompt)
           : 'No prompt';
-        if (client && model) {
-          const text = await client.chat(model, [
-            { role: 'system', content: 'You are a helpful low-code assistant.' },
-            { role: 'user', content: prompt },
-          ]);
-          return { text };
-        }
-        return { text: 'Fake chat response' };
+        const text = await client.chat(model, [
+          { role: 'system', content: 'You are a helpful low-code assistant.' },
+          { role: 'user', content: prompt },
+        ]);
+        return { text };
       },
       async *streamChat(request: unknown) {
         const prompt = typeof request === 'object' && request && 'prompt' in request
           ? String((request as { prompt: unknown }).prompt)
           : 'No prompt';
         const client = createClient();
-        const model = env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL;
-        if (client && model) {
-          yield* client.streamChat(model, [
-            { role: 'system', content: 'You are a helpful low-code assistant.' },
-            { role: 'user', content: prompt },
-          ]);
-          return;
-        }
-        yield { text: `[Fake] ${prompt}` };
+        const model = requireModel(getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL, 'chat');
+        yield* client.streamChat(model, [
+          { role: 'system', content: 'You are a helpful low-code assistant.' },
+          { role: 'user', content: prompt },
+        ]);
       },
     },
     tools: createToolRegistry([
@@ -327,7 +273,7 @@ function extractMetadata(events: AgentEvent[]): RunMetadata {
   return doneEvent.data.metadata;
 }
 
-export const fakeRuntime: AgentRuntime = {
+export const agentRuntime: AgentRuntime = {
   async run(request) {
     const events = await runAgent(request, createRuntimeDeps());
     return { events, metadata: extractMetadata(events) };

@@ -2,7 +2,7 @@
  * Hono App 装配 — 挂载路由、中间件
  *
  * 默认装配：
- * - 当前通过 @shenbi/ai-agents + fake llm/tools 生成真实 AgentEvent 流
+ * - 当前通过 @shenbi/ai-agents + provider runtime 生成真实 AgentEvent 流
  * - 后续只需要替换 runtime 装配中的 llm/tools/memory，不需要改路由层
  */
 import { Hono } from 'hono';
@@ -12,7 +12,7 @@ import { handleError } from './middleware/error-handler.ts';
 import { createRunRoute } from './routes/run.ts';
 import { createRunStreamRoute } from './routes/run-stream.ts';
 import { createModelsRoute } from './routes/models.ts';
-import { fakeRuntime } from './runtime/fake-runtime.ts';
+import { agentRuntime } from './runtime/agent-runtime.ts';
 import type { AgentRuntime } from './runtime/types.ts';
 
 export interface AppOptions {
@@ -23,7 +23,7 @@ export interface AppOptions {
 }
 
 export function createApp(options: AppOptions = {}): Hono {
-  const runtime = options.runtime ?? fakeRuntime;
+  const runtime = options.runtime ?? agentRuntime;
 
   const app = new Hono();
 
