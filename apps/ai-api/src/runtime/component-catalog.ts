@@ -1,4 +1,4 @@
-import type { ZoneType } from '@shenbi/ai-agents';
+import type { PageType, ZoneType } from '@shenbi/ai-agents';
 import type { ComponentContract } from '@shenbi/schema';
 import * as schemaContractsModule from '../../../../packages/schema/contracts/index.ts';
 
@@ -49,6 +49,14 @@ interface ZoneTemplate {
   };
 }
 
+interface PageSkeleton {
+  pageType: PageType;
+  intent: string;
+  layoutPattern: string;
+  recommendedZones: ZoneType[];
+  optionalZones: ZoneType[];
+}
+
 const zoneGoldenExamples: Record<ZoneType, string> = {
   'page-header': '{"component":"Container","id":"page-header","props":{"direction":"column","gap":8},"children":[{"component":"Typography.Title","id":"page-title","props":{"level":2},"children":["用户列表"]},{"component":"Typography.Text","id":"page-desc","props":{"type":"secondary"},"children":["管理用户信息、角色与状态"]},{"component":"Space","id":"page-actions","props":{"size":"small"},"children":[{"component":"Button","id":"create-user","props":{"type":"primary"},"children":["新建用户"]}]}]}',
   filter: '{"component":"Card","id":"user-filter","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"filter-form","props":{"layout":"inline"},"children":[{"component":"FormItem","id":"filter-name","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"filter-name-input","props":{"placeholder":"请输入姓名"}}]},{"component":"FormItem","id":"filter-role","props":{"label":"角色","name":"role"},"children":[{"component":"Select","id":"filter-role-select","props":{"placeholder":"请选择角色"}}]},{"component":"FormItem","id":"filter-date","props":{"label":"日期","name":"date"},"children":[{"component":"DatePicker","id":"filter-date-picker","props":{}}]},{"component":"Space","id":"filter-actions","props":{"size":"small"},"children":[{"component":"Button","id":"submit","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"reset","props":{},"children":["重置"]}]}]}]}',
@@ -62,6 +70,51 @@ const zoneGoldenExamples: Record<ZoneType, string> = {
   'side-info': '{"component":"Card","id":"side-info-card","props":{"title":"提示信息"},"children":[{"component":"Typography.Text","id":"side-info-text","props":{"type":"secondary"},"children":["可在此区域展示说明、统计补充或审批提醒。"]}]}',
   'empty-state': '{"component":"Card","id":"empty-state-card","props":{"title":"暂无数据"},"children":[{"component":"Alert","id":"empty-alert","props":{"type":"info","message":"当前条件下暂无记录","showIcon":true}}]}',
   custom: '{"component":"Card","id":"custom-block","props":{"title":"自定义模块"},"children":[{"component":"Typography.Paragraph","id":"custom-copy","props":{},"children":["请使用受支持组件构建清晰的后台业务区块。"]}]}',
+};
+
+const pageSkeletons: Record<PageType, PageSkeleton> = {
+  dashboard: {
+    pageType: 'dashboard',
+    intent: '仪表盘类页面，先展示概况，再展示趋势和主数据',
+    layoutPattern: 'page-header -> kpi-row -> chart-area -> data-table -> timeline-area',
+    recommendedZones: ['page-header', 'kpi-row', 'chart-area', 'data-table'],
+    optionalZones: ['timeline-area', 'side-info'],
+  },
+  list: {
+    pageType: 'list',
+    intent: '列表管理类页面，重点是筛选、表格和分页相关区域',
+    layoutPattern: 'page-header -> filter -> data-table',
+    recommendedZones: ['page-header', 'filter', 'data-table'],
+    optionalZones: ['side-info', 'empty-state'],
+  },
+  form: {
+    pageType: 'form',
+    intent: '表单录入或编辑页面，重点是表单主体和提交操作',
+    layoutPattern: 'page-header -> form-body -> form-actions',
+    recommendedZones: ['page-header', 'form-body', 'form-actions'],
+    optionalZones: ['side-info', 'timeline-area'],
+  },
+  detail: {
+    pageType: 'detail',
+    intent: '详情展示页面，重点是键值信息和关联记录',
+    layoutPattern: 'page-header -> detail-info -> data-table|timeline-area',
+    recommendedZones: ['page-header', 'detail-info'],
+    optionalZones: ['data-table', 'timeline-area', 'side-info'],
+  },
+  statistics: {
+    pageType: 'statistics',
+    intent: '统计分析页面，重点是指标概览、趋势和对比数据',
+    layoutPattern: 'page-header -> kpi-row -> chart-area -> data-table',
+    recommendedZones: ['page-header', 'kpi-row', 'chart-area'],
+    optionalZones: ['data-table', 'side-info', 'timeline-area'],
+  },
+  custom: {
+    pageType: 'custom',
+    intent: '自由布局页面，不强制固定区域顺序',
+    layoutPattern: 'custom',
+    recommendedZones: ['page-header', 'custom'],
+    optionalZones: ['filter', 'kpi-row', 'data-table', 'detail-info', 'form-body', 'form-actions', 'chart-area', 'timeline-area', 'side-info', 'empty-state'],
+  },
 };
 
 const zoneTemplates: Record<ZoneType, ZoneTemplate> = {
@@ -407,6 +460,7 @@ export const supportedComponentSet = new Set(supportedComponents);
 export const supportedContracts = builtinContracts.filter((contract) => supportedComponentSet.has(contract.componentType));
 export const componentGroups = compiledGroups;
 export const compiledZoneTemplates = zoneTemplates;
+export const compiledPageSkeletons = pageSkeletons;
 
 export function getPlannerContractSummary(): string {
   return compiledGroups
@@ -421,6 +475,21 @@ export function getPlannerZoneTemplateSummary(): string {
       return `${template.zoneType}: ${template.intent}; layout=${template.layoutPattern}; groups=${template.preferredGroups.join(', ')}; prefer=${components}; maxDepth=${template.maxDepth}; maxChildren=${template.maxChildrenPerArray}`;
     })
     .join('\n');
+}
+
+export function getPageSkeleton(pageType: PageType): PageSkeleton {
+  return pageSkeletons[pageType];
+}
+
+export function getPageSkeletonSummary(pageType: PageType): string {
+  const skeleton = pageSkeletons[pageType];
+  return [
+    `pageType: ${skeleton.pageType}`,
+    `intent: ${skeleton.intent}`,
+    `layoutPattern: ${skeleton.layoutPattern}`,
+    `recommendedZones: ${skeleton.recommendedZones.join(', ')}`,
+    `optionalZones: ${skeleton.optionalZones.join(', ')}`,
+  ].join('\n');
 }
 
 export function getZoneContractSummary(zoneType: ZoneType, preferredComponents: readonly string[] = []): string {

@@ -35,6 +35,8 @@ import {
   supportedComponentList,
 } from './normalize-schema.ts';
 import {
+  getPageSkeleton,
+  getPageSkeletonSummary,
   getPlannerContractSummary,
   getZoneComponentCandidates,
   getZoneContractSummary,
@@ -71,6 +73,54 @@ const supportedZoneTypes = [
 ] as const;
 const plannerContractSummary = getPlannerContractSummary();
 const plannerZoneTemplateSummary = getPlannerZoneTemplateSummary();
+
+function classifyPromptToPageType(prompt: string): PageType {
+  const normalized = prompt.toLowerCase();
+  if (/自定义|自由|创意|landing|marketing/.test(prompt)) {
+    return 'custom';
+  }
+  if (/详情|detail|profile|信息页/.test(prompt)) {
+    return 'detail';
+  }
+  if (/表单|新建|创建|编辑|录入|审批/.test(prompt)) {
+    return 'form';
+  }
+  if (/列表|list|table|查询|管理/.test(prompt)) {
+    return 'list';
+  }
+  if (/统计|分析|趋势|报表/.test(prompt)) {
+    return 'statistics';
+  }
+  if (/首页|大屏|dashboard|概览|看板|考勤/.test(prompt) || normalized.includes('home')) {
+    return 'dashboard';
+  }
+  return 'custom';
+}
+
+function orderBlocksBySkeleton(plan: PagePlan): PagePlan {
+  const skeleton = getPageSkeleton(plan.pageType);
+  const rank = new Map<ZoneType, number>();
+  skeleton.recommendedZones.forEach((zone, index) => {
+    rank.set(zone, index);
+  });
+  skeleton.optionalZones.forEach((zone, index) => {
+    if (!rank.has(zone)) {
+      rank.set(zone, skeleton.recommendedZones.length + index);
+    }
+  });
+
+  return {
+    ...plan,
+    blocks: [...plan.blocks].sort((left, right) => {
+      const leftRank = rank.get(left.type) ?? Number.MAX_SAFE_INTEGER;
+      const rightRank = rank.get(right.type) ?? Number.MAX_SAFE_INTEGER;
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+      return left.priority - right.priority;
+    }),
+  };
+}
 
 function summarizeModelOutput(text: string): string {
   const compact = text.replace(/\s+/g, ' ').trim();
@@ -404,7 +454,7 @@ function normalizePlan(plan: PagePlan): PagePlan {
     throw new LLMError(`Planner returned unsupported pageType: ${String(plan.pageType)}`, 'UNSUPPORTED_PAGE_TYPE');
   }
 
-  return {
+  return orderBlocksBySkeleton({
     ...plan,
     blocks: plan.blocks.map((block, index) => {
       if (!isSupportedZoneType(block.type)) {
@@ -423,9 +473,9 @@ function normalizePlan(plan: PagePlan): PagePlan {
         components,
         priority: Number.isFinite(block.priority) ? block.priority : index + 1,
         complexity: block.complexity === 'medium' || block.complexity === 'complex' ? block.complexity : 'simple',
-      };
-    }),
-  };
+        };
+      }),
+  });
 }
 
 function validateNode(node: GenerateBlockResult['node']): GenerateBlockResult['node'] {
@@ -459,6 +509,8 @@ function getThinkingFromUnknown(request: unknown): OpenAICompatibleThinking | un
 }
 
 function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] {
+  const suggestedPageType = classifyPromptToPageType(input.request.prompt);
+  const suggestedSkeletonSummary = getPageSkeletonSummary(suggestedPageType);
   return [
     {
       role: 'system',
@@ -472,6 +524,8 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         plannerContractSummary,
         'Zone templates:',
         plannerZoneTemplateSummary,
+        'Suggested page skeleton for this request:',
+        suggestedSkeletonSummary,
         'Hard rules:',
         '- pageTitle must be a concise human-readable title.',
         '- pageType must be exactly one of: dashboard, list, form, detail, statistics, custom.',
@@ -498,6 +552,7 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         '- Never put semantic aliases like hero, recent-records, summary-panel, alert-summary, dashboard-header, banner, widget into type or components.',
         '- Business meaning belongs only in id and description.',
         '- If unsure, choose Card with components ["Card"].',
+        `- For this request, prefer pageType "${suggestedPageType}" unless the user clearly asks for a custom mixed layout.`,
         '- Favor clean B2B admin layouts: clear page title, concise helper text, grouped filters, summary cards, primary data area, moderate whitespace.',
         '- Prefer blocks that match the zone template layout instead of inventing new structure patterns.',
         '- Return JSON only. No markdown, no explanation, no code fences.',

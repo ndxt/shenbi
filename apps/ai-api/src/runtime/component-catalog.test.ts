@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   componentGroups,
+  compiledPageSkeletons,
   compiledZoneTemplates,
+  getPageSkeleton,
+  getPageSkeletonSummary,
   getPlannerContractSummary,
   getPlannerZoneTemplateSummary,
   getZoneComponentCandidates,
@@ -43,5 +46,11 @@ describe('component catalog', () => {
     expect(getZoneLevel2ComponentBrief('detail-info', ['Descriptions'])).toContain('hints: parent Descriptions');
     expect(getZoneGenerationParameters('filter')).toContain('maxDepth=');
     expect(getZoneGenerationParameters('filter')).toContain('root should usually be one of:');
+  });
+
+  it('provides page skeleton summaries for classifier-guided planning', () => {
+    expect(getPageSkeleton('list').recommendedZones).toEqual(['page-header', 'filter', 'data-table']);
+    expect(getPageSkeletonSummary('detail')).toContain('recommendedZones: page-header, detail-info');
+    expect(compiledPageSkeletons.dashboard.optionalZones).toContain('timeline-area');
   });
 });
