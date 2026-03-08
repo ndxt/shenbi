@@ -24,10 +24,13 @@ function createPagePlan(): PagePlan {
   return {
     pageTitle: 'Admin Dashboard',
     pageType: 'dashboard',
+    layout: [
+      { blocks: ['hero'] },
+      { columns: [{ span: 24, blocks: ['table'] }] },
+    ],
     blocks: [
       {
         id: 'hero',
-        type: 'kpi-row',
         description: 'Top summary area',
         components: ['Card'],
         priority: 1,
@@ -35,7 +38,6 @@ function createPagePlan(): PagePlan {
       },
       {
         id: 'table',
-        type: 'data-table',
         description: 'User list',
         components: ['Table'],
         priority: 2,
@@ -75,6 +77,11 @@ function createSchema(): PageSchema {
 
 function createDeps() {
   const planPage = vi.fn(async () => createPagePlan());
+  const buildSkeletonSchema = vi.fn(async () => ({
+    id: 'page-skeleton',
+    name: 'Admin Dashboard',
+    body: [{ id: 'hero-skeleton', component: 'Card' }],
+  }));
   const generateBlock = vi
     .fn()
     .mockImplementationOnce(async () => createGeneratedBlock('hero', 'Card'))
@@ -90,6 +97,7 @@ function createDeps() {
     },
     tools: createToolRegistry([
       { name: 'planPage', execute: planPage },
+      { name: 'buildSkeletonSchema', execute: buildSkeletonSchema },
       { name: 'generateBlock', execute: generateBlock },
       { name: 'assembleSchema', execute: assembleSchema },
     ]),
@@ -100,17 +108,18 @@ function createDeps() {
     },
   };
 
-  return {
-    deps,
-    planPage,
-    generateBlock,
-    assembleSchema,
-  };
+    return {
+      deps,
+      planPage,
+      buildSkeletonSchema,
+      generateBlock,
+      assembleSchema,
+    };
 }
 
 describe('runAgent', () => {
   it('emits stable page-builder happy-path events and writes memory', async () => {
-    const { deps, planPage, generateBlock, assembleSchema } = createDeps();
+    const { deps, planPage, buildSkeletonSchema, generateBlock, assembleSchema } = createDeps();
 
     const events = await runAgent(createRequest(), deps);
     expect(events.map((event) => event.type)).toEqual([
@@ -122,8 +131,13 @@ describe('runAgent', () => {
       'plan',
       'tool:start',
       'tool:result',
-      'schema:block',
+      'schema:skeleton',
+      'schema:block:start',
       'tool:start',
+      'schema:block:start',
+      'tool:start',
+      'tool:result',
+      'schema:block',
       'tool:result',
       'schema:block',
       'tool:start',
@@ -133,6 +147,7 @@ describe('runAgent', () => {
     ]);
 
     expect(planPage).toHaveBeenCalledOnce();
+    expect(buildSkeletonSchema).toHaveBeenCalledOnce();
     expect(generateBlock).toHaveBeenCalledTimes(2);
     expect(assembleSchema).toHaveBeenCalledOnce();
 
@@ -160,6 +175,7 @@ describe('runAgent', () => {
           throw new Error('plan failed');
         },
       },
+      { name: 'buildSkeletonSchema', execute: async () => createSchema() },
       { name: 'generateBlock', execute: async () => createGeneratedBlock('hero', 'Card') },
       { name: 'assembleSchema', execute: async () => createSchema() },
     ]);

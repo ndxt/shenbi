@@ -8,7 +8,7 @@ function createSessionId(): string {
 }
 
 function hasPageBuilderTools(deps: AgentRuntimeDeps): boolean {
-  return ['planPage', 'generateBlock', 'assembleSchema'].every((name) => Boolean(deps.tools.get(name)));
+  return ['planPage', 'buildSkeletonSchema', 'generateBlock', 'assembleSchema'].every((name) => Boolean(deps.tools.get(name)));
 }
 
 export async function* runAgentStream(

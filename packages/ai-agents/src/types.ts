@@ -2,24 +2,24 @@ import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import type {
   AgentEvent,
   FeedbackRequest,
+  LayoutRow,
   ModelInfo,
   PagePlan as SharedPagePlan,
   PageType,
   RunMetadata,
   RunRequest,
   RunResponse,
-  ZoneType,
 } from '@shenbi/ai-contracts';
 
 export type {
   AgentEvent,
   FeedbackRequest,
+  LayoutRow,
   ModelInfo,
   PageType,
   RunMetadata,
   RunRequest,
   RunResponse,
-  ZoneType,
 } from '@shenbi/ai-contracts';
 
 export type PagePlan = SharedPagePlan;
@@ -95,6 +95,8 @@ export interface GenerateBlockInput {
   request: RunRequest;
   context: AgentRuntimeContext;
   pageTitle?: string;
+  blockIndex?: number;
+  placementSummary?: string;
 }
 
 export interface GenerateBlockResult {

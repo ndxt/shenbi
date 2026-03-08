@@ -5,6 +5,7 @@ import { aiClient } from '../ai/sse-client';
 import type { PagePlan, RunMetadata, RunRequest } from '../ai/api-types';
 
 export type PlanConfig = PagePlan;
+export type BlockRunStatus = 'waiting' | 'generating' | 'done';
 
 function isSchemaNode(value: unknown): value is SchemaNode {
     return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
@@ -56,10 +57,45 @@ function summarizeComponents(contracts: ComponentContract[]): string {
         .join('; ');
 }
 
+function replaceNodeInTree(value: unknown, targetId: string, replacement: SchemaNode): unknown {
+    if (Array.isArray(value)) {
+        return value.map((item) => replaceNodeInTree(item, targetId, replacement));
+    }
+    if (!isSchemaNode(value)) {
+        return value;
+    }
+
+    if (value.id === targetId) {
+        return replacement;
+    }
+
+    if (Array.isArray(value.children)) {
+        return {
+            ...value,
+            children: value.children.map((child) => replaceNodeInTree(child, targetId, replacement)),
+        };
+    }
+
+    return value;
+}
+
+function replaceSkeletonNode(schema: PageSchema, blockId: string, node: SchemaNode): PageSchema {
+    const skeletonId = `${blockId}-skeleton`;
+    const nextSchema: PageSchema = {
+        ...schema,
+        body: replaceNodeInTree(schema.body, skeletonId, node) as PageSchema['body'],
+    };
+    if (Array.isArray(schema.dialogs)) {
+        nextSchema.dialogs = replaceNodeInTree(schema.dialogs, skeletonId, node) as SchemaNode[];
+    }
+    return nextSchema;
+}
+
 export function useAgentRun(bridge: EditorAIBridge | undefined) {
     const [isRunning, setIsRunning] = useState(false);
     const [progressText, setProgressText] = useState('');
     const [currentPlan, setCurrentPlan] = useState<PlanConfig | null>(null);
+    const [blockStatuses, setBlockStatuses] = useState<Record<string, BlockRunStatus>>({});
     const abortControllerRef = useRef<AbortController | null>(null);
 
     // Stable refs to avoid unstable callback deps
@@ -111,6 +147,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         setIsRunning(false);
         setProgressText('已取消');
         setCurrentPlan(null);
+        setBlockStatuses({});
         await unlockHistory();
         if (preGenerationSchemaRef.current && bridgeRef.current) {
             await bridgeRef.current.execute('schema.restore', { schema: preGenerationSchemaRef.current });
@@ -135,6 +172,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             setIsRunning(true);
             setProgressText('初始化...');
             setCurrentPlan(null);
+            setBlockStatuses({});
 
             const ac = new AbortController();
             abortControllerRef.current = ac;
@@ -189,15 +227,43 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             break;
                         case 'plan':
                             setCurrentPlan(event.data);
+                            setBlockStatuses(
+                                Object.fromEntries(event.data.blocks.map((block) => [block.id, 'waiting' as const]))
+                            );
                             setProgressText('获取到架构计划');
                             break;
+                        case 'schema:skeleton':
+                            setProgressText('渲染页面骨架');
+                            bridgeRef.current?.replaceSchema(event.data.schema);
+                            break;
+                        case 'schema:block:start':
+                            setBlockStatuses((prev) => ({
+                                ...prev,
+                                [event.data.blockId]: 'generating',
+                            }));
+                            setProgressText(`正在生成区块: ${event.data.description}`);
+                            break;
                         case 'schema:block':
-                            setProgressText(`正在插入节点: ${event.data.node.component}`);
-                            await bridgeRef.current?.appendBlock(event.data.node);
+                            setProgressText(`正在替换区块: ${event.data.node.component}`);
+                            if (bridgeRef.current) {
+                                const nextSchema = replaceSkeletonNode(
+                                    bridgeRef.current.getSchema(),
+                                    event.data.blockId,
+                                    event.data.node,
+                                );
+                                bridgeRef.current.replaceSchema(nextSchema);
+                            }
+                            setBlockStatuses((prev) => ({
+                                ...prev,
+                                [event.data.blockId]: 'done',
+                            }));
                             break;
                         case 'schema:done':
                             setProgressText('更新页面 Schema');
                             bridgeRef.current?.replaceSchema(event.data.schema);
+                            setBlockStatuses((prev) => Object.fromEntries(
+                                Object.keys(prev).map((blockId) => [blockId, 'done' as const])
+                            ));
                             break;
                         case 'done':
                             onDone(event.data.metadata);
@@ -226,6 +292,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         isRunning,
         progressText,
         currentPlan,
+        blockStatuses,
         runAgent,
         cancelRun,
     };

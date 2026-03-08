@@ -5,19 +5,10 @@ export interface ThinkingConfig {
 }
 
 export type PageType = 'dashboard' | 'list' | 'form' | 'detail' | 'statistics' | 'custom';
-export type ZoneType =
-  | 'page-header'
-  | 'filter'
-  | 'kpi-row'
-  | 'data-table'
-  | 'detail-info'
-  | 'form-body'
-  | 'form-actions'
-  | 'chart-area'
-  | 'timeline-area'
-  | 'side-info'
-  | 'empty-state'
-  | 'custom';
+
+export type LayoutRow =
+  | { blocks: string[] }
+  | { columns: Array<{ span: number; blocks: string[] }> };
 
 export interface RunRequest {
   prompt: string;
@@ -46,9 +37,9 @@ export interface RunMetadata {
 export interface PagePlan {
   pageTitle: string;
   pageType: PageType;
+  layout?: LayoutRow[];
   blocks: Array<{
     id: string;
-    type: ZoneType;
     description: string;
     components: string[];
     priority: number;
@@ -63,6 +54,8 @@ export type AgentEvent =
   | { type: 'tool:start'; data: { tool: string; label?: string } }
   | { type: 'tool:result'; data: { tool: string; ok: boolean; summary?: string } }
   | { type: 'plan'; data: PagePlan }
+  | { type: 'schema:skeleton'; data: { schema: PageSchema } }
+  | { type: 'schema:block:start'; data: { blockId: string; description: string } }
   | { type: 'schema:block'; data: { blockId: string; node: SchemaNode } }
   | { type: 'schema:done'; data: { schema: PageSchema } }
   | { type: 'done'; data: { metadata: RunMetadata } }
