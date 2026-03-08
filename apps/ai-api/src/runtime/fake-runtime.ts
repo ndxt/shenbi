@@ -23,16 +23,24 @@ import type { AgentRuntime } from './types.ts';
 const memory = createInMemoryAgentMemoryStore();
 
 function createPagePlan(input: PlanPageInput): PagePlan {
-  const requestedType = input.context.componentSummary.includes('DataTable') ? 'DataTable' : 'HeroSection';
+  const prompt = input.request.prompt;
   return {
-    pageTitle: 'Fake Page',
+    pageTitle: `${prompt}页面`,
     blocks: [
       {
-        id: 'block-1',
-        type: requestedType,
-        description: `根据提示生成首页区块: ${input.request.prompt}`,
-        components: [requestedType],
+        id: 'summary-card',
+        type: 'Card',
+        description: `根据提示生成摘要卡片: ${prompt}`,
+        components: ['Card', 'Button'],
         priority: 1,
+        complexity: 'simple',
+      },
+      {
+        id: 'attendance-table',
+        type: 'Table',
+        description: `根据提示生成数据表格: ${prompt}`,
+        components: ['Table'],
+        priority: 2,
         complexity: 'simple',
       },
     ],
@@ -40,14 +48,74 @@ function createPagePlan(input: PlanPageInput): PagePlan {
 }
 
 async function generateBlock(input: GenerateBlockInput): Promise<GenerateBlockResult> {
+  if (input.block.type === 'Card') {
+    return {
+      blockId: input.block.id,
+      node: {
+        id: 'attendance-summary-card',
+        component: 'Card',
+        props: {
+          title: input.request.prompt,
+          bordered: true,
+        },
+        children: [
+          {
+            id: 'attendance-summary-container',
+            component: 'Container',
+            props: {
+              direction: 'column',
+              gap: 12,
+            },
+            children: [
+              {
+                id: 'attendance-summary-action',
+                component: 'Button',
+                props: {
+                  type: 'primary',
+                },
+                children: '开始查看',
+              },
+            ],
+          },
+        ],
+      },
+      summary: 'Generated Card',
+    };
+  }
+
+  if (input.block.type === 'Table') {
+    return {
+      blockId: input.block.id,
+      node: {
+        id: 'attendance-table',
+        component: 'Table',
+        props: {
+          rowKey: 'id',
+          bordered: true,
+          pagination: false,
+          dataSource: [
+            { id: 1, name: '张三', department: '研发', status: '正常', checkIn: '09:01' },
+            { id: 2, name: '李四', department: '运营', status: '迟到', checkIn: '09:23' },
+          ],
+          columns: [
+            { title: '姓名', dataIndex: 'name', key: 'name' },
+            { title: '部门', dataIndex: 'department', key: 'department' },
+            { title: '状态', dataIndex: 'status', key: 'status' },
+            { title: '签到时间', dataIndex: 'checkIn', key: 'checkIn' },
+          ],
+        },
+      },
+      summary: 'Generated Table',
+    };
+  }
+
   return {
     blockId: input.block.id,
     node: {
-      component: input.block.components[0] ?? input.block.type,
+      component: 'Container',
       props: {
-        title: input.request.prompt,
-        description: input.block.description,
-        selectedNodeId: input.context.selectedNodeId,
+        direction: 'column',
+        gap: 8,
       },
     },
     summary: `Generated ${input.block.type}`,
