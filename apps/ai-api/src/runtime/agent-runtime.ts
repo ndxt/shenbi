@@ -486,9 +486,7 @@ function normalizePlan(plan: PagePlan): PagePlan {
   }
 
   const seenBlockIds = new Map<string, number>();
-  return orderBlocksBySkeleton({
-    ...plan,
-    blocks: plan.blocks.map((block, index) => {
+  const normalizedBlocks: PagePlan['blocks'] = plan.blocks.map((block, index) => {
       if (!isSupportedZoneType(block.type)) {
         throw new LLMError(`Planner returned unsupported zone type: ${String(block.type)}`, 'UNSUPPORTED_ZONE_TYPE');
       }
@@ -507,15 +505,36 @@ function normalizePlan(plan: PagePlan): PagePlan {
       const nextCount = (seenBlockIds.get(safeBaseId) ?? 0) + 1;
       seenBlockIds.set(safeBaseId, nextCount);
 
+      const complexity: PagePlan['blocks'][number]['complexity'] =
+        block.complexity === 'medium' || block.complexity === 'complex'
+          ? block.complexity
+          : 'simple';
+
       return {
         ...block,
         id: nextCount === 1 ? safeBaseId : `${safeBaseId}-${nextCount}`,
         type: block.type,
         components,
         priority: Number.isFinite(block.priority) ? block.priority : index + 1,
-        complexity: block.complexity === 'medium' || block.complexity === 'complex' ? block.complexity : 'simple',
-        };
-      }),
+        complexity,
+      };
+    });
+
+  const hasCustomDetailLayout = plan.pageType === 'detail'
+    && normalizedBlocks.some((block) =>
+      block.type === 'custom'
+      && (block.components.includes('Row') || block.components.includes('Col'))
+    );
+
+  const dedupedBlocks = hasCustomDetailLayout
+    ? normalizedBlocks.filter((block) =>
+      block.type === 'page-header' || block.type === 'custom'
+    )
+    : normalizedBlocks;
+
+  return orderBlocksBySkeleton({
+    ...plan,
+    blocks: dedupedBlocks,
   });
 }
 
@@ -673,6 +692,12 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         '- timeline-area zones should prefer Card + Timeline + Timeline.Item.',
         '- chart-area zones should prefer Card with Typography.Title, Typography.Paragraph, Statistic, Tag or supporting summary content when no chart component exists.',
         '- side-info zones should prefer Card + Typography.Text or Descriptions.',
+        '- A non-custom zone must generate only its own zone content, not a full page layout.',
+        '- For detail-info, data-table, timeline-area, filter, side-info, and chart-area, do not return a top-level Row/Col page layout, Tabs container, page header, or repeated copies of other zones.',
+        '- If the zone is data-table, return table-focused content only. Do not include basic info, contact info, approval timeline, or page-level split layouts.',
+        '- If the zone is timeline-area, return timeline-focused content only. Do not include tables, descriptions, or page-level split layouts.',
+        '- If the zone is detail-info, return detail-focused content only. Do not include tabs, tables, timelines, or page-level split layouts.',
+        '- Only custom zones may own a full mixed layout such as left/right split content.',
         '- Never use raw HTML tags like div, span, section, header, footer. Use Container instead of div/section/header/footer.',
         '- For Table, include sample data in props.dataSource and props.columns.',
         '- For Statistic, include props.title and props.value.',
