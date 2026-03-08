@@ -80,7 +80,7 @@ function findBalancedJsonObject(text: string): string | null {
     return null;
   }
 
-  let depth = 0;
+  const stack: string[] = [];
   let inString = false;
   let escaped = false;
 
@@ -102,14 +102,28 @@ function findBalancedJsonObject(text: string): string | null {
       continue;
     }
     if (char === '{') {
-      depth += 1;
+      stack.push(char);
+      continue;
+    }
+    if (char === '[') {
+      stack.push(char);
       continue;
     }
     if (char === '}') {
-      depth -= 1;
-      if (depth === 0) {
+      if (stack.at(-1) !== '{') {
+        return null;
+      }
+      stack.pop();
+      if (stack.length === 0) {
         return text.slice(start, index + 1);
       }
+      continue;
+    }
+    if (char === ']') {
+      if (stack.at(-1) !== '[') {
+        return null;
+      }
+      stack.pop();
     }
   }
 

@@ -114,4 +114,11 @@ describe('agent runtime json salvage', () => {
     expect(salvaged).toBe('{"component":"Card","children":[{"component":"Tag","children":["在职"]}]}');
     expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Card' });
   });
+
+  it('salvages near-valid json with extra trailing mixed brackets', () => {
+    const raw = '{"component":"Card","children":[{"component":"Timeline","children":[{"component":"Timeline.Item","children":["持续发展"]}]}]}}]}';
+    const salvaged = trySalvageJsonCandidate(raw);
+    expect(salvaged).toBe('{"component":"Card","children":[{"component":"Timeline","children":[{"component":"Timeline.Item","children":["持续发展"]}]}]}');
+    expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Card' });
+  });
 });
