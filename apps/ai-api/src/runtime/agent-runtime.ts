@@ -22,6 +22,7 @@ import type { AgentEvent } from '@shenbi/ai-contracts';
 import type { PageSchema } from '@shenbi/schema';
 import { LLMError } from '../adapters/errors.ts';
 import { loadEnv } from '../adapters/env.ts';
+import { logger } from '../adapters/logger.ts';
 import {
   OpenAICompatibleClient,
   type OpenAICompatibleMessage,
@@ -52,13 +53,29 @@ const supportedZoneTypes = [
   'custom',
 ] as const;
 
-function extractJson<T>(text: string): T {
+function summarizeModelOutput(text: string): string {
+  const compact = text.replace(/\s+/g, ' ').trim();
+  if (compact.length <= 320) {
+    return compact;
+  }
+  return `${compact.slice(0, 320)}...`;
+}
+
+function extractJson<T>(text: string, source: 'planner' | 'block'): T {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced?.[1] ?? text;
   try {
     return JSON.parse(candidate.trim()) as T;
   } catch {
-    throw new LLMError('Model returned invalid JSON', 'MODEL_INVALID_JSON');
+    logger.error('ai.model.invalid_json', {
+      source,
+      rawOutput: text,
+      summarizedOutput: summarizeModelOutput(text),
+    });
+    throw new LLMError(
+      `Model returned invalid JSON (${source}). Raw output: ${summarizeModelOutput(text)}`,
+      'MODEL_INVALID_JSON',
+    );
   }
 }
 
@@ -278,7 +295,7 @@ async function generateBlock(input: GenerateBlockInput): Promise<GenerateBlockRe
   const client = createClient();
   const model = requireModel(input.request.blockModel ?? env.AI_BLOCK_MODEL, 'block');
   const text = await client.chat(model, createBlockMessages(input), getThinking(input.request));
-  const node = validateNode(extractJson<GenerateBlockResult['node']>(text));
+  const node = validateNode(extractJson<GenerateBlockResult['node']>(text, 'block'));
   return {
     blockId: input.block.id,
     node,
@@ -435,7 +452,7 @@ async function planWithModel(input: PlanPageInput): Promise<PagePlan> {
   const client = createClient();
   const model = requireModel(input.request.plannerModel ?? env.AI_PLANNER_MODEL, 'planner');
   const text = await client.chat(model, createPlannerMessages(input), getThinking(input.request));
-  const plan = extractJson<PagePlan>(text);
+  const plan = extractJson<PagePlan>(text, 'planner');
   return normalizePlan(plan);
 }
 
