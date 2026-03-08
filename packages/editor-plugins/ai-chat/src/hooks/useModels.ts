@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
-const PLANNER_MODELS = ['gpt-4-turbo', 'claude-3-opus', 'gemini-1.5-pro'] as const;
-const BLOCK_MODELS = ['gpt-3.5-turbo', 'claude-3-haiku', 'gemini-1.5-flash'] as const;
+const PLANNER_MODELS = ['GLM-4.7', 'GLM-4.6', 'GLM-5'] as const;
+const BLOCK_MODELS = ['GLM-4.6', 'GLM-4.7', 'GLM-5'] as const;
 
 export function useModels(defaultPlannerModel?: string, defaultBlockModel?: string) {
     const [plannerModel, setPlannerModel] = useState(defaultPlannerModel ?? PLANNER_MODELS[0]);
