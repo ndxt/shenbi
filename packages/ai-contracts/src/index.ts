@@ -4,6 +4,21 @@ export interface ThinkingConfig {
   type: 'enabled' | 'disabled';
 }
 
+export type PageType = 'dashboard' | 'list' | 'form' | 'detail' | 'statistics' | 'custom';
+export type ZoneType =
+  | 'page-header'
+  | 'filter'
+  | 'kpi-row'
+  | 'data-table'
+  | 'detail-info'
+  | 'form-body'
+  | 'form-actions'
+  | 'chart-area'
+  | 'timeline-area'
+  | 'side-info'
+  | 'empty-state'
+  | 'custom';
+
 export interface RunRequest {
   prompt: string;
   plannerModel?: string;
@@ -29,9 +44,10 @@ export interface RunMetadata {
 
 export interface PagePlan {
   pageTitle: string;
+  pageType: PageType;
   blocks: Array<{
     id: string;
-    type: string;
+    type: ZoneType;
     description: string;
     components: string[];
     priority: number;

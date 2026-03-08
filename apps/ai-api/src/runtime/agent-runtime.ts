@@ -12,9 +12,11 @@ import {
   type GenerateBlockInput,
   type GenerateBlockResult,
   type PagePlan,
+  type PageType,
   type PlanPageInput,
   type RunMetadata,
   type RunRequest,
+  type ZoneType,
 } from '@shenbi/ai-agents';
 import type { AgentEvent } from '@shenbi/ai-contracts';
 import type { PageSchema } from '@shenbi/schema';
@@ -31,6 +33,21 @@ const memory = createInMemoryAgentMemoryStore();
 const env = loadEnv();
 const supportedComponents = ['Card', 'Container', 'Button', 'Table', 'Alert'] as const;
 const supportedComponentList = supportedComponents.join(', ');
+const supportedPageTypes = ['dashboard', 'list', 'form', 'detail', 'statistics', 'custom'] as const;
+const supportedZoneTypes = [
+  'page-header',
+  'filter',
+  'kpi-row',
+  'data-table',
+  'detail-info',
+  'form-body',
+  'form-actions',
+  'chart-area',
+  'timeline-area',
+  'side-info',
+  'empty-state',
+  'custom',
+] as const;
 
 function extractJson<T>(text: string): T {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -78,6 +95,14 @@ function isSupportedComponent(value: unknown): value is (typeof supportedCompone
   return typeof value === 'string' && supportedComponents.includes(value as (typeof supportedComponents)[number]);
 }
 
+function isSupportedPageType(value: unknown): value is PageType {
+  return typeof value === 'string' && supportedPageTypes.includes(value as PageType);
+}
+
+function isSupportedZoneType(value: unknown): value is ZoneType {
+  return typeof value === 'string' && supportedZoneTypes.includes(value as ZoneType);
+}
+
 function isNodeLike(value: unknown): value is GenerateBlockResult['node'] {
   return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
 }
@@ -86,12 +111,15 @@ function normalizePlan(plan: PagePlan): PagePlan {
   if (!plan.pageTitle || !Array.isArray(plan.blocks) || plan.blocks.length === 0) {
     throw new LLMError('Planner returned an empty page plan', 'EMPTY_PAGE_PLAN');
   }
+  if (!isSupportedPageType(plan.pageType)) {
+    throw new LLMError(`Planner returned unsupported pageType: ${String(plan.pageType)}`, 'UNSUPPORTED_PAGE_TYPE');
+  }
 
   return {
     ...plan,
     blocks: plan.blocks.map((block, index) => {
-      if (!isSupportedComponent(block.type)) {
-        throw new LLMError(`Planner returned unsupported block type: ${String(block.type)}`, 'UNSUPPORTED_BLOCK_TYPE');
+      if (!isSupportedZoneType(block.type)) {
+        throw new LLMError(`Planner returned unsupported zone type: ${String(block.type)}`, 'UNSUPPORTED_ZONE_TYPE');
       }
 
       const components = Array.isArray(block.components) ? block.components.filter(isSupportedComponent) : [];
@@ -113,7 +141,7 @@ function normalizePlan(plan: PagePlan): PagePlan {
 
 function validateNode(node: GenerateBlockResult['node']): GenerateBlockResult['node'] {
   if (!isSupportedComponent(node.component)) {
-    throw new LLMError(`Block generator returned unsupported component: ${String(node.component)}`, 'UNSUPPORTED_COMPONENT');
+    node.component = 'Container';
   }
 
   if (Array.isArray(node.children)) {
@@ -161,27 +189,34 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         'You are a low-code page planner.',
         'Only output valid JSON.',
         `Use only these supported components when planning: ${supportedComponentList}.`,
+        `Use only these page types: ${supportedPageTypes.join(', ')}.`,
+        `Use only these zone types: ${supportedZoneTypes.join(', ')}.`,
         'Hard rules:',
         '- pageTitle must be a concise human-readable title.',
+        '- pageType must be exactly one of: dashboard, list, form, detail, statistics, custom.',
         '- blocks must be a non-empty array.',
         '- block.id is a semantic identifier and may contain business meaning such as alert-summary, recent-records, attendance-table.',
-        '- block.type is NOT a business label. block.type must be exactly one of: Card, Container, Button, Table, Alert.',
+        '- block.type is a zone type, not a component name.',
+        '- block.type must be exactly one of: page-header, filter, kpi-row, data-table, detail-info, form-body, form-actions, chart-area, timeline-area, side-info, empty-state, custom.',
         '- block.components must be a non-empty array.',
         '- Every item in block.components must be exactly one of: Card, Container, Button, Table, Alert.',
-        '- If the block is a summary, notice, warning, status, or announcement area, use type Alert and components ["Alert"] or type Card and components ["Card"].',
-        '- If the block is a records, list, ranking, attendance, or detail table area, use type Table and components ["Table"].',
+        '- If the page is a dashboard, use pageType "dashboard" and prefer zones page-header, kpi-row, chart-area, data-table, timeline-area.',
+        '- If the page is a list page, use pageType "list" and prefer zones page-header, filter, data-table.',
+        '- If the page is a form page, use pageType "form" and prefer zones page-header, form-body, form-actions.',
+        '- If the page is a detail page, use pageType "detail" and prefer zones page-header, detail-info, data-table or timeline-area.',
+        '- If the page is a statistics page, use pageType "statistics" and prefer zones page-header, kpi-row, chart-area, data-table.',
         '- Never put semantic aliases like hero, recent-records, summary-panel, alert-summary, dashboard-header, banner, widget into type or components.',
         '- Business meaning belongs only in id and description.',
         '- If unsure, choose Card with components ["Card"].',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Valid example 1:',
-        '{"pageTitle":"考勤首页","blocks":[{"id":"alert-summary","type":"Alert","description":"展示今日考勤提醒","components":["Alert"],"priority":1,"complexity":"simple"}]}',
+        '{"pageTitle":"考勤首页","pageType":"dashboard","blocks":[{"id":"header","type":"page-header","description":"页面标题与主要操作","components":["Container","Button"],"priority":1,"complexity":"simple"},{"id":"alert-summary","type":"kpi-row","description":"展示今日考勤提醒和关键统计","components":["Alert","Card"],"priority":2,"complexity":"simple"}]}',
         'Valid example 2:',
-        '{"pageTitle":"考勤首页","blocks":[{"id":"recent-records","type":"Table","description":"展示最近考勤记录","components":["Table"],"priority":2,"complexity":"simple"}]}',
+        '{"pageTitle":"用户列表","pageType":"list","blocks":[{"id":"header","type":"page-header","description":"页面标题与新建按钮","components":["Container","Button"],"priority":1,"complexity":"simple"},{"id":"filters","type":"filter","description":"搜索和筛选区域","components":["Container","Button"],"priority":2,"complexity":"simple"},{"id":"recent-records","type":"data-table","description":"展示最近考勤记录","components":["Table","Card"],"priority":3,"complexity":"simple"}]}',
         'Invalid example:',
-        '{"pageTitle":"考勤首页","blocks":[{"id":"recent-records","type":"recent-records","description":"...","components":["recent-records"],"priority":1,"complexity":"simple"}]}',
+        '{"pageTitle":"考勤首页","pageType":"dashboard","blocks":[{"id":"recent-records","type":"recent-records","description":"...","components":["recent-records"],"priority":1,"complexity":"simple"}]}',
         'Return exactly this JSON shape:',
-        '{"pageTitle":"string","blocks":[{"id":"string","type":"Card|Table|Container|Button|Alert","description":"string","components":["Card"],"priority":1,"complexity":"simple"}]}',
+        '{"pageTitle":"string","pageType":"dashboard|list|form|detail|statistics|custom","blocks":[{"id":"string","type":"page-header|filter|kpi-row|data-table|detail-info|form-body|form-actions|chart-area|timeline-area|side-info|empty-state|custom","description":"string","components":["Card"],"priority":1,"complexity":"simple"}]}',
       ].join('\n'),
     },
     {
@@ -207,7 +242,13 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         '- The root node component must be one of the supported components.',
         '- Every child schema node must also use only supported components.',
         '- children may contain schema nodes or plain text only.',
-        '- Do not output semantic aliases like hero, recent-records, summary-panel, header, footer.',
+        '- page-header zones should usually use Container and Button, with text children for title/subtitle.',
+        '- filter zones should usually use Container with Button or plain text placeholders.',
+        '- kpi-row zones should usually use Card or Alert and concise content.',
+        '- data-table zones should use Table or Card wrapping table-like content.',
+        '- detail-info zones should prefer Card or Container with structured text.',
+        '- form-actions zones should prefer Container and Button.',
+        '- Never use raw HTML tags like div, span, section, header, footer. Use Container instead of div/section/header/footer.',
         '- For Table, include sample data in props.dataSource and props.columns.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Return exactly this JSON shape:',
@@ -239,10 +280,89 @@ async function generateBlock(input: GenerateBlockInput): Promise<GenerateBlockRe
 }
 
 async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
+  const headerBlock = input.blocks.find((block) => block.blockId === 'header' || input.plan.blocks.find((planBlock) => planBlock.id === block.blockId)?.type === 'page-header');
+  const contentBlocks = input.blocks.filter((block) => block !== headerBlock);
+
+  const contentChildren = contentBlocks.map((block) => {
+    const blockPlan = input.plan.blocks.find((planBlock) => planBlock.id === block.blockId);
+    const zoneType = blockPlan?.type ?? 'custom';
+
+    if (zoneType === 'kpi-row') {
+      return {
+        id: `${block.blockId}-section`,
+        component: 'Container',
+        props: {
+          direction: 'row',
+          gap: 16,
+        },
+        children: [block.node],
+      };
+    }
+
+    if (zoneType === 'data-table') {
+      return {
+        id: `${block.blockId}-section`,
+        component: 'Card',
+        props: {
+          title: blockPlan?.description ?? '数据区域',
+          bordered: true,
+        },
+        children: [block.node],
+      };
+    }
+
+    return block.node;
+  });
+
   return {
     id: 'ai-generated-page',
     name: input.plan.pageTitle,
-    body: input.blocks.map((block) => block.node),
+    body: [
+      {
+        id: 'page-root',
+        component: 'Container',
+        props: {
+          direction: 'column',
+          gap: input.plan.pageType === 'dashboard' || input.plan.pageType === 'statistics' ? 24 : 16,
+          style: {
+            width: '100%',
+            padding: 24,
+          },
+        },
+        children: [
+          {
+            id: 'page-header-shell',
+            component: 'Container',
+            props: {
+              direction: 'column',
+              gap: 8,
+            },
+            children: headerBlock
+              ? [headerBlock.node]
+              : [
+                  {
+                    id: 'page-title-fallback',
+                    component: 'Container',
+                    props: {
+                      direction: 'column',
+                      gap: 4,
+                    },
+                    children: [input.plan.pageTitle, `${input.plan.pageType} page`],
+                  },
+                ],
+          },
+          {
+            id: 'page-content-shell',
+            component: 'Container',
+            props: {
+              direction: 'column',
+              gap: input.plan.pageType === 'dashboard' || input.plan.pageType === 'statistics' ? 24 : 16,
+            },
+            children: contentChildren,
+          },
+        ],
+      },
+    ],
   };
 }
 

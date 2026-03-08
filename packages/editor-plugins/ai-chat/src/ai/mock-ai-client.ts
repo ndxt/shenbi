@@ -51,18 +51,19 @@ export class MockAIClient implements AIClient {
             type: 'plan',
             data: {
                 pageTitle: '示例应用布局',
+                pageType: 'dashboard',
                 blocks: [
                     {
                         id: 'header-block',
-                        type: 'Header',
+                        type: 'page-header',
                         description: '顶部导航栏',
-                        components: ['Header'],
+                        components: ['Container', 'Button'],
                         priority: 1,
                         complexity: 'simple' as const,
                     },
                     {
                         id: 'hero-block',
-                        type: 'Hero',
+                        type: 'kpi-row',
                         description: '内容介绍区',
                         components: ['Card'],
                         priority: 2,

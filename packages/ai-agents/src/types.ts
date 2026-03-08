@@ -4,18 +4,22 @@ import type {
   FeedbackRequest,
   ModelInfo,
   PagePlan as SharedPagePlan,
+  PageType,
   RunMetadata,
   RunRequest,
   RunResponse,
+  ZoneType,
 } from '@shenbi/ai-contracts';
 
 export type {
   AgentEvent,
   FeedbackRequest,
   ModelInfo,
+  PageType,
   RunMetadata,
   RunRequest,
   RunResponse,
+  ZoneType,
 } from '@shenbi/ai-contracts';
 
 export type PagePlan = SharedPagePlan;

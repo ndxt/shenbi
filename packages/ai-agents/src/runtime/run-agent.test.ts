@@ -23,10 +23,11 @@ function createRequest(overrides: Partial<RunRequest> = {}): RunRequest {
 function createPagePlan(): PagePlan {
   return {
     pageTitle: 'Admin Dashboard',
+    pageType: 'dashboard',
     blocks: [
       {
         id: 'hero',
-        type: 'Hero',
+        type: 'kpi-row',
         description: 'Top summary area',
         components: ['Card'],
         priority: 1,
@@ -34,7 +35,7 @@ function createPagePlan(): PagePlan {
       },
       {
         id: 'table',
-        type: 'Table',
+        type: 'data-table',
         description: 'User list',
         components: ['Table'],
         priority: 2,
