@@ -61,6 +61,33 @@ describe('normalizeGeneratedNode', () => {
     expect(normalized.columns?.[0]?.render).toBeUndefined();
   });
 
+  it('sanitizes unsafe table pagination callbacks', () => {
+    const node: SchemaNode = {
+      component: 'Table',
+      props: {
+        pagination: {
+          showTotal: { component: 'Typography.Text', children: '总数' },
+          itemRender: { component: 'Button', children: '页码' },
+          showQuickJumper: {
+            goButton: { component: 'Button', children: '跳转' },
+          },
+        },
+      },
+    };
+
+    const normalized = normalizeGeneratedNode(node);
+    const pagination = normalized.props?.pagination as Record<string, unknown> | undefined;
+    expect(pagination?.showTotal).toBeUndefined();
+    expect(pagination?.itemRender).toBeUndefined();
+    expect(
+      pagination?.showQuickJumper
+      && typeof pagination.showQuickJumper === 'object'
+      && !Array.isArray(pagination.showQuickJumper)
+        ? (pagination.showQuickJumper as Record<string, unknown>).goButton
+        : undefined,
+    ).toBeUndefined();
+  });
+
   it('wraps row children into cols', () => {
     const node: SchemaNode = {
       component: 'Row',

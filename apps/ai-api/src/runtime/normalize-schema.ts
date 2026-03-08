@@ -184,6 +184,30 @@ function normalizeNodeProps(node: SchemaNode): void {
     });
     delete props.columns;
   }
+
+  if (node.component === 'Table' && props.pagination && typeof props.pagination === 'object' && !Array.isArray(props.pagination)) {
+    const pagination = { ...(props.pagination as Record<string, unknown>) };
+
+    if (typeof pagination.showTotal !== 'function') {
+      delete pagination.showTotal;
+    }
+    if (typeof pagination.itemRender !== 'function') {
+      delete pagination.itemRender;
+    }
+    if (
+      pagination.showQuickJumper
+      && typeof pagination.showQuickJumper === 'object'
+      && !Array.isArray(pagination.showQuickJumper)
+    ) {
+      const quickJumper = { ...(pagination.showQuickJumper as Record<string, unknown>) };
+      if (isNodeLike(quickJumper.goButton) || Array.isArray(quickJumper.goButton) || typeof quickJumper.goButton === 'object') {
+        delete quickJumper.goButton;
+      }
+      pagination.showQuickJumper = quickJumper;
+    }
+
+    props.pagination = pagination as unknown as SchemaNode['props'][string];
+  }
 }
 
 function normalizeChildren(node: SchemaNode): SchemaNode {
