@@ -31,6 +31,10 @@ function isSchemaNode(value: unknown): value is SchemaNode {
   return isObject(value) && typeof value.component === 'string';
 }
 
+function isPrimitiveChild(value: unknown): value is string | number | boolean | null {
+  return value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+}
+
 function isCompiledExpression(value: unknown): value is CompiledExpression {
   return (
     isObject(value) &&
@@ -335,7 +339,15 @@ function compileChildren(
   }
 
   if (Array.isArray(children)) {
-    const compiledChildren = children.filter(isSchemaNode).map((child) => compileNode(child, resolver));
+    const schemaChildren = children.filter(isSchemaNode);
+    if (schemaChildren.length === 0 && children.every(isPrimitiveChild)) {
+      return {
+        staticChildren: children,
+        deps: [],
+      };
+    }
+
+    const compiledChildren = schemaChildren.map((child) => compileNode(child, resolver));
     return {
       compiledChildren,
       deps: collectDeps(compiledChildren.map((child) => child.allDeps)),

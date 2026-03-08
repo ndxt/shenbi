@@ -183,6 +183,21 @@ describe('compiler/schema', () => {
     expect(compiled.staticProps.children).toBeUndefined();
   });
 
+  it('数组形式的静态文本 children 会保留为 static children', () => {
+    const resolver = createResolver({ 'Descriptions.Item': 'div' });
+    const schema: SchemaNode = {
+      component: 'Descriptions.Item',
+      children: ['张明'],
+    };
+
+    const compiled = compileSchema(schema, resolver);
+    if (Array.isArray(compiled)) {
+      throw new Error('预期编译结果为单节点');
+    }
+
+    expect(compiled.staticProps.children).toEqual(['张明']);
+  });
+
   it('slots 会按节点与节点数组递归编译', () => {
     const resolver = createResolver({ Card: 'div', Text: 'span', Button: 'button' });
     const schema: SchemaNode = {
