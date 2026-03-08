@@ -166,9 +166,33 @@ function trySalvageJsonCandidate(text: string): string | null {
     return extracted;
   }
 
+  const trimmed = text.trim();
+  for (let trimCount = 1; trimCount <= Math.min(24, trimmed.length); trimCount += 1) {
+    const candidate = trimmed.slice(0, trimmed.length - trimCount).trimEnd();
+    if (!candidate) {
+      break;
+    }
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // continue trimming
+    }
+  }
+
   const start = text.indexOf('{');
   if (start < 0) {
     return null;
+  }
+
+  const fullBase = text.slice(start).trim();
+  const fullOpenCount = countOutsideStrings(fullBase, '{');
+  const fullCloseCount = countOutsideStrings(fullBase, '}');
+  if (fullOpenCount > fullCloseCount) {
+    if (fullOpenCount - fullCloseCount > 8) {
+      return null;
+    }
+    return `${fullBase}${'}'.repeat(fullOpenCount - fullCloseCount)}`;
   }
 
   const end = text.lastIndexOf('}');
@@ -197,11 +221,7 @@ function trySalvageJsonCandidate(text: string): string | null {
     }
     return null;
   }
-  if (openCount - closeCount > 8) {
-    return null;
-  }
-
-  return `${base}${'}'.repeat(openCount - closeCount)}`;
+  return null;
 }
 
 function extractJson<T>(

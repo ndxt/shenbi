@@ -11,7 +11,7 @@ function findBalancedJsonObject(text: string): string | null {
     return null;
   }
 
-  let depth = 0;
+  const stack: string[] = [];
   let inString = false;
   let escaped = false;
 
@@ -33,14 +33,28 @@ function findBalancedJsonObject(text: string): string | null {
       continue;
     }
     if (char === '{') {
-      depth += 1;
+      stack.push(char);
+      continue;
+    }
+    if (char === '[') {
+      stack.push(char);
       continue;
     }
     if (char === '}') {
-      depth -= 1;
-      if (depth === 0) {
+      if (stack.at(-1) !== '{') {
+        return null;
+      }
+      stack.pop();
+      if (stack.length === 0) {
         return text.slice(start, index + 1);
       }
+      continue;
+    }
+    if (char === ']') {
+      if (stack.at(-1) !== '[') {
+        return null;
+      }
+      stack.pop();
     }
   }
 
@@ -83,20 +97,62 @@ function trySalvageJsonCandidate(text: string): string | null {
     return extracted;
   }
 
+  const trimmed = text.trim();
+  for (let trimCount = 1; trimCount <= Math.min(24, trimmed.length); trimCount += 1) {
+    const candidate = trimmed.slice(0, trimmed.length - trimCount).trimEnd();
+    if (!candidate) {
+      break;
+    }
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // continue trimming
+    }
+  }
+
   const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start < 0 && end < 0) {
+  if (start < 0) {
     return null;
   }
 
-  const base = (start >= 0 ? text.slice(start) : text).trim();
+  const fullBase = text.slice(start).trim();
+  const fullOpenCount = countOutsideStrings(fullBase, '{');
+  const fullCloseCount = countOutsideStrings(fullBase, '}');
+  if (fullOpenCount > fullCloseCount) {
+    if (fullOpenCount - fullCloseCount > 8) {
+      return null;
+    }
+    return `${fullBase}${'}'.repeat(fullOpenCount - fullCloseCount)}`;
+  }
+
+  const end = text.lastIndexOf('}');
+  const base = text.slice(start, end >= start ? end + 1 : text.length).trim();
   const openCount = countOutsideStrings(base, '{');
   const closeCount = countOutsideStrings(base, '}');
-  if (openCount <= closeCount || openCount - closeCount > 8) {
+  if (openCount === closeCount) {
+    return base;
+  }
+  if (openCount < closeCount) {
+    let truncated = base;
+    while (truncated.length > 0) {
+      truncated = truncated.trimEnd().slice(0, -1);
+      if (!truncated) {
+        break;
+      }
+      const nextOpenCount = countOutsideStrings(truncated, '{');
+      const nextCloseCount = countOutsideStrings(truncated, '}');
+      if (nextOpenCount === nextCloseCount) {
+        return truncated.trim();
+      }
+      if (nextCloseCount < nextOpenCount) {
+        break;
+      }
+    }
     return null;
   }
 
-  return `${base}${'}'.repeat(openCount - closeCount)}`;
+  return null;
 }
 
 describe('agent runtime json salvage', () => {
@@ -104,8 +160,10 @@ describe('agent runtime json salvage', () => {
     const raw = '```json\n{"component":"Card","children":[{"component":"Button","children":["确定"]}]\n```';
     const candidate = extractJsonCandidate(raw);
     const salvaged = trySalvageJsonCandidate(candidate);
-    expect(salvaged).toBe('{"component":"Card","children":[{"component":"Button","children":["确定"]}]}');
-    expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Card' });
+    const parsed = JSON.parse(salvaged!);
+    expect(parsed).toMatchObject({ component: 'Card' });
+    expect(Array.isArray(parsed.children)).toBe(true);
+    expect(parsed.children).toHaveLength(1);
   });
 
   it('salvages near-valid json with extra trailing closing braces', () => {
@@ -120,5 +178,12 @@ describe('agent runtime json salvage', () => {
     const salvaged = trySalvageJsonCandidate(raw);
     expect(salvaged).toBe('{"component":"Card","children":[{"component":"Timeline","children":[{"component":"Timeline.Item","children":["持续发展"]}]}]}');
     expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Card' });
+  });
+
+  it('salvages near-valid json with extra trailing tokens after valid object', () => {
+    const raw = '{"component":"Container","children":[{"component":"Typography.Text","children":["ok"]}]}]}';
+    const salvaged = trySalvageJsonCandidate(raw);
+    expect(salvaged).toBe('{"component":"Container","children":[{"component":"Typography.Text","children":["ok"]}]}');
+    expect(JSON.parse(salvaged!)).toMatchObject({ component: 'Container' });
   });
 });
