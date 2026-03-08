@@ -167,7 +167,8 @@ describe('POST /api/ai/run — 503 LLM error', () => {
     expect(res.status).toBe(503);
     const json = await res.json() as { success: boolean; error: string };
     expect(json.success).toBe(false);
-    expect(json.error).toBe('Provider unavailable');
+    expect(json.error).toContain('Provider unavailable');
+    expect(json.error).toContain('Debug file: .ai-debug');
   });
 });
 

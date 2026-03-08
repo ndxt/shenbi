@@ -17,6 +17,7 @@ export function createRunRoute(runtime: AgentRuntime): Hono {
     try {
       const body = await c.req.json().catch(() => null);
       const req = validateRunRequest(body);
+      c.set('runRequest' as never, req as never);
 
       const result = await runtime.run(req);
 

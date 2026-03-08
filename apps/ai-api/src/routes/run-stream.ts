@@ -10,6 +10,7 @@
 import { Hono } from 'hono';
 import { validateRunRequest } from './validate.ts';
 import { handleError } from '../middleware/error-handler.ts';
+import { writeErrorDump } from '../adapters/debug-dump.ts';
 import { logRequest, logger } from '../adapters/logger.ts';
 import type { AgentRuntime } from '../runtime/types.ts';
 import type { RunRequest } from '@shenbi/ai-contracts';
@@ -28,6 +29,7 @@ export function createRunStreamRoute(runtime: AgentRuntime): Hono {
     try {
       const body = await c.req.json().catch(() => null);
       req = validateRunRequest(body);
+      c.set('runRequest' as never, req as never);
     } catch (error) {
       return handleError(error, c);
     }
@@ -65,10 +67,20 @@ export function createRunStreamRoute(runtime: AgentRuntime): Hono {
             route: 'POST /api/ai/run/stream',
           });
         } catch (error) {
+          const debugFile = writeErrorDump({
+            category: 'stream-error',
+            error,
+            requestId,
+            method: c.req.method,
+            path: c.req.path,
+            status: 500,
+            code: 'STREAM_ERROR',
+            request: req,
+          });
           const errEvent = {
             type: 'error' as const,
             data: {
-              message: error instanceof Error ? error.message : 'Stream error',
+              message: `${error instanceof Error ? error.message : 'Stream error'}. Debug file: ${debugFile}`,
               code: 'STREAM_ERROR',
             },
           };
@@ -84,6 +96,13 @@ export function createRunStreamRoute(runtime: AgentRuntime): Hono {
             durationMs: Date.now() - start,
             success: false,
             route: 'POST /api/ai/run/stream',
+          });
+          logger.error('ai.stream.error', {
+            requestId,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            path: c.req.path,
+            debugFile,
           });
         } finally {
           clearInterval(heartbeat);
