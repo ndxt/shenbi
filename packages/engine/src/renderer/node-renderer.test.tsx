@@ -213,6 +213,195 @@ describe('NodeRenderer', () => {
     expect(screen.getByTestId('content').textContent).toContain('张明');
   });
 
+  it('Descriptions 将 compiledChildren 转换为 items prop，确保 label/value 不丢失', () => {
+    // 模拟 antd Descriptions 的行为：通过 items prop 渲染 label 和 children
+    const DescComp = (props: any) => {
+      const items = props.items ?? [];
+      return createElement('div', { 'data-testid': 'descriptions' },
+        ...items.map((item: any) =>
+          createElement('div', { key: item.key, 'data-testid': `item-${item.key}` },
+            createElement('span', { 'data-testid': `label-${item.key}` }, item.label),
+            createElement('span', { 'data-testid': `value-${item.key}` }, item.children),
+          ),
+        ),
+      );
+    };
+
+    const node: CompiledNode = {
+      Component: DescComp,
+      componentType: 'Descriptions',
+      staticProps: { bordered: true, column: 2 },
+      dynamicProps: {},
+      compiledChildren: [
+        {
+          id: 'item-name',
+          Component: 'div',
+          componentType: 'Descriptions.Item',
+          staticProps: { label: '姓名', children: '张明' },
+          dynamicProps: {},
+          allDeps: [],
+        },
+        {
+          id: 'item-id',
+          Component: 'div',
+          componentType: 'Descriptions.Item',
+          staticProps: { label: '工号', children: 'EMP001' },
+          dynamicProps: {},
+          allDeps: [],
+        },
+        {
+          id: 'item-dept',
+          Component: 'div',
+          componentType: 'Descriptions.Item',
+          staticProps: { label: '部门' },
+          dynamicProps: {},
+          compiledChildren: [
+            {
+              Component: 'span',
+              componentType: 'Typography.Text',
+              staticProps: {},
+              dynamicProps: {},
+              childrenFn: expr('技术部', () => '技术部'),
+              allDeps: [],
+            },
+          ],
+          allDeps: [],
+        },
+        {
+          id: 'item-status',
+          Component: 'div',
+          componentType: 'Descriptions.Item',
+          staticProps: {},
+          dynamicProps: {},
+          childrenFn: expr('{{state.detail.status}}', (ctx) => ctx.state.status),
+          allDeps: ['state.status'],
+        },
+      ],
+      allDeps: [],
+    };
+
+    renderWithContext(node, { status: '在职' });
+
+    // 验证 items 被正确传递
+    expect(screen.getByTestId('descriptions')).toBeTruthy();
+
+    // 静态 label + 静态 children
+    expect(screen.getByTestId('label-item-name').textContent).toBe('姓名');
+    expect(screen.getByTestId('value-item-name').textContent).toBe('张明');
+
+    expect(screen.getByTestId('label-item-id').textContent).toBe('工号');
+    expect(screen.getByTestId('value-item-id').textContent).toBe('EMP001');
+
+    // 静态 label + compiledChildren
+    expect(screen.getByTestId('label-item-dept').textContent).toBe('部门');
+    expect(screen.getByTestId('value-item-dept').textContent).toContain('技术部');
+
+    // 动态 children（childrenFn 路径）
+    expect(screen.getByTestId('value-item-status').textContent).toBe('在职');
+  });
+
+  it('Timeline 将 compiledChildren 转换为 items prop，确保 content 不丢失', () => {
+    const TimelineComp = (props: any) => {
+      const items = props.items ?? [];
+      return createElement('div', { 'data-testid': 'timeline' },
+        ...items.map((item: any) =>
+          createElement('div', { key: item.key, 'data-testid': `tl-${item.key}` },
+            createElement('span', { 'data-testid': `tl-color-${item.key}` }, item.color ?? ''),
+            createElement('span', { 'data-testid': `tl-content-${item.key}` }, item.children),
+          ),
+        ),
+      );
+    };
+
+    const node: CompiledNode = {
+      Component: TimelineComp,
+      componentType: 'Timeline',
+      staticProps: { mode: 'left' },
+      dynamicProps: {},
+      compiledChildren: [
+        {
+          id: 'tl-1',
+          Component: 'div',
+          componentType: 'Timeline.Item',
+          staticProps: { color: 'green', children: '入职通过试用期' },
+          dynamicProps: {},
+          allDeps: [],
+        },
+        {
+          id: 'tl-2',
+          Component: 'div',
+          componentType: 'Timeline.Item',
+          staticProps: { color: 'blue' },
+          dynamicProps: {},
+          childrenFn: expr('{{state.latest}}', (ctx) => ctx.state.latest),
+          allDeps: ['state.latest'],
+        },
+      ],
+      allDeps: [],
+    };
+
+    renderWithContext(node, { latest: '完成季度考核' });
+    expect(screen.getByTestId('tl-content-tl-1').textContent).toBe('入职通过试用期');
+    expect(screen.getByTestId('tl-color-tl-1').textContent).toBe('green');
+    expect(screen.getByTestId('tl-content-tl-2').textContent).toBe('完成季度考核');
+  });
+
+  it('Tabs 将 compiledChildren 转换为 items prop，确保 tab/children 不丢失', () => {
+    const TabsComp = (props: any) => {
+      const items = props.items ?? [];
+      return createElement('div', { 'data-testid': 'tabs' },
+        ...items.map((item: any) =>
+          createElement('div', { key: item.key, 'data-testid': `tab-${item.key}` },
+            createElement('span', { 'data-testid': `tab-label-${item.key}` }, item.tab ?? item.label ?? ''),
+            createElement('span', { 'data-testid': `tab-content-${item.key}` }, item.children),
+          ),
+        ),
+      );
+    };
+
+    const node: CompiledNode = {
+      Component: TabsComp,
+      componentType: 'Tabs',
+      staticProps: {},
+      dynamicProps: {},
+      compiledChildren: [
+        {
+          id: 'pane-1',
+          Component: 'div',
+          componentType: 'Tabs.TabPane',
+          staticProps: { tab: '基本信息', children: '内容一' },
+          dynamicProps: {},
+          allDeps: [],
+        },
+        {
+          id: 'pane-2',
+          Component: 'div',
+          componentType: 'Tabs.TabPane',
+          staticProps: { tab: '详细资料' },
+          dynamicProps: {},
+          compiledChildren: [
+            {
+              Component: 'span',
+              componentType: 'Typography.Text',
+              staticProps: {},
+              dynamicProps: {},
+              childrenFn: expr('详细内容', () => '详细内容'),
+              allDeps: [],
+            },
+          ],
+          allDeps: [],
+        },
+      ],
+      allDeps: [],
+    };
+
+    renderWithContext(node);
+    expect(screen.getByTestId('tab-label-pane-1').textContent).toBe('基本信息');
+    expect(screen.getByTestId('tab-content-pane-1').textContent).toBe('内容一');
+    expect(screen.getByTestId('tab-label-pane-2').textContent).toBe('详细资料');
+    expect(screen.getByTestId('tab-content-pane-2').textContent).toContain('详细内容');
+  });
+
   it('文本 children 表达式: {{state.msg}} 正确显示', () => {
     const node: CompiledNode = {
       Component: 'p',
@@ -384,7 +573,7 @@ describe('NodeRenderer', () => {
   it('事件绑定: executeActions reject 会被捕获避免未处理异常', async () => {
     const chain = [{ type: 'callMethod' as const, name: 'handleReject' }];
     const executeError = new Error('boom');
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
 
     const node: CompiledNode = {
       Component: 'button',

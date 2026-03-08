@@ -18,6 +18,17 @@ import type {
 } from '../types/contracts';
 import { setByPathMutable } from '../utils';
 
+/**
+ * Ant Design 内部使用 `{...node.props}` 从 JSX children 提取 item 数据的容器组件。
+ * 这些组件的 children 被 NodeRenderer 包装后会导致 props 丢失。
+ * 修复方式：将 compiledChildren 转换为 items prop 格式。
+ */
+const ITEMS_BASED_COMPONENTS = new Set([
+  'Descriptions',
+  'Timeline',
+  'Tabs',
+]);
+
 // ===== Context =====
 
 export const ShenbiContext = createContext<ShenbiContextValue | null>(null);
@@ -288,8 +299,7 @@ export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRende
         if (col.compiledRender || col.compiledEditRender) {
           const renderNode = col.compiledRender;
           const editRenderNode = col.compiledEditRender;
-          colConfig.render = (text: any, record: any, index: number) =>
-          {
+          colConfig.render = (text: any, record: any, index: number) => {
             const rowId = resolveRowId(record, index);
             const useEditRender = editRenderNode != null
               && editingKey != null
@@ -314,11 +324,60 @@ export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRende
       });
   }
 
+  // Step 10.5: Items-based 组件特殊处理
+  // Ant Design 的部分容器组件（Descriptions, Timeline, Tabs 等）会通过 useItems / useLegacyItems
+  // 内部使用 {...node.props} 从 JSX children 中提取 item 数据。当 children 是 NodeRenderer
+  // 包装器时，node.props 是 { node: compiledNode } 而非预期的 { label, children, ... }，
+  // 导致 label/children 全部丢失。
+  // 修复：将 compiledChildren 转换为 items prop 格式，绕过 JSX children 路径。
+  const isItemsBased = ITEMS_BASED_COMPONENTS.has(node.componentType);
+  if (isItemsBased && node.compiledChildren && node.compiledChildren.length > 0) {
+    const items = node.compiledChildren.map((itemNode, i) => {
+      // 解析子节点的全部 props
+      const resolvedItemProps: Record<string, any> = { ...itemNode.staticProps };
+      for (const [propKey, propExpr] of Object.entries(itemNode.dynamicProps)) {
+        resolvedItemProps[propKey] = evalExpr(propExpr, ctx);
+      }
+
+      // compiledPropNodes（如 label 是一个 SchemaNode）
+      if (itemNode.compiledPropNodes) {
+        for (const [propName, propNode] of Object.entries(itemNode.compiledPropNodes)) {
+          if (Array.isArray(propNode)) {
+            resolvedItemProps[propName] = propNode.map((child, idx) =>
+              renderChild(child, `${propName}_${idx}`, extraContext),
+            );
+          } else {
+            resolvedItemProps[propName] = renderChild(propNode, propName, extraContext);
+          }
+        }
+      }
+
+      // 解析 children (value/content)
+      let itemChildren: ReactNode = resolvedItemProps.children;
+      if (itemNode.childrenFn) {
+        itemChildren = evalExpr(itemNode.childrenFn, ctx);
+      } else if (itemNode.compiledChildren && itemNode.compiledChildren.length > 0) {
+        itemChildren = itemNode.compiledChildren.map((child, idx) =>
+          renderChild(child, child.id ?? idx, extraContext),
+        );
+      }
+      resolvedItemProps.children = itemChildren;
+
+      // 确保有 key
+      resolvedItemProps.key = resolvedItemProps.key ?? itemNode.id ?? `item-${i}`;
+
+      return resolvedItemProps;
+    });
+
+    resolvedProps.items = items;
+  }
+
   // Step 11: children
   let children: ReactNode = resolvedProps.children;
   if (node.childrenFn) {
     children = evalExpr(node.childrenFn, ctx);
-  } else if (node.compiledChildren && node.compiledChildren.length > 0) {
+  } else if (node.compiledChildren && node.compiledChildren.length > 0
+    && !isItemsBased) {
     children = node.compiledChildren.map((child, i) =>
       renderChild(child, child.id ?? i, extraContext),
     );
@@ -327,22 +386,22 @@ export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRende
   // Step 12: 错误边界
   let element = node.componentType === 'Form'
     ? createElement(
-        FormRuntimeBinder,
-        node.id
-          ? {
-              Comp,
-              resolvedProps,
-              children,
-              nodeId: node.id,
-              runtime,
-            }
-          : {
-              Comp,
-              resolvedProps,
-              children,
-              runtime,
-            },
-      )
+      FormRuntimeBinder,
+      node.id
+        ? {
+          Comp,
+          resolvedProps,
+          children,
+          nodeId: node.id,
+          runtime,
+        }
+        : {
+          Comp,
+          resolvedProps,
+          children,
+          runtime,
+        },
+    )
     : createElement(Comp, resolvedProps, children);
   if (node.errorBoundary) {
     element = createElement(
