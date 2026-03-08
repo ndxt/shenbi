@@ -35,8 +35,13 @@ function createRequestInit(request: RunRequest, signal?: AbortSignal): RequestIn
 }
 
 async function readResponseError(response: Response): Promise<string> {
+    const text = await response.text();
+    if (!text) {
+        return `${response.status} ${response.statusText}`.trim();
+    }
+
     try {
-        const payload = await response.json();
+        const payload = JSON.parse(text) as unknown;
         if (payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string') {
             return payload.error;
         }
@@ -44,8 +49,7 @@ async function readResponseError(response: Response): Promise<string> {
         // Ignore parse failures and fall back to plain text.
     }
 
-    const text = await response.text();
-    return text || `${response.status} ${response.statusText}`.trim();
+    return text;
 }
 
 function parseEventChunk(chunk: string): AgentEvent | null {

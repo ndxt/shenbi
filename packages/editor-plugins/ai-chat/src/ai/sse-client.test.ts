@@ -90,6 +90,24 @@ describe('FetchAIClient', () => {
       { type: 'done', data: { metadata: { sessionId: 'session-1', conversationId: 'conv-1' } } },
     ]);
   });
+
+  it('reads error responses without consuming the response body twice', async () => {
+    const fetchImplementation = vi.fn(async () => new Response(
+      JSON.stringify({ error: 'bad request' }),
+      {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    ));
+
+    const client = new FetchAIClient({
+      fetchImplementation: fetchImplementation as typeof fetch,
+    });
+
+    await expect(Array.fromAsync(client.runStream(createRequest()))).rejects.toThrow('bad request');
+  });
 });
 
 describe('MockAIClient', () => {
