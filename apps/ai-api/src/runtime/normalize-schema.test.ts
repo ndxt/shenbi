@@ -162,4 +162,40 @@ describe('normalizeGeneratedNode', () => {
     expect(children).toHaveLength(2);
     expect(children[1]?.component).toBe('Typography.Text');
   });
+
+  it('deduplicates repeated node ids recursively', () => {
+    const node: SchemaNode = {
+      id: 'employee-detail-layout',
+      component: 'Container',
+      children: [
+        {
+          id: 'employee-detail-layout',
+          component: 'Card',
+          children: [
+            { id: 'employee-detail-layout', component: 'Typography.Text', children: 'A' },
+          ],
+        },
+        {
+          id: 'employee-detail-layout',
+          component: 'Card',
+          children: 'B',
+        },
+      ],
+    };
+
+    const normalized = normalizeGeneratedNode(node);
+    const children = normalized.children as SchemaNode[];
+    expect(normalized.id).toBe('employee-detail-layout');
+    expect(children[0]?.id).toBe('employee-detail-layout-2');
+    expect(children[1]?.id).toBe('employee-detail-layout-3');
+    const grandchild = children[0]?.children as SchemaNode[];
+    expect(grandchild[0]?.id).toBeTruthy();
+    const ids = [
+      normalized.id,
+      children[0]?.id,
+      children[1]?.id,
+      grandchild[0]?.id,
+    ].filter((id): id is string => typeof id === 'string');
+    expect(new Set(ids).size).toBe(ids.length);
+  });
 });

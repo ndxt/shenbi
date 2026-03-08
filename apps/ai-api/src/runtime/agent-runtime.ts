@@ -485,6 +485,7 @@ function normalizePlan(plan: PagePlan): PagePlan {
     throw new LLMError(`Planner returned unsupported pageType: ${String(plan.pageType)}`, 'UNSUPPORTED_PAGE_TYPE');
   }
 
+  const seenBlockIds = new Map<string, number>();
   return orderBlocksBySkeleton({
     ...plan,
     blocks: plan.blocks.map((block, index) => {
@@ -497,9 +498,18 @@ function normalizePlan(plan: PagePlan): PagePlan {
         throw new LLMError(`Planner returned no supported components for block: ${block.id || `block-${index + 1}`}`, 'UNSUPPORTED_BLOCK_COMPONENTS');
       }
 
+      const rawId = String(block.id || `block-${index + 1}`);
+      const safeBaseId = rawId
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || `block-${index + 1}`;
+      const nextCount = (seenBlockIds.get(safeBaseId) ?? 0) + 1;
+      seenBlockIds.set(safeBaseId, nextCount);
+
       return {
         ...block,
-        id: block.id || `block-${index + 1}`,
+        id: nextCount === 1 ? safeBaseId : `${safeBaseId}-${nextCount}`,
         type: block.type,
         components,
         priority: Number.isFinite(block.priority) ? block.priority : index + 1,

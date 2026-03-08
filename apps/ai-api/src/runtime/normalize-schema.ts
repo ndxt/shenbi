@@ -22,6 +22,15 @@ export function isNodeLike(value: unknown): value is SchemaNode {
   return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
 }
 
+function toSafeIdSegment(value: string): string {
+  return value
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    || 'node';
+}
+
 function isTextLike(value: unknown): value is string | number | boolean {
   return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 }
@@ -309,6 +318,30 @@ function normalizeComponentName(node: SchemaNode): void {
   }
 }
 
+function ensureUniqueNodeIds(node: SchemaNode, seen: Set<string>, fallbackBase = 'node'): void {
+  const baseId = toSafeIdSegment(
+    typeof node.id === 'string' && node.id
+      ? node.id
+      : `${fallbackBase}-${node.component.toLowerCase()}`
+  );
+  let nextId = baseId;
+  let suffix = 2;
+  while (seen.has(nextId)) {
+    nextId = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+  seen.add(nextId);
+  node.id = nextId;
+
+  if (Array.isArray(node.children)) {
+    node.children.forEach((child, index) => {
+      if (isNodeLike(child)) {
+        ensureUniqueNodeIds(child, seen, `${node.id}-child-${index + 1}`);
+      }
+    });
+  }
+}
+
 export function normalizeGeneratedNode(node: SchemaNode): SchemaNode {
   normalizeComponentName(node);
 
@@ -320,5 +353,7 @@ export function normalizeGeneratedNode(node: SchemaNode): SchemaNode {
     }
   }
 
-  return normalizeChildren(node);
+  const normalized = normalizeChildren(node);
+  ensureUniqueNodeIds(normalized, new Set());
+  return normalized;
 }
