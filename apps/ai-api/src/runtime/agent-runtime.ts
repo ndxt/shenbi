@@ -221,6 +221,32 @@ function normalizeNodeProps(node: GenerateBlockResult['node']): void {
   if (node.component === 'Tag') {
     delete props.icon;
   }
+
+  if (node.component === 'Table' && Array.isArray(props.columns)) {
+    node.columns = props.columns.map((column, index) => {
+      const col = (column && typeof column === 'object' ? { ...(column as Record<string, unknown>) } : {}) as Record<string, unknown>;
+      if (isNodeLike(col.title) || Array.isArray(col.title)) {
+        col.title = flattenToText(col.title) || `列${index + 1}`;
+      }
+      if (isNodeLike(col.render) || Array.isArray(col.render) || typeof col.render === 'object') {
+        delete col.render;
+      }
+      if (isNodeLike(col.editRender) || Array.isArray(col.editRender) || typeof col.editRender === 'object') {
+        delete col.editRender;
+      }
+      if (typeof col.dataIndex !== 'string' || !col.dataIndex) {
+        col.dataIndex = `field${index + 1}`;
+      }
+      if (typeof col.key !== 'string' || !col.key) {
+        col.key = String(col.dataIndex);
+      }
+      if (typeof col.title !== 'string' || !col.title) {
+        col.title = `列${index + 1}`;
+      }
+      return col;
+    });
+    delete props.columns;
+  }
 }
 
 function normalizeChildrenForComponent(node: GenerateBlockResult['node']): GenerateBlockResult['node'] {
