@@ -33,6 +33,11 @@ import {
   supportedComponents,
   supportedComponentList,
 } from './normalize-schema.ts';
+import {
+  getPlannerContractSummary,
+  getZoneComponentCandidates,
+  getZoneContractSummary,
+} from './component-catalog.ts';
 import type { AgentRuntime } from './types.ts';
 
 const memory = createInMemoryAgentMemoryStore();
@@ -52,6 +57,7 @@ const supportedZoneTypes = [
   'empty-state',
   'custom',
 ] as const;
+const plannerContractSummary = getPlannerContractSummary();
 
 function summarizeModelOutput(text: string): string {
   const compact = text.replace(/\s+/g, ' ').trim();
@@ -111,8 +117,8 @@ function requireModel(model: string | undefined, kind: 'planner' | 'block' | 'ch
   return model;
 }
 
-function isSupportedComponent(value: unknown): value is (typeof supportedComponents)[number] {
-  return typeof value === 'string' && supportedComponents.includes(value as (typeof supportedComponents)[number]);
+function isSupportedComponent(value: unknown): value is string {
+  return typeof value === 'string' && supportedComponents.includes(value);
 }
 
 function isSupportedPageType(value: unknown): value is PageType {
@@ -195,6 +201,8 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         `Use only these supported components when planning: ${supportedComponentList}.`,
         `Use only these page types: ${supportedPageTypes.join(', ')}.`,
         `Use only these zone types: ${supportedZoneTypes.join(', ')}.`,
+        'Available component groups and contract summaries:',
+        plannerContractSummary,
         'Hard rules:',
         '- pageTitle must be a concise human-readable title.',
         '- pageType must be exactly one of: dashboard, list, form, detail, statistics, custom.',
@@ -209,15 +217,15 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         '- If the page is a form page, use pageType "form" and prefer zones page-header, form-body, form-actions, side-info.',
         '- If the page is a detail page, use pageType "detail" and prefer zones page-header, detail-info, data-table or timeline-area.',
         '- If the page is a statistics page, use pageType "statistics" and prefer zones page-header, kpi-row, chart-area, data-table.',
-        '- For page-header, prefer Container + Typography.Title + Typography.Text + Space + Button.',
-        '- For filter, prefer Card + Form + FormItem + Input + Select + DatePicker + Space + Button.',
-        '- For kpi-row, prefer Row + Col + Card + Statistic + Tag + Alert.',
-        '- For data-table, prefer Card + Table + Button + Tag.',
-        '- For detail-info, prefer Card + Descriptions + Descriptions.Item + Tag + Typography.Text.',
-        '- For form-body, prefer Card + Form + FormItem + Input + Select + DatePicker.',
-        '- For form-actions, prefer Space + Button + Container.',
-        '- For timeline-area, prefer Card + Timeline + Timeline.Item.',
-        '- For chart-area, if no chart component is available, use Card with Typography.Title/Typography.Paragraph and supporting Statistic blocks.',
+        '- For page-header, use layout-shell + typography + actions groups.',
+        '- For filter, use data-display + filters-form + layout-shell + actions groups.',
+        '- For kpi-row, use layout-shell + data-display + feedback-status groups.',
+        '- For data-table, use data-display + actions + feedback-status groups.',
+        '- For detail-info, use data-display + typography + feedback-status groups.',
+        '- For form-body, use data-display + filters-form groups.',
+        '- For form-actions, use layout-shell + actions groups.',
+        '- For timeline-area, use data-display + typography groups.',
+        '- For chart-area, if no chart component is available, use data-display + typography + feedback-status groups.',
         '- Never put semantic aliases like hero, recent-records, summary-panel, alert-summary, dashboard-header, banner, widget into type or components.',
         '- Business meaning belongs only in id and description.',
         '- If unsure, choose Card with components ["Card"].',
@@ -246,18 +254,23 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
 }
 
 function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage[] {
+  const zoneCandidates = getZoneComponentCandidates(input.block.type);
+  const zoneContractSummary = getZoneContractSummary(input.block.type, input.block.components);
   return [
     {
       role: 'system',
       content: [
         'You generate one low-code block as valid JSON.',
         `Only use supported components: ${supportedComponentList}.`,
+        `For this zone, prioritize these candidate components: ${zoneCandidates.join(', ')}.`,
+        'Zone-specific contract summary:',
+        zoneContractSummary,
         'Rules:',
         '- The root node component must be one of the supported components.',
         '- Every child schema node must also use only supported components.',
         '- children may contain schema nodes or plain text only.',
         '- Build polished B2B admin blocks with clear hierarchy, balanced spacing, and concise business copy.',
-        '- page-header zones should usually use Container or Space with Typography.Title, Typography.Text, and Button.',
+        '- page-header zones should usually use layout-shell + typography + actions components.',
         '- filter zones should usually use Card containing Form, FormItem, Input, Select, DatePicker, Space, and Button.',
         '- kpi-row zones should usually use Row + Col + Card + Statistic + Tag. Four concise KPI cards are better than one oversized block.',
         '- data-table zones should use Card wrapping Table and optional action buttons or tags.',

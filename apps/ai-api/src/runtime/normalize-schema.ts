@@ -1,34 +1,7 @@
 import type { ColumnSchema, SchemaNode } from '@shenbi/schema';
+import { supportedComponents, supportedComponentList, supportedComponentSet } from './component-catalog.ts';
 
-export const supportedComponents = [
-  'Alert',
-  'Button',
-  'Card',
-  'Col',
-  'Container',
-  'DatePicker',
-  'Descriptions',
-  'Descriptions.Item',
-  'Form',
-  'FormItem',
-  'Input',
-  'Row',
-  'Select',
-  'Space',
-  'Statistic',
-  'Table',
-  'Tabs',
-  'Tabs.TabPane',
-  'Tag',
-  'Timeline',
-  'Timeline.Item',
-  'Typography.Paragraph',
-  'Typography.Text',
-  'Typography.Title',
-] as const;
-
-export const supportedComponentList = supportedComponents.join(', ');
-const supportedComponentSet = new Set<string>(supportedComponents);
+export { supportedComponents, supportedComponentList, supportedComponentSet } from './component-catalog.ts';
 
 const htmlComponentMapping: Record<string, string> = {
   div: 'Container',
@@ -206,7 +179,7 @@ function normalizeNodeProps(node: SchemaNode): void {
       pagination.showQuickJumper = quickJumper;
     }
 
-    props.pagination = pagination as unknown as SchemaNode['props'][string];
+    (props as Record<string, unknown>).pagination = pagination;
   }
 }
 
