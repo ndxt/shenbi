@@ -38,6 +38,7 @@ export interface CompiledNode {
   componentType: string;
   staticProps: Record<string, any>;
   dynamicProps: Record<string, CompiledExpression>;
+  compiledPropNodes?: Record<string, CompiledNode | CompiledNode[]>;
   ifFn?: CompiledExpression;
   showFn?: CompiledExpression;
   childrenFn?: CompiledExpression;

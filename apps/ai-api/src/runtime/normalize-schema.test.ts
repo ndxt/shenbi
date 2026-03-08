@@ -126,6 +126,27 @@ describe('normalizeGeneratedNode', () => {
     expect(item && typeof item === 'object' && 'component' in item ? item.component : undefined).toBe('Descriptions.Item');
   });
 
+  it('drops descriptions.items to force child rendering', () => {
+    const node: SchemaNode = {
+      component: 'Descriptions',
+      props: {
+        column: 2,
+        items: [{ label: '姓名', children: '张明' }] as any,
+      },
+      children: [
+        {
+          component: 'Descriptions.Item',
+          props: { label: '姓名' },
+          children: ['张明'],
+        },
+      ],
+    };
+
+    const normalized = normalizeGeneratedNode(node);
+    expect(normalized.props?.items).toBeUndefined();
+    expect(Array.isArray(normalized.children)).toBe(true);
+  });
+
   it('preserves mixed children by converting text into Typography.Text nodes', () => {
     const node: SchemaNode = {
       component: 'Container',

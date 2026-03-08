@@ -218,6 +218,25 @@ describe('compiler/schema', () => {
     expect((compiled.compiledSlots?.extra as any[])?.length).toBe(2);
   });
 
+  it('SchemaNode 类型 props 会编译为 compiledPropNodes', () => {
+    const resolver = createResolver({ 'Descriptions.Item': 'div', Text: 'span' });
+    const schema: SchemaNode = {
+      component: 'Descriptions.Item',
+      props: {
+        label: { component: 'Text', children: '姓名' },
+      },
+      children: ['张明'],
+    };
+
+    const compiled = compileSchema(schema, resolver);
+    if (Array.isArray(compiled)) {
+      throw new Error('预期编译结果为单节点');
+    }
+
+    expect(compiled.compiledPropNodes?.label).toBeTruthy();
+    expect(compiled.staticProps.label).toBeUndefined();
+  });
+
   it('columns 的 render 会编译为 compiledRender 并保留 renderParams', () => {
     const resolver = createResolver({ Table: 'table', Tag: 'span' });
     const schema: SchemaNode = {

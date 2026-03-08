@@ -185,6 +185,34 @@ describe('NodeRenderer', () => {
     expect(screen.getByText('更多')).toBeTruthy();
   });
 
+  it('compiledPropNodes 会渲染到对应 prop 上', () => {
+    const DescriptionsItemComp = (props: any) =>
+      createElement('div', null,
+        createElement('div', { 'data-testid': 'label' }, props.label),
+        createElement('div', { 'data-testid': 'content' }, props.children),
+      );
+    const node: CompiledNode = {
+      Component: DescriptionsItemComp,
+      componentType: 'Descriptions.Item',
+      staticProps: { children: ['张明'] },
+      dynamicProps: {},
+      compiledPropNodes: {
+        label: {
+          Component: 'span',
+          componentType: 'Typography.Text',
+          staticProps: {},
+          dynamicProps: {},
+          childrenFn: expr('姓名', () => '姓名'),
+          allDeps: [],
+        },
+      },
+      allDeps: [],
+    };
+    renderWithContext(node);
+    expect(screen.getByTestId('label').textContent).toContain('姓名');
+    expect(screen.getByTestId('content').textContent).toContain('张明');
+  });
+
   it('文本 children 表达式: {{state.msg}} 正确显示', () => {
     const node: CompiledNode = {
       Component: 'p',

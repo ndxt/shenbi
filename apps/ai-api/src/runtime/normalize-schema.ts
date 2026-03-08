@@ -111,6 +111,10 @@ function normalizeNodeProps(node: SchemaNode): void {
     }
   }
 
+  if (node.component === 'Descriptions') {
+    delete props.items;
+  }
+
   if (node.component === 'Statistic') {
     if (isNodeLike(props.title) || Array.isArray(props.title)) {
       props.title = flattenToText(props.title) || '指标';

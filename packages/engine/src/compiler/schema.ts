@@ -407,6 +407,32 @@ function compileSlots(
   return Object.keys(compiled).length > 0 ? compiled : undefined;
 }
 
+function compilePropNodes(
+  props: SchemaNode['props'],
+  resolver: ComponentResolver,
+): Record<string, CompiledNode | CompiledNode[]> | undefined {
+  if (!props) {
+    return undefined;
+  }
+
+  const compiled: Record<string, CompiledNode | CompiledNode[]> = {};
+  for (const [propName, propValue] of Object.entries(props)) {
+    if (Array.isArray(propValue)) {
+      const schemaNodes = (propValue as unknown[]).filter(isSchemaNode) as SchemaNode[];
+      if (schemaNodes.length > 0) {
+        compiled[propName] = schemaNodes.map((item) => compileNode(item, resolver));
+      }
+      continue;
+    }
+
+    if (isSchemaNode(propValue)) {
+      compiled[propName] = compileNode(propValue, resolver);
+    }
+  }
+
+  return Object.keys(compiled).length > 0 ? compiled : undefined;
+}
+
 function collectSlotDeps(compiledSlots: CompiledNode['compiledSlots']): string[] {
   if (!compiledSlots) {
     return [];
@@ -418,6 +444,22 @@ function collectSlotDeps(compiledSlots: CompiledNode['compiledSlots']): string[]
       deps.push(...collectDeps(slotValue.map((item) => item.allDeps)));
     } else if (slotValue) {
       deps.push(...slotValue.allDeps);
+    }
+  }
+  return [...new Set(deps)];
+}
+
+function collectPropNodeDeps(compiledPropNodes: CompiledNode['compiledPropNodes']): string[] {
+  if (!compiledPropNodes) {
+    return [];
+  }
+
+  const deps: string[] = [];
+  for (const propValue of Object.values(compiledPropNodes)) {
+    if (Array.isArray(propValue)) {
+      deps.push(...collectDeps(propValue.map((item) => item.allDeps)));
+    } else if (propValue) {
+      deps.push(...propValue.allDeps);
     }
   }
   return [...new Set(deps)];
@@ -474,8 +516,12 @@ function compileNode(node: SchemaNode, resolver: ComponentResolver): CompiledNod
   const staticProps: Record<string, any> = {};
   const dynamicProps: Record<string, CompiledExpression> = {};
   const propDeps: string[][] = [];
+  const compiledPropNodes = compilePropNodes(node.props, resolver);
 
   for (const [key, value] of Object.entries(node.props ?? {})) {
+    if (compiledPropNodes?.[key]) {
+      continue;
+    }
     const result = compilePropRuntimeValue(value);
     if (!result.isStatic) {
       dynamicProps[key] = result.value as CompiledExpression;
@@ -514,6 +560,7 @@ function compileNode(node: SchemaNode, resolver: ComponentResolver): CompiledNod
     compiledChildrenInfo.childrenFn?.deps,
     compiledChildrenInfo.compiledChildren?.flatMap((child) => child.allDeps),
     collectSlotDeps(compiledSlots),
+    collectPropNodeDeps(compiledPropNodes),
     collectColumnDeps(compiledColumns),
     loop?.dataFn.deps,
     loop?.keyFn.deps,
@@ -547,6 +594,9 @@ function compileNode(node: SchemaNode, resolver: ComponentResolver): CompiledNod
   }
   if (compiledSlots) {
     compiledNode.compiledSlots = compiledSlots;
+  }
+  if (compiledPropNodes) {
+    compiledNode.compiledPropNodes = compiledPropNodes;
   }
   if (compiledColumns) {
     compiledNode.compiledColumns = compiledColumns;

@@ -254,6 +254,16 @@ export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRende
     }
   }
 
+  if (node.compiledPropNodes) {
+    for (const [propName, propNode] of Object.entries(node.compiledPropNodes)) {
+      if (Array.isArray(propNode)) {
+        resolvedProps[propName] = propNode.map((child, index) => renderChild(child, `${propName}_${index}`, extraContext));
+      } else {
+        resolvedProps[propName] = renderChild(propNode, propName, extraContext);
+      }
+    }
+  }
+
   // Step 10: columns
   if (node.compiledColumns) {
     const rowKey = resolvedProps.rowKey ?? 'key';
