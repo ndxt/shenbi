@@ -41,6 +41,7 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
     isRunning,
     progressText,
     currentPlan,
+    blockStatuses,
     runAgent,
     cancelRun,
   } = useAgentRun(bridge);
@@ -153,10 +154,18 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
                   <Info size={10} /> {currentPlan.pageTitle || '架构计划'}
                 </div>
                 <ul className="flex flex-col gap-1 pl-2">
-                  {currentPlan.blocks.map((b, i) => (
-                    <li key={i} className="text-[11px] text-text-primary flex gap-2">
-                      <span className="text-blue-400 font-mono">[{b.type}]</span>
+                  {currentPlan.blocks.map((b) => (
+                    <li key={b.id} className="text-[11px] text-text-primary flex gap-2">
                       <span className="opacity-80 truncate">{b.description}</span>
+                      <span className={`ml-auto text-[10px] font-mono ${
+                        blockStatuses[b.id] === 'done'
+                          ? 'text-emerald-400'
+                          : blockStatuses[b.id] === 'generating'
+                            ? 'text-blue-400'
+                            : 'text-text-secondary'
+                      }`}>
+                        {blockStatuses[b.id] ?? 'waiting'}
+                      </span>
                     </li>
                   ))}
                 </ul>

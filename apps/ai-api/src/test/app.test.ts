@@ -72,16 +72,26 @@ describe('GET /health', () => {
 
 describe('GET /api/ai/models', () => {
   it('returns model list', async () => {
-    const app = createApp();
-    const res = await app.request('/api/ai/models');
-    expect(res.status).toBe(200);
-    const json = await res.json() as { success: boolean; data: unknown[] };
-    expect(json.success).toBe(true);
-    expect(Array.isArray(json.data)).toBe(true);
-    expect((json.data as Array<{ id: string }>).length).toBeGreaterThan(0);
-    const model = (json.data as Array<{ id: string; provider: string }>)[0];
-    expect(typeof model?.id).toBe('string');
-    expect(typeof model?.provider).toBe('string');
+    const previousProvider = process.env.AI_PROVIDER;
+    try {
+      process.env.AI_PROVIDER = 'openai-compatible';
+      const app = createApp();
+      const res = await app.request('/api/ai/models');
+      expect(res.status).toBe(200);
+      const json = await res.json() as { success: boolean; data: unknown[] };
+      expect(json.success).toBe(true);
+      expect(Array.isArray(json.data)).toBe(true);
+      expect((json.data as Array<{ id: string }>).length).toBeGreaterThan(0);
+      const model = (json.data as Array<{ id: string; provider: string }>)[0];
+      expect(typeof model?.id).toBe('string');
+      expect(typeof model?.provider).toBe('string');
+    } finally {
+      if (previousProvider === undefined) {
+        delete process.env.AI_PROVIDER;
+      } else {
+        process.env.AI_PROVIDER = previousProvider;
+      }
+    }
   });
 });
 

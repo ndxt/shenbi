@@ -2,8 +2,7 @@
  * Mock AI client for tests only — NOT exported from the package public API.
  */
 import type { AIClient, AgentEvent, RunRequest, RunStreamOptions } from './api-types';
-import { createAIDemoSchema } from './demo-schema';
-
+import type { PageSchema } from '@shenbi/schema';
 function wait(ms: number, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
         const timeout = setTimeout(resolve, ms);
@@ -52,10 +51,18 @@ export class MockAIClient implements AIClient {
             data: {
                 pageTitle: '示例应用布局',
                 pageType: 'dashboard',
+                layout: [
+                    { blocks: ['header-block'] },
+                    {
+                        columns: [
+                            { span: 16, blocks: ['hero-block'] },
+                            { span: 8, blocks: ['aside-block'] },
+                        ],
+                    },
+                ],
                 blocks: [
                     {
                         id: 'header-block',
-                        type: 'page-header',
                         description: '顶部导航栏',
                         components: ['Container', 'Button'],
                         priority: 1,
@@ -63,11 +70,17 @@ export class MockAIClient implements AIClient {
                     },
                     {
                         id: 'hero-block',
-                        type: 'kpi-row',
                         description: '内容介绍区',
                         components: ['Card'],
                         priority: 2,
                         complexity: 'medium' as const,
+                    },
+                    {
+                        id: 'aside-block',
+                        description: '右侧说明区',
+                        components: ['Card', 'Typography.Text'],
+                        priority: 3,
+                        complexity: 'simple' as const,
                     },
                 ],
             },
@@ -77,12 +90,166 @@ export class MockAIClient implements AIClient {
         await wait(500, options.signal);
         yield { type: 'message:delta', data: { text: '规划完成，开始生成页面结构...\n' } };
 
-        const schema = createAIDemoSchema();
-        for (const [index, node] of (Array.isArray(schema.body) ? schema.body : [schema.body]).entries()) {
-            if (!node) {
+        const schema: PageSchema = {
+            id: 'mock-plan-b-page',
+            name: '示例应用布局',
+            body: [
+                {
+                    id: 'header-block',
+                    component: 'Card',
+                    props: {
+                        title: '页面头部',
+                    },
+                    children: [
+                        {
+                            id: 'header-title',
+                            component: 'Typography.Text',
+                            children: '欢迎使用 Plan B 布局生成',
+                        },
+                    ],
+                },
+                {
+                    id: 'layout-row-2',
+                    component: 'Row',
+                    props: { gutter: [24, 24] },
+                    children: [
+                        {
+                            id: 'layout-row-2-col-1',
+                            component: 'Col',
+                            props: { span: 16 },
+                            children: [
+                                {
+                                    id: 'hero-block',
+                                    component: 'Card',
+                                    props: {
+                                        title: '内容介绍区',
+                                    },
+                                    children: [
+                                        {
+                                            id: 'hero-text',
+                                            component: 'Typography.Text',
+                                            children: '这里展示页面的核心介绍内容。',
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            id: 'layout-row-2-col-2',
+                            component: 'Col',
+                            props: { span: 8 },
+                            children: [
+                                {
+                                    id: 'aside-block',
+                                    component: 'Card',
+                                    props: {
+                                        title: '右侧说明区',
+                                    },
+                                    children: [
+                                        {
+                                            id: 'aside-text',
+                                            component: 'Typography.Text',
+                                            children: '这里展示补充说明和操作提示。',
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+        const skeletonSchema: PageSchema = {
+            id: 'mock-skeleton-page',
+            name: '示例应用布局',
+            body: [
+                {
+                    id: 'header-block-skeleton',
+                    component: 'Card',
+                    props: {
+                        title: '页面头部',
+                        loading: true,
+                    },
+                    children: [
+                        {
+                            id: 'header-block-skeleton-text',
+                            component: 'Typography.Text',
+                            children: '生成中...',
+                        },
+                    ],
+                },
+                {
+                    id: 'layout-row-2',
+                    component: 'Row',
+                    props: { gutter: [24, 24] },
+                    children: [
+                        {
+                            id: 'layout-row-2-col-1',
+                            component: 'Col',
+                            props: { span: 16 },
+                            children: [
+                                {
+                                    id: 'hero-block-skeleton',
+                                    component: 'Card',
+                                    props: {
+                                        title: '内容介绍区',
+                                        loading: true,
+                                    },
+                                    children: [
+                                        {
+                                            id: 'hero-block-skeleton-text',
+                                            component: 'Typography.Text',
+                                            children: '生成中...',
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            id: 'layout-row-2-col-2',
+                            component: 'Col',
+                            props: { span: 8 },
+                            children: [
+                                {
+                                    id: 'aside-block-skeleton',
+                                    component: 'Card',
+                                    props: {
+                                        title: '右侧说明区',
+                                        loading: true,
+                                    },
+                                    children: [
+                                        {
+                                            id: 'aside-block-skeleton-text',
+                                            component: 'Typography.Text',
+                                            children: '生成中...',
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        };
+        yield {
+            type: 'schema:skeleton',
+            data: {
+                schema: skeletonSchema,
+            },
+        };
+        await wait(300, options.signal);
+        yield { type: 'schema:block:start', data: { blockId: 'header-block', description: '顶部导航栏' } };
+        yield { type: 'schema:block:start', data: { blockId: 'hero-block', description: '内容介绍区' } };
+        yield { type: 'schema:block:start', data: { blockId: 'aside-block', description: '右侧说明区' } };
+        await wait(300, options.signal);
+
+        const nodes = Array.isArray(schema.body) ? schema.body : [schema.body];
+        const blockIds = ['header-block', 'hero-block', 'aside-block'];
+        for (const [index, node] of nodes.entries()) {
+            if (!node || !blockIds[index]) {
                 continue;
             }
-            yield { type: 'schema:block', data: { blockId: `block-${index + 1}`, node } };
+            yield { type: 'schema:block', data: { blockId: blockIds[index]!, node } };
             await wait(800, options.signal);
         }
 

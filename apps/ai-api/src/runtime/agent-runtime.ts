@@ -5,6 +5,7 @@
 import {
   createInMemoryAgentMemoryStore,
   createToolRegistry,
+  type LayoutRow,
   runAgent,
   runAgentStream,
   type AgentRuntimeDeps,
@@ -16,7 +17,6 @@ import {
   type PlanPageInput,
   type RunMetadata,
   type RunRequest,
-  type ZoneType,
 } from '@shenbi/ai-agents';
 import type { AgentEvent } from '@shenbi/ai-contracts';
 import type { PageSchema } from '@shenbi/schema';
@@ -44,13 +44,8 @@ import {
   getPageSkeleton,
   getPageSkeletonSummary,
   getPlannerContractSummary,
-  getZoneComponentCandidates,
-  getZoneGoldenExample,
-  getZoneGenerationParameters,
-  getZoneTemplate,
-  getZoneTemplateSummary,
-  getPlannerZoneTemplateSummary,
-  getComponentSchemaContracts,
+  expandComponents,
+  getFullComponentContracts,
 } from './component-catalog.ts';
 import type { AgentRuntime } from './types.ts';
 
@@ -62,22 +57,7 @@ type JsonSalvageStrategy =
   | 'appended_missing_braces'
   | 'trimmed_extra_closing_braces';
 const supportedPageTypes = ['dashboard', 'list', 'form', 'detail', 'statistics', 'custom'] as const;
-const supportedZoneTypes = [
-  'page-header',
-  'filter',
-  'kpi-row',
-  'data-table',
-  'detail-info',
-  'form-body',
-  'form-actions',
-  'chart-area',
-  'timeline-area',
-  'side-info',
-  'empty-state',
-  'custom',
-] as const;
 const plannerContractSummary = getPlannerContractSummary();
-const plannerZoneTemplateSummary = getPlannerZoneTemplateSummary();
 const designPolicySummary = getDesignPolicySummary();
 
 interface RunTraceRecord {
@@ -90,7 +70,6 @@ interface RunTraceRecord {
   };
   blocks: Array<{
     blockId: string;
-    zoneType: ZoneType;
     description: string;
     suggestedComponents: string[];
     model: string;
@@ -127,29 +106,54 @@ function classifyPromptToPageType(prompt: string): PageType {
   return 'custom';
 }
 
-function orderBlocksBySkeleton(plan: PagePlan): PagePlan {
-  const skeleton = getPageSkeleton(plan.pageType);
-  const rank = new Map<ZoneType, number>();
-  skeleton.recommendedZones.forEach((zone, index) => {
-    rank.set(zone, index);
-  });
-  skeleton.optionalZones.forEach((zone, index) => {
-    if (!rank.has(zone)) {
-      rank.set(zone, skeleton.recommendedZones.length + index);
+function defaultLayoutFromBlocks(blockIds: string[]): LayoutRow[] {
+  return [{ blocks: blockIds }];
+}
+
+function isBlocksRow(row: LayoutRow): row is Extract<LayoutRow, { blocks: string[] }> {
+  return 'blocks' in row;
+}
+
+function validateLayoutRow(row: LayoutRow, knownBlockIds: Set<string>, rowIndex: number): void {
+  if (isBlocksRow(row)) {
+    if (!Array.isArray(row.blocks) || row.blocks.length === 0) {
+      throw new LLMError(`Planner returned empty layout row at index ${rowIndex}`, 'INVALID_LAYOUT_ROW');
+    }
+    for (const blockId of row.blocks) {
+      if (!knownBlockIds.has(blockId)) {
+        throw new LLMError(`Planner layout references unknown block id: ${blockId}`, 'UNKNOWN_LAYOUT_BLOCK');
+      }
+    }
+    return;
+  }
+
+  if (!Array.isArray(row.columns) || row.columns.length === 0) {
+    throw new LLMError(`Planner returned empty layout columns at index ${rowIndex}`, 'INVALID_LAYOUT_COLUMNS');
+  }
+
+  const totalSpan = row.columns.reduce((sum, column) => sum + (Number.isFinite(column.span) ? column.span : 0), 0);
+  if (totalSpan !== 24) {
+    throw new LLMError(`Planner layout row ${rowIndex} must sum to 24 span, received ${totalSpan}`, 'INVALID_LAYOUT_SPAN');
+  }
+
+  row.columns.forEach((column, columnIndex) => {
+    if (!Array.isArray(column.blocks) || column.blocks.length === 0) {
+      throw new LLMError(`Planner returned empty layout column at row ${rowIndex}, column ${columnIndex}`, 'INVALID_LAYOUT_COLUMN');
+    }
+    for (const blockId of column.blocks) {
+      if (!knownBlockIds.has(blockId)) {
+        throw new LLMError(`Planner layout references unknown block id: ${blockId}`, 'UNKNOWN_LAYOUT_BLOCK');
+      }
     }
   });
+}
 
-  return {
-    ...plan,
-    blocks: [...plan.blocks].sort((left, right) => {
-      const leftRank = rank.get(left.type) ?? Number.MAX_SAFE_INTEGER;
-      const rightRank = rank.get(right.type) ?? Number.MAX_SAFE_INTEGER;
-      if (leftRank !== rightRank) {
-        return leftRank - rightRank;
-      }
-      return left.priority - right.priority;
-    }),
-  };
+function collectLayoutBlockIds(layout: LayoutRow[]): string[] {
+  return layout.flatMap((row) => (
+    isBlocksRow(row)
+      ? row.blocks
+      : row.columns.flatMap((column) => column.blocks)
+  ));
 }
 
 function summarizeModelOutput(text: string): string {
@@ -516,48 +520,15 @@ function isSupportedPageType(value: unknown): value is PageType {
   return typeof value === 'string' && supportedPageTypes.includes(value as PageType);
 }
 
-function isSupportedZoneType(value: unknown): value is ZoneType {
-  return typeof value === 'string' && supportedZoneTypes.includes(value as ZoneType);
-}
-
-/** Leaf zone types that should not coexist with a custom layout block covering the same content. */
-const leafZoneTypes: ReadonlySet<ZoneType> = new Set<ZoneType>([
-  'detail-info', 'data-table', 'timeline-area', 'chart-area', 'side-info',
-  'kpi-row', 'filter', 'form-body', 'form-actions', 'empty-state',
-]);
-
-/**
- * Detect and resolve conflicts where the planner produced both a "custom" layout
- * block (containing Row/Col/Tabs — i.e. it already owns the full page layout)
- * AND separate leaf zones for the same content.
- *
- * Resolution: keep page-header + custom layout blocks, drop redundant leaf zones.
- */
-function resolvePlanConflicts(blocks: PagePlan['blocks']): PagePlan['blocks'] {
-  const customLayoutBlocks = blocks.filter((block) =>
-    block.type === 'custom'
-    && (block.components.includes('Row') || block.components.includes('Col') || block.components.includes('Tabs')),
-  );
-
-  if (customLayoutBlocks.length === 0) {
-    return blocks;
-  }
-
-  const hasLeafZones = blocks.some((block) => leafZoneTypes.has(block.type));
-  if (!hasLeafZones) {
-    return blocks;
-  }
-
-  // Conflict detected: custom layout + leaf zones coexist.
-  // Keep page-header and custom, drop leaf zones.
-  logger.warn('ai.plan.conflict_resolved', {
-    customBlocks: customLayoutBlocks.map((b) => b.id),
-    droppedLeafZones: blocks.filter((b) => leafZoneTypes.has(b.type)).map((b) => `${b.id}(${b.type})`),
-  });
-
-  return blocks.filter((block) =>
-    block.type === 'page-header' || block.type === 'custom',
-  );
+function sanitizeBlockId(rawId: unknown, index: number, seenBlockIds: Map<string, number>): string {
+  const safeBaseId = String(rawId || `block-${index + 1}`)
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || `block-${index + 1}`;
+  const nextCount = (seenBlockIds.get(safeBaseId) ?? 0) + 1;
+  seenBlockIds.set(safeBaseId, nextCount);
+  return nextCount === 1 ? safeBaseId : `${safeBaseId}-${nextCount}`;
 }
 
 function normalizePlan(plan: PagePlan): PagePlan {
@@ -569,24 +540,14 @@ function normalizePlan(plan: PagePlan): PagePlan {
   }
 
   const seenBlockIds = new Map<string, number>();
-  const normalizedBlocks: PagePlan['blocks'] = plan.blocks.map((block, index) => {
-    if (!isSupportedZoneType(block.type)) {
-      throw new LLMError(`Planner returned unsupported zone type: ${String(block.type)}`, 'UNSUPPORTED_ZONE_TYPE');
-    }
-
+  const normalizedBlocks = plan.blocks.map((block, index) => {
     const components = Array.isArray(block.components) ? block.components.filter(isSupportedComponent) : [];
     if (components.length === 0) {
-      throw new LLMError(`Planner returned no supported components for block: ${block.id || `block-${index + 1}`}`, 'UNSUPPORTED_BLOCK_COMPONENTS');
+      throw new LLMError(
+        `Planner returned no supported components for block: ${String(block.id || `block-${index + 1}`)}`,
+        'UNSUPPORTED_BLOCK_COMPONENTS',
+      );
     }
-
-    const rawId = String(block.id || `block-${index + 1}`);
-    const safeBaseId = rawId
-      .trim()
-      .replace(/[^a-zA-Z0-9_-]+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '') || `block-${index + 1}`;
-    const nextCount = (seenBlockIds.get(safeBaseId) ?? 0) + 1;
-    seenBlockIds.set(safeBaseId, nextCount);
 
     const complexity: PagePlan['blocks'][number]['complexity'] =
       block.complexity === 'medium' || block.complexity === 'complex'
@@ -594,25 +555,208 @@ function normalizePlan(plan: PagePlan): PagePlan {
         : 'simple';
 
     return {
-      ...block,
-      id: nextCount === 1 ? safeBaseId : `${safeBaseId}-${nextCount}`,
-      type: block.type,
+      id: sanitizeBlockId(block.id, index, seenBlockIds),
+      description: String(block.description || `Block ${index + 1}`).trim() || `Block ${index + 1}`,
       components,
       priority: Number.isFinite(block.priority) ? block.priority : index + 1,
       complexity,
     };
   });
 
-  const dedupedBlocks = resolvePlanConflicts(normalizedBlocks);
+  const knownBlockIds = new Set(normalizedBlocks.map((block) => block.id));
+  const initialLayout = Array.isArray(plan.layout) && plan.layout.length > 0
+    ? plan.layout
+    : defaultLayoutFromBlocks(normalizedBlocks.map((block) => block.id));
 
-  return orderBlocksBySkeleton({
-    ...plan,
-    blocks: dedupedBlocks,
+  initialLayout.forEach((row, rowIndex) => validateLayoutRow(row, knownBlockIds, rowIndex));
+
+  const referencedIds = collectLayoutBlockIds(initialLayout);
+  const seenLayoutIds = new Set<string>();
+  for (const blockId of referencedIds) {
+    if (seenLayoutIds.has(blockId)) {
+      throw new LLMError(`Planner layout references duplicate block id: ${blockId}`, 'DUPLICATE_LAYOUT_BLOCK');
+    }
+    seenLayoutIds.add(blockId);
+  }
+
+  const missingBlockIds = normalizedBlocks
+    .map((block) => block.id)
+    .filter((blockId) => !seenLayoutIds.has(blockId));
+
+  return {
+    pageTitle: plan.pageTitle.trim(),
+    pageType: plan.pageType,
+    blocks: normalizedBlocks,
+    layout: [
+      ...initialLayout,
+      ...(missingBlockIds.length > 0 ? defaultLayoutFromBlocks(missingBlockIds) : []),
+    ],
+  };
+}
+
+function createPlacementSummary(plan: PagePlan, blockId: string): string {
+  const layout = plan.layout ?? defaultLayoutFromBlocks(plan.blocks.map((block) => block.id));
+
+  for (const [rowIndex, row] of layout.entries()) {
+    if (isBlocksRow(row)) {
+      const blockIndex = row.blocks.indexOf(blockId);
+      if (blockIndex >= 0) {
+        return row.blocks.length === 1
+          ? `第 ${rowIndex + 1} 行，满宽区域`
+          : `第 ${rowIndex + 1} 行，第 ${blockIndex + 1} 个纵向堆叠区域`;
+      }
+      continue;
+    }
+
+    for (const [columnIndex, column] of row.columns.entries()) {
+      const blockIndex = column.blocks.indexOf(blockId);
+      if (blockIndex >= 0) {
+        return [
+          `第 ${rowIndex + 1} 行`,
+          `第 ${columnIndex + 1} 列`,
+          `宽度 ${column.span}/24`,
+          column.blocks.length > 1 ? `列内第 ${blockIndex + 1} 个区块` : '列内唯一区块',
+        ].join('，');
+      }
+    }
+  }
+
+  return '默认纵向堆叠区域';
+}
+
+function createSkeletonBlock(blockId: string, description: string): GenerateBlockResult['node'] {
+  return {
+    id: `${blockId}-skeleton`,
+    component: 'Card',
+    props: {
+      title: description,
+      style: {
+        minHeight: 160,
+      },
+    },
+    children: [
+      {
+        id: `${blockId}-skeleton-body`,
+        component: 'Container',
+        props: {
+          direction: 'column',
+          gap: 12,
+        },
+        children: [
+          {
+            id: `${blockId}-skeleton-line-1`,
+            component: 'Typography.Text',
+            props: { type: 'secondary' },
+            children: ['Loading block...'],
+          },
+          {
+            id: `${blockId}-skeleton-line-2`,
+            component: 'Typography.Text',
+            props: { type: 'secondary' },
+            children: ['Preparing layout and content'],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function buildStackNode(id: string, nodes: GenerateBlockResult['node'][], gap: number): GenerateBlockResult['node'] {
+  if (nodes.length === 1) {
+    return nodes[0]!;
+  }
+
+  return {
+    id,
+    component: 'Container',
+    props: {
+      direction: 'column',
+      gap,
+    },
+    children: nodes,
+  };
+}
+
+function isGeneratedNode(value: GenerateBlockResult['node'] | undefined): value is GenerateBlockResult['node'] {
+  return Boolean(value);
+}
+
+function assembleFromLayout(layout: LayoutRow[], blockNodes: Record<string, GenerateBlockResult['node']>, gap: number): GenerateBlockResult['node'][] {
+  return layout.map((row, rowIndex) => {
+    if (isBlocksRow(row)) {
+      const nodes = row.blocks.map((blockId) => blockNodes[blockId]).filter(isGeneratedNode);
+      return buildStackNode(`layout-row-${rowIndex + 1}`, nodes, gap);
+    }
+
+    return {
+      id: `layout-row-${rowIndex + 1}`,
+      component: 'Row',
+      props: {
+        gutter: [gap, gap],
+      },
+      children: row.columns.map((column, columnIndex) => {
+        const nodes = column.blocks.map((blockId) => blockNodes[blockId]).filter(isGeneratedNode);
+        return {
+          id: `layout-row-${rowIndex + 1}-col-${columnIndex + 1}`,
+          component: 'Col',
+          props: {
+            span: column.span,
+          },
+          children: [buildStackNode(`layout-row-${rowIndex + 1}-col-${columnIndex + 1}-stack`, nodes, gap)],
+        };
+      }),
+    };
   });
 }
 
-function validateNode(node: GenerateBlockResult['node']): GenerateBlockResult['node'] {
-  return normalizeGeneratedNode(node);
+function findHeaderBlockId(plan: PagePlan): string | undefined {
+  const layout = plan.layout ?? [];
+  const firstRow = layout[0];
+  if (!firstRow) {
+    return undefined;
+  }
+
+  const firstIds = isBlocksRow(firstRow)
+    ? firstRow.blocks
+    : firstRow.columns.flatMap((column) => column.blocks);
+
+  return plan.blocks.find((block) => {
+    if (!firstIds.includes(block.id)) {
+      return false;
+    }
+    const lower = `${block.id} ${block.description}`.toLowerCase();
+    return /header|title|hero|banner|overview|summary|标题|概览/.test(lower);
+  })?.id;
+}
+
+function wrapStandaloneRoot(node: GenerateBlockResult['node'], blockId: string): GenerateBlockResult['node'] {
+  const wrappedComponents = new Set([
+    'Table',
+    'Statistic',
+    'Timeline',
+    'Descriptions',
+    'Result',
+    'Empty',
+    'Steps',
+    'Progress',
+    'Breadcrumb',
+    'Pagination',
+  ]);
+
+  if (!wrappedComponents.has(node.component)) {
+    return node;
+  }
+
+  return {
+    id: `${blockId}-card-shell`,
+    component: 'Card',
+    props: {},
+    children: [node],
+  };
+}
+
+function validateNode(node: GenerateBlockResult['node'], blockId: string): GenerateBlockResult['node'] {
+  return wrapStandaloneRoot(normalizeGeneratedNode(node), blockId);
 }
 
 function getRequestedChatModel(request: unknown): string | undefined {
@@ -645,6 +789,7 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
   const suggestedPageType = classifyPromptToPageType(input.request.prompt);
   const suggestedSkeletonSummary = getPageSkeletonSummary(suggestedPageType);
   const freeLayoutPatternSummary = getFreeLayoutPatternSummary(suggestedPageType);
+  const skeleton = getPageSkeleton(suggestedPageType);
   return [
     {
       role: 'system',
@@ -653,59 +798,43 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         'Only output valid JSON.',
         `Use only these supported components when planning: ${supportedComponentList}.`,
         `Use only these page types: ${supportedPageTypes.join(', ')}.`,
-        `Use only these zone types: ${supportedZoneTypes.join(', ')}.`,
         'Available component groups and contract summaries:',
         plannerContractSummary,
         'Design policy:',
         designPolicySummary,
-        'Zone templates:',
-        plannerZoneTemplateSummary,
         'Reference page skeleton for this request:',
         suggestedSkeletonSummary,
         'Free-layout patterns you may borrow from when they improve clarity:',
         freeLayoutPatternSummary,
+        `Recommended layout intent: ${skeleton.intent}`,
+        `Recommended layout pattern: ${skeleton.layoutPattern}`,
         'Hard rules:',
         '- pageTitle must be a concise human-readable title.',
         '- pageType must be exactly one of: dashboard, list, form, detail, statistics, custom.',
+        '- layout must be an array of rows.',
+        '- Each row is either {"blocks":["block-id"]} for vertical stacking or {"columns":[{"span":12,"blocks":["a"]},{"span":12,"blocks":["b"]}]}.',
+        '- For rows with columns, the sum of span must equal 24.',
         '- blocks must be a non-empty array.',
-        '- block.id is a semantic identifier and may contain business meaning such as alert-summary, recent-records, attendance-table.',
-        '- block.type is a zone type, not a component name.',
-        '- block.type must be exactly one of: page-header, filter, kpi-row, data-table, detail-info, form-body, form-actions, chart-area, timeline-area, side-info, empty-state, custom.',
+        '- block.id is a semantic identifier and may contain business meaning such as employee-overview, attendance-records, approval-timeline.',
         '- block.components must be a non-empty array.',
         `- Every item in block.components must be chosen from: ${supportedComponentList}.`,
-        '- If the page is a dashboard, use pageType "dashboard" and prefer zones page-header, kpi-row, chart-area, data-table, timeline-area.',
-        '- If the page is a list page, use pageType "list" and prefer zones page-header, filter, data-table.',
-        '- If the page is a form page, use pageType "form" and prefer zones page-header, form-body, form-actions, side-info.',
-        '- If the page is a detail page, use pageType "detail" and prefer zones page-header, detail-info, data-table or timeline-area.',
-        '- If the page is a statistics page, use pageType "statistics" and prefer zones page-header, kpi-row, chart-area, data-table.',
-        '- For page-header, use layout-shell + typography + actions groups.',
-        '- For filter, use data-display + filters-form + layout-shell + actions groups.',
-        '- For kpi-row, use layout-shell + data-display + feedback-status groups.',
-        '- For data-table, use data-display + actions + feedback-status groups.',
-        '- For detail-info, use data-display + typography + feedback-status groups.',
-        '- For form-body, use data-display + filters-form groups.',
-        '- For form-actions, use layout-shell + actions groups.',
-        '- For timeline-area, use data-display + typography groups.',
-        '- For chart-area, if no chart component is available, use data-display + typography + feedback-status groups.',
-        '- Never put semantic aliases like hero, recent-records, summary-panel, alert-summary, dashboard-header, banner, widget into type or components.',
-        '- Business meaning belongs only in id and description.',
-        '- If unsure, choose Card with components ["Card"].',
+        '- Planner components must describe functional content only. Avoid Row, Col, Space, Flex, Divider, Container as planner outputs unless a KPI/statistic region clearly requires them.',
+        '- The same block id may appear in layout at most once.',
+        '- Every block should describe one visual region only; do not repeat the same semantic content in multiple blocks.',
+        '- When the user describes left/right, top/bottom, double-column, triple-column, or asymmetric layout, express that through layout rows/columns instead of duplicating blocks.',
+        '- If unsure, choose a single clear business block, not repeated regions.',
         `- For this request, prefer pageType "${suggestedPageType}" unless the user clearly asks for a custom mixed layout.`,
-        '- IMPORTANT: If you include a "custom" layout block that already provides the full page layout (e.g. left-right split with Row/Col), do NOT also include leaf zones like detail-info, data-table, timeline-area for the same content. Either plan ONE custom layout block that contains everything, OR plan individual leaf zones that the assembler will stack vertically — never both.',
-        '- CRITICAL: When the user describes spatial/positional layout (e.g. 左/右, 上/下, 左上/左下/右侧, 双栏, 三栏, 左边...右边...), you MUST use a SINGLE block with type "custom" containing ALL described areas. Do NOT split spatially-related areas into separate blocks (kpi-row, data-table, timeline-area) — that destroys the intended layout by stacking them vertically. The custom block generator will use Row/Col to implement the spatial arrangement.',
-        '- Only use separate leaf zones (kpi-row, data-table, etc.) when the user does NOT describe spatial positioning and content should simply flow top-to-bottom.',
         '- Favor clean B2B admin layouts: clear page title, concise helper text, grouped filters, summary cards, primary data area, moderate whitespace.',
-        '- Page skeletons and zone templates are references, not prison rules. You may adapt order or composition when it improves clarity and aesthetics.',
         '- Use free-layout patterns when they create a stronger composition, especially for custom or mixed business pages.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Valid example 1:',
-        '{"pageTitle":"考勤首页","pageType":"dashboard","blocks":[{"id":"header","type":"page-header","description":"页面标题、描述和主要操作","components":["Container","Typography.Title","Typography.Text","Space","Button"],"priority":1,"complexity":"simple"},{"id":"attendance-kpis","type":"kpi-row","description":"展示今日出勤、迟到、请假等关键指标","components":["Row","Col","Card","Statistic","Tag"],"priority":2,"complexity":"simple"},{"id":"attendance-table","type":"data-table","description":"展示最近考勤记录","components":["Card","Table","Tag"],"priority":3,"complexity":"medium"}]}',
+        '{"pageTitle":"考勤首页","pageType":"dashboard","layout":[{"blocks":["header-block"]},{"columns":[{"span":16,"blocks":["kpi-block","records-block"]},{"span":8,"blocks":["timeline-block"]}]}],"blocks":[{"id":"header-block","description":"页面标题、描述和主操作区","components":["Typography.Title","Typography.Text","Button"],"priority":1,"complexity":"simple"},{"id":"kpi-block","description":"考勤核心指标区域","components":["Statistic","Tag"],"priority":2,"complexity":"simple"},{"id":"records-block","description":"最近考勤记录表格","components":["Table","Tag","Pagination"],"priority":3,"complexity":"medium"},{"id":"timeline-block","description":"审批动态时间线","components":["Timeline","Typography.Text"],"priority":4,"complexity":"medium"}]}',
         'Valid example 2:',
-        '{"pageTitle":"用户列表","pageType":"list","blocks":[{"id":"header","type":"page-header","description":"页面标题、统计和新建按钮","components":["Container","Typography.Title","Typography.Text","Button"],"priority":1,"complexity":"simple"},{"id":"filters","type":"filter","description":"搜索、角色筛选和日期筛选","components":["Card","Form","FormItem","Input","Select","DatePicker","Space","Button"],"priority":2,"complexity":"medium"},{"id":"recent-records","type":"data-table","description":"展示最近用户数据和状态标签","components":["Card","Table","Tag","Button"],"priority":3,"complexity":"medium"}]}',
+        '{"pageTitle":"员工详情","pageType":"detail","layout":[{"blocks":["detail-header"]},{"columns":[{"span":10,"blocks":["profile-block","contact-block"]},{"span":14,"blocks":["attendance-block","approval-block"]}]}],"blocks":[{"id":"detail-header","description":"页面标题、说明和操作按钮","components":["Typography.Title","Typography.Text","Button","Breadcrumb"],"priority":1,"complexity":"simple"},{"id":"profile-block","description":"员工基本信息","components":["Descriptions","Tag","Avatar"],"priority":2,"complexity":"simple"},{"id":"contact-block","description":"联系方式","components":["Descriptions","Typography.Text"],"priority":3,"complexity":"simple"},{"id":"attendance-block","description":"最近考勤记录","components":["Table","Pagination","Tag"],"priority":4,"complexity":"medium"},{"id":"approval-block","description":"审批动态","components":["Timeline","Badge"],"priority":5,"complexity":"medium"}]}',
         'Invalid example:',
-        '{"pageTitle":"考勤首页","pageType":"dashboard","blocks":[{"id":"recent-records","type":"recent-records","description":"...","components":["recent-records"],"priority":1,"complexity":"simple"}]}',
+        '{"pageTitle":"考勤首页","pageType":"dashboard","layout":[{"columns":[{"span":16,"blocks":["records"]},{"span":8,"blocks":["records"]}]}],"blocks":[{"id":"records","description":"最近记录","components":["Table"],"priority":1,"complexity":"simple"}]}',
         'Return exactly this JSON shape:',
-        '{"pageTitle":"string","pageType":"dashboard|list|form|detail|statistics|custom","blocks":[{"id":"string","type":"page-header|filter|kpi-row|data-table|detail-info|form-body|form-actions|chart-area|timeline-area|side-info|empty-state|custom","description":"string","components":["Card"],"priority":1,"complexity":"simple"}]}',
+        '{"pageTitle":"string","pageType":"dashboard|list|form|detail|statistics|custom","layout":[{"blocks":["block-id"]},{"columns":[{"span":12,"blocks":["left-block"]},{"span":12,"blocks":["right-block"]}]}],"blocks":[{"id":"string","description":"string","components":["Table"],"priority":1,"complexity":"simple"}]}',
       ].join('\n'),
     },
     {
@@ -722,66 +851,38 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
 }
 
 function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage[] {
-  const zoneCandidates = getZoneComponentCandidates(input.block.type);
-  const componentSchemaContracts = getComponentSchemaContracts(input.block.components);
-  const zoneGenerationParameters = getZoneGenerationParameters(input.block.type);
-  const zoneGoldenExample = getZoneGoldenExample(input.block.type);
-  const zoneTemplateSummary = getZoneTemplateSummary(input.block.type);
-  const freeLayoutPatternSummary = getFreeLayoutPatternSummary(classifyPromptToPageType(input.request.prompt));
+  const expandedComponents = expandComponents(input.block.components);
+  const componentSchemaContracts = getFullComponentContracts(expandedComponents);
   return [
     {
       role: 'system',
       content: [
         'You generate one low-code block as valid JSON.',
         `Only use supported components: ${supportedComponentList}.`,
-        `For this zone, prioritize these candidate components: ${zoneCandidates.join(', ')}.`,
-        'Zone template:',
-        zoneTemplateSummary,
-        'Zone generation parameters:',
-        zoneGenerationParameters,
+        `For this block, prioritize these components: ${expandedComponents.join(', ')}.`,
         'Design policy:',
         designPolicySummary,
         'Component schema contracts (MUST follow these exact structures):',
         componentSchemaContracts,
-        'Valid zone example:',
-        zoneGoldenExample,
-        'Free-layout composition references:',
-        freeLayoutPatternSummary,
         'Rules:',
         '- STRICT CONTRACT COMPLIANCE: Only use props that appear in the "Component schema contracts" section above. Do NOT add extra props from memory, from antd v4, or from any other source.',
         '- STRICT ENUM VALUES: For any prop that has a defined enum, use ONLY the exact values listed in the contract. Do not invent or substitute alternative values.',
         '- The root node component must be one of the supported components.',
         '- Every child schema node must also use only supported components.',
         '- children may contain schema nodes or plain text only.',
-        '- Use the zone template skeleton as a starting point, but adapt composition when a cleaner free layout improves readability.',
-        '- Stay within the declared maxDepth and maxChildrenPerArray.',
         '- Build polished B2B admin blocks with clear hierarchy, balanced spacing, and concise business copy.',
-        '- Prefer layout primitives such as Row, Col, Space, Flex, and Divider to create rhythm, spacing, and asymmetric but balanced compositions.',
-        '- page-header zones should usually use layout-shell + typography + actions components.',
-        '- filter zones should usually use Card containing Form, FormItem, Input, Select, DatePicker, Space, and Button.',
-        '- kpi-row zones should usually use Row + Col + Card + Statistic + Tag. Four concise KPI cards are better than one oversized block.',
-        '- data-table zones should use Card wrapping Table and optional action buttons or tags.',
-        '- detail-info zones should prefer Card + Descriptions + Descriptions.Item + Tag.',
-        '- form-body zones should prefer Card + Form + FormItem + Input/Select/DatePicker.',
-        '- form-actions zones should prefer Space and Button.',
-        '- timeline-area zones should prefer Card + Timeline + Timeline.Item.',
-        '- chart-area zones should prefer Card with Typography.Title, Typography.Paragraph, Statistic, Tag or supporting summary content when no chart component exists.',
-        '- side-info zones should prefer Card + Typography.Text or Descriptions.',
-        '- A non-custom zone must generate only its own zone content, not a full page layout.',
-        '- For detail-info, data-table, timeline-area, filter, side-info, and chart-area, do not return a top-level Row/Col page layout, Tabs container, page header, or repeated copies of other zones.',
-        '- If the zone is data-table, return table-focused content only. Do not include basic info, contact info, approval timeline, or page-level split layouts.',
-        '- If the zone is timeline-area, return timeline-focused content only. Do not include tables, descriptions, or page-level split layouts.',
-        '- If the zone is detail-info, return detail-focused content only. Do not include tabs, tables, timelines, or page-level split layouts.',
-        '- Only custom zones may own a full mixed layout such as left/right split content.',
+        '- You are generating one visual region only, not a whole page.',
+        '- Do NOT output page-level wrappers, page-level titles, page shell, or duplicated sibling regions.',
+        '- Do NOT output page-level Row/Col or Tabs split layouts unless the current block description explicitly requires an internal split inside this one block.',
+        '- Prefer Card as a self-contained wrapper for data, detail, timeline, result, empty-state, and status regions.',
+        '- KPI regions may use Row > Col > Statistic inside a single block.',
         '- Never use raw HTML tags like div, span, section, header, footer. Use Container instead of div/section/header/footer.',
-        '- When a Col has multiple children stacked vertically, wrap them in a Container with direction="column" and gap=16 for proper spacing.',
         '- For Table, include sample data in props.dataSource and props.columns.',
         '- For Statistic, include props.title and props.value.',
         '- For FormItem, include a label prop and exactly one input-like child when possible.',
         '- For Descriptions, include props.column and Descriptions.Item children with label props.',
         '- For Timeline, return Timeline.Item children with short text content.',
         '- Use realistic Chinese B-end copy such as 今日出勤率, 本周迟到人数, 最近考勤记录, 审批状态.',
-        '- For custom, dashboard, or detail prompts, prefer stronger composition patterns like main-content-plus-side-info, summary-then-detail, or split-context-and-data when appropriate.',
         '- Keep braces and brackets balanced. Your answer must be parseable by JSON.parse without any cleanup.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Return exactly this JSON shape:',
@@ -791,15 +892,10 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
     {
       role: 'user',
       content: [
-        // Custom zones need the full prompt to understand whole-page layout intent.
-        // Non-custom zones only see their own scoped description to prevent
-        // the model from re-generating full-page layouts triggered by keywords
-        // like "双栏", "左边...右边..." in the original prompt.
-        // But include the page title for context so headers aren't generic.
-        input.block.type === 'custom'
-          ? `Prompt: ${input.request.prompt}`
-          : `Prompt: Generate the "${input.block.description}" section for a page titled "${input.pageTitle ?? 'Untitled'}".`,
-        `Block Type: ${input.block.type}`,
+        `Prompt: ${input.request.prompt}`,
+        `Page Title: ${input.pageTitle ?? 'Untitled'}`,
+        `Block Index: ${input.blockIndex ?? 0}`,
+        `Placement: ${input.placementSummary ?? '默认纵向堆叠区域'}`,
         `Block Description: ${input.block.description}`,
         `Suggested Components: ${input.block.components.join(', ')}`,
         'Your response must start with { and end with }. No other text.',
@@ -808,163 +904,14 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
   ];
 }
 
-/**
- * Zone types that accept Row as a legitimate root.
- * kpi-row genuinely needs Row>Col layout; custom zones may have any layout;
- * form-actions is too small to need checking.
- */
-const rowAllowedZones: ReadonlySet<ZoneType> = new Set<ZoneType>(['custom', 'kpi-row', 'form-actions']);
-
-/**
- * Components that each non-custom zone "wants" — the first match in a deep tree
- * is extracted when the block generator violated its zone ownership.
- */
-const zoneSignatureComponents: Partial<Record<ZoneType, ReadonlySet<string>>> = {
-  'data-table': new Set(['Table']),
-  'timeline-area': new Set(['Timeline']),
-  'detail-info': new Set(['Descriptions']),
-  'chart-area': new Set(['Statistic']),
-  filter: new Set(['Form']),
-  'side-info': new Set(['Descriptions', 'Typography.Text']),
-};
-
-interface SchemaNodeLike {
-  component: string;
-  id?: string;
-  props?: Record<string, unknown>;
-  children?: unknown;
-  columns?: unknown;
-  [key: string]: unknown;
-}
-
-function isSchemaNodeLike(value: unknown): value is SchemaNodeLike {
-  return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
-}
-
-/**
- * Walk a node tree depth-first and return the first Card/Container that contains
- * a signature component matching the target zone type.
- */
-function findZoneSubtree(
-  node: SchemaNodeLike,
-  signatureComponents: ReadonlySet<string>,
-): SchemaNodeLike | null {
-  // If the node itself IS a signature component, return its parent wrapper.
-  // But we need the Card wrapper — check children first.
-  const children = Array.isArray(node.children) ? node.children.filter(isSchemaNodeLike) : [];
-
-  // Check if any immediate child is a signature component
-  if (children.some((child) => signatureComponents.has(child.component))) {
-    return node;
-  }
-
-  // Recurse into children
-  for (const child of children) {
-    const found = findZoneSubtree(child, signatureComponents);
-    if (found) {
-      return found;
-    }
-  }
-  return null;
-}
-
-/**
- * Enforce zone ownership on a block's generated output.
- *
- * If a non-custom zone generated a top-level Row/Col page layout (violation),
- * attempt to extract the subtree that actually matches this zone's purpose.
- * Falls back to the original node if extraction fails.
- */
-function validateBlockOutput(
-  node: SchemaNodeLike,
-  zoneType: ZoneType,
-  blockId: string,
-): SchemaNodeLike {
-  // Custom zones and zones that legitimately use Row are exempt.
-  if (rowAllowedZones.has(zoneType)) {
-    return node;
-  }
-
-  // Detect violation: top-level Row with multiple Col children.
-  const isTopLevelRowLayout =
-    node.component === 'Row'
-    && Array.isArray(node.children)
-    && node.children.filter(isSchemaNodeLike).filter((c) => c.component === 'Col').length > 1;
-
-  // Detect violation: top-level Tabs in a non-custom zone.
-  const isTopLevelTabs = node.component === 'Tabs';
-
-  if (!isTopLevelRowLayout && !isTopLevelTabs) {
-    return node;
-  }
-
-  // Zone boundary violated. Try to extract the matching subtree.
-  const signature = zoneSignatureComponents[zoneType];
-  if (signature) {
-    const subtree = findZoneSubtree(node, signature);
-    if (subtree && subtree !== node) {
-      logger.warn('ai.block.zone_violation_corrected', {
-        blockId,
-        zoneType,
-        originalRoot: node.component,
-        extractedRoot: subtree.component,
-      });
-      return subtree;
-    }
-  }
-
-  // Fallback: if the row layout has Col children, try to return the first Col's
-  // children as a Container — this at least removes the split-layout.
-  if (isTopLevelRowLayout && Array.isArray(node.children)) {
-    const cols = node.children.filter(isSchemaNodeLike).filter((c) => c.component === 'Col');
-    if (cols.length > 0) {
-      const firstCol = cols[0]!;
-      const colChildren = Array.isArray(firstCol.children)
-        ? firstCol.children.filter(isSchemaNodeLike)
-        : [];
-      if (colChildren.length === 1) {
-        logger.warn('ai.block.zone_violation_fallback', {
-          blockId,
-          zoneType,
-          fallback: 'first_col_single_child',
-        });
-        return colChildren[0]!;
-      }
-      if (colChildren.length > 1) {
-        logger.warn('ai.block.zone_violation_fallback', {
-          blockId,
-          zoneType,
-          fallback: 'first_col_container',
-        });
-        return {
-          component: 'Container',
-          id: `${blockId}-corrected`,
-          props: { direction: 'column', gap: 16 },
-          children: colChildren,
-        };
-      }
-    }
-  }
-
-  // No extraction possible — keep original and log warning.
-  logger.warn('ai.block.zone_violation_unresolved', {
-    blockId,
-    zoneType,
-    rootComponent: node.component,
-  });
-  return node;
-}
-
 async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord): Promise<GenerateBlockResult> {
   const client = createClient();
   const model = requireModel(input.request.blockModel ?? env.AI_BLOCK_MODEL, 'block');
   const text = await client.chat(model, createBlockMessages(input), getThinking(input.request));
   const rawNode = extractJson<GenerateBlockResult['node']>(text, 'block', input.request, model);
-  const correctedNode = validateBlockOutput(rawNode, input.block.type, input.block.id);
-  const node = validateNode(correctedNode as GenerateBlockResult['node']);
+  const node = validateNode(rawNode, input.block.id);
   trace?.blocks.push({
     blockId: input.block.id,
-    zoneType: input.block.type,
     description: input.block.description,
     suggestedComponents: input.block.components,
     model,
@@ -974,87 +921,30 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
   return {
     blockId: input.block.id,
     node,
-    summary: `Generated ${input.block.type} via ${model}`,
+    summary: `Generated ${input.block.description} via ${model}`,
   };
 }
 
-async function assembleSchema(input: AssembleSchemaInput, trace?: RunTraceRecord): Promise<PageSchema> {
-  const headerBlock = input.blocks.find((block) => block.blockId === 'header' || input.plan.blocks.find((planBlock) => planBlock.id === block.blockId)?.type === 'page-header');
-  const contentBlocks = input.blocks.filter((block) => block !== headerBlock);
+function buildSkeletonSchema(plan: PagePlan): PageSchema {
+  const gap = plan.pageType === 'dashboard' || plan.pageType === 'statistics' ? 24 : 16;
+  const layout = plan.layout ?? defaultLayoutFromBlocks(plan.blocks.map((block) => block.id));
+  const headerBlockId = findHeaderBlockId(plan);
+  const skeletonNodes = Object.fromEntries(
+    plan.blocks.map((block) => [block.id, createSkeletonBlock(block.id, block.description)]),
+  ) as Record<string, GenerateBlockResult['node']>;
+  const assembledRows = assembleFromLayout(layout, skeletonNodes, gap);
+  const contentRows = headerBlockId ? assembledRows.slice(1) : assembledRows;
 
-  const contentGap = input.plan.pageType === 'dashboard' || input.plan.pageType === 'statistics' ? 24 : 16;
-
-  const contentChildren = contentBlocks.map((block) => {
-    const blockPlan = input.plan.blocks.find((planBlock) => planBlock.id === block.blockId);
-    const zoneType = blockPlan?.type ?? 'custom';
-    const zoneTemplate = getZoneTemplate(zoneType);
-    const wrapperTitle = zoneTemplate.wrapper?.useDescriptionAsTitle ? blockPlan?.description : undefined;
-
-    if (zoneType === 'kpi-row') {
-      return {
-        id: `${block.blockId}-section`,
-        component: 'Row',
-        props: {
-          gutter: [16, 16],
-        },
-        children: [
-          {
-            id: `${block.blockId}-col`,
-            component: 'Col',
-            props: {
-              span: 24,
-            },
-            children: [block.node],
-          },
-        ],
-      };
-    }
-
-    if (zoneTemplate.wrapper && zoneType === 'filter') {
-      return {
-        id: `${block.blockId}-section`,
-        component: zoneTemplate.wrapper.component,
-        props: {
-          ...(zoneTemplate.wrapper.props ?? {}),
-          ...(wrapperTitle ? { title: wrapperTitle } : {}),
-        },
-        children: [block.node],
-      };
-    }
-
-    if (zoneTemplate.wrapper && (
-      zoneType === 'data-table'
-      || zoneType === 'detail-info'
-      || zoneType === 'form-body'
-      || zoneType === 'timeline-area'
-      || zoneType === 'chart-area'
-      || zoneType === 'side-info'
-      || zoneType === 'empty-state'
-    )) {
-      return {
-        id: `${block.blockId}-section`,
-        component: zoneTemplate.wrapper.component,
-        props: {
-          ...(zoneTemplate.wrapper.props ?? {}),
-          ...(wrapperTitle ? { title: wrapperTitle } : {}),
-        },
-        children: [block.node],
-      };
-    }
-
-    return block.node;
-  });
-
-  const schema: PageSchema = {
+  return {
     id: 'ai-generated-page',
-    name: input.plan.pageTitle,
+    name: plan.pageTitle,
     body: [
       {
         id: 'page-root',
         component: 'Container',
         props: {
           direction: 'column',
-          gap: contentGap,
+          gap,
           style: {
             width: '100%',
             padding: 24,
@@ -1062,7 +952,7 @@ async function assembleSchema(input: AssembleSchemaInput, trace?: RunTraceRecord
           },
         },
         children: [
-          ...(headerBlock
+          ...(headerBlockId
             ? [{
               id: 'page-header-shell',
               component: 'Container',
@@ -1076,7 +966,7 @@ async function assembleSchema(input: AssembleSchemaInput, trace?: RunTraceRecord
                   boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
                 },
               },
-              children: [headerBlock.node],
+              children: [assembledRows[0]!],
             }]
             : []),
           {
@@ -1084,9 +974,66 @@ async function assembleSchema(input: AssembleSchemaInput, trace?: RunTraceRecord
             component: 'Container',
             props: {
               direction: 'column',
-              gap: contentGap,
+              gap,
             },
-            children: contentChildren,
+            children: contentRows,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+async function assembleSchema(input: AssembleSchemaInput, trace?: RunTraceRecord): Promise<PageSchema> {
+  const gap = input.plan.pageType === 'dashboard' || input.plan.pageType === 'statistics' ? 24 : 16;
+  const layout = input.plan.layout ?? defaultLayoutFromBlocks(input.plan.blocks.map((block) => block.id));
+  const headerBlockId = findHeaderBlockId(input.plan);
+  const blockNodes = Object.fromEntries(input.blocks.map((block) => [block.blockId, block.node])) as Record<string, GenerateBlockResult['node']>;
+  const assembledRows = assembleFromLayout(layout, blockNodes, gap);
+  const contentRows = headerBlockId ? assembledRows.slice(1) : assembledRows;
+
+  const schema: PageSchema = {
+    id: 'ai-generated-page',
+    name: input.plan.pageTitle,
+    body: [
+      {
+        id: 'page-root',
+        component: 'Container',
+        props: {
+          direction: 'column',
+          gap,
+          style: {
+            width: '100%',
+            padding: 24,
+            background: '#f5f7fa',
+          },
+        },
+        children: [
+          ...(headerBlockId
+            ? [{
+              id: 'page-header-shell',
+              component: 'Container',
+              props: {
+                direction: 'column',
+                gap: 10,
+                style: {
+                  padding: 20,
+                  borderRadius: 16,
+                  background: '#ffffff',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
+                },
+              },
+              children: [assembledRows[0]!],
+            }]
+            : []),
+          {
+            id: 'page-content-shell',
+            component: 'Container',
+            props: {
+              direction: 'column',
+              gap,
+            },
+            children: contentRows,
           },
         ],
       },
@@ -1154,6 +1101,12 @@ function createRuntimeDeps(trace?: RunTraceRecord): AgentRuntimeDeps {
         name: 'generateBlock',
         async execute(input: unknown) {
           return generateBlock(input as GenerateBlockInput, trace);
+        },
+      },
+      {
+        name: 'buildSkeletonSchema',
+        async execute(input: unknown) {
+          return buildSkeletonSchema((input as { plan: PagePlan }).plan);
         },
       },
       {

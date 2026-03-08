@@ -29,6 +29,8 @@ const { messageMock, notificationMock } = vi.hoisted(() => ({
   },
 }));
 
+const fetchMock = vi.hoisted(() => vi.fn());
+
 interface FormContextValue {
   form: {
     setFieldsValue: (next: Record<string, any>) => void;
@@ -234,6 +236,13 @@ vi.mock('antd', async (importOriginal) => {
     ]);
 
   const Space = (props: any) => createElement('div', null, props.children);
+  const Row = (props: any) => createElement('div', null, props.children);
+  const Col = (props: any) => createElement('div', null, props.children);
+  const Typography = {
+    Title: (props: any) => createElement('h1', null, props.children),
+    Text: (props: any) => createElement('span', null, props.children),
+    Paragraph: (props: any) => createElement('p', null, props.children),
+  };
 
   const Tag = (props: any) =>
     createElement('span', { 'data-testid': 'tag', 'data-color': props.color ?? '' }, props.children);
@@ -342,6 +351,9 @@ vi.mock('antd', async (importOriginal) => {
     Form,
     Card,
     Space,
+    Row,
+    Col,
+    Typography,
     Table,
     Tag,
     Alert,
@@ -379,11 +391,23 @@ describe('preview/App integration', () => {
     vi.clearAllMocks();
     window.history.replaceState(null, '', '/');
     window.localStorage.clear();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: [
+          { id: 'GLM-4.7', name: 'GLM-4.7' },
+          { id: 'GLM-4.6', name: 'GLM-4.6' },
+        ],
+      }),
+    } satisfies Partial<Response>);
+    vi.stubGlobal('fetch', fetchMock);
     setAIClient(new MockAIClient());
   });
 
   afterEach(() => {
     resetAIClient();
+    vi.unstubAllGlobals();
   });
 
   it('首屏渲染用户管理并自动拉取用户列表', async () => {
@@ -456,19 +480,25 @@ describe('preview/App integration', () => {
     });
   });
 
-  it('AI 面板：通过 bridge 执行 schema.replace 并更新画布', async () => {
+  it('AI 面板：通过 skeleton 热替换并更新画布', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
+
+    await user.selectOptions(screen.getByLabelText('模式切换'), 'shell');
+    await waitFor(() => {
+      expect(screen.queryByLabelText('场景切换')).toBeNull();
+    });
 
     await user.click(screen.getByTitle('Toggle AI Assistant'));
     const input = await screen.findByPlaceholderText('Ask AI anything... (Enter to send)');
     await user.type(input, '生成演示页面{enter}');
 
     await waitFor(() => {
-      expect(screen.getByText('AI 生成演示页面')).toBeInTheDocument();
-      expect(screen.getByText('开始使用')).toBeInTheDocument();
-    }, { timeout: 7000 });
-  });
+      expect(screen.getByText('页面头部')).toBeInTheDocument();
+      expect(screen.getByText('欢迎使用 Plan B 布局生成')).toBeInTheDocument();
+      expect(screen.getByText('右侧说明区')).toBeInTheDocument();
+    }, { timeout: 9000 });
+  }, 12000);
 
   it('编辑器：Events 支持 JSON 回写并驱动运行时', async () => {
     const user = userEvent.setup();

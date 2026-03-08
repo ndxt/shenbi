@@ -1000,6 +1000,22 @@ const childrenVsItemsWarnings: Record<string, string> = {
   Steps: 'IMPORTANT: Use props.items with plain title/description strings. Do NOT use children nodes.',
 };
 
+const baseComponents = ['Container', 'Card', 'Typography.Text'] as const;
+
+const companionMap: Partial<Record<string, string[]>> = {
+  Table: ['Tag', 'Button', 'Typography.Text', 'Pagination'],
+  Statistic: ['Row', 'Col', 'Typography.Text'],
+  Form: ['FormItem', 'Input', 'Select', 'DatePicker', 'Button', 'Space'],
+  Timeline: ['Typography.Text'],
+  Descriptions: ['Tag', 'Typography.Text'],
+  Tabs: ['Card'],
+  Steps: ['Card', 'Typography.Text'],
+  Progress: ['Card', 'Typography.Text'],
+  Breadcrumb: ['Typography.Text', 'Button'],
+  Result: ['Button', 'Typography.Text'],
+  Empty: ['Button', 'Typography.Text'],
+};
+
 function buildComponentIndex(
   contracts: readonly ComponentContract[],
   definitions: readonly ComponentGroupDefinition[],
@@ -1148,6 +1164,48 @@ export function getComponentSchemaContracts(componentTypes: readonly string[]): 
       if (!brief) return null;
       return brief.schemaContract;
     })
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function deriveChildComponents(componentType: string): string[] {
+  const directHints = getChildComponentHints(componentType);
+  if (directHints.length > 0) {
+    return directHints;
+  }
+  if (componentType === 'Form') {
+    return ['FormItem'];
+  }
+  return [];
+}
+
+export function expandComponents(plannerComponents: readonly string[]): string[] {
+  const expanded = new Set<string>();
+
+  for (const componentType of plannerComponents) {
+    if (!supportedComponentSet.has(componentType)) {
+      continue;
+    }
+    expanded.add(componentType);
+    deriveChildComponents(componentType).forEach((child) => {
+      if (supportedComponentSet.has(child)) {
+        expanded.add(child);
+      }
+    });
+    (companionMap[componentType] ?? []).forEach((companion) => {
+      if (supportedComponentSet.has(companion)) {
+        expanded.add(companion);
+      }
+    });
+  }
+
+  baseComponents.forEach((componentType) => expanded.add(componentType));
+  return [...expanded];
+}
+
+export function getFullComponentContracts(componentTypes: readonly string[]): string {
+  return expandComponents(componentTypes)
+    .map((componentType) => compiledLevel2Briefs[componentType]?.schemaContract ?? null)
     .filter(Boolean)
     .join('\n');
 }

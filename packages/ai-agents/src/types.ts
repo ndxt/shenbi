@@ -2,6 +2,7 @@ import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import type {
   AgentEvent,
   FeedbackRequest,
+  LayoutRow,
   ModelInfo,
   PagePlan as SharedPagePlan,
   PageType,
@@ -14,6 +15,7 @@ import type {
 export type {
   AgentEvent,
   FeedbackRequest,
+  LayoutRow,
   ModelInfo,
   PageType,
   RunMetadata,
@@ -95,6 +97,8 @@ export interface GenerateBlockInput {
   request: RunRequest;
   context: AgentRuntimeContext;
   pageTitle?: string;
+  blockIndex?: number;
+  placementSummary?: string;
 }
 
 export interface GenerateBlockResult {
