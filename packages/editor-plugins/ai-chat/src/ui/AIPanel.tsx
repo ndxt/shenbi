@@ -15,6 +15,7 @@ export interface AIPanelProps {
 }
 
 export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPanelProps) {
+  const [thinkingEnabled, setThinkingEnabled] = React.useState(false);
   const {
     plannerModels,
     plannerModel,
@@ -79,6 +80,7 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
       text,
       plannerModel,
       blockModel,
+      thinkingEnabled,
       currentConvId,
       () => addMessage({ role: 'assistant', content: '' }),
       (id, chunk) => updateMessage(id, (prev) => prev + chunk),
@@ -101,6 +103,19 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
       <div className="flex-none p-3 border-b border-border-ide flex gap-4 bg-bg-canvas">
         <ModelSelector label="Planner" models={plannerModels} value={plannerModel} onChange={setPlannerModel} disabled={isRunning || modelSelectionBlocked} />
         <ModelSelector label="Block" models={blockModels} value={blockModel} onChange={setBlockModel} disabled={isRunning || modelSelectionBlocked} />
+      </div>
+
+      <div className="flex-none px-3 py-2 border-b border-border-ide bg-bg-canvas flex items-center justify-between text-[11px] text-text-secondary">
+        <span>思考</span>
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <span className={thinkingEnabled ? 'text-blue-400' : 'opacity-70'}>{thinkingEnabled ? '已开启' : '已关闭'}</span>
+          <input
+            type="checkbox"
+            checked={thinkingEnabled}
+            onChange={(e) => setThinkingEnabled(e.target.checked)}
+            disabled={isRunning || modelSelectionBlocked}
+          />
+        </label>
       </div>
 
       {isLoadingModels && (

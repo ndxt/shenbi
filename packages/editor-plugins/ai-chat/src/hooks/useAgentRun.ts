@@ -122,6 +122,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             prompt: string,
             plannerModel: string,
             blockModel: string,
+            thinkingEnabled: boolean,
             conversationId: string | undefined,
             onMessageStart: () => string,
             onMessageDelta: (id: string, chunk: string) => void,
@@ -152,6 +153,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                 ...(selectedNodeId ? { selectedNodeId } : {}),
                 ...(plannerModel ? { plannerModel } : {}),
                 ...(blockModel ? { blockModel } : {}),
+                thinking: { type: thinkingEnabled ? 'enabled' : 'disabled' },
                 context: {
                     schemaSummary,
                     componentSummary,

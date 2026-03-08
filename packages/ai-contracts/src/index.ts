@@ -1,11 +1,16 @@
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
 
+export interface ThinkingConfig {
+  type: 'enabled' | 'disabled';
+}
+
 export interface RunRequest {
   prompt: string;
   plannerModel?: string;
   blockModel?: string;
   conversationId?: string;
   selectedNodeId?: string;
+  thinking?: ThinkingConfig;
   context: {
     schemaSummary: string;
     componentSummary: string;

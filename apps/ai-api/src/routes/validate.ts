@@ -43,6 +43,14 @@ export function validateRunRequest(body: unknown): RunRequest {
   if (typeof body['blockModel'] === 'string') req.blockModel = body['blockModel'];
   if (typeof body['conversationId'] === 'string') req.conversationId = body['conversationId'];
   if (typeof body['selectedNodeId'] === 'string') req.selectedNodeId = body['selectedNodeId'];
+  if (isRecord(body['thinking'])) {
+    const thinkingType = body['thinking']['type'];
+    if (thinkingType === 'enabled' || thinkingType === 'disabled') {
+      req.thinking = { type: thinkingType };
+    } else {
+      throw new ValidationError('thinking.type must be "enabled" or "disabled"');
+    }
+  }
 
   return req;
 }

@@ -20,12 +20,17 @@ import type { AgentEvent } from '@shenbi/ai-contracts';
 import type { PageSchema } from '@shenbi/schema';
 import { LLMError } from '../adapters/errors.ts';
 import { loadEnv } from '../adapters/env.ts';
-import { OpenAICompatibleClient, type OpenAICompatibleMessage } from '../adapters/openai-compatible.ts';
+import {
+  OpenAICompatibleClient,
+  type OpenAICompatibleMessage,
+  type OpenAICompatibleThinking,
+} from '../adapters/openai-compatible.ts';
 import type { AgentRuntime } from './types.ts';
 
 const memory = createInMemoryAgentMemoryStore();
 const env = loadEnv();
 const supportedComponents = ['Card', 'Container', 'Button', 'Table', 'Alert'] as const;
+const supportedComponentList = supportedComponents.join(', ');
 
 function extractJson<T>(text: string): T {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -136,6 +141,18 @@ function getRequestedChatModel(request: unknown): string | undefined {
   return undefined;
 }
 
+function getThinking(request: RunRequest): OpenAICompatibleThinking | undefined {
+  return request.thinking ? { type: request.thinking.type } : undefined;
+}
+
+function getThinkingFromUnknown(request: unknown): OpenAICompatibleThinking | undefined {
+  if (!request || typeof request !== 'object' || !('thinking' in request)) {
+    return undefined;
+  }
+  const thinking = (request as { thinking?: RunRequest['thinking'] }).thinking;
+  return thinking ? { type: thinking.type } : undefined;
+}
+
 function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] {
   return [
     {
@@ -143,9 +160,16 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
       content: [
         'You are a low-code page planner.',
         'Only output valid JSON.',
-        'Use only these supported components when planning:',
-        supportedComponents.join(', '),
-        'Return JSON shape:',
+        `Use only these supported components when planning: ${supportedComponentList}.`,
+        'Rules:',
+        '- pageTitle must be a concise human-readable title.',
+        '- blocks must be a non-empty array.',
+        '- block.type must be exactly one of the supported components.',
+        '- block.components must be a non-empty subset of the supported components.',
+        '- Do not use semantic aliases like hero, recent-records, summary-panel, header, footer.',
+        '- Put business meaning only in id and description, never in type/components.',
+        '- Return JSON only. No markdown, no explanation, no code fences.',
+        'Return exactly this JSON shape:',
         '{"pageTitle":"string","blocks":[{"id":"string","type":"Card|Table|Container|Button|Alert","description":"string","components":["Card"],"priority":1,"complexity":"simple"}]}',
       ].join('\n'),
     },
@@ -167,12 +191,16 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
       role: 'system',
       content: [
         'You generate one low-code block as valid JSON.',
-        'Only use supported components:',
-        supportedComponents.join(', '),
-        'Return JSON shape:',
+        `Only use supported components: ${supportedComponentList}.`,
+        'Rules:',
+        '- The root node component must be one of the supported components.',
+        '- Every child schema node must also use only supported components.',
+        '- children may contain schema nodes or plain text only.',
+        '- Do not output semantic aliases like hero, recent-records, summary-panel, header, footer.',
+        '- For Table, include sample data in props.dataSource and props.columns.',
+        '- Return JSON only. No markdown, no explanation, no code fences.',
+        'Return exactly this JSON shape:',
         '{"component":"Card|Table|Container|Button|Alert","id":"string","props":{},"children":[]}',
-        'For children, use schema nodes or plain text only.',
-        'For Table, put sample data in props.dataSource and props.columns.',
       ].join('\n'),
     },
     {
@@ -190,7 +218,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
 async function generateBlock(input: GenerateBlockInput): Promise<GenerateBlockResult> {
   const client = createClient();
   const model = requireModel(input.request.blockModel ?? env.AI_BLOCK_MODEL, 'block');
-  const text = await client.chat(model, createBlockMessages(input));
+  const text = await client.chat(model, createBlockMessages(input), getThinking(input.request));
   const node = validateNode(extractJson<GenerateBlockResult['node']>(text));
   return {
     blockId: input.block.id,
@@ -210,7 +238,7 @@ async function assembleSchema(input: AssembleSchemaInput): Promise<PageSchema> {
 async function planWithModel(input: PlanPageInput): Promise<PagePlan> {
   const client = createClient();
   const model = requireModel(input.request.plannerModel ?? env.AI_PLANNER_MODEL, 'planner');
-  const text = await client.chat(model, createPlannerMessages(input));
+  const text = await client.chat(model, createPlannerMessages(input), getThinking(input.request));
   const plan = extractJson<PagePlan>(text);
   return normalizePlan(plan);
 }
@@ -224,10 +252,11 @@ function createRuntimeDeps(): AgentRuntimeDeps {
         const prompt = typeof request === 'object' && request && 'prompt' in request
           ? String((request as { prompt: unknown }).prompt)
           : 'No prompt';
+        const thinking = getThinkingFromUnknown(request);
         const text = await client.chat(model, [
           { role: 'system', content: 'You are a helpful low-code assistant.' },
           { role: 'user', content: prompt },
-        ]);
+        ], thinking);
         return { text };
       },
       async *streamChat(request: unknown) {
@@ -236,10 +265,11 @@ function createRuntimeDeps(): AgentRuntimeDeps {
           : 'No prompt';
         const client = createClient();
         const model = requireModel(getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL, 'chat');
+        const thinking = getThinkingFromUnknown(request);
         yield* client.streamChat(model, [
           { role: 'system', content: 'You are a helpful low-code assistant.' },
           { role: 'user', content: prompt },
-        ]);
+        ], thinking);
       },
     },
     tools: createToolRegistry([

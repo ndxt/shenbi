@@ -10,6 +10,10 @@ export interface OpenAICompatibleClientOptions {
   apiKey: string;
 }
 
+export interface OpenAICompatibleThinking {
+  type: 'enabled' | 'disabled';
+}
+
 interface ChatCompletionChoice {
   message?: {
     content?: string | null;
@@ -72,7 +76,11 @@ export class OpenAICompatibleClient {
     this.apiKey = options.apiKey;
   }
 
-  async chat(model: string, messages: OpenAICompatibleMessage[]): Promise<string> {
+  async chat(
+    model: string,
+    messages: OpenAICompatibleMessage[],
+    thinking?: OpenAICompatibleThinking,
+  ): Promise<string> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -84,6 +92,7 @@ export class OpenAICompatibleClient {
         messages,
         temperature: 0.2,
         stream: false,
+        ...(thinking ? { thinking } : {}),
       }),
     });
 
@@ -99,7 +108,11 @@ export class OpenAICompatibleClient {
     return content;
   }
 
-  async *streamChat(model: string, messages: OpenAICompatibleMessage[]): AsyncIterable<{ text: string }> {
+  async *streamChat(
+    model: string,
+    messages: OpenAICompatibleMessage[],
+    thinking?: OpenAICompatibleThinking,
+  ): AsyncIterable<{ text: string }> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -111,6 +124,7 @@ export class OpenAICompatibleClient {
         messages,
         temperature: 0.2,
         stream: true,
+        ...(thinking ? { thinking } : {}),
       }),
     });
 
@@ -192,4 +206,3 @@ export class OpenAICompatibleClient {
     }
   }
 }
-
