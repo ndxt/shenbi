@@ -1,7 +1,32 @@
 import {
   COMPONENT_CONTRACT_V1_VERSION,
+  type ContractProp,
   type ComponentContract,
 } from '../types/contract';
+import { paginationShape } from './navigation';
+
+export const rowSelectionShape: Record<string, ContractProp> = {
+  type: {
+    type: 'enum',
+    enum: ['checkbox', 'radio'],
+  },
+  selectedRowKeys: {
+    type: 'array',
+    allowExpression: true,
+  },
+  preserveSelectedRowKeys: {
+    type: 'boolean',
+    allowExpression: true,
+  },
+  checkStrictly: {
+    type: 'boolean',
+    allowExpression: true,
+  },
+  columnWidth: {
+    type: 'number',
+    allowExpression: true,
+  },
+};
 
 export const tableContract: ComponentContract = {
   componentType: 'Table',
@@ -40,12 +65,23 @@ export const tableContract: ComponentContract = {
       allowExpression: true,
     },
     pagination: {
-      type: 'object',
+      type: 'any',
       allowExpression: true,
+      oneOf: [
+        {
+          type: 'boolean',
+          enum: [false],
+        },
+        {
+          type: 'object',
+          shape: paginationShape,
+        },
+      ],
     },
     rowSelection: {
       type: 'object',
       allowExpression: true,
+      shape: rowSelectionShape,
     },
     editable: {
       type: 'object',

@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { validateGeneratedBlockNode, validateGeneratedBlockNodeWithDiagnostics } from './agent-runtime.ts';
 
 function extractJsonCandidate(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -315,6 +318,105 @@ describe('stripArrowFunctions', () => {
     const result = stripArrowFunctions(input);
     expect(result.stripped).toBe(false);
     expect(result.text).toBe(input);
+  });
+});
+
+describe('validateGeneratedBlockNode', () => {
+  it('wraps array roots into a valid container block', () => {
+    const normalized = validateGeneratedBlockNode([
+      { component: 'Card', props: { title: '状态概览' } },
+      { component: 'Card', props: { title: '快捷入口' } },
+    ] as any, 'status-summary');
+
+    expect(normalized.component).toBe('Container');
+    expect(Array.isArray(normalized.children)).toBe(true);
+    expect((normalized.children as Array<{ component: string }>).map((child) => child.component)).toEqual(['Card', 'Card']);
+  });
+
+  it('reproduces the trace fix for form, tabs, and status summary blocks', () => {
+    const tracePath = resolve(process.cwd(), '.ai-debug', 'traces', '2026-03-09T04-55-55-917Z-success.json');
+    const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as {
+      trace: {
+        blocks: Array<{
+          blockId: string;
+          rawOutput: string;
+        }>;
+      };
+    };
+
+    const blockMap = Object.fromEntries(trace.trace.blocks.map((block) => [block.blockId, block.rawOutput]));
+    const filterNode = validateGeneratedBlockNode(JSON.parse(blockMap['filter-bar']!), 'filter-bar');
+    const tabsNode = validateGeneratedBlockNode(JSON.parse(blockMap['data-tabs']!), 'data-tabs');
+    const statusNode = validateGeneratedBlockNode(JSON.parse(blockMap['status-summary']!), 'status-summary');
+
+    const form = (filterNode.children as any[])[0];
+    const formChildren = form?.children as Array<{ component: string; children?: any[] }>;
+    expect(formChildren.some((child) => child.component === 'Form.Item')).toBe(true);
+    expect(formChildren.some((child) => child.component === 'FormItem')).toBe(false);
+    expect(JSON.stringify(filterNode)).toContain('DatePicker.RangePicker');
+
+    expect(tabsNode.component).toBe('Tabs');
+    expect(Array.isArray(tabsNode.children)).toBe(true);
+    expect(((tabsNode.children as any[])[0]?.component)).toBe('Tabs.TabPane');
+
+    expect(statusNode.component).toBe('Container');
+    expect(Array.isArray(statusNode.children)).toBe(true);
+    expect(JSON.stringify(statusNode)).not.toContain('[[{');
+  });
+
+  it('drops invalid function props from the pagination trace and records diagnostics', () => {
+    const tracePath = resolve(process.cwd(), '.ai-debug', 'traces', '2026-03-09T05-32-28-171Z-success.json');
+    const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as {
+      trace: {
+        blocks: Array<{
+          blockId: string;
+          rawOutput: string;
+        }>;
+      };
+    };
+
+    const paginationBlock = trace.trace.blocks.find((block) => block.blockId === 'main-data-block');
+    expect(paginationBlock).toBeDefined();
+    const parsedNode = JSON.parse(paginationBlock!.rawOutput);
+    const result = validateGeneratedBlockNodeWithDiagnostics(parsedNode, 'pagination-block');
+
+    expect(JSON.stringify(result.node)).not.toContain('"showTotal":"(total => `共 ${total} 条`)"');
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        componentType: 'Pagination',
+        propPath: 'showTotal',
+        action: 'drop',
+      }),
+    ]));
+  });
+
+  it('reproduces the table title regression fix from the 2026-03-09 trace', () => {
+    const tracePath = resolve(process.cwd(), '.ai-debug', 'traces', '2026-03-09T06-06-00-103Z-success.json');
+    const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as {
+      trace: {
+        blocks: Array<{
+          blockId: string;
+          rawOutput: string;
+        }>;
+      };
+    };
+
+    const tabsBlock = trace.trace.blocks.find((block) => block.blockId === 'main-content-tabs');
+    expect(tabsBlock).toBeDefined();
+    const parsedNode = JSON.parse(tabsBlock!.rawOutput);
+    const result = validateGeneratedBlockNodeWithDiagnostics(parsedNode, 'main-content-tabs');
+    const serialized = JSON.stringify(result.node);
+
+    expect(serialized).not.toContain('"title":"订单列表"');
+    expect(serialized).toContain('"pagination":false');
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        componentType: 'Table',
+        propPath: 'title',
+        action: 'drop',
+        rule: 'unknown prop',
+      }),
+    ]));
   });
 });
 

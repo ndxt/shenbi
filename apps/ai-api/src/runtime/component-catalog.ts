@@ -121,11 +121,11 @@ type LegacyZoneType =
 // planner/group summaries. They are no longer part of the runtime main path.
 const legacyZoneGoldenExamples: Record<LegacyZoneType, string> = {
   'page-header': '{"component":"Container","id":"page-header","props":{"direction":"column","gap":8},"children":[{"component":"Typography.Title","id":"page-title","props":{"level":2},"children":["用户列表"]},{"component":"Typography.Text","id":"page-desc","props":{"type":"secondary"},"children":["管理用户信息、角色与状态"]},{"component":"Space","id":"page-actions","props":{"size":"small"},"children":[{"component":"Button","id":"create-user","props":{"type":"primary"},"children":["新建用户"]}]}]}',
-  filter: '{"component":"Card","id":"user-filter","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"filter-form","props":{"layout":"inline"},"children":[{"component":"FormItem","id":"filter-name","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"filter-name-input","props":{"placeholder":"请输入姓名"}}]},{"component":"FormItem","id":"filter-role","props":{"label":"角色","name":"role"},"children":[{"component":"Select","id":"filter-role-select","props":{"placeholder":"请选择角色"}}]},{"component":"FormItem","id":"filter-date","props":{"label":"日期","name":"date"},"children":[{"component":"DatePicker","id":"filter-date-picker","props":{}}]},{"component":"Space","id":"filter-actions","props":{"size":"small"},"children":[{"component":"Button","id":"submit","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"reset","props":{},"children":["重置"]}]}]}]}',
+  filter: '{"component":"Card","id":"user-filter","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"filter-form","props":{"layout":"inline"},"children":[{"component":"Form.Item","id":"filter-name","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"filter-name-input","props":{"placeholder":"请输入姓名"}}]},{"component":"Form.Item","id":"filter-role","props":{"label":"角色","name":"role"},"children":[{"component":"Select","id":"filter-role-select","props":{"placeholder":"请选择角色"}}]},{"component":"Form.Item","id":"filter-date","props":{"label":"日期","name":"date"},"children":[{"component":"DatePicker","id":"filter-date-picker","props":{}}]},{"component":"Space","id":"filter-actions","props":{"size":"small"},"children":[{"component":"Button","id":"submit","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"reset","props":{},"children":["重置"]}]}]}]}',
   'kpi-row': '{"component":"Row","id":"attendance-kpis","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"kpi-1-col","props":{"span":6},"children":[{"component":"Card","id":"kpi-1-card","props":{},"children":[{"component":"Statistic","id":"kpi-1","props":{"title":"今日出勤率","value":96}}]}]},{"component":"Col","id":"kpi-2-col","props":{"span":6},"children":[{"component":"Card","id":"kpi-2-card","props":{},"children":[{"component":"Statistic","id":"kpi-2","props":{"title":"迟到人数","value":12}}]}]}]}',
   'data-table': '{"component":"Card","id":"user-table-card","props":{"title":"用户列表"},"children":[{"component":"Table","id":"user-table","props":{"dataSource":[{"key":"1","name":"张三","role":"管理员","status":"启用"}],"pagination":{"pageSize":10}},"columns":[{"key":"name","dataIndex":"name","title":"姓名"},{"key":"role","dataIndex":"role","title":"角色"},{"key":"status","dataIndex":"status","title":"状态"}]}]}',
   'detail-info': '{"component":"Card","id":"employee-detail","props":{"title":"员工详情"},"children":[{"component":"Descriptions","id":"employee-descriptions","props":{"column":2},"children":[{"component":"Descriptions.Item","id":"detail-name","props":{"label":"姓名"},"children":["张三"]},{"component":"Descriptions.Item","id":"detail-dept","props":{"label":"部门"},"children":["技术部"]}]}]}',
-  'form-body': '{"component":"Card","id":"employee-form-card","props":{"title":"员工信息"},"children":[{"component":"Form","id":"employee-form","props":{"layout":"vertical"},"children":[{"component":"FormItem","id":"employee-name","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"employee-name-input","props":{"placeholder":"请输入姓名"}}]},{"component":"FormItem","id":"employee-role","props":{"label":"角色","name":"role"},"children":[{"component":"Select","id":"employee-role-select","props":{"placeholder":"请选择角色"}}]}]}]}',
+  'form-body': '{"component":"Card","id":"employee-form-card","props":{"title":"员工信息"},"children":[{"component":"Form","id":"employee-form","props":{"layout":"vertical"},"children":[{"component":"Form.Item","id":"employee-name","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"employee-name-input","props":{"placeholder":"请输入姓名"}}]},{"component":"Form.Item","id":"employee-role","props":{"label":"角色","name":"role"},"children":[{"component":"Select","id":"employee-role-select","props":{"placeholder":"请选择角色"}}]}]}]}',
   'form-actions': '{"component":"Space","id":"form-actions","props":{"size":"small"},"children":[{"component":"Button","id":"save-btn","props":{"type":"primary"},"children":["保存"]},{"component":"Button","id":"cancel-btn","props":{},"children":["取消"]}]}',
   'chart-area': '{"component":"Card","id":"trend-summary-card","props":{"title":"趋势概览"},"children":[{"component":"Typography.Paragraph","id":"trend-summary-text","props":{},"children":["本周出勤趋势整体稳定，建议重点关注周一迟到高峰。"]},{"component":"Statistic","id":"trend-stat","props":{"title":"平均出勤率","value":94}}]}',
   'timeline-area': '{"component":"Card","id":"activity-timeline-card","props":{"title":"最近动态"},"children":[{"component":"Timeline","id":"activity-timeline","props":{},"children":[{"component":"Timeline.Item","id":"timeline-1","props":{},"children":["09:20 张三提交补卡申请"]},{"component":"Timeline.Item","id":"timeline-2","props":{},"children":["10:15 李四完成审批"]}]}]}',
@@ -247,10 +247,10 @@ const legacyZoneTemplates: Record<LegacyZoneType, ZoneTemplate> = {
     intent: '搜索、筛选、时间范围和查询操作区域',
     layoutPattern: 'compact card wrapper, inline or vertical form, action buttons aligned at the end',
     preferredGroups: ['data-display', 'filters-form', 'layout-shell', 'actions'],
-    preferredComponents: ['Card', 'Form', 'FormItem', 'Input', 'Select', 'DatePicker', 'Space', 'Button'],
+    preferredComponents: ['Card', 'Form', 'Form.Item', 'Input', 'Select', 'DatePicker', 'DatePicker.RangePicker', 'Space', 'Button'],
     maxDepth: 4,
     maxChildrenPerArray: 6,
-    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"__FORM_ID__","props":{"layout":"inline"},"children":[{"component":"FormItem","id":"__FIELD_ID__","props":{"label":"关键词","name":"keyword"},"children":[{"component":"Input","id":"__INPUT_ID__","props":{"placeholder":"请输入关键词"}}]},{"component":"Space","id":"__ACTION_ID__","props":{"size":"small"},"children":[{"component":"Button","id":"__QUERY_ID__","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"__RESET_ID__","props":{},"children":["重置"]}]}]}]}',
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"__FORM_ID__","props":{"layout":"inline"},"children":[{"component":"Form.Item","id":"__FIELD_ID__","props":{"label":"关键词","name":"keyword"},"children":[{"component":"Input","id":"__INPUT_ID__","props":{"placeholder":"请输入关键词"}}]},{"component":"Space","id":"__ACTION_ID__","props":{"size":"small"},"children":[{"component":"Button","id":"__QUERY_ID__","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"__RESET_ID__","props":{},"children":["重置"]}]}]}]}',
     wrapper: {
       component: 'Card',
       props: {
@@ -306,12 +306,12 @@ const legacyZoneTemplates: Record<LegacyZoneType, ZoneTemplate> = {
   'form-body': {
     zoneType: 'form-body',
     intent: '表单主体区域，负责录入和编辑业务数据',
-    layoutPattern: 'card wrapper + vertical form + grouped fields, each FormItem contains exactly one input-like child',
+    layoutPattern: 'card wrapper + vertical form + grouped fields, each Form.Item contains exactly one input-like child',
     preferredGroups: ['data-display', 'filters-form'],
-    preferredComponents: ['Card', 'Form', 'FormItem', 'Input', 'Select', 'DatePicker'],
+    preferredComponents: ['Card', 'Form', 'Form.Item', 'Input', 'Select', 'DatePicker', 'DatePicker.RangePicker', 'Drawer'],
     maxDepth: 4,
     maxChildrenPerArray: 6,
-    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"__TITLE__"},"children":[{"component":"Form","id":"__FORM_ID__","props":{"layout":"vertical"},"children":[{"component":"FormItem","id":"__FIELD_1__","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"__INPUT_1__","props":{"placeholder":"请输入姓名"}}]},{"component":"FormItem","id":"__FIELD_2__","props":{"label":"部门","name":"department"},"children":[{"component":"Select","id":"__SELECT_1__","props":{"placeholder":"请选择部门"}}]}]}]}',
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"__TITLE__"},"children":[{"component":"Form","id":"__FORM_ID__","props":{"layout":"vertical"},"children":[{"component":"Form.Item","id":"__FIELD_1__","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"__INPUT_1__","props":{"placeholder":"请输入姓名"}}]},{"component":"Form.Item","id":"__FIELD_2__","props":{"label":"部门","name":"department"},"children":[{"component":"Select","id":"__SELECT_1__","props":{"placeholder":"请选择部门"}}]}]}]}',
     wrapper: {
       component: 'Card',
       props: {
@@ -439,7 +439,7 @@ const runtimeComponentGroupDefinitions: ComponentGroupDefinition[] = [
   {
     name: 'filters-form',
     description: 'query conditions and form controls for admin pages',
-    components: ['Form', 'FormItem', 'Input', 'Select', 'DatePicker'],
+    components: ['Form', 'Form.Item', 'Input', 'Select', 'DatePicker', 'DatePicker.RangePicker'],
   },
   {
     name: 'feedback-status',
@@ -456,6 +456,7 @@ const runtimeComponentGroupDefinitions: ComponentGroupDefinition[] = [
       'Empty',
       'Statistic',
       'Table',
+      'Drawer',
       'Descriptions',
       'Descriptions.Item',
       'Tabs',
@@ -574,14 +575,7 @@ function summarizeContract(contract: ComponentContract): CompiledComponentSummar
   const propSummary = Object.entries(contract.props ?? {})
     .filter(([, prop]) => !prop.deprecated)
     .slice(0, 12)
-    .map(([name, prop]) => {
-      const required = prop.required ? '!' : '';
-      // Output ALL enum values so the model sees the complete whitelist
-      const enumHint = Array.isArray(prop.enum) && prop.enum.length > 0
-        ? `=${prop.enum.join('|')}`
-        : '';
-      return `${name}:${prop.type}${required}${enumHint}`;
-    });
+    .map(([name, prop]) => formatContractProp(name, prop));
   const eventSummary = Object.keys(contract.events ?? {})
     .slice(0, 3)
     .map((name) => name);
@@ -590,9 +584,9 @@ function summarizeContract(contract: ComponentContract): CompiledComponentSummar
     .map(([name, slot]) => `${name}${slot.multiple ? '[]' : ''}`);
   const parentHints: string[] = [];
   if (contract.componentType === 'Form') {
-    parentHints.push('children prefer FormItem');
+    parentHints.push('children prefer Form.Item');
   }
-  if (contract.componentType === 'FormItem') {
+  if (contract.componentType === 'Form.Item') {
     parentHints.push('parent Form; child one input-like node');
   }
   if (contract.componentType === 'Descriptions') {
@@ -639,7 +633,7 @@ function collectComponentGroups(
 }
 
 function getParentComponentHint(componentType: string): string | undefined {
-  if (componentType === 'FormItem') return 'Form';
+  if (componentType === 'Form.Item') return 'Form';
   if (componentType === 'Descriptions.Item') return 'Descriptions';
   if (componentType === 'Tabs.TabPane') return 'Tabs';
   if (componentType === 'Timeline.Item') return 'Timeline';
@@ -648,7 +642,7 @@ function getParentComponentHint(componentType: string): string | undefined {
 }
 
 function getChildComponentHints(componentType: string): string[] {
-  if (componentType === 'Form') return ['FormItem'];
+  if (componentType === 'Form') return ['Form.Item'];
   if (componentType === 'Descriptions') return ['Descriptions.Item'];
   if (componentType === 'Tabs') return ['Tabs.TabPane'];
   if (componentType === 'Timeline') return ['Timeline.Item'];
@@ -981,11 +975,13 @@ const componentMiniSkeletons: Record<string, string> = {
   'Tabs.TabPane': '{"component":"Tabs.TabPane","id":"..","props":{"tab":"标签名","key":"tab1"},"children":[...]}',
 
   // Form
-  Form: '{"component":"Form","id":"..","props":{"layout":"vertical"},"children":[<FormItem children>]}',
-  FormItem: '{"component":"FormItem","id":"..","props":{"label":"字段名","name":"fieldName"},"children":[<one input child>]}',
+  Form: '{"component":"Form","id":"..","props":{"layout":"vertical"},"children":[<Form.Item children>]}',
+  'Form.Item': '{"component":"Form.Item","id":"..","props":{"label":"字段名","name":"fieldName"},"children":[<one input child>]}',
   Input: '{"component":"Input","id":"..","props":{"placeholder":"请输入"}}',
   Select: '{"component":"Select","id":"..","props":{"placeholder":"请选择"}}',
   DatePicker: '{"component":"DatePicker","id":"..","props":{}}',
+  'DatePicker.RangePicker': '{"component":"DatePicker.RangePicker","id":"..","props":{"allowClear":true}}',
+  Drawer: '{"component":"Drawer","id":"..","props":{"title":"详情信息","open":true,"placement":"right","width":420},"children":[...]}',
 
   // Feedback
   Alert: '{"component":"Alert","id":"..","props":{"type":"info","message":"提示信息","showIcon":true}}',
@@ -1011,7 +1007,7 @@ const baseComponents = ['Container', 'Card', 'Typography.Text'] as const;
 const companionMap: Partial<Record<string, string[]>> = {
   Table: ['Tag', 'Button', 'Typography.Text', 'Pagination'],
   Statistic: ['Row', 'Col', 'Typography.Text'],
-  Form: ['FormItem', 'Input', 'Select', 'DatePicker', 'Button', 'Space'],
+  Form: ['Form.Item', 'Input', 'Select', 'DatePicker', 'DatePicker.RangePicker', 'Button', 'Space'],
   Timeline: ['Typography.Text'],
   Descriptions: ['Tag', 'Typography.Text'],
   Tabs: ['Card'],
@@ -1021,6 +1017,25 @@ const companionMap: Partial<Record<string, string[]>> = {
   Result: ['Button', 'Typography.Text'],
   Empty: ['Button', 'Typography.Text'],
 };
+
+const functionPropExamples: Record<string, string> = {
+  'Breadcrumb.itemRender': '{"type":"JSFunction","params":["currentRoute","params","items","paths"],"body":"return currentRoute?.title ?? \\"\\";"}',
+  'Pagination.showTotal': '{"type":"JSFunction","params":["total","range"],"body":"return `共 ${total} 条`;"}',
+  'Progress.format': '{"type":"JSFunction","params":["percent","successPercent"],"body":"return `${percent ?? 0}%`;"}',
+  'Statistic.formatter': '{"type":"JSFunction","params":["value"],"body":"return `${value}`;"}',
+  'Tabs.renderTabBar': '{"type":"JSFunction","params":["props","DefaultTabBar"],"body":"return DefaultTabBar(props);"}',
+};
+
+function formatContractProp(name: string, prop: { type: string; required?: boolean; enum?: unknown[] }): string {
+  const required = prop.required ? '!' : '';
+  const enumHint = Array.isArray(prop.enum) && prop.enum.length > 0
+    ? `=${prop.enum.join('|')}`
+    : '';
+  const functionHint = prop.type === 'function'
+    ? '(MUST use JSFunction JSON)'
+    : '';
+  return `${name}:${prop.type}${required}${enumHint}${functionHint}`;
+}
 
 function buildComponentIndex(
   contracts: readonly ComponentContract[],
@@ -1098,6 +1113,16 @@ function buildSchemaContract(componentType: string): string {
     lines.push(`  valid-props (use ONLY these): ${summary.propSummary.join(', ')}`);
   }
 
+  const functionPropRules = Object.entries(contract.props ?? {})
+    .filter(([, prop]) => prop.type === 'function' && !prop.deprecated)
+    .map(([propName]) => {
+      const example = functionPropExamples[`${componentType}.${propName}`];
+      return example
+        ? `  function-prop ${componentType}.${propName}: MUST use {"type":"JSFunction","params":[...],"body":"..."} JSON. Example: ${example}`
+        : `  function-prop ${componentType}.${propName}: MUST use {"type":"JSFunction","params":[...],"body":"..."} JSON.`;
+    });
+  lines.push(...functionPropRules);
+
   if (skeleton) {
     lines.push(`  schema-example: ${skeleton}`);
   }
@@ -1161,7 +1186,7 @@ export function getComponentSchemaContracts(componentTypes: readonly string[]): 
     if (comp === 'Timeline') expanded.add('Timeline.Item');
     if (comp === 'Descriptions') expanded.add('Descriptions.Item');
     if (comp === 'Tabs') expanded.add('Tabs.TabPane');
-    if (comp === 'Form') expanded.add('FormItem');
+    if (comp === 'Form') expanded.add('Form.Item');
   }
 
   return [...expanded]
@@ -1180,7 +1205,7 @@ export function deriveChildComponents(componentType: string): string[] {
     return directHints;
   }
   if (componentType === 'Form') {
-    return ['FormItem'];
+    return ['Form.Item'];
   }
   return [];
 }

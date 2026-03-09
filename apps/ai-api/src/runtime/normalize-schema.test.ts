@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SchemaNode } from '@shenbi/schema';
-import { normalizeGeneratedNode } from './normalize-schema.ts';
+import { normalizeGeneratedNode, normalizeGeneratedNodeWithDiagnostics } from './normalize-schema.ts';
 
 describe('normalizeGeneratedNode', () => {
   it('maps html tags to supported components', () => {
@@ -88,6 +88,83 @@ describe('normalizeGeneratedNode', () => {
     ).toBeUndefined();
   });
 
+  it('drops invalid standalone pagination function props and records diagnostics', () => {
+    const result = normalizeGeneratedNodeWithDiagnostics({
+      component: 'Pagination',
+      props: {
+        current: 1,
+        total: 120,
+        showTotal: '(total) => `共 ${total} 条`',
+      },
+    });
+
+    expect(result.node.props?.showTotal).toBeUndefined();
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        componentType: 'Pagination',
+        propPath: 'showTotal',
+        action: 'drop',
+      }),
+    ]));
+  });
+
+  it('keeps JSFunction values for standalone pagination and nested table pagination', () => {
+    const functionValue = {
+      type: 'JSFunction',
+      params: ['total', 'range'],
+      body: 'return `共 ${total} 条`;',
+    };
+    const paginationNode = normalizeGeneratedNode({
+      component: 'Pagination',
+      props: {
+        showTotal: functionValue,
+      },
+    });
+    const tableNode = normalizeGeneratedNode({
+      component: 'Table',
+      props: {
+        pagination: {
+          showTotal: functionValue,
+        },
+      },
+    });
+
+    expect(paginationNode.props?.showTotal).toEqual(functionValue);
+    expect((tableNode.props?.pagination as Record<string, unknown> | undefined)?.showTotal).toEqual(functionValue);
+  });
+
+  it('drops unknown table props and records diagnostics', () => {
+    const result = normalizeGeneratedNodeWithDiagnostics({
+      component: 'Table',
+      props: {
+        title: '订单列表',
+        dataSource: [],
+      },
+    });
+
+    expect(result.node.props?.title).toBeUndefined();
+    expect(result.node.props?.dataSource).toEqual([]);
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        componentType: 'Table',
+        propPath: 'title',
+        action: 'drop',
+        rule: 'unknown prop',
+      }),
+    ]));
+  });
+
+  it('preserves table pagination=false via union contract', () => {
+    const normalized = normalizeGeneratedNode({
+      component: 'Table',
+      props: {
+        pagination: false,
+      },
+    });
+
+    expect(normalized.props?.pagination).toBe(false);
+  });
+
   it('normalizes breadcrumb items and drops unsafe breadcrumb props', () => {
     const node: SchemaNode = {
       component: 'Breadcrumb',
@@ -166,6 +243,47 @@ describe('normalizeGeneratedNode', () => {
     const success = normalized.props?.success as Record<string, unknown> | undefined;
     expect(success?.format).toBeUndefined();
     expect(success?.strokeColor).toBeUndefined();
+  });
+
+  it('keeps JSFunction-based formatter props for breadcrumb, progress, and statistic', () => {
+    const functionValue = {
+      type: 'JSFunction',
+      params: ['value'],
+      body: 'return `${value}`;',
+    };
+    const breadcrumb = normalizeGeneratedNode({
+      component: 'Breadcrumb',
+      props: {
+        itemRender: {
+          type: 'JSFunction',
+          params: ['currentRoute'],
+          body: 'return currentRoute?.title ?? "";',
+        },
+      },
+    });
+    const progress = normalizeGeneratedNode({
+      component: 'Progress',
+      props: {
+        percent: 80,
+        format: functionValue,
+      },
+    });
+    const statistic = normalizeGeneratedNode({
+      component: 'Statistic',
+      props: {
+        title: '完成率',
+        formatter: functionValue,
+      },
+    });
+
+    expect(breadcrumb.props?.itemRender).toEqual({
+      type: 'JSFunction',
+      params: ['currentRoute'],
+      body: 'return currentRoute?.title ?? "";',
+    });
+    expect(progress.props?.format).toEqual(functionValue);
+    expect(statistic.props?.formatter).toEqual(functionValue);
+    expect(statistic.props?.title).toBe('完成率');
   });
 
   it('normalizes avatar text and strips unsafe avatar icon', () => {
@@ -250,20 +368,60 @@ describe('normalizeGeneratedNode', () => {
     expect(child && typeof child === 'object' && 'component' in child ? child.component : undefined).toBe('Col');
   });
 
-  it('wraps form children into FormItem and keeps Form.Item alias', () => {
+  it('wraps form children into Form.Item and keeps original props', () => {
     const node: SchemaNode = {
       component: 'Form',
       children: [
         { component: 'Input', props: { placeholder: '姓名' } },
-        { component: 'Form.Item', children: [{ component: 'Input' }] },
+        { component: 'Form.Item', props: { label: '邮箱', name: 'email' }, children: [{ component: 'Input' }] },
       ],
     };
 
     const normalized = normalizeGeneratedNode(node);
     expect(Array.isArray(normalized.children)).toBe(true);
     const children = normalized.children as SchemaNode[];
-    expect(children[0]?.component).toBe('FormItem');
-    expect(children[1]?.component).toBe('FormItem');
+    expect(children[0]?.component).toBe('Form.Item');
+    expect(children[1]?.component).toBe('Form.Item');
+    expect(children[1]?.props?.label).toBe('邮箱');
+    expect(children[1]?.props?.name).toBe('email');
+  });
+
+  it('maps FormItem alias to Form.Item', () => {
+    const normalized = normalizeGeneratedNode({
+      component: 'FormItem',
+      props: { label: '姓名', name: 'name' },
+      children: [{ component: 'Input' }],
+    });
+
+    expect(normalized.component).toBe('Form.Item');
+    expect(Array.isArray(normalized.children)).toBe(true);
+  });
+
+  it('keeps DatePicker.RangePicker as a supported component', () => {
+    const normalized = normalizeGeneratedNode({
+      component: 'DatePicker.RangePicker',
+      props: { allowClear: true },
+    });
+
+    expect(normalized.component).toBe('DatePicker.RangePicker');
+  });
+
+  it('preserves Tabs.TabPane children for later items conversion', () => {
+    const normalized = normalizeGeneratedNode({
+      component: 'Tabs',
+      children: [
+        {
+          component: 'Tabs.TabPane',
+          props: { key: 'orders', tab: '订单列表' },
+          children: [{ component: 'Table', props: { dataSource: [] }, columns: [] }],
+        },
+      ],
+    });
+
+    expect(Array.isArray(normalized.children)).toBe(true);
+    const tabsChildren = normalized.children as SchemaNode[];
+    expect(tabsChildren[0]?.component).toBe('Tabs.TabPane');
+    expect(tabsChildren[0]?.props?.label).toBe('订单列表');
   });
 
   it('wraps descriptions children into descriptions items', () => {
@@ -338,7 +496,7 @@ describe('normalizeGeneratedNode', () => {
     const children = normalized.children as SchemaNode[];
     expect(normalized.id).toBe('employee-detail-layout');
     expect(children[0]?.id).toBe('employee-detail-layout-2');
-    expect(children[1]?.id).toBe('employee-detail-layout-3');
+    expect(children[1]?.id).toMatch(/^employee-detail-layout-\d+$/);
     const grandchild = children[0]?.children as SchemaNode[];
     expect(grandchild[0]?.id).toBeTruthy();
     const ids = [

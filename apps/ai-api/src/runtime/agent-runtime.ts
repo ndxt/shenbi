@@ -19,7 +19,7 @@ import {
   type RunRequest,
 } from '@shenbi/ai-agents';
 import type { AgentEvent } from '@shenbi/ai-contracts';
-import type { PageSchema } from '@shenbi/schema';
+import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import { LLMError } from '../adapters/errors.ts';
 import {
   writeInvalidJsonDump,
@@ -34,7 +34,10 @@ import {
   type OpenAICompatibleThinking,
 } from '../adapters/openai-compatible.ts';
 import {
+  isNodeLike,
   normalizeGeneratedNode,
+  normalizeGeneratedNodeWithDiagnostics,
+  type SanitizationDiagnostic,
   supportedComponents,
   supportedComponentList,
 } from './normalize-schema.ts';
@@ -75,6 +78,7 @@ interface RunTraceRecord {
     model: string;
     rawOutput: string;
     normalizedNode?: GenerateBlockResult['node'];
+    sanitizationDiagnostics?: SanitizationDiagnostic[];
   }>;
   finalSchema?: PageSchema;
   error?: {
@@ -755,8 +759,57 @@ function wrapStandaloneRoot(node: GenerateBlockResult['node'], blockId: string):
   };
 }
 
+function normalizeBlockRootChild(child: unknown, blockId: string, index: number): SchemaNode {
+  if (isNodeLike(child)) {
+    return normalizeGeneratedNode(child);
+  }
+
+  return {
+    id: `${blockId}-text-${index + 1}`,
+    component: 'Typography.Text',
+    props: {},
+    children: String(child ?? ''),
+  };
+}
+
+export function validateGeneratedBlockNodeWithDiagnostics(
+  node: GenerateBlockResult['node'] | SchemaNode[],
+  blockId: string,
+): { node: GenerateBlockResult['node']; diagnostics: SanitizationDiagnostic[] } {
+  if (Array.isArray(node)) {
+    const normalizedRoot: SchemaNode = {
+      id: `${blockId}-block-root`,
+      component: 'Container',
+      props: {
+        direction: 'column',
+        gap: 16,
+      },
+      children: node.map((child, index) => normalizeBlockRootChild(child, blockId, index)),
+    };
+
+    return {
+      node: wrapStandaloneRoot(normalizedRoot, blockId),
+      diagnostics: [],
+    };
+  }
+
+  const normalizedRoot = normalizeGeneratedNodeWithDiagnostics(node);
+
+  return {
+    node: wrapStandaloneRoot(normalizedRoot.node, blockId),
+    diagnostics: normalizedRoot.diagnostics,
+  };
+}
+
+export function validateGeneratedBlockNode(
+  node: GenerateBlockResult['node'] | SchemaNode[],
+  blockId: string,
+): GenerateBlockResult['node'] {
+  return validateGeneratedBlockNodeWithDiagnostics(node, blockId).node;
+}
+
 function validateNode(node: GenerateBlockResult['node'], blockId: string): GenerateBlockResult['node'] {
-  return wrapStandaloneRoot(normalizeGeneratedNode(node), blockId);
+  return validateGeneratedBlockNode(node, blockId);
 }
 
 function getRequestedChatModel(request: unknown): string | undefined {
@@ -823,6 +876,8 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         '- Every block should describe one visual region only; do not repeat the same semantic content in multiple blocks.',
         '- When the user describes left/right, top/bottom, double-column, triple-column, or asymmetric layout, express that through layout rows/columns instead of duplicating blocks.',
         '- If unsure, choose a single clear business block, not repeated regions.',
+        '- If the prompt explicitly mentions drawer/抽屉 and Drawer is supported, include a dedicated Drawer block instead of replacing it with a generic side-info card.',
+        '- If the prompt mentions chart/趋势图 but no real chart component exists in the supported set, plan a dedicated trend-summary block using Card/Statistic/Typography instead of inventing an unsupported chart component.',
         `- For this request, prefer pageType "${suggestedPageType}" unless the user clearly asks for a custom mixed layout.`,
         '- Favor clean B2B admin layouts: clear page title, concise helper text, grouped filters, summary cards, primary data area, moderate whitespace.',
         '- Use free-layout patterns when they create a stronger composition, especially for custom or mixed business pages.',
@@ -867,6 +922,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         'Rules:',
         '- STRICT CONTRACT COMPLIANCE: Only use props that appear in the "Component schema contracts" section above. Do NOT add extra props from memory, from antd v4, or from any other source.',
         '- STRICT ENUM VALUES: For any prop that has a defined enum, use ONLY the exact values listed in the contract. Do not invent or substitute alternative values.',
+        '- STRICT FUNCTION PROPS: Any prop whose contract type is function MUST be encoded as JSON-safe {"type":"JSFunction","params":[...],"body":"..."} objects. Never emit raw functions or strings like "(x)=>x".',
         '- The root node component must be one of the supported components.',
         '- Every child schema node must also use only supported components.',
         '- children may contain schema nodes or plain text only.',
@@ -879,10 +935,11 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         '- Never use raw HTML tags like div, span, section, header, footer. Use Container instead of div/section/header/footer.',
         '- For Table, include sample data in props.dataSource and props.columns.',
         '- For Statistic, include props.title and props.value.',
-        '- For FormItem, include a label prop and exactly one input-like child when possible.',
+        '- For Form.Item, include a label prop and exactly one input-like child when possible.',
         '- For Descriptions, include props.column and Descriptions.Item children with label props.',
         '- For Timeline, return Timeline.Item children with short text content.',
         '- Use realistic Chinese B-end copy such as 今日出勤率, 本周迟到人数, 最近考勤记录, 审批状态.',
+        '- Avoid high-risk callback props unless the block explicitly needs them. If a function prop is unnecessary, omit it.',
         '- Keep braces and brackets balanced. Your answer must be parseable by JSON.parse without any cleanup.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Return exactly this JSON shape:',
@@ -909,7 +966,7 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
   const model = requireModel(input.request.blockModel ?? env.AI_BLOCK_MODEL, 'block');
   const text = await client.chat(model, createBlockMessages(input), getThinking(input.request));
   const rawNode = extractJson<GenerateBlockResult['node']>(text, 'block', input.request, model);
-  const node = validateNode(rawNode, input.block.id);
+  const { node, diagnostics } = validateGeneratedBlockNodeWithDiagnostics(rawNode, input.block.id);
   trace?.blocks.push({
     blockId: input.block.id,
     description: input.block.description,
@@ -917,6 +974,7 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
     model,
     rawOutput: text,
     normalizedNode: node,
+    sanitizationDiagnostics: diagnostics,
   });
   return {
     blockId: input.block.id,

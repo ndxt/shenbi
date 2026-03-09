@@ -1,7 +1,86 @@
 import {
   COMPONENT_CONTRACT_V1_VERSION,
+  type ContractProp,
   type ComponentContract,
 } from '../types/contract';
+
+export const paginationShape: Record<string, ContractProp> = {
+  current: {
+    type: 'number',
+    allowExpression: true,
+    description: '当前页数',
+  },
+  defaultCurrent: {
+    type: 'number',
+    default: 1,
+    description: '默认的当前页数',
+  },
+  total: {
+    type: 'number',
+    default: 0,
+    allowExpression: true,
+    description: '数据总数',
+  },
+  pageSize: {
+    type: 'number',
+    allowExpression: true,
+    description: '每页条数',
+  },
+  defaultPageSize: {
+    type: 'number',
+    default: 10,
+    description: '默认的每页条数',
+  },
+  pageSizeOptions: {
+    type: 'array',
+    default: [10, 20, 50, 100],
+    allowExpression: true,
+    description: '指定每页可以显示多少条',
+  },
+  showSizeChanger: {
+    type: 'boolean',
+    allowExpression: true,
+    description: '是否展示 pageSize 切换器',
+  },
+  showQuickJumper: {
+    type: 'any',
+    allowExpression: true,
+    description: '是否可以快速跳转至某页',
+  },
+  showTotal: {
+    type: 'function',
+    description: '用于显示数据总量和当前数据顺序',
+  },
+  simple: {
+    type: 'any',
+    allowExpression: true,
+    description: '简洁模式',
+  },
+  size: {
+    type: 'enum',
+    enum: ['default', 'small'],
+    allowExpression: true,
+    description: '当为 small 时，是小尺寸分页',
+  },
+  disabled: {
+    type: 'boolean',
+    default: false,
+    allowExpression: true,
+    description: '是否禁用',
+  },
+  hideOnSinglePage: {
+    type: 'boolean',
+    default: false,
+    allowExpression: true,
+    description: '只有一页时是否隐藏分页器',
+  },
+  align: {
+    type: 'enum',
+    enum: ['start', 'center', 'end'],
+    allowExpression: true,
+    description: '对齐方式',
+  },
+};
 
 // Anchor
 export const anchorContract: ComponentContract = {
@@ -290,84 +369,7 @@ export const paginationContract: ComponentContract = {
   category: 'navigation',
   icon: 'MoreHorizontal',
   version: COMPONENT_CONTRACT_V1_VERSION,
-  props: {
-    current: {
-      type: 'number',
-      allowExpression: true,
-      description: '当前页数',
-    },
-    defaultCurrent: {
-      type: 'number',
-      default: 1,
-      description: '默认的当前页数',
-    },
-    total: {
-      type: 'number',
-      default: 0,
-      allowExpression: true,
-      description: '数据总数',
-    },
-    pageSize: {
-      type: 'number',
-      allowExpression: true,
-      description: '每页条数',
-    },
-    defaultPageSize: {
-      type: 'number',
-      default: 10,
-      description: '默认的每页条数',
-    },
-    pageSizeOptions: {
-      type: 'array',
-      default: [10, 20, 50, 100],
-      allowExpression: true,
-      description: '指定每页可以显示多少条',
-    },
-    showSizeChanger: {
-      type: 'boolean',
-      allowExpression: true,
-      description: '是否展示 pageSize 切换器',
-    },
-    showQuickJumper: {
-      type: 'any',
-      default: false,
-      allowExpression: true,
-      description: '是否可以快速跳转至某页',
-    },
-    showTotal: {
-      type: 'function',
-      description: '用于显示数据总量和当前数据顺序',
-    },
-    simple: {
-      type: 'any',
-      allowExpression: true,
-      description: '简洁模式',
-    },
-    size: {
-      type: 'enum',
-      enum: ['default', 'small'],
-      allowExpression: true,
-      description: '当为 small 时，是小尺寸分页',
-    },
-    disabled: {
-      type: 'boolean',
-      default: false,
-      allowExpression: true,
-      description: '是否禁用',
-    },
-    hideOnSinglePage: {
-      type: 'boolean',
-      default: false,
-      allowExpression: true,
-      description: '只有一页时是否隐藏分页器',
-    },
-    align: {
-      type: 'enum',
-      enum: ['start', 'center', 'end'],
-      allowExpression: true,
-      description: '对齐方式',
-    },
-  },
+  props: paginationShape,
   events: {
     onChange: {
       description: '页码改变的回调',

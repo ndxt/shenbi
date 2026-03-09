@@ -21,9 +21,12 @@ export interface ContractParam {
 
 export interface ContractProp {
   type: ContractValueType;
+  oneOf?: ContractProp[];
   required?: boolean;
   default?: unknown;
   enum?: unknown[];
+  shape?: Record<string, ContractProp>;
+  items?: ContractProp;
   description?: string;
   allowExpression?: boolean;
   deprecated?: boolean;

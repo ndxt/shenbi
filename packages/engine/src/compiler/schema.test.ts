@@ -143,6 +143,24 @@ describe('compiler/schema', () => {
     expect(compiled.dynamicProps.pagination).toBeUndefined();
   });
 
+  it('boolean 类型的 pagination=false 保持在 staticProps', () => {
+    const resolver = createResolver({ Table: 'table' });
+    const schema: SchemaNode = {
+      component: 'Table',
+      props: {
+        pagination: false,
+      },
+    };
+
+    const compiled = compileSchema(schema, resolver);
+    if (Array.isArray(compiled)) {
+      throw new Error('预期编译结果为单节点');
+    }
+
+    expect(compiled.staticProps.pagination).toBe(false);
+    expect(compiled.dynamicProps.pagination).toBeUndefined();
+  });
+
   it('嵌套 children 会递归编译子树', () => {
     const resolver = createResolver({ Container: 'div', Button: 'button' });
     const schema: SchemaNode = {

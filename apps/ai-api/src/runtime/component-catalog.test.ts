@@ -13,6 +13,7 @@ import {
   compiledPageSkeletons,
   getDesignPolicySummary,
   getFreeLayoutPatternSummary,
+  getFullComponentContracts,
   getPageSkeleton,
   getPageSkeletonSummary,
   getPlannerContractSummary,
@@ -23,6 +24,9 @@ describe('component catalog', () => {
   it('builds supported components from grouped contracts', () => {
     expect(supportedComponents).toContain('Table');
     expect(supportedComponents).toContain('Form');
+    expect(supportedComponents).toContain('Form.Item');
+    expect(supportedComponents).toContain('DatePicker.RangePicker');
+    expect(supportedComponents).toContain('Drawer');
     expect(supportedComponents).toContain('Typography.Title');
     expect(supportedComponents).toContain('Divider');
     expect(supportedComponents).toContain('Pagination');
@@ -35,10 +39,12 @@ describe('component catalog', () => {
     expect(supportedComponents).toContain('Badge.Ribbon');
     expect(supportedComponents).toContain('Empty');
     expect(supportedComponents).toContain('Result');
+    expect(supportedComponents).not.toContain('FormItem');
     expect(supportedComponents).not.toContain('HeroSection');
     expect(compiledComponentIndex.byComponent.Table?.groups).toContain('data-display');
     expect(compiledComponentIndex.byComponent.Pagination?.groups).toContain('navigation');
     expect(compiledComponentIndex.byComponent.Progress?.groups).toContain('feedback-status');
+    expect(compiledComponentIndex.byComponent['Form.Item']?.parentComponent).toBe('Form');
     expect(compiledComponentIndex.byComponent.Avatar?.groups).toContain('data-display');
     expect(compiledComponentIndex.byComponent.Result?.groups).toContain('feedback-status');
     expect(compiledComponentIndex.byComponent['Tabs.TabPane']?.parentComponent).toBe('Tabs');
@@ -72,9 +78,21 @@ describe('component catalog', () => {
   it('compiles level2 briefs for runtime and knowledge layers', () => {
     expect(compiledLevel2Briefs.Descriptions?.childComponents).toContain('Descriptions.Item');
     expect(compiledLevel2Briefs.Table?.schemaContract).toContain('schema-example:');
+    expect(compiledLevel2Briefs.Pagination?.schemaContract).toContain('function-prop Pagination.showTotal');
+    expect(compiledLevel2Briefs.Pagination?.schemaContract).toContain('"type":"JSFunction"');
     expect(compiledKnowledgeLevel2Briefs.Collapse?.childComponents).toContain('Collapse.Panel');
     expect(compiledKnowledgeLevel2Briefs.Pagination?.groups).toContain('navigation');
     expect(compiledKnowledgeLevel2Briefs.Avatar?.componentType).toBe('Avatar');
+  });
+
+  it('exposes JSFunction guidance in full component contracts', () => {
+    const contracts = getFullComponentContracts(['Pagination', 'Tabs', 'Breadcrumb', 'Progress', 'Statistic']);
+    expect(contracts).toContain('Pagination.showTotal');
+    expect(contracts).toContain('Breadcrumb.itemRender');
+    expect(contracts).toContain('Tabs.renderTabBar');
+    expect(contracts).toContain('Progress.format');
+    expect(contracts).toContain('Statistic.formatter');
+    expect(contracts).toContain('MUST use {"type":"JSFunction","params":[...],"body":"..."}');
   });
 
   it('provides page skeleton summaries for classifier-guided planning', () => {

@@ -1,4 +1,6 @@
-import type { ColumnSchema, SchemaNode } from '@shenbi/schema';
+import type { ColumnSchema, PropValue, SchemaNode } from '@shenbi/schema';
+import type { ComponentContract, ContractProp } from '../../../../packages/schema/types/contract.ts';
+import * as schemaContractsModule from '../../../../packages/schema/contracts/index.ts';
 import { supportedComponents, supportedComponentList, supportedComponentSet } from './component-catalog.ts';
 
 export { supportedComponents, supportedComponentList, supportedComponentSet } from './component-catalog.ts';
@@ -18,8 +20,340 @@ const htmlComponentMapping: Record<string, string> = {
   button: 'Button',
 };
 
+const componentAliasMapping: Record<string, string> = {
+  FormItem: 'Form.Item',
+};
+
+export interface SanitizationDiagnostic {
+  componentType: string;
+  propPath: string;
+  valueKind: string;
+  action: 'drop' | 'default';
+  rule: string;
+}
+
+const builtinContracts =
+  (schemaContractsModule as { builtinContracts?: ComponentContract[] }).builtinContracts
+  ?? (schemaContractsModule as { default?: { builtinContracts?: ComponentContract[] } }).default?.builtinContracts
+  ?? [];
+
+const builtinContractMap = Object.fromEntries(
+  builtinContracts.map((contract) => [contract.componentType, contract]),
+) as Record<string, ComponentContract>;
+
 export function isNodeLike(value: unknown): value is SchemaNode {
   return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isJsFunctionValue(value: unknown): value is { type?: string; __type?: string; params?: string[]; body?: string } {
+  return Boolean(value)
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && (
+      (value as { type?: string }).type === 'JSFunction'
+      || (value as { __type?: string }).__type === 'JSFunction'
+    )
+    && typeof (value as { body?: string }).body === 'string'
+    && (
+      !('params' in (value as Record<string, unknown>))
+      || Array.isArray((value as { params?: unknown }).params)
+    );
+}
+
+function isJsExpressionValue(value: unknown): value is { type?: string; __type?: string; value?: string } {
+  return Boolean(value)
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && (
+      (value as { type?: string }).type === 'JSExpression'
+      || (value as { __type?: string }).__type === 'JSExpression'
+    )
+    && typeof (value as { value?: string }).value === 'string';
+}
+
+function isAllowedFunctionValue(value: unknown): boolean {
+  return typeof value === 'function' || isJsFunctionValue(value);
+}
+
+function isRenderablePrimitive(value: unknown): value is string | number | boolean {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+}
+
+function describeValueKind(value: unknown): string {
+  if (value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value)) {
+    return 'array';
+  }
+  if (isNodeLike(value)) {
+    return 'SchemaNode';
+  }
+  if (isJsFunctionValue(value)) {
+    return 'JSFunction';
+  }
+  return typeof value;
+}
+
+function pushDiagnostic(
+  diagnostics: SanitizationDiagnostic[],
+  componentType: string,
+  propPath: string,
+  value: unknown,
+  action: SanitizationDiagnostic['action'],
+  rule: string,
+): void {
+  diagnostics.push({
+    componentType,
+    propPath,
+    valueKind: describeValueKind(value),
+    action,
+    rule,
+  });
+}
+
+function sanitizeSchemaNodeProp(
+  value: unknown,
+  componentType: string,
+  propPath: string,
+  diagnostics: SanitizationDiagnostic[],
+): SchemaNode | undefined {
+  if (!isNodeLike(value)) {
+    pushDiagnostic(diagnostics, componentType, propPath, value, 'drop', 'type=SchemaNode');
+    return undefined;
+  }
+  normalizeComponentName(value);
+  sanitizePropsByContract(value, diagnostics);
+  if (Array.isArray(value.children)) {
+    for (const child of value.children) {
+      if (isNodeLike(child)) {
+        sanitizeSchemaNodeProp(child, value.component, `${propPath}.children`, diagnostics);
+      }
+    }
+  }
+  return value;
+}
+
+function sanitizeRenderableNodeValue(
+  value: unknown,
+  componentType: string,
+  propPath: string,
+  diagnostics: SanitizationDiagnostic[],
+): unknown {
+  if (isRenderablePrimitive(value)) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const sanitizedItems = value.flatMap((item, index) => {
+      const sanitizedItem = sanitizeRenderableNodeValue(
+        item,
+        componentType,
+        `${propPath}[${index}]`,
+        diagnostics,
+      );
+      return sanitizedItem === undefined ? [] : [sanitizedItem];
+    });
+    return sanitizedItems;
+  }
+
+  return sanitizeSchemaNodeProp(value, componentType, propPath, diagnostics);
+}
+
+function normalizeLegacyPropAliases(node: SchemaNode): void {
+  const props = node.props;
+  if (!props || typeof props !== 'object') {
+    return;
+  }
+
+  if (node.component === 'Tabs.TabPane' && !('label' in props) && 'tab' in props) {
+    props.label = props.tab as PropValue;
+    delete props.tab;
+  }
+}
+
+function sanitizePropByContract(
+  value: unknown,
+  prop: ContractProp,
+  componentType: string,
+  propPath: string,
+  diagnostics: SanitizationDiagnostic[],
+): unknown {
+  if (Array.isArray(prop.oneOf) && prop.oneOf.length > 0) {
+    for (const candidate of prop.oneOf) {
+      const candidateDiagnostics: SanitizationDiagnostic[] = [];
+      const sanitizedValue = sanitizePropByContract(
+        value,
+        candidate,
+        componentType,
+        propPath,
+        candidateDiagnostics,
+      );
+      if (sanitizedValue !== undefined) {
+        diagnostics.push(...candidateDiagnostics);
+        return sanitizedValue;
+      }
+    }
+
+    pushDiagnostic(
+      diagnostics,
+      componentType,
+      propPath,
+      value,
+      'drop',
+      `oneOf(${prop.oneOf.map((candidate) => candidate.type).join('|')})`,
+    );
+    return undefined;
+  }
+
+  if (prop.allowExpression && isJsExpressionValue(value)) {
+    return value;
+  }
+
+  switch (prop.type) {
+    case 'function':
+      if (isAllowedFunctionValue(value)) {
+        return value;
+      }
+      pushDiagnostic(diagnostics, componentType, propPath, value, 'drop', 'type=function(JSFunction only)');
+      return undefined;
+    case 'boolean':
+      if (typeof value === 'boolean' && (!prop.enum || prop.enum.includes(value))) {
+        return value;
+      }
+      pushDiagnostic(
+        diagnostics,
+        componentType,
+        propPath,
+        value,
+        'drop',
+        prop.enum ? `type=boolean(${prop.enum.join('|')})` : 'type=boolean',
+      );
+      return undefined;
+    case 'number':
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      pushDiagnostic(diagnostics, componentType, propPath, value, 'drop', 'type=number');
+      return undefined;
+    case 'string':
+      if (typeof value === 'string') {
+        return value;
+      }
+      pushDiagnostic(diagnostics, componentType, propPath, value, 'drop', 'type=string');
+      return undefined;
+    case 'enum':
+      if (prop.enum?.includes(value)) {
+        return value;
+      }
+      pushDiagnostic(
+        diagnostics,
+        componentType,
+        propPath,
+        value,
+        'drop',
+        `type=enum(${(prop.enum ?? []).join('|')})`,
+      );
+      return undefined;
+    case 'SchemaNode':
+      return sanitizeRenderableNodeValue(value, componentType, propPath, diagnostics);
+    case 'object': {
+      if (!isPlainObject(value)) {
+        pushDiagnostic(diagnostics, componentType, propPath, value, 'drop', 'type=object');
+        return undefined;
+      }
+      if (!prop.shape) {
+        return value;
+      }
+      const sanitizedObject: Record<string, unknown> = {};
+      for (const [childKey, childValue] of Object.entries(value)) {
+        const childProp = prop.shape[childKey];
+        if (!childProp) {
+          pushDiagnostic(
+            diagnostics,
+            componentType,
+            `${propPath}.${childKey}`,
+            childValue,
+            'drop',
+            'unknown nested prop',
+          );
+          continue;
+        }
+        const nextValue = sanitizePropByContract(
+          childValue,
+          childProp,
+          componentType,
+          `${propPath}.${childKey}`,
+          diagnostics,
+        );
+        if (nextValue !== undefined) {
+          sanitizedObject[childKey] = nextValue;
+        }
+      }
+      return sanitizedObject;
+    }
+    case 'array':
+      if (!Array.isArray(value)) {
+        pushDiagnostic(diagnostics, componentType, propPath, value, 'drop', 'type=array');
+        return undefined;
+      }
+      if (!prop.items) {
+        return value;
+      }
+      return value.flatMap((item, index) => {
+        const sanitizedItem = sanitizePropByContract(
+          item,
+          prop.items!,
+          componentType,
+          `${propPath}[${index}]`,
+          diagnostics,
+        );
+        return sanitizedItem === undefined ? [] : [sanitizedItem];
+      });
+    default:
+      return value;
+  }
+}
+
+function sanitizePropsByContract(
+  node: SchemaNode,
+  diagnostics: SanitizationDiagnostic[],
+): void {
+  const contract = builtinContractMap[node.component] as ComponentContract | undefined;
+  const props = node.props;
+  if (!contract?.props || !props || typeof props !== 'object') {
+    return;
+  }
+
+  const sanitizedProps: Record<string, PropValue> = {};
+  for (const [propName, propValue] of Object.entries(props)) {
+    const contractProp = contract.props[propName];
+    if (!contractProp) {
+      pushDiagnostic(diagnostics, node.component, propName, propValue, 'drop', 'unknown prop');
+      continue;
+    }
+    const sanitizedValue = sanitizePropByContract(
+      propValue,
+      contractProp,
+      node.component,
+      propName,
+      diagnostics,
+    );
+    if (sanitizedValue !== undefined) {
+      sanitizedProps[propName] = sanitizedValue as PropValue;
+      continue;
+    }
+    if (contractProp.default !== undefined) {
+      sanitizedProps[propName] = contractProp.default as PropValue;
+      pushDiagnostic(diagnostics, node.component, propName, propValue, 'default', `default=${String(contractProp.default)}`);
+    }
+  }
+
+  node.props = sanitizedProps;
 }
 
 function toSafeIdSegment(value: string): string {
@@ -78,7 +412,7 @@ function normalizeNodeProps(node: SchemaNode): void {
     return;
   }
 
-  const textPropKeys = ['title', 'label', 'description', 'placeholder'];
+  const textPropKeys = ['title', 'label', 'description', 'placeholder', 'subTitle'];
   for (const key of textPropKeys) {
     if (key in props) {
       const value = props[key];
@@ -125,6 +459,11 @@ function normalizeNodeProps(node: SchemaNode): void {
       props.variant = props.variant ?? (props.bordered ? 'outlined' : 'borderless');
       delete props.bordered;
     }
+  }
+
+  if (node.component === 'Tabs.TabPane' && !('label' in props) && 'tab' in props) {
+    props.label = props.tab;
+    delete props.tab;
   }
 
   if (node.component === 'Avatar') {
@@ -216,7 +555,7 @@ function normalizeNodeProps(node: SchemaNode): void {
         delete props.separator;
       }
     }
-    if (typeof props.itemRender !== 'function') {
+    if (!isAllowedFunctionValue(props.itemRender)) {
       delete props.itemRender;
     }
     if (Array.isArray(props.items)) {
@@ -270,12 +609,12 @@ function normalizeNodeProps(node: SchemaNode): void {
   }
 
   if (node.component === 'Progress') {
-    if (typeof props.format !== 'function') {
+    if (!isAllowedFunctionValue(props.format)) {
       delete props.format;
     }
     if (props.success && typeof props.success === 'object' && !Array.isArray(props.success)) {
       const success = { ...(props.success as Record<string, unknown>) };
-      if (typeof success.format !== 'function') {
+      if (!isAllowedFunctionValue(success.format)) {
         delete success.format;
       }
       if ('strokeColor' in success && typeof success.strokeColor === 'object') {
@@ -350,10 +689,10 @@ function normalizeNodeProps(node: SchemaNode): void {
   if (node.component === 'Table' && props.pagination && typeof props.pagination === 'object' && !Array.isArray(props.pagination)) {
     const pagination = { ...(props.pagination as Record<string, unknown>) };
 
-    if (typeof pagination.showTotal !== 'function') {
+    if (!isAllowedFunctionValue(pagination.showTotal)) {
       delete pagination.showTotal;
     }
-    if (typeof pagination.itemRender !== 'function') {
+    if (!isAllowedFunctionValue(pagination.itemRender)) {
       delete pagination.itemRender;
     }
     if (
@@ -380,6 +719,7 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
     case 'Alert':
     case 'Breadcrumb':
     case 'DatePicker':
+    case 'DatePicker.RangePicker':
     case 'Input':
     case 'Pagination':
     case 'Progress':
@@ -387,8 +727,7 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
     case 'Select':
     case 'Statistic':
     case 'Steps':
-    case 'Table':
-    case 'Tabs': {
+    case 'Table': {
       if (node.component === 'Breadcrumb' && !Array.isArray(node.props?.items)) {
         const breadcrumbItems = children
           .map((child, index) => {
@@ -418,6 +757,27 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
         }
       }
       delete node.children;
+      return node;
+    }
+    case 'Tabs': {
+      node.children = children
+        .filter((child) => isNodeLike(child) || isTextLike(child))
+        .map((child, index) => {
+          if (isNodeLike(child) && child.component === 'Tabs.TabPane') {
+            return child;
+          }
+          return {
+            id: `${node.id ?? 'tabs'}-pane-${index + 1}`,
+            component: 'Tabs.TabPane',
+            props: {
+              key: `${node.id ?? 'tabs'}-pane-${index + 1}`,
+              label: `标签${index + 1}`,
+            },
+            children: isNodeLike(child)
+              ? [child]
+              : [textToTypographyNode(String(child), `${node.id ?? 'tabs'}-pane-${index + 1}-text`)],
+          };
+        });
       return node;
     }
     case 'Avatar.Group': {
@@ -489,12 +849,12 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
           if (child.component === 'Form.Item' || child.component === 'FormItem') {
             return {
               ...child,
-              component: 'FormItem',
+              component: 'Form.Item',
             };
           }
           return {
             id: `${node.id ?? 'form'}-form-item-${index + 1}`,
-            component: 'FormItem',
+            component: 'Form.Item',
             props: {
               label: `字段${index + 1}`,
               name: `field${index + 1}`,
@@ -504,6 +864,7 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
         });
       return node;
     }
+    case 'Form.Item':
     case 'FormItem': {
       const nodeChildren = children.filter(isNodeLike);
       const firstChild = nodeChildren[0];
@@ -544,6 +905,10 @@ function normalizeComponentName(node: SchemaNode): void {
     node.component = mapped;
     return;
   }
+  const alias = componentAliasMapping[node.component];
+  if (alias) {
+    node.component = alias;
+  }
   if (!supportedComponentSet.has(node.component)) {
     node.component = 'Container';
   }
@@ -573,18 +938,35 @@ function ensureUniqueNodeIds(node: SchemaNode, seen: Set<string>, fallbackBase =
   }
 }
 
-export function normalizeGeneratedNode(node: SchemaNode): SchemaNode {
+function normalizeGeneratedNodeInternal(
+  node: SchemaNode,
+  diagnostics: SanitizationDiagnostic[],
+): SchemaNode {
   normalizeComponentName(node);
+  normalizeLegacyPropAliases(node);
+  sanitizePropsByContract(node, diagnostics);
 
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
       if (isNodeLike(child)) {
-        normalizeGeneratedNode(child);
+        normalizeGeneratedNodeInternal(child, diagnostics);
       }
     }
   }
 
-  const normalized = normalizeChildren(node);
+  return normalizeChildren(node);
+}
+
+export function normalizeGeneratedNodeWithDiagnostics(node: SchemaNode): {
+  node: SchemaNode;
+  diagnostics: SanitizationDiagnostic[];
+} {
+  const diagnostics: SanitizationDiagnostic[] = [];
+  const normalized = normalizeGeneratedNodeInternal(node, diagnostics);
   ensureUniqueNodeIds(normalized, new Set());
-  return normalized;
+  return { node: normalized, diagnostics };
+}
+
+export function normalizeGeneratedNode(node: SchemaNode): SchemaNode {
+  return normalizeGeneratedNodeWithDiagnostics(node).node;
 }
