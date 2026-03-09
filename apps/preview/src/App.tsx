@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as antd from 'antd';
 import { Rocket } from 'lucide-react';
 import {
@@ -55,6 +55,7 @@ type ScenarioKey =
   | 'nine-grid';
 
 type AppMode = ShellMode;
+const ACTIVE_SCENARIO_STORAGE_KEY = 'shenbi:preview:active-scenario';
 
 const scenarioOptions: { label: string; value: ScenarioKey }[] = [
   { label: '用户管理场景', value: 'user-management' },
@@ -120,14 +121,29 @@ function createEmptyShellSchema(): PageSchema {
   };
 }
 
+function getStoredActiveScenario(): ScenarioKey {
+  if (typeof window === 'undefined') {
+    return 'user-management';
+  }
+
+  const storedScenario = window.localStorage.getItem(ACTIVE_SCENARIO_STORAGE_KEY);
+  if (storedScenario && scenarioOptions.some((option) => option.value === storedScenario)) {
+    return storedScenario as ScenarioKey;
+  }
+
+  return 'user-management';
+}
+
 export function App() {
   const [appMode, setAppMode] = useShellModeUrl();
-  const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
+  const [activeScenario, setActiveScenario] = useState<ScenarioKey>(() => getStoredActiveScenario());
   const initialScenarioSnapshots = useMemo(() => createInitialScenarioSnapshots(), []);
+  const initialScenarioSchemas = useMemo(() => createInitialScenarioState(), []);
   const [activityMessage, setActivityMessage] = useState<string>('');
   const initialShellSchema = useMemo(() => createEmptyShellSchema(), []);
   const {
     activeScenarioSnapshot,
+    updateScenarioSnapshot,
     updateScenarioSchema,
     setScenarioSelectedNodeId,
     executeScenarioCommand,
@@ -263,6 +279,28 @@ export function App() {
     executeCommand: executePluginCommand,
     notifications,
   });
+  const handleResetWorkspace = useCallback(() => {
+    if (appMode === 'shell') {
+      updateActiveSchema(() => createEmptyShellSchema());
+      setShellSelectedNodeId(undefined);
+      return;
+    }
+
+    updateScenarioSnapshot(activeScenario, (previousSnapshot) => ({
+      ...previousSnapshot,
+      ...createScenarioSnapshot(cloneSchema(initialScenarioSchemas[activeScenario])),
+      ...(previousSnapshot.currentFileId ? { currentFileId: previousSnapshot.currentFileId } : {}),
+    }));
+    setScenarioSelectedNodeId(undefined);
+  }, [
+    activeScenario,
+    appMode,
+    initialScenarioSchemas,
+    setScenarioSelectedNodeId,
+    setShellSelectedNodeId,
+    updateActiveSchema,
+    updateScenarioSnapshot,
+  ]);
   const plugins = useMemo(() => {
     const registeredPlugins = [
       createSetterPlugin({
@@ -314,17 +352,25 @@ export function App() {
       createAIChatPlugin({
         defaultWidth: 300,
         getAvailableComponents: () => builtinContracts,
+        onResetWorkspace: handleResetWorkspace,
       }),
     ];
     if (appMode === 'shell' && filesSidebarTabOptions) {
       registeredPlugins.push(createFilesPlugin(filesSidebarTabOptions));
     }
     return registeredPlugins;
-  }, [appMode, filesSidebarTabOptions]);
+  }, [appMode, filesSidebarTabOptions, handleResetWorkspace]);
 
   const handleCanvasSelectNode = (schemaNodeId: string) => {
     selectSchemaNode(schemaNodeId);
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(ACTIVE_SCENARIO_STORAGE_KEY, activeScenario);
+  }, [activeScenario]);
 
   return (
     <AppShell
@@ -402,6 +448,14 @@ export function App() {
               </button>
             </>
           ) : null}
+          <button
+            type="button"
+            aria-label="清空页面"
+            className="h-7 rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary transition-colors hover:bg-bg-activity-bar"
+            onClick={handleResetWorkspace}
+          >
+            清空页面
+          </button>
           {activityMessage ? (
             <span className="ml-2 text-[11px] text-text-secondary">{activityMessage}</span>
           ) : null}

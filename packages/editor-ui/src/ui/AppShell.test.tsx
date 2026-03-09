@@ -9,6 +9,57 @@ function MockIcon(_props: ActivityBarItemIconProps) {
 }
 
 describe('AppShell', () => {
+  it('辅助面板宽度拖拽后会持久化并在重新挂载后恢复', async () => {
+    window.localStorage.clear();
+    const plugins = [
+      defineEditorPlugin({
+        id: 'plugin.ai-width',
+        name: 'AI Width Plugin',
+        contributes: {
+          auxiliaryPanels: [
+            {
+              id: 'plugin-ai-width',
+              label: 'PluginAIWidth',
+              order: 99,
+              defaultOpen: true,
+              defaultWidth: 300,
+              render: () => <div>Plugin AI Width Panel</div>,
+            },
+          ],
+        },
+      }),
+    ];
+
+    const firstRender = render(
+      <AppShell plugins={plugins}>
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    const firstPanel = screen.getByText('Plugin AI Width Panel').closest('div[style]');
+    expect(firstPanel).not.toBeNull();
+    expect(firstPanel).toHaveStyle({ width: '300px' });
+
+    const resizeHandles = firstRender.container.querySelectorAll('.cursor-col-resize');
+    fireEvent.mouseDown(resizeHandles[1] as Element, { clientX: 1000 });
+    fireEvent.mouseMove(document, { clientX: 900 });
+    fireEvent.mouseUp(document);
+
+    expect(firstPanel).toHaveStyle({ width: '400px' });
+
+    firstRender.unmount();
+
+    render(
+      <AppShell plugins={plugins}>
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    const secondPanel = screen.getByText('Plugin AI Width Panel').closest('div[style]');
+    expect(secondPanel).not.toBeNull();
+    expect(secondPanel).toHaveStyle({ width: '400px' });
+  });
+
   it('renders all main shell regions', () => {
     render(
       <AppShell>

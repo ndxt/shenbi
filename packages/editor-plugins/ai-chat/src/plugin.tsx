@@ -24,7 +24,15 @@ export interface CreateAIChatPluginOptions extends AIPanelProps {
 }
 
 function AIChatPanelHost(
-  props: Pick<CreateAIChatPluginOptions, 'bridge' | 'getAvailableComponents' | 'subscribe'> & {
+  props: Pick<
+    CreateAIChatPluginOptions,
+    'bridge'
+    | 'defaultPlannerModel'
+    | 'defaultBlockModel'
+    | 'onResetWorkspace'
+    | 'getAvailableComponents'
+    | 'subscribe'
+  > & {
     context: PluginContext;
   },
 ) {
@@ -42,7 +50,14 @@ function AIChatPanelHost(
     });
   }, [props.bridge, props.context, props.getAvailableComponents, props.subscribe]);
 
-  return <AIPanel {...(bridge ? { bridge } : {})} />;
+  return (
+    <AIPanel
+      {...(bridge ? { bridge } : {})}
+      {...(props.defaultPlannerModel ? { defaultPlannerModel: props.defaultPlannerModel } : {})}
+      {...(props.defaultBlockModel ? { defaultBlockModel: props.defaultBlockModel } : {})}
+      {...(props.onResetWorkspace ? { onResetWorkspace: props.onResetWorkspace } : {})}
+    />
+  );
 }
 
 export function createAIChatPlugin(options: CreateAIChatPluginOptions): EditorPluginManifest {
@@ -57,6 +72,9 @@ export function createAIChatPlugin(options: CreateAIChatPluginOptions): EditorPl
         <AIChatPanelHost
           context={context}
           {...(options.bridge ? { bridge: options.bridge } : {})}
+          {...(options.defaultPlannerModel ? { defaultPlannerModel: options.defaultPlannerModel } : {})}
+          {...(options.defaultBlockModel ? { defaultBlockModel: options.defaultBlockModel } : {})}
+          {...(options.onResetWorkspace ? { onResetWorkspace: options.onResetWorkspace } : {})}
           {...(options.getAvailableComponents ? { getAvailableComponents: options.getAvailableComponents } : {})}
           {...(options.subscribe ? { subscribe: options.subscribe } : {})}
         />

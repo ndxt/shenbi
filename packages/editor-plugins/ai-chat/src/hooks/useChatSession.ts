@@ -1,5 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { RunMetadata } from '../ai/api-types';
+import { readJSONFromStorage, writeJSONToStorage } from '../utils/local-storage';
+
+const STORAGE_KEY = 'shenbi:ai-chat:session';
 
 export interface ChatMessage {
     id: string;
@@ -9,10 +12,23 @@ export interface ChatMessage {
 }
 
 export function useChatSession() {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [conversationId, setConversationId] = useState<string | undefined>();
+    const storedState = readJSONFromStorage<{
+        messages?: ChatMessage[];
+        conversationId?: string;
+        lastMetadata?: RunMetadata;
+    }>(STORAGE_KEY, {});
+    const [messages, setMessages] = useState<ChatMessage[]>(storedState.messages ?? []);
+    const [conversationId, setConversationId] = useState<string | undefined>(storedState.conversationId);
     const [activeRunId, setActiveRunId] = useState<string | undefined>();
-    const [lastMetadata, setLastMetadata] = useState<RunMetadata | undefined>();
+    const [lastMetadata, setLastMetadata] = useState<RunMetadata | undefined>(storedState.lastMetadata);
+
+    useEffect(() => {
+        writeJSONToStorage(STORAGE_KEY, {
+            messages,
+            conversationId,
+            lastMetadata,
+        });
+    }, [conversationId, lastMetadata, messages]);
 
     const addMessage = useCallback((msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
         const id = Date.now().toString() + Math.random().toString(36).slice(2, 6);

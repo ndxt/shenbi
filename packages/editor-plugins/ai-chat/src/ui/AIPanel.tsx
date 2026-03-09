@@ -7,15 +7,57 @@ import { useAgentRun } from '../hooks/useAgentRun';
 import { ChatMessageList } from './ChatMessageList';
 import { ChatInput } from './ChatInput';
 import { ModelSelector } from './ModelSelector';
+import { readJSONFromStorage, writeJSONToStorage } from '../utils/local-storage';
 
 export interface AIPanelProps {
   bridge?: EditorAIBridge;
   defaultPlannerModel?: string;
   defaultBlockModel?: string;
+  onResetWorkspace?: () => void;
 }
 
-export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPanelProps) {
-  const [thinkingEnabled, setThinkingEnabled] = React.useState(false);
+const UI_STORAGE_KEY = 'shenbi:ai-chat:ui';
+const PROMPT_HISTORY_STORAGE_KEY = 'shenbi:ai-chat:prompt-history';
+const MAX_PROMPT_HISTORY = 12;
+
+const PROMPT_PRESETS = [
+  {
+    label: '工作台总览',
+    value: '生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作，重点覆盖卡片、表格、Tabs、Drawer、Form、按钮和响应式布局组合。',
+  },
+  {
+    label: '主从详情',
+    value: '生成一个主从详情页面：左侧树或列表，右侧 Tabs 详情区，支持查询、状态标签、操作按钮、表单编辑弹窗和底部时间线，覆盖 Tree、Tabs、Descriptions、Modal、Form、Tag 组合。',
+  },
+  {
+    label: '表单编排',
+    value: '生成一个复杂表单编排页面，包含基础信息、分组区域、Form.List 动态增删、联动校验、提交按钮区和结果预览卡片，覆盖 Form、Input、Select、DatePicker、Form.List、Card、Alert 组合。',
+  },
+  {
+    label: '列表加抽屉',
+    value: '生成一个列表页，包含查询表单、批量操作栏、数据表格、行内操作、详情抽屉和分页，覆盖 Query Form、Table、Drawer、Space、Button、Tag 常见覆盖场景。',
+  },
+  {
+    label: '多区块门户',
+    value: '生成一个多区块门户页面，包含顶部欢迎区、左右分栏卡片、中部九宫格快捷入口、下方图文混排信息区和浮动操作按钮，覆盖 Grid、Card、Typography、List、Flex、FloatButton 组合。',
+  },
+] as const;
+
+export function AIPanel({
+  bridge,
+  defaultPlannerModel,
+  defaultBlockModel,
+  onResetWorkspace,
+}: AIPanelProps) {
+  const storedUIState = readJSONFromStorage<{
+    thinkingEnabled?: boolean;
+    draftText?: string;
+  }>(UI_STORAGE_KEY, {});
+  const [thinkingEnabled, setThinkingEnabled] = React.useState(Boolean(storedUIState.thinkingEnabled));
+  const [draftText, setDraftText] = React.useState(storedUIState.draftText ?? '');
+  const [promptHistory, setPromptHistory] = React.useState<string[]>(
+    readJSONFromStorage<string[]>(PROMPT_HISTORY_STORAGE_KEY, [])
+  );
   const {
     plannerModels,
     plannerModel,
@@ -35,6 +77,7 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
     setConversationId,
     lastMetadata,
     setLastMetadata,
+    resetSession,
   } = useChatSession();
 
   const {
@@ -66,6 +109,37 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
     target.scrollIntoView({ behavior: 'smooth' });
   }, [messages, progressText]);
 
+  useEffect(() => {
+    writeJSONToStorage(UI_STORAGE_KEY, {
+      thinkingEnabled,
+      draftText,
+    });
+  }, [draftText, thinkingEnabled]);
+
+  useEffect(() => {
+    writeJSONToStorage(PROMPT_HISTORY_STORAGE_KEY, promptHistory);
+  }, [promptHistory]);
+
+  const applyPromptText = React.useCallback((text: string) => {
+    setDraftText(text);
+  }, []);
+
+  const rememberPrompt = React.useCallback((text: string) => {
+    setPromptHistory((previous) => [
+      text,
+      ...previous.filter((item) => item !== text),
+    ].slice(0, MAX_PROMPT_HISTORY));
+  }, []);
+
+  const handleClear = React.useCallback(() => {
+    if (isRunning) {
+      return;
+    }
+    resetSession();
+    setDraftText('');
+    onResetWorkspace?.();
+  }, [isRunning, onResetWorkspace, resetSession]);
+
   const handleSend = (text: string) => {
     if (modelSelectionBlocked) {
       addMessage({ role: 'assistant', content: `[Error]: ${modelsError ?? '模型列表尚未加载完成'}` });
@@ -76,6 +150,8 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
     if (!conversationId) setConversationId(currentConvId);
 
     addMessage({ role: 'user', content: text });
+    rememberPrompt(text);
+    setDraftText('');
 
     void runAgent(
       text,
@@ -93,12 +169,20 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
   };
 
   return (
-    <div className="w-full h-full bg-bg-panel border-l border-border-ide flex flex-col shrink-0 overflow-hidden">
+      <div className="w-full h-full bg-bg-panel border-l border-border-ide flex flex-col shrink-0 overflow-hidden">
       <div className="h-9 px-4 border-b border-border-ide flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 text-text-primary">
           <Sparkles size={14} className="text-blue-500" />
           <span className="text-[11px] font-bold uppercase tracking-wider">AI Assistant</span>
         </div>
+        <button
+          type="button"
+          className="rounded border border-border-ide px-2 py-1 text-[10px] text-text-secondary transition-colors hover:border-blue-500 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={handleClear}
+          disabled={isRunning}
+        >
+          清空
+        </button>
       </div>
 
       <div className="flex-none p-3 border-b border-border-ide flex gap-4 bg-bg-canvas">
@@ -199,6 +283,12 @@ export function AIPanel({ bridge, defaultPlannerModel, defaultBlockModel }: AIPa
           onCancel={cancelRun}
           isRunning={isRunning}
           disabled={!bridge || modelSelectionBlocked}
+          text={draftText}
+          onTextChange={setDraftText}
+          promptPresets={[...PROMPT_PRESETS]}
+          promptHistory={promptHistory}
+          onSelectPreset={applyPromptText}
+          onSelectHistory={applyPromptText}
         />
       </div>
     </div>

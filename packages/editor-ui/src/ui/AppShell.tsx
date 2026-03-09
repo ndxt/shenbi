@@ -53,6 +53,7 @@ interface AppShellProps {
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
 
 const MAX_RECENT_COMMANDS = 6;
+const LAYOUT_STORAGE_KEY = 'shenbi:app-shell:layout';
 
 const THEME_CLASSES = [
   'theme-light',
@@ -70,6 +71,43 @@ function isCleanup(value: unknown): value is EditorPluginCleanup {
   return typeof value === 'function';
 }
 
+interface StoredLayoutState {
+  showSidebar?: boolean;
+  showInspector?: boolean;
+  showConsole?: boolean;
+  showAssistantPanel?: boolean;
+  activeAuxiliaryPanelId?: string;
+  sidebarSize?: number;
+  inspectorSize?: number;
+  assistantPanelSize?: number;
+  consoleSize?: number;
+}
+
+function readStoredLayoutState(): StoredLayoutState {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) as StoredLayoutState : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredLayoutState(value: StoredLayoutState): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // Ignore localStorage failures and keep the workbench functional.
+  }
+}
+
 export function AppShell({
   children,
   toolbarExtra,
@@ -82,13 +120,16 @@ export function AppShell({
   onCanvasSelectNode,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const storedLayoutState = React.useMemo(() => readStoredLayoutState(), []);
   const [theme, setTheme] = React.useState<ThemeMode>('dark');
   
   // Panel Visibility State
-  const [showSidebar, setShowSidebar] = React.useState(true);
-  const [showInspector, setShowInspector] = React.useState(true);
-  const [showConsole, setShowConsole] = React.useState(true);
-  const [showAssistantPanel, setShowAssistantPanel] = React.useState(false);
+  const [showSidebar, setShowSidebar] = React.useState(storedLayoutState.showSidebar ?? true);
+  const [showInspector, setShowInspector] = React.useState(storedLayoutState.showInspector ?? true);
+  const [showConsole, setShowConsole] = React.useState(storedLayoutState.showConsole ?? true);
+  const [showAssistantPanel, setShowAssistantPanel] = React.useState(
+    storedLayoutState.showAssistantPanel ?? false
+  );
   const [showCommandPalette, setShowCommandPalette] = React.useState(false);
   const [contextMenuState, setContextMenuState] = React.useState<{
     open: boolean;
@@ -100,7 +141,9 @@ export function AppShell({
     position: { x: 0, y: 0 },
   });
   const [activeSidebarTabId, setActiveSidebarTabId] = React.useState('components');
-  const [activeAuxiliaryPanelId, setActiveAuxiliaryPanelId] = React.useState<string | undefined>(undefined);
+  const [activeAuxiliaryPanelId, setActiveAuxiliaryPanelId] = React.useState<string | undefined>(
+    storedLayoutState.activeAuxiliaryPanelId
+  );
   const [focusVersion, setFocusVersion] = React.useState(0);
 
   const [isMaximized, setIsMaximized] = React.useState(false);
@@ -135,10 +178,23 @@ export function AppShell({
   }, []);
 
   // Panel Size State
-  const { size: sidebarSize, startResize: startSidebarResize } = useResize(256, 160, 600);
-  const { size: inspectorSize, startResize: startInspectorResize } = useResize(256, 160, 600);
-  const { size: aiPanelSize, startResize: startAIPanelResize } = useResize(300, 200, 800);
-  const { size: consoleSize, startResize: startConsoleResize } = useResize(192, 100, 800);
+  const {
+    size: sidebarSize,
+    startResize: startSidebarResize,
+  } = useResize(storedLayoutState.sidebarSize ?? 256, 160, 600);
+  const {
+    size: inspectorSize,
+    startResize: startInspectorResize,
+  } = useResize(storedLayoutState.inspectorSize ?? 256, 160, 600);
+  const {
+    size: aiPanelSize,
+    startResize: startAIPanelResize,
+    setSize: setAIPanelSize,
+  } = useResize(storedLayoutState.assistantPanelSize ?? 300, 200, 800);
+  const {
+    size: consoleSize,
+    startResize: startConsoleResize,
+  } = useResize(storedLayoutState.consoleSize ?? 192, 100, 800);
   const pluginContributes = React.useMemo(
     () => collectPluginContributes(plugins),
     [plugins],
@@ -181,7 +237,7 @@ export function AppShell({
     () => auxiliaryPanels.find((panel) => panel.id === activeAuxiliaryPanelId) ?? auxiliaryPanels[0],
     [activeAuxiliaryPanelId, auxiliaryPanels],
   );
-  const assistantPanelSize = activeAuxiliaryPanel?.defaultWidth ?? aiPanelSize;
+  const assistantPanelSize = aiPanelSize;
   const hostCommands = React.useMemo(() => createHostCommandRegistry({
     pluginContext,
     showSidebar,
@@ -403,6 +459,8 @@ export function AppShell({
     };
     return context;
   }, [hostCommandMap, pluginContext, pluginContributes.commands]);
+  const resolvedPluginContextRef = React.useRef(resolvedPluginContext);
+  resolvedPluginContextRef.current = resolvedPluginContext;
   const runCommand = React.useCallback((commandId: string, payload?: unknown) => {
     recordRecentCommand(commandId);
     return resolvedPluginContext.commands?.execute(commandId, payload);
@@ -413,17 +471,56 @@ export function AppShell({
   };
 
   React.useEffect(() => {
+    writeStoredLayoutState({
+      showSidebar,
+      showInspector,
+      showConsole,
+      showAssistantPanel,
+      sidebarSize,
+      inspectorSize,
+      assistantPanelSize: aiPanelSize,
+      consoleSize,
+      ...(activeAuxiliaryPanelId ? { activeAuxiliaryPanelId } : {}),
+    });
+  }, [
+    activeAuxiliaryPanelId,
+    aiPanelSize,
+    consoleSize,
+    showAssistantPanel,
+    showConsole,
+    showInspector,
+    showSidebar,
+    inspectorSize,
+    sidebarSize,
+  ]);
+
+  React.useEffect(() => {
     if (auxiliaryPanels.length === 0) {
       setShowAssistantPanel(false);
       setActiveAuxiliaryPanelId(undefined);
       return;
     }
     const fallbackPanel = auxiliaryPanels.find((panel) => panel.defaultOpen) ?? auxiliaryPanels[0];
-    setActiveAuxiliaryPanelId((prev) => prev ?? fallbackPanel?.id);
-    if (auxiliaryPanels.some((panel) => panel.defaultOpen)) {
+    setActiveAuxiliaryPanelId((prev) => (
+      prev && auxiliaryPanels.some((panel) => panel.id === prev) ? prev : fallbackPanel?.id
+    ));
+    if (
+      storedLayoutState.showAssistantPanel === undefined
+      && auxiliaryPanels.some((panel) => panel.defaultOpen)
+    ) {
       setShowAssistantPanel((prev) => prev || true);
     }
-  }, [auxiliaryPanels]);
+  }, [auxiliaryPanels, storedLayoutState.showAssistantPanel]);
+
+  React.useEffect(() => {
+    if (!activeAuxiliaryPanel) {
+      return;
+    }
+    if (storedLayoutState.assistantPanelSize !== undefined) {
+      return;
+    }
+    setAIPanelSize(activeAuxiliaryPanel.defaultWidth ?? 300);
+  }, [activeAuxiliaryPanel, setAIPanelSize, storedLayoutState.assistantPanelSize]);
 
   React.useEffect(() => {
     const cleanups: EditorPluginCleanup[] = [];
@@ -464,7 +561,7 @@ export function AppShell({
         continue;
       }
       try {
-        const result = plugin.activate(resolvedPluginContext);
+        const result = plugin.activate(resolvedPluginContextRef.current);
         collectCleanup(result, plugin);
       } catch (error) {
         reportActivationError(plugin, error);
@@ -476,7 +573,7 @@ export function AppShell({
         cleanup();
       }
     };
-  }, [plugins, resolvedPluginContext]);
+  }, [pluginContext, plugins]);
 
   React.useEffect(() => {
     if (allShortcuts.length === 0) {

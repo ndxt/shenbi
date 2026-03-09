@@ -480,6 +480,58 @@ describe('preview/App integration', () => {
     });
   });
 
+  it('AI 面板：面板开关和模型选择可从本地恢复', async () => {
+    const user = userEvent.setup();
+    const firstRender = render(createElement(App));
+
+    await waitFor(() => {
+      expect(screen.getByText('User 1')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTitle('Toggle AI Assistant'));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '清空' })).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText('Planner'), 'GLM-4.6');
+    await user.selectOptions(screen.getByLabelText('Block'), 'GLM-4.6');
+
+    firstRender.unmount();
+
+    render(createElement(App));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '清空' })).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText('Planner')).toHaveValue('GLM-4.6');
+      expect(screen.getByLabelText('Block')).toHaveValue('GLM-4.6');
+    });
+  });
+
+  it('AI 面板：常用覆盖场景和历史输入可回填到输入框', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.selectOptions(screen.getByLabelText('模式切换'), 'shell');
+    await user.click(screen.getByTitle('Toggle AI Assistant'));
+
+    const input = await screen.findByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行');
+    await user.selectOptions(screen.getByLabelText('常用覆盖场景'), '生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作，重点覆盖卡片、表格、Tabs、Drawer、Form、按钮和响应式布局组合。');
+    expect(input).toHaveValue('生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作，重点覆盖卡片、表格、Tabs、Drawer、Form、按钮和响应式布局组合。');
+
+    await user.type(input, '{enter}');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '清空' })).toBeEnabled();
+    }, { timeout: 9000 });
+
+    await user.click(screen.getByRole('button', { name: /生成一个复杂工作台首页/ }));
+    await waitFor(() => {
+      expect(input).toHaveValue('生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作，重点覆盖卡片、表格、Tabs、Drawer、Form、按钮和响应式布局组合。');
+    });
+  }, 12000);
+
   it('AI 面板：通过 skeleton 热替换并更新画布', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
@@ -490,7 +542,7 @@ describe('preview/App integration', () => {
     });
 
     await user.click(screen.getByTitle('Toggle AI Assistant'));
-    const input = await screen.findByPlaceholderText('Ask AI anything... (Enter to send)');
+    const input = await screen.findByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行');
     await user.type(input, '生成演示页面{enter}');
 
     await waitFor(() => {
@@ -498,6 +550,50 @@ describe('preview/App integration', () => {
       expect(screen.getByText('欢迎使用 Plan B 布局生成')).toBeInTheDocument();
       expect(screen.getByText('右侧说明区')).toBeInTheDocument();
     }, { timeout: 9000 });
+  }, 12000);
+
+  it('AI 面板：清空会重置聊天记录和当前页面 Schema', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.selectOptions(screen.getByLabelText('模式切换'), 'shell');
+    await user.click(screen.getByTitle('Toggle AI Assistant'));
+    const input = await screen.findByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行');
+    await user.type(input, '生成演示页面{enter}');
+
+    await waitFor(() => {
+      expect(screen.getByText('页面头部')).toBeInTheDocument();
+      expect(screen.getByText('右侧说明区')).toBeInTheDocument();
+    }, { timeout: 9000 });
+
+    await user.click(screen.getByRole('button', { name: '清空' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('页面头部')).toBeNull();
+      expect(screen.queryByText('右侧说明区')).toBeNull();
+      expect(screen.getByText(/你好！我是 Shenbi 智能开发助手/)).toBeInTheDocument();
+    });
+  }, 12000);
+
+  it('工具栏：清空页面会重置当前画布', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await user.selectOptions(screen.getByLabelText('模式切换'), 'shell');
+    await user.click(screen.getByTitle('Toggle AI Assistant'));
+    const input = await screen.findByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行');
+    await user.type(input, '生成演示页面{enter}');
+
+    await waitFor(() => {
+      expect(screen.getByText('页面头部')).toBeInTheDocument();
+    }, { timeout: 9000 });
+
+    await user.click(screen.getByRole('button', { name: '清空页面' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('页面头部')).toBeNull();
+      expect(screen.queryByText('欢迎使用 Plan B 布局生成')).toBeNull();
+    });
   }, 12000);
 
   it('编辑器：Events 支持 JSON 回写并驱动运行时', async () => {
