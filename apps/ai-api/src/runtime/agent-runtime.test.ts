@@ -881,6 +881,39 @@ describe('agent runtime quality guidance', () => {
       'side-list-overdense',
     ]));
   });
+
+  it('regresses the 2026-03-09 complex form trace for fake field labels on section nodes', () => {
+    const trace = loadTrace('2026-03-09T07-48-49-880Z-success.json');
+    const blocks = trace.trace.blocks as Array<{ blockId: string; rawOutput: string; description: string; suggestedComponents: string[] }>;
+    const formBlock = blocks.find((block) => block.blockId === 'form-main-block');
+
+    expect(formBlock).toBeTruthy();
+
+    const validated = validateGeneratedBlockNodeWithDiagnostics(
+      JSON.parse(formBlock!.rawOutput),
+      formBlock!.blockId,
+    );
+
+    const labels: string[] = [];
+    const textNodes: string[] = [];
+    walkTraceNodes(validated.node, (node) => {
+      if (node.component === 'Form.Item' && typeof node.props?.label === 'string') {
+        labels.push(node.props.label);
+      }
+      if (node.component === 'Typography.Text' && typeof node.children === 'string') {
+        textNodes.push(node.children);
+      }
+    });
+
+    expect(labels).not.toEqual(expect.arrayContaining(['字段1', '字段2', '字段5', '字段6']));
+    expect(textNodes).toEqual(expect.arrayContaining(['基础信息', '日程与分组']));
+    expect(validated.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        componentType: 'Form',
+        rule: 'preserved-non-field-form-child',
+      }),
+    ]));
+  });
 });
 
 function walkTraceNodes(

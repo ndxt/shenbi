@@ -32,11 +32,42 @@ const formLayoutChildComponents = new Set([
   'Flex',
 ]);
 
+const formPresentationalChildComponents = new Set([
+  'Alert',
+  'Card',
+  'Divider',
+  'Typography.Title',
+  'Typography.Text',
+  'Typography.Paragraph',
+]);
+
+const formFieldLikeComponents = new Set([
+  'Input',
+  'Input.TextArea',
+  'InputNumber',
+  'Select',
+  'DatePicker',
+  'DatePicker.RangePicker',
+  'TimePicker',
+  'Switch',
+  'Checkbox',
+  'Checkbox.Group',
+  'Radio',
+  'Radio.Group',
+  'Rate',
+  'Slider',
+  'TreeSelect',
+  'Cascader',
+  'AutoComplete',
+  'Mentions',
+  'ColorPicker',
+]);
+
 export interface SanitizationDiagnostic {
   componentType: string;
   propPath: string;
   valueKind: string;
-  action: 'drop' | 'default';
+  action: 'drop' | 'default' | 'preserve';
   rule: string;
 }
 
@@ -122,6 +153,17 @@ function pushDiagnostic(
     action,
     rule,
   });
+}
+
+function isFormDirectChildComponent(component: string): boolean {
+  return component === 'Form.Item'
+    || component === 'FormItem'
+    || formLayoutChildComponents.has(component)
+    || formPresentationalChildComponents.has(component);
+}
+
+function isFormFieldLikeComponent(component: string): boolean {
+  return formFieldLikeComponents.has(component);
 }
 
 function sanitizeSchemaNodeProp(
@@ -753,7 +795,7 @@ function normalizeNodeProps(node: SchemaNode): void {
   }
 }
 
-function normalizeChildren(node: SchemaNode): SchemaNode {
+function normalizeChildren(node: SchemaNode, diagnostics: SanitizationDiagnostic[]): SchemaNode {
   normalizeNodeProps(node);
   const children = Array.isArray(node.children) ? node.children : [];
 
@@ -894,17 +936,34 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
               component: 'Form.Item',
             };
           }
-          if (formLayoutChildComponents.has(child.component)) {
+          if (isFormDirectChildComponent(child.component)) {
             return child;
           }
+          if (isFormFieldLikeComponent(child.component)) {
+            pushDiagnostic(
+              diagnostics,
+              'Form',
+              `children[${index}]`,
+              child,
+              'default',
+              'auto-wrapped-field-control',
+            );
+            return {
+              id: `${node.id ?? 'form'}-form-item-${index + 1}`,
+              component: 'Form.Item',
+              children: [child],
+            };
+          }
+          pushDiagnostic(
+            diagnostics,
+            'Form',
+            `children[${index}]`,
+            child,
+            'preserve',
+            'preserved-non-field-form-child',
+          );
           return {
-            id: `${node.id ?? 'form'}-form-item-${index + 1}`,
-            component: 'Form.Item',
-            props: {
-              label: `字段${index + 1}`,
-              name: `field${index + 1}`,
-            },
-            children: [child],
+            ...child,
           };
         });
       return node;
@@ -999,7 +1058,7 @@ function normalizeGeneratedNodeInternal(
     }
   }
 
-  return normalizeChildren(node);
+  return normalizeChildren(node, diagnostics);
 }
 
 export function normalizeGeneratedNodeWithDiagnostics(node: SchemaNode): {

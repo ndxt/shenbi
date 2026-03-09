@@ -138,6 +138,121 @@ describe('normalizeGeneratedNode', () => {
     expect(formChildren.some((child) => child.component === 'Form.Item' && child.props?.label === '字段2')).toBe(false);
   });
 
+  it('keeps presentational nodes directly under Form without generating fake form labels', () => {
+    const result = normalizeGeneratedNodeWithDiagnostics({
+      component: 'Form',
+      id: 'complex-form',
+      props: { layout: 'vertical' },
+      children: [
+        {
+          component: 'Alert',
+          id: 'form-alert',
+          props: { type: 'info', message: '请先阅读填写须知' },
+        },
+        {
+          component: 'Typography.Text',
+          id: 'section-title',
+          props: { strong: true },
+          children: ['基础信息'],
+        },
+        {
+          component: 'Divider',
+          id: 'section-divider',
+          props: { dashed: false },
+        },
+        {
+          component: 'Container',
+          id: 'basic-row',
+          props: { direction: 'row', gap: 16 },
+          children: [{
+            component: 'Form.Item',
+            id: 'name-item',
+            props: { label: '姓名', name: 'name' },
+            children: [{ component: 'Input', id: 'name-input', props: { placeholder: '请输入姓名' } }],
+          }],
+        },
+      ],
+    });
+
+    const formChildren = result.node.children as SchemaNode[];
+    expect(formChildren.map((child) => child.component)).toEqual([
+      'Alert',
+      'Typography.Text',
+      'Divider',
+      'Container',
+    ]);
+    expect(JSON.stringify(result.node)).not.toContain('字段1');
+    expect(JSON.stringify(result.node)).not.toContain('字段2');
+    expect(result.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        componentType: 'Form',
+        rule: 'preserved-non-field-form-child',
+      }),
+    ]));
+  });
+
+  it('auto-wraps field controls directly under Form without generating synthetic labels', () => {
+    const result = normalizeGeneratedNodeWithDiagnostics({
+      component: 'Form',
+      id: 'quick-form',
+      children: [
+        { component: 'Input', id: 'direct-input', props: { placeholder: '请输入关键词' } },
+        { component: 'Select', id: 'direct-select', props: { options: [{ label: '启用', value: 'enabled' }] } },
+        { component: 'DatePicker.RangePicker', id: 'direct-range', props: { allowClear: true } },
+      ],
+    });
+
+    const formChildren = result.node.children as SchemaNode[];
+    expect(formChildren).toHaveLength(3);
+    expect(formChildren.every((child) => child.component === 'Form.Item')).toBe(true);
+    expect(formChildren.every((child) => child.props?.label === undefined)).toBe(true);
+    expect(formChildren.every((child) => child.props?.name === undefined)).toBe(true);
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        componentType: 'Form',
+        propPath: 'children[0]',
+        action: 'default',
+        rule: 'auto-wrapped-field-control',
+      }),
+      expect.objectContaining({
+        componentType: 'Form',
+        propPath: 'children[1]',
+        action: 'default',
+        rule: 'auto-wrapped-field-control',
+      }),
+      expect.objectContaining({
+        componentType: 'Form',
+        propPath: 'children[2]',
+        action: 'default',
+        rule: 'auto-wrapped-field-control',
+      }),
+    ]));
+    expect(JSON.stringify(result.node)).not.toContain('字段1');
+  });
+
+  it('preserves unsupported non-field nodes under Form and records diagnostics instead of fake labels', () => {
+    const result = normalizeGeneratedNodeWithDiagnostics({
+      component: 'Form',
+      id: 'form-with-tag',
+      children: [
+        { component: 'Tag', id: 'status-tag', props: { color: 'blue' }, children: ['待审核'] },
+      ],
+    });
+
+    const formChildren = result.node.children as SchemaNode[];
+    expect(formChildren).toHaveLength(1);
+    expect(formChildren[0]?.component).toBe('Tag');
+    expect(JSON.stringify(result.node)).not.toContain('字段1');
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        componentType: 'Form',
+        propPath: 'children[0]',
+        action: 'preserve',
+        rule: 'preserved-non-field-form-child',
+      }),
+    ]));
+  });
+
   it('normalizes typography children to text safely', () => {
     const node: SchemaNode = {
       component: 'Typography.Title',
