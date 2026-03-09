@@ -107,6 +107,11 @@ function parseTemperature(raw: string | undefined): number | undefined {
   return Number.isFinite(value) ? value : undefined;
 }
 
+function mergeModelLists(...lists: Array<string[] | undefined>): string[] | undefined {
+  const merged = lists.flatMap((list) => list ?? []).map((item) => item.trim()).filter(Boolean);
+  return merged.length > 0 ? Array.from(new Set(merged)) : undefined;
+}
+
 function resolveProviderConfig(
   loaded: Record<string, string>,
   provider: string,
@@ -117,6 +122,22 @@ function resolveProviderConfig(
     providerPrefix ? [`${providerPrefix}_${suffix}`] : []
   );
   const useSharedCompatKeys = isActiveProvider || provider === 'openai-compatible';
+
+  const providerThinkingModels = parseModelList(readEnvValue(loaded, [
+    ...providerKeys('THINKING_MODELS'),
+    ...(useSharedCompatKeys ? ['AI_THINKING_MODELS'] : []),
+  ]));
+  const providerNonThinkingModels = parseModelList(readEnvValue(loaded, provider === 'openai-compatible'
+    ? [
+      ...providerKeys('NON_THINKING_MODELS'),
+      'AI_NON_THINKING_MODELS',
+    ]
+    : [
+      ...providerKeys('NON_THINKING_MODELS'),
+    ]));
+  const globalNonThinkingModels = provider === 'openai-compatible'
+    ? undefined
+    : parseModelList(readEnvValue(loaded, ['AI_NON_THINKING_MODELS']));
 
   return {
     provider,
@@ -160,14 +181,8 @@ function resolveProviderConfig(
       ...providerKeys('TEMPERATURE'),
       ...(useSharedCompatKeys ? ['AI_TEMPERATURE'] : []),
     ])),
-    thinkingModels: parseModelList(readEnvValue(loaded, [
-      ...providerKeys('THINKING_MODELS'),
-      ...(useSharedCompatKeys ? ['AI_THINKING_MODELS'] : []),
-    ])),
-    nonThinkingModels: parseModelList(readEnvValue(loaded, [
-      ...providerKeys('NON_THINKING_MODELS'),
-      ...(useSharedCompatKeys ? ['AI_NON_THINKING_MODELS'] : []),
-    ])),
+    thinkingModels: providerThinkingModels,
+    nonThinkingModels: mergeModelLists(providerNonThinkingModels, globalNonThinkingModels),
   };
 }
 

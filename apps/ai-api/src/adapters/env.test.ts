@@ -32,7 +32,27 @@ describe('loadEnv', () => {
       blockModel: 'GLM-4.6',
       models: ['GLM-4.6', 'GLM-4.7'],
       thinkingModels: ['GLM-4.6', 'GLM-4.7'],
-      nonThinkingModels: undefined,
+      nonThinkingModels: ['gpt*'],
     });
+  });
+
+  it('applies global non-thinking models to all configured providers', () => {
+    vi.stubEnv('AI_PROVIDER', 'nextai');
+    vi.stubEnv('AI_PROVIDERS', 'openai-compatible,nextai');
+    vi.stubEnv('AI_NON_THINKING_MODELS', 'gpt*');
+    vi.stubEnv('AI_OPENAI_COMPAT_BASE_URL', 'https://open.bigmodel.cn/api/coding/paas/v4');
+    vi.stubEnv('AI_OPENAI_COMPAT_API_KEY', 'glm-key');
+    vi.stubEnv('NEXTAI_BASE_URL', 'https://api.nextaicore.com/v1');
+    vi.stubEnv('NEXTAI_API_KEY', 'nextai-key');
+    vi.stubEnv('NEXTAI_PLANNER_MODEL', 'gpt-4o');
+    vi.stubEnv('NEXTAI_BLOCK_MODEL', 'gpt-5');
+    vi.stubEnv('NEXTAI_MODELS', 'gpt-4o,gpt-5,gpt-5-codex');
+
+    const env = loadEnv();
+    const glmProvider = env.providers.find((item) => item.provider === 'openai-compatible');
+    const nextaiProvider = env.providers.find((item) => item.provider === 'nextai');
+
+    expect(glmProvider?.nonThinkingModels).toEqual(['gpt*']);
+    expect(nextaiProvider?.nonThinkingModels).toEqual(['gpt*']);
   });
 });

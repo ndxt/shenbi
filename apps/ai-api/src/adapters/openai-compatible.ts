@@ -58,6 +58,13 @@ function normalizeModelName(model: string): string {
   return model.trim().toLowerCase();
 }
 
+function matchesModelRule(model: string, rule: string): boolean {
+  if (rule.endsWith('*')) {
+    return model.startsWith(rule.slice(0, -1));
+  }
+  return model === rule;
+}
+
 function serializeThinking(
   model: string,
   thinkingModels: ReadonlySet<string>,
@@ -68,13 +75,13 @@ function serializeThinking(
     return undefined;
   }
   const normalizedModel = normalizeModelName(model);
-  if (nonThinkingModels.has(normalizedModel)) {
+  if (Array.from(nonThinkingModels).some((rule) => matchesModelRule(normalizedModel, rule))) {
     return undefined;
   }
   if (thinkingModels.size === 0) {
     return thinking;
   }
-  return thinkingModels.has(normalizedModel) ? thinking : undefined;
+  return Array.from(thinkingModels).some((rule) => matchesModelRule(normalizedModel, rule)) ? thinking : undefined;
 }
 
 async function readErrorMessage(response: Response): Promise<string> {

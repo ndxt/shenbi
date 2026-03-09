@@ -65,10 +65,10 @@ describe('OpenAICompatibleClient', () => {
     const client = new OpenAICompatibleClient({
       baseUrl: 'https://example.com/v1',
       apiKey: 'test-key',
-      nonThinkingModels: ['gpt-4o-mini'],
+      nonThinkingModels: ['gpt*'],
     });
 
-    await client.chat('gpt-4o-mini', [
+    await client.chat('gpt-5-codex', [
       { role: 'system', content: 'system prompt' },
       { role: 'user', content: 'user prompt' },
     ], { type: 'enabled' });
@@ -118,7 +118,7 @@ describe('OpenAICompatibleClient', () => {
     const client = new OpenAICompatibleClient({
       baseUrl: 'https://example.com/v1',
       apiKey: 'test-key',
-      nonThinkingModels: ['gpt-4o-mini'],
+      nonThinkingModels: ['gpt*'],
     });
 
     const disabledSummary = client.buildRequestDebugSummary('gpt-4o-mini', [
