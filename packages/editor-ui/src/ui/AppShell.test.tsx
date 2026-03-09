@@ -1261,6 +1261,7 @@ describe('AppShell', () => {
   it('工具栏菜单会按 target 放到不同区域并按 group 分隔', () => {
     render(
       <AppShell
+        breadcrumbItems={[{ id: 'test-root', label: 'Page' }]}
         plugins={[
           defineEditorPlugin({
             id: 'plugin.toolbar-layout',

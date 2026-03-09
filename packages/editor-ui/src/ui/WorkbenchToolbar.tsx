@@ -17,9 +17,10 @@ interface WorkbenchToolbarProps {
   extra?: React.ReactNode;
   menus?: ToolbarMenuItem[];
   onRunMenuCommand?: (commandId: string) => void;
+  breadcrumbItems?: { id: string; label: string }[];
 }
 
-export function WorkbenchToolbar({ extra, menus, onRunMenuCommand }: WorkbenchToolbarProps) {
+export function WorkbenchToolbar({ extra, menus, onRunMenuCommand, breadcrumbItems = [] }: WorkbenchToolbarProps) {
   const startMenus = React.useMemo(
     () => menus?.filter((menu) => menu.target === 'toolbar-start') ?? [],
     [menus],
@@ -45,13 +46,18 @@ export function WorkbenchToolbar({ extra, menus, onRunMenuCommand }: WorkbenchTo
         ) : null}
       </div>
 
-      <div className="flex items-center text-[11px] text-text-secondary gap-1 overflow-hidden max-w-[40%]">
-        <span>Page</span>
-        <ChevronRight size={12} />
-        <span>Container</span>
-        <ChevronRight size={12} />
-        <span className="text-text-primary">Card</span>
-      </div>
+      {breadcrumbItems.length > 0 && (
+        <div className="flex items-center text-[11px] text-text-secondary gap-1 overflow-hidden max-w-[40%]">
+          {breadcrumbItems.map((item, index) => (
+            <React.Fragment key={item.id}>
+              {index > 0 && <ChevronRight size={12} />}
+              <span className={index === breadcrumbItems.length - 1 ? 'text-text-primary truncate' : 'truncate'}>
+                {item.label}
+              </span>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         {endMenus.length > 0 && onRunMenuCommand ? <ToolbarMenus menus={endMenus} onRunCommand={onRunMenuCommand} /> : null}

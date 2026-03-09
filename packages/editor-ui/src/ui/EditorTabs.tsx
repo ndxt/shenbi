@@ -1,13 +1,11 @@
 import React from 'react';
-import { X, FileCode, FileJson } from 'lucide-react';
+import { X, FileCode } from 'lucide-react';
 
-export function EditorTabs() {
+export function EditorTabs({ label }: { label?: string | undefined }) {
+  const displayLabel = label || 'Untitled';
   return (
     <div className="h-9 bg-bg-editor border-b border-border-ide flex items-center shrink-0 overflow-x-auto scrollbar-hide">
-      <TabItem label="App.tsx" icon={FileCode} active />
-      <TabItem label="demo-schema.ts" icon={FileJson} />
-      <TabItem label="AppShell.tsx" icon={FileCode} />
-      <TabItem label="preview-ide.css" icon={FileCode} />
+      <TabItem label={displayLabel} icon={FileCode} active />
     </div>
   );
 }

@@ -55,6 +55,8 @@ interface AppShellProps {
   pluginContext?: PluginContext;
   persistenceAdapter?: WorkspacePersistenceAdapter;
   onCanvasSelectNode?: (nodeId: string) => void;
+  schemaName?: string | undefined;
+  breadcrumbItems?: { id: string; label: string }[];
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -101,6 +103,8 @@ export function AppShell({
   pluginContext,
   persistenceAdapter,
   onCanvasSelectNode,
+  schemaName,
+  breadcrumbItems,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const resolvedPersistenceAdapter = React.useMemo(
@@ -804,10 +808,11 @@ export function AppShell({
         )}
         
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <EditorTabs />
+          <EditorTabs label={schemaName ?? undefined} />
           <WorkbenchToolbar
             extra={toolbarExtra}
             menus={allMenus}
+            breadcrumbItems={breadcrumbItems ?? []}
             onRunMenuCommand={(commandId) => {
               void runCommand(commandId);
             }}

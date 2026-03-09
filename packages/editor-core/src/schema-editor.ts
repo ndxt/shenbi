@@ -446,3 +446,33 @@ export function patchSchemaNodeColumns(
 export function getDefaultSelectedNodeId(treeNodes: EditorTreeNode[]): string | undefined {
   return treeNodes[0]?.id;
 }
+
+export function getAncestorChain(
+  treeNodes: EditorTreeNode[],
+  treeId: string | undefined,
+): { id: string; label: string }[] {
+  if (!treeId) {
+    return [];
+  }
+
+  const path: { id: string; label: string }[] = [];
+
+  function walk(nodes: EditorTreeNode[]): boolean {
+    for (const node of nodes) {
+      if (node.id === treeId) {
+        path.push({ id: node.id, label: node.type });
+        return true;
+      }
+      if (node.children && node.children.length > 0) {
+        if (walk(node.children)) {
+          path.unshift({ id: node.id, label: node.type });
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  walk(treeNodes);
+  return path;
+}

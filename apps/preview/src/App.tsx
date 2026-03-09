@@ -10,6 +10,7 @@ import { defineEditorPlugin } from '@shenbi/editor-plugin-api';
 import {
   type EditorStateSnapshot,
   buildEditorTree,
+  getAncestorChain,
   getDefaultSelectedNodeId,
   getSchemaNodeByTreeId,
   getTreeIdBySchemaNodeId,
@@ -214,6 +215,10 @@ export function App() {
   const selectedContract = useMemo(
     () => (selectedNode ? getBuiltinContract(selectedNode.component) : undefined),
     [selectedNode],
+  );
+  const breadcrumbItems = useMemo(
+    () => getAncestorChain(treeNodes, selectedNodeId),
+    [treeNodes, selectedNodeId],
   );
   const {
     handlePatchProps,
@@ -443,6 +448,8 @@ export function App() {
       plugins={plugins}
       pluginContext={pluginContext}
       onCanvasSelectNode={handleCanvasSelectNode}
+      schemaName={activeSchema.name}
+      breadcrumbItems={breadcrumbItems}
       toolbarExtra={(
         <div className="flex items-center gap-2">
           <span className="text-text-secondary" style={{ fontSize: '11px' }}>模式</span>
