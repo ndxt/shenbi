@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { validateGeneratedBlockNode, validateGeneratedBlockNodeWithDiagnostics } from './agent-runtime.ts';
+import {
+  assessBlockQuality,
+  classifyPromptToPageType,
+  validateGeneratedBlockNode,
+  validateGeneratedBlockNodeWithDiagnostics,
+} from './agent-runtime.ts';
 
 function extractJsonCandidate(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -221,6 +226,11 @@ function trySalvageJsonCandidate(text: string): { candidate: string; strategy: s
   return null;
 }
 
+function loadTrace(name: string): any {
+  const tracePath = resolve(process.cwd(), '.ai-debug', 'traces', name);
+  return JSON.parse(readFileSync(tracePath, 'utf8'));
+}
+
 describe('agent runtime json salvage', () => {
   it('salvages near-valid json with trailing missing braces', () => {
     const raw = '```json\n{"component":"Card","children":[{"component":"Button","children":["确定"]}]\n```';
@@ -320,6 +330,576 @@ describe('stripArrowFunctions', () => {
     expect(result.text).toBe(input);
   });
 });
+
+describe('agent runtime quality guidance', () => {
+  it('classifies workbench prompts as dashboard before detail/form', () => {
+    const pageType = classifyPromptToPageType(
+      '生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作。',
+    );
+
+    expect(pageType).toBe('dashboard');
+  });
+
+  it('classifies master-detail prompts as detail instead of list', () => {
+    const pageType = classifyPromptToPageType(
+      '生成一个主从详情页面：左侧树或列表，右侧 Tabs 详情区，支持查询、状态标签、操作按钮、表单编辑弹窗和底部时间线。',
+    );
+
+    expect(pageType).toBe('detail');
+  });
+
+  it('flags cramped inline filters, stacked vertical filters, and fragmented KPI rows for retry', () => {
+    const filterNode = validateGeneratedBlockNode({
+      component: 'Card',
+      id: 'filter-card',
+      children: [{
+        component: 'Form',
+        id: 'filter-form',
+        props: { layout: 'inline' },
+        children: [
+          {
+            component: 'Form.Item',
+            id: 'range-item',
+            props: { label: '日期范围', name: 'range' },
+            children: [{ component: 'DatePicker.RangePicker', id: 'range-picker', props: {} }],
+          },
+          {
+            component: 'Form.Item',
+            id: 'status-item',
+            props: { label: '状态', name: 'status' },
+            children: [{ component: 'Select', id: 'status-select', props: {} }],
+          },
+          {
+            component: 'Form.Item',
+            id: 'keyword-item',
+            props: { label: '关键词', name: 'keyword' },
+            children: [{ component: 'Input', id: 'keyword-input', props: {} }],
+          },
+          {
+            component: 'Form.Item',
+            id: 'actions-item',
+            props: {},
+            children: [{ component: 'Button', id: 'query-btn', props: { type: 'primary' }, children: '查询' }],
+          },
+        ],
+      }],
+    }, 'filter-block');
+    const filterDiagnostics = assessBlockQuality(filterNode, {
+      block: {
+        id: 'filter-block',
+        description: '数据筛选查询区，支持日期、状态等条件',
+        components: ['Form', 'Form.Item', 'DatePicker.RangePicker', 'Select', 'Input', 'Button'],
+      },
+    } as never);
+
+    expect(filterDiagnostics.map((item) => item.rule)).toEqual(expect.arrayContaining([
+      'filter-inline-overflow',
+      'filter-actions-mixed-with-fields',
+    ]));
+
+    const verticalStackedFilterNode = validateGeneratedBlockNode({
+      component: 'Card',
+      id: 'filter-card-vertical',
+      children: [{
+        component: 'Form',
+        id: 'filter-form-vertical',
+        props: { layout: 'vertical' },
+        children: [{
+          component: 'Row',
+          id: 'filter-row-vertical',
+          children: [
+            {
+              component: 'Col',
+              id: 'fields-col',
+              props: { span: 6 },
+              children: [
+                {
+                  component: 'Form.Item',
+                  id: 'range-item-vertical',
+                  props: { label: '日期范围', name: 'range' },
+                  children: [{ component: 'DatePicker.RangePicker', id: 'range-picker-vertical', props: {} }],
+                },
+                {
+                  component: 'Form.Item',
+                  id: 'status-item-vertical',
+                  props: { label: '状态', name: 'status' },
+                  children: [{ component: 'Select', id: 'status-select-vertical', props: {} }],
+                },
+                {
+                  component: 'Form.Item',
+                  id: 'keyword-item-vertical',
+                  props: { label: '关键词', name: 'keyword' },
+                  children: [{ component: 'Input', id: 'keyword-input-vertical', props: {} }],
+                },
+              ],
+            },
+            {
+              component: 'Col',
+              id: 'actions-col',
+              props: { span: 18 },
+              children: [{
+                component: 'Container',
+                id: 'actions-wrap-vertical',
+                props: { direction: 'row' },
+                children: [{
+                  component: 'Button',
+                  id: 'query-btn-vertical',
+                  props: { type: 'primary' },
+                  children: '查询',
+                }],
+              }],
+            },
+          ],
+        }],
+      }],
+    }, 'filter-block');
+    const verticalStackedDiagnostics = assessBlockQuality(verticalStackedFilterNode, {
+      block: {
+        id: 'filter-block',
+        description: '全宽筛选查询区，包含日期范围、状态选择和关键词搜索',
+        components: ['Form', 'Form.Item', 'DatePicker.RangePicker', 'Select', 'Input', 'Button', 'Row', 'Col'],
+      },
+    } as never);
+
+    expect(verticalStackedDiagnostics.map((item) => item.rule)).toContain('filter-vertical-stacked-layout');
+
+    const horizontalFilterNode = validateGeneratedBlockNode({
+      component: 'Card',
+      id: 'filter-card-horizontal',
+      children: [{
+        component: 'Form',
+        id: 'filter-form-horizontal',
+        props: { layout: 'vertical' },
+        children: [{
+          component: 'Row',
+          id: 'filter-row-horizontal',
+          props: { gutter: [16, 16], align: 'bottom' },
+          children: [
+            {
+              component: 'Col',
+              id: 'keyword-col',
+              props: { span: 5 },
+              children: [{
+                component: 'Form.Item',
+                id: 'keyword-item-horizontal',
+                props: { label: '关键词', name: 'keyword' },
+                children: [{ component: 'Input', id: 'keyword-input-horizontal', props: {} }],
+              }],
+            },
+            {
+              component: 'Col',
+              id: 'status-col',
+              props: { span: 5 },
+              children: [{
+                component: 'Form.Item',
+                id: 'status-item-horizontal',
+                props: { label: '状态', name: 'status' },
+                children: [{ component: 'Select', id: 'status-select-horizontal', props: {} }],
+              }],
+            },
+            {
+              component: 'Col',
+              id: 'range-col',
+              props: { span: 8 },
+              children: [{
+                component: 'Form.Item',
+                id: 'range-item-horizontal',
+                props: { label: '日期范围', name: 'range' },
+                children: [{ component: 'DatePicker.RangePicker', id: 'range-picker-horizontal', props: {} }],
+              }],
+            },
+            {
+              component: 'Col',
+              id: 'action-col-horizontal',
+              props: { span: 6 },
+              children: [{
+                component: 'Container',
+                id: 'actions-wrap-horizontal',
+                props: { direction: 'row', justify: 'end' },
+                children: [{
+                  component: 'Space',
+                  id: 'actions-horizontal',
+                  children: [{
+                    component: 'Button',
+                    id: 'query-btn-horizontal',
+                    props: { type: 'primary' },
+                    children: '查询',
+                  }],
+                }],
+              }],
+            },
+          ],
+        }],
+      }],
+    }, 'filter-block');
+    const horizontalDiagnostics = assessBlockQuality(horizontalFilterNode, {
+      block: {
+        id: 'filter-block',
+        description: '全宽筛选查询区，包含日期范围、状态选择和关键词搜索',
+        components: ['Form', 'Form.Item', 'DatePicker.RangePicker', 'Select', 'Input', 'Button', 'Row', 'Col'],
+      },
+    } as never);
+
+    expect(horizontalDiagnostics.map((item) => item.rule)).not.toContain('filter-vertical-stacked-layout');
+
+    const kpiNode = validateGeneratedBlockNode({
+      component: 'Row',
+      id: 'kpi-row',
+      props: { gutter: [16, 16] },
+      children: Array.from({ length: 5 }, (_, index) => ({
+        component: 'Col',
+        id: `kpi-col-${index + 1}`,
+        props: { span: index < 4 ? 6 : 8 },
+        children: [{
+          component: 'Card',
+          id: `kpi-card-${index + 1}`,
+          props: { title: `指标 ${index + 1}` },
+          children: index === 2
+            ? [{ component: 'Progress', id: 'kpi-progress', props: { percent: 78 } }]
+            : index === 3
+              ? [{ component: 'Tag', id: 'kpi-tag', props: { color: 'red' }, children: '紧急' }]
+              : [{ component: 'Statistic', id: `kpi-stat-${index + 1}`, props: { title: `指标 ${index + 1}`, value: index + 1 } }],
+        }],
+      })),
+    }, 'kpi-block');
+    const kpiDiagnostics = assessBlockQuality(kpiNode, {
+      block: {
+        id: 'kpi-block',
+        description: '核心业务指标卡片，展示关键数值和趋势',
+        components: ['Row', 'Col', 'Card', 'Statistic', 'Progress', 'Tag'],
+      },
+    } as never);
+
+    expect(kpiDiagnostics.map((item) => item.rule)).toEqual(expect.arrayContaining([
+      'kpi-too-many-cards',
+      'kpi-tag-only-card',
+      'kpi-mixed-card-structures',
+    ]));
+  });
+
+  it('flags empty alerts in tab panes for retry', () => {
+    const tabsNode = validateGeneratedBlockNode({
+      component: 'Tabs',
+      id: 'trend-tabs',
+      children: [{
+        component: 'Tabs.TabPane',
+        id: 'tab-1',
+        props: { label: '趋势' },
+        children: [
+          { component: 'Alert', id: 'blank-alert', props: { type: 'info' } },
+          { component: 'Card', id: 'tiny-card-1', props: { title: '卡片1' } },
+          { component: 'Card', id: 'tiny-card-2', props: { title: '卡片2' } },
+          { component: 'Card', id: 'tiny-card-3', props: { title: '卡片3' } },
+          { component: 'Card', id: 'tiny-card-4', props: { title: '卡片4' } },
+          { component: 'Card', id: 'tiny-card-5', props: { title: '卡片5' } },
+        ],
+      }],
+    }, 'tabs-block');
+
+    const diagnostics = assessBlockQuality(tabsNode, {
+      block: {
+        id: 'tabs-block',
+        description: '趋势分析 Tabs 区域',
+        components: ['Tabs', 'Alert', 'Card'],
+      },
+    } as never);
+
+    expect(diagnostics.map((item) => item.rule)).toEqual(expect.arrayContaining([
+      'alert-missing-copy',
+      'tab-pane-fragmented-layout',
+    ]));
+  });
+
+  it('flags empty buttons in header and filter action regions', () => {
+    const headerNode = validateGeneratedBlockNode({
+      component: 'Container',
+      id: 'header-actions',
+      children: [{
+        component: 'Button',
+        id: 'settings-btn',
+        props: { type: 'text' },
+        children: [],
+      }],
+    }, 'header-block');
+    const filterNode = validateGeneratedBlockNode({
+      component: 'Form',
+      id: 'filter-form',
+      props: { layout: 'vertical' },
+      children: [{
+        component: 'Container',
+        id: 'actions-wrap',
+        props: { direction: 'row' },
+        children: [{
+          component: 'Button',
+          id: 'search-btn',
+          props: { type: 'primary' },
+          children: [],
+        }],
+      }],
+    }, 'filter-block');
+
+    const headerDiagnostics = assessBlockQuality(headerNode, {
+      block: {
+        id: 'header-block',
+        description: '页面标题和顶部主操作按钮组',
+        components: ['Button', 'Space'],
+      },
+    } as never);
+    const filterDiagnostics = assessBlockQuality(filterNode, {
+      block: {
+        id: 'filter-block',
+        description: '筛选区和查询按钮',
+        components: ['Form', 'Button'],
+      },
+    } as never);
+
+    expect(headerDiagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rule: 'button-missing-text',
+        severity: 'retry',
+      }),
+    ]));
+    expect(filterDiagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rule: 'button-missing-text',
+        severity: 'retry',
+      }),
+    ]));
+  });
+
+  it('flags multiline text buttons and overdense content in narrow master list blocks', () => {
+    const masterListNode = validateGeneratedBlockNode({
+      component: 'Card',
+      id: 'master-list-block',
+      props: { title: '主数据列表' },
+      children: [{
+        component: 'Container',
+        id: 'list-container',
+        props: { direction: 'column', gap: 8 },
+        children: [{
+          component: 'Button',
+          id: 'master-item-1',
+          props: {
+            type: 'text',
+            block: true,
+            style: { textAlign: 'left', padding: '8px 12px' },
+          },
+          children: [{
+            component: 'Space',
+            id: 'master-item-space',
+            props: { direction: 'vertical', size: 0 },
+            children: [
+              {
+                component: 'Typography.Text',
+                id: 'master-item-title',
+                props: { strong: true },
+                children: '主数据项目 001',
+              },
+              {
+                component: 'Space',
+                id: 'master-item-meta',
+                props: { size: 'small' },
+                children: [
+                  { component: 'Tag', id: 'master-tag-1', props: { color: 'green' }, children: '启用' },
+                  { component: 'Tag', id: 'master-tag-2', props: { color: 'blue' }, children: '已同步' },
+                ],
+              },
+              {
+                component: 'Typography.Text',
+                id: 'master-item-desc',
+                props: { type: 'secondary' },
+                children: '描述信息：这是第一条主数据的详细描述，内容偏长。',
+              },
+            ],
+          }],
+        }],
+      }],
+    }, 'master-list-block');
+
+    const diagnostics = assessBlockQuality(masterListNode, {
+      block: {
+        id: 'master-list-block',
+        description: '左侧主数据列表，支持查询和选中状态',
+        components: ['Card', 'Form', 'Form.Item', 'Input', 'Tag', 'Button', 'Container', 'Typography.Text'],
+      },
+    } as never);
+
+    expect(diagnostics.map((item) => item.rule)).toEqual(expect.arrayContaining([
+      'master-list-button-card-layout',
+      'side-list-overdense',
+    ]));
+  });
+
+  it('regresses the 2026-03-09 workbench trace with quality diagnostics', () => {
+    const trace = loadTrace('2026-03-09T06-20-11-463Z-success.json');
+    const blocks = trace.trace.blocks as Array<{ blockId: string; rawOutput: string; description: string; suggestedComponents: string[] }>;
+    const filterBlock = blocks.find((block) => block.blockId === 'filter-block');
+    const kpiBlock = blocks.find((block) => block.blockId === 'kpi-block');
+    const tabsBlock = blocks.find((block) => block.suggestedComponents.includes('Tabs'));
+
+    expect(filterBlock).toBeTruthy();
+    expect(kpiBlock).toBeTruthy();
+    expect(tabsBlock).toBeTruthy();
+
+    const normalizedFilter = validateGeneratedBlockNode(JSON.parse(filterBlock!.rawOutput), filterBlock!.blockId);
+    const normalizedKpi = validateGeneratedBlockNode(JSON.parse(kpiBlock!.rawOutput), kpiBlock!.blockId);
+    const normalizedTabs = validateGeneratedBlockNode(JSON.parse(tabsBlock!.rawOutput), tabsBlock!.blockId);
+
+    const filterDiagnostics = assessBlockQuality(normalizedFilter, {
+      block: {
+        id: filterBlock!.blockId,
+        description: filterBlock!.description,
+        components: filterBlock!.suggestedComponents,
+      },
+    } as never);
+    const kpiDiagnostics = assessBlockQuality(normalizedKpi, {
+      block: {
+        id: kpiBlock!.blockId,
+        description: kpiBlock!.description,
+        components: kpiBlock!.suggestedComponents,
+      },
+    } as never);
+    const tabsDiagnostics = assessBlockQuality(normalizedTabs, {
+      block: {
+        id: tabsBlock!.blockId,
+        description: tabsBlock!.description,
+        components: tabsBlock!.suggestedComponents,
+      },
+    } as never);
+
+    expect(filterDiagnostics.map((item) => item.rule)).toContain('filter-inline-overflow');
+    expect(kpiDiagnostics.map((item) => item.rule)).toContain('kpi-too-many-cards');
+    expect(kpiDiagnostics.map((item) => item.rule)).toContain('kpi-mixed-card-structures');
+
+    let alertMessage: string | undefined;
+    walkTraceNodes(normalizedTabs, (node) => {
+      if (node.component === 'Alert' && typeof node.props?.message === 'string') {
+        alertMessage = node.props.message;
+      }
+    });
+    expect(alertMessage).toBeTruthy();
+    expect(tabsDiagnostics.map((item) => item.rule)).not.toContain('alert-missing-copy');
+  });
+
+  it('regresses the 2026-03-09 filter trace for legacy children and fake form labels', () => {
+    const trace = loadTrace('2026-03-09T06-39-06-634Z-success.json');
+    const blocks = trace.trace.blocks as Array<{ blockId: string; rawOutput: string; description: string; suggestedComponents: string[] }>;
+    const filterBlock = blocks.find((block) => block.blockId === 'filter-block');
+    const headerBlock = blocks.find((block) => block.blockId === 'header-block');
+
+    expect(filterBlock).toBeTruthy();
+    expect(headerBlock).toBeTruthy();
+
+    const normalizedFilter = validateGeneratedBlockNode(JSON.parse(filterBlock!.rawOutput), filterBlock!.blockId);
+    const normalizedHeader = validateGeneratedBlockNode(JSON.parse(headerBlock!.rawOutput), headerBlock!.blockId);
+
+    const labels: string[] = [];
+    const buttonTexts: string[] = [];
+    walkTraceNodes(normalizedFilter, (node) => {
+      if (node.component === 'Form.Item' && typeof node.props?.label === 'string') {
+        labels.push(node.props.label);
+      }
+      if (node.component === 'Button' && typeof node.children === 'string') {
+        buttonTexts.push(node.children);
+      }
+    });
+
+    expect(labels).not.toContain('字段1');
+    expect(labels).not.toContain('字段2');
+    expect(buttonTexts).toEqual(expect.arrayContaining(['重置', '查询']));
+
+    const headerDiagnostics = assessBlockQuality(normalizedHeader, {
+      block: {
+        id: headerBlock!.blockId,
+        description: headerBlock!.description,
+        components: headerBlock!.suggestedComponents,
+      },
+    } as never);
+
+    expect(headerDiagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rule: 'button-missing-text',
+      }),
+    ]));
+  });
+
+  it('regresses the 2026-03-09 dashboard filter trace for vertical stacked layout drift', () => {
+    const trace = loadTrace('2026-03-09T06-56-41-203Z-success.json');
+    const blocks = trace.trace.blocks as Array<{ blockId: string; rawOutput: string; description: string; suggestedComponents: string[] }>;
+    const filterBlock = blocks.find((block) => block.blockId === 'filter-block');
+
+    expect(filterBlock).toBeTruthy();
+
+    const normalizedFilter = validateGeneratedBlockNode(JSON.parse(filterBlock!.rawOutput), filterBlock!.blockId);
+    const filterDiagnostics = assessBlockQuality(normalizedFilter, {
+      block: {
+        id: filterBlock!.blockId,
+        description: filterBlock!.description,
+        components: filterBlock!.suggestedComponents,
+      },
+    } as never);
+
+    expect(filterDiagnostics.map((item) => item.rule)).toContain('filter-vertical-stacked-layout');
+    expect(filterDiagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rule: 'filter-vertical-stacked-layout',
+        severity: 'retry',
+      }),
+    ]));
+  });
+
+  it('regresses the 2026-03-09 master-detail trace for misclassification and left list layout drift', () => {
+    const trace = loadTrace('2026-03-09T07-29-56-720Z-success.json');
+    const prompt = trace.trace.request.prompt as string;
+    const blocks = trace.trace.blocks as Array<{ blockId: string; rawOutput: string; description: string; suggestedComponents: string[] }>;
+    const masterListBlock = blocks.find((block) => block.blockId === 'master-list-block');
+
+    expect(classifyPromptToPageType(prompt)).toBe('detail');
+    expect(masterListBlock).toBeTruthy();
+
+    const validated = validateGeneratedBlockNodeWithDiagnostics(
+      JSON.parse(masterListBlock!.rawOutput),
+      masterListBlock!.blockId,
+    );
+    const diagnostics = assessBlockQuality(validated.node, {
+      block: {
+        id: masterListBlock!.blockId,
+        description: masterListBlock!.description,
+        components: masterListBlock!.suggestedComponents,
+      },
+    } as never);
+
+    expect(validated.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        componentType: 'Button',
+        propPath: 'style',
+        action: 'drop',
+      }),
+    ]));
+    expect(diagnostics.map((item) => item.rule)).toEqual(expect.arrayContaining([
+      'master-list-button-card-layout',
+      'side-list-overdense',
+    ]));
+  });
+});
+
+function walkTraceNodes(
+  value: any,
+  visitor: (node: any) => void,
+): void {
+  if (!value) {
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => walkTraceNodes(item, visitor));
+    return;
+  }
+  if (typeof value !== 'object' || !('component' in value)) {
+    return;
+  }
+  visitor(value);
+  walkTraceNodes(value.children, visitor);
+}
 
 describe('validateGeneratedBlockNode', () => {
   it('wraps array roots into a valid container block', () => {

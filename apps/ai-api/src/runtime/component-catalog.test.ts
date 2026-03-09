@@ -80,6 +80,8 @@ describe('component catalog', () => {
     expect(compiledLevel2Briefs.Table?.schemaContract).toContain('schema-example:');
     expect(compiledLevel2Briefs.Pagination?.schemaContract).toContain('function-prop Pagination.showTotal');
     expect(compiledLevel2Briefs.Pagination?.schemaContract).toContain('"type":"JSFunction"');
+    expect(compiledLevel2Briefs.Alert?.schemaContract).toContain('message');
+    expect(compiledLevel2Briefs.Alert?.schemaContract).not.toContain('title(required)');
     expect(compiledKnowledgeLevel2Briefs.Collapse?.childComponents).toContain('Collapse.Panel');
     expect(compiledKnowledgeLevel2Briefs.Pagination?.groups).toContain('navigation');
     expect(compiledKnowledgeLevel2Briefs.Avatar?.componentType).toBe('Avatar');
@@ -98,12 +100,18 @@ describe('component catalog', () => {
   it('provides page skeleton summaries for classifier-guided planning', () => {
     expect(getPageSkeleton('list').recommendedZones).toEqual(['page-header', 'filter', 'data-table']);
     expect(getPageSkeletonSummary('detail')).toContain('recommendedZones: page-header, detail-info');
+    expect(getPageSkeletonSummary('dashboard')).toContain('layoutPattern: page-header -> filter -> kpi-row -> (chart-area|data-table) + side-info');
     expect(compiledPageSkeletons.dashboard.optionalZones).toContain('timeline-area');
   });
 
   it('exposes design policy and free-layout patterns for softer layout guidance', () => {
     expect(getDesignPolicySummary()).toContain('Use Row, Col, Space, Flex, and Divider');
+    expect(getDesignPolicySummary()).toContain('at most 3 fields in the same row');
+    expect(getDesignPolicySummary()).toContain('horizontal search bar');
+    expect(getDesignPolicySummary()).toContain('master-detail pages');
+    expect(getDesignPolicySummary()).toContain('keep a single row of at most 4 cards');
     expect(getFreeLayoutPatternSummary('detail')).toContain('main-with-side-info');
+    expect(getFreeLayoutPatternSummary('detail')).toContain('master-detail-split');
     expect(getFreeLayoutPatternSummary('custom')).toContain('split-context-and-data');
     expect(compiledFreeLayoutPatterns.length).toBeGreaterThan(1);
   });

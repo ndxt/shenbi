@@ -121,8 +121,8 @@ type LegacyZoneType =
 // planner/group summaries. They are no longer part of the runtime main path.
 const legacyZoneGoldenExamples: Record<LegacyZoneType, string> = {
   'page-header': '{"component":"Container","id":"page-header","props":{"direction":"column","gap":8},"children":[{"component":"Typography.Title","id":"page-title","props":{"level":2},"children":["用户列表"]},{"component":"Typography.Text","id":"page-desc","props":{"type":"secondary"},"children":["管理用户信息、角色与状态"]},{"component":"Space","id":"page-actions","props":{"size":"small"},"children":[{"component":"Button","id":"create-user","props":{"type":"primary"},"children":["新建用户"]}]}]}',
-  filter: '{"component":"Card","id":"user-filter","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"filter-form","props":{"layout":"inline"},"children":[{"component":"Form.Item","id":"filter-name","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"filter-name-input","props":{"placeholder":"请输入姓名"}}]},{"component":"Form.Item","id":"filter-role","props":{"label":"角色","name":"role"},"children":[{"component":"Select","id":"filter-role-select","props":{"placeholder":"请选择角色"}}]},{"component":"Form.Item","id":"filter-date","props":{"label":"日期","name":"date"},"children":[{"component":"DatePicker","id":"filter-date-picker","props":{}}]},{"component":"Space","id":"filter-actions","props":{"size":"small"},"children":[{"component":"Button","id":"submit","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"reset","props":{},"children":["重置"]}]}]}]}',
-  'kpi-row': '{"component":"Row","id":"attendance-kpis","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"kpi-1-col","props":{"span":6},"children":[{"component":"Card","id":"kpi-1-card","props":{},"children":[{"component":"Statistic","id":"kpi-1","props":{"title":"今日出勤率","value":96}}]}]},{"component":"Col","id":"kpi-2-col","props":{"span":6},"children":[{"component":"Card","id":"kpi-2-card","props":{},"children":[{"component":"Statistic","id":"kpi-2","props":{"title":"迟到人数","value":12}}]}]}]}',
+  filter: '{"component":"Card","id":"user-filter","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"filter-form","props":{"layout":"vertical"},"children":[{"component":"Row","id":"filter-row","props":{"gutter":[16,16],"align":"bottom"},"children":[{"component":"Col","id":"filter-keyword-col","props":{"span":5},"children":[{"component":"Form.Item","id":"filter-keyword","props":{"label":"关键词","name":"keyword"},"children":[{"component":"Input","id":"filter-keyword-input","props":{"placeholder":"请输入关键词"}}]}]},{"component":"Col","id":"filter-role-col","props":{"span":5},"children":[{"component":"Form.Item","id":"filter-role","props":{"label":"状态","name":"status"},"children":[{"component":"Select","id":"filter-role-select","props":{"placeholder":"请选择状态"}}]}]},{"component":"Col","id":"filter-date-col","props":{"span":8},"children":[{"component":"Form.Item","id":"filter-date","props":{"label":"日期范围","name":"date"},"children":[{"component":"DatePicker.RangePicker","id":"filter-date-picker","props":{"placeholder":["开始日期","结束日期"],"style":{"width":"100%"}}}]}]},{"component":"Col","id":"filter-actions-col","props":{"span":6},"children":[{"component":"Container","id":"filter-actions-wrap","props":{"direction":"row","justify":"end","style":{"paddingTop":"30px"}},"children":[{"component":"Space","id":"filter-actions","props":{"size":"small"},"children":[{"component":"Button","id":"submit","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"reset","props":{},"children":["重置"]},{"component":"Button","id":"export","props":{"type":"dashed"},"children":["导出"]}]}]}]}]}]}]}',
+  'kpi-row': '{"component":"Row","id":"attendance-kpis","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"kpi-1-col","props":{"span":6},"children":[{"component":"Card","id":"kpi-1-card","props":{},"children":[{"component":"Statistic","id":"kpi-1","props":{"title":"今日出勤率","value":96}},{"component":"Typography.Text","id":"kpi-1-note","props":{"type":"secondary"},"children":["较昨日 +1.2%"]}]}]},{"component":"Col","id":"kpi-2-col","props":{"span":6},"children":[{"component":"Card","id":"kpi-2-card","props":{},"children":[{"component":"Statistic","id":"kpi-2","props":{"title":"迟到人数","value":12}},{"component":"Typography.Text","id":"kpi-2-note","props":{"type":"secondary"},"children":["需重点关注"]}]}]}]}',
   'data-table': '{"component":"Card","id":"user-table-card","props":{"title":"用户列表"},"children":[{"component":"Table","id":"user-table","props":{"dataSource":[{"key":"1","name":"张三","role":"管理员","status":"启用"}],"pagination":{"pageSize":10}},"columns":[{"key":"name","dataIndex":"name","title":"姓名"},{"key":"role","dataIndex":"role","title":"角色"},{"key":"status","dataIndex":"status","title":"状态"}]}]}',
   'detail-info': '{"component":"Card","id":"employee-detail","props":{"title":"员工详情"},"children":[{"component":"Descriptions","id":"employee-descriptions","props":{"column":2},"children":[{"component":"Descriptions.Item","id":"detail-name","props":{"label":"姓名"},"children":["张三"]},{"component":"Descriptions.Item","id":"detail-dept","props":{"label":"部门"},"children":["技术部"]}]}]}',
   'form-body': '{"component":"Card","id":"employee-form-card","props":{"title":"员工信息"},"children":[{"component":"Form","id":"employee-form","props":{"layout":"vertical"},"children":[{"component":"Form.Item","id":"employee-name","props":{"label":"姓名","name":"name"},"children":[{"component":"Input","id":"employee-name-input","props":{"placeholder":"请输入姓名"}}]},{"component":"Form.Item","id":"employee-role","props":{"label":"角色","name":"role"},"children":[{"component":"Select","id":"employee-role-select","props":{"placeholder":"请选择角色"}}]}]}]}',
@@ -138,8 +138,8 @@ const pageSkeletons: Record<PageType, PageSkeleton> = {
   dashboard: {
     pageType: 'dashboard',
     intent: '仪表盘类页面，先展示概况，再展示趋势和主数据',
-    layoutPattern: 'page-header -> kpi-row -> chart-area -> data-table -> timeline-area',
-    recommendedZones: ['page-header', 'kpi-row', 'chart-area', 'data-table'],
+    layoutPattern: 'page-header -> filter -> kpi-row -> (chart-area|data-table) + side-info',
+    recommendedZones: ['page-header', 'filter', 'kpi-row', 'chart-area', 'data-table'],
     optionalZones: ['timeline-area', 'side-info'],
   },
   list: {
@@ -187,6 +187,16 @@ const designPolicy = [
   'Use cards to group related business information, but do not wrap every tiny element in a card.',
   'Favor concise Chinese business copy and short labels. Titles should be strong, descriptions should be short, and supporting text should be secondary.',
   'For free layouts, prefer asymmetric but balanced compositions such as main content + side info, summary cards above details, or left text + right data.',
+  'For master-detail pages, prefer a 7/17 or 8/16 split: compact master navigation/list on the left, richer detail tabs/body on the right.',
+  'In narrow left side panels, do not use Button type="text" as a multi-line card wrapper. Use compact Containers/Cards for selectable master items instead.',
+  'For dashboard pages, prefer header full-width, filter full-width, KPI full-width, then a 16/8 or 18/6 main-content + side-info row.',
+  'For dashboard and list filter regions, default to one horizontal search bar with at most 3 fields in the same row plus a right-aligned tail action area.',
+  'If a RangePicker appears, give it a wider column inside the same row. Do not switch the whole filter block to a vertical stacked layout just because a date range exists.',
+  'Use vertical/two-row filter layouts only for advanced search, more than 3 fields, or genuinely narrow widths.',
+  'Filter action buttons should be a separate tail action area, not an empty-label Form.Item mixed into the same line of fields.',
+  'For KPI regions, keep a single row of at most 4 cards. Each card should use a consistent structure: title + main value + one secondary line.',
+  'Do not mix progress-only cards, tag-only cards, and verbose text cards in the same KPI row.',
+  'Inside one tab pane, keep at most one Alert, one short description, and one main data area. Avoid a wall of many tiny cards.',
 ].join('\n');
 
 const freeLayoutPatterns: FreeLayoutPattern[] = [
@@ -229,6 +239,19 @@ const freeLayoutPatterns: FreeLayoutPattern[] = [
     ],
     example: '{"component":"Row","id":"layout-split-context-data","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"context-col","props":{"span":10},"children":[{"component":"Card","id":"context-card","props":{"title":"业务说明"},"children":[{"component":"Typography.Title","id":"context-title","props":{"level":4},"children":["页面背景"]},{"component":"Typography.Paragraph","id":"context-copy","props":{},"children":["左侧展示说明、详情或表单上下文。"]}]}]},{"component":"Col","id":"data-col","props":{"span":14},"children":[{"component":"Card","id":"data-card","props":{"title":"结构化数据"},"children":[{"component":"Table","id":"data-table","props":{"dataSource":[{"key":"1","name":"张三","status":"正常"}],"pagination":{"pageSize":5}},"columns":[{"key":"name","dataIndex":"name","title":"姓名"},{"key":"status","dataIndex":"status","title":"状态"}]}]}]}]}',
   },
+  {
+    id: 'master-detail-split',
+    appliesTo: ['detail', 'custom'],
+    title: '主从导航 + 详情 Tabs',
+    intent: '适合左侧主列表、右侧详情区的管理页面，保持左紧右松的主从关系。',
+    composition: 'Use a two-column Row. Left column span 7-8 for a compact master list/card stack. Right column span 16-17 for Tabs, Descriptions, Form, or timeline content.',
+    guidance: [
+      'Left-side master items should stay compact: one title line, one status/meta line, and one short description line.',
+      'Do not use multiline text Buttons as list-card wrappers in the left column.',
+      'Keep the right column visually dominant with detail tabs, descriptions, forms, or timeline content.',
+    ],
+    example: '{"component":"Row","id":"layout-master-detail","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"master-col","props":{"span":8},"children":[{"component":"Card","id":"master-list-card","props":{"title":"主数据列表","size":"small"},"children":[{"component":"Container","id":"master-list","props":{"direction":"column","gap":8},"children":[{"component":"Container","id":"master-item-1","props":{"direction":"column","gap":4},"children":[{"component":"Typography.Text","id":"master-title-1","props":{"strong":true},"children":["产品管理模块"]},{"component":"Space","id":"master-meta-1","props":{"size":"small"},"children":[{"component":"Tag","id":"master-tag-1","props":{"color":"green"},"children":["启用"]},{"component":"Tag","id":"master-tag-2","props":{"color":"blue"},"children":["已同步"]}]},{"component":"Typography.Text","id":"master-desc-1","props":{"type":"secondary"},"children":["短描述信息，帮助区分当前主项。"]}]}]}]}]},{"component":"Col","id":"detail-col","props":{"span":16},"children":[{"component":"Tabs","id":"detail-tabs","props":{"defaultActiveKey":"basic"},"children":[{"component":"Tabs.TabPane","id":"detail-tab-basic","props":{"label":"基本信息","key":"basic"},"children":[{"component":"Card","id":"detail-info-card","props":{"title":"详细信息"},"children":[{"component":"Descriptions","id":"detail-info","props":{"column":2},"children":[{"component":"Descriptions.Item","id":"detail-code","props":{"label":"编码"},"children":["PRD-2023-001"]},{"component":"Descriptions.Item","id":"detail-name","props":{"label":"名称"},"children":["产品管理模块"]}]}]}]}]}]}]}',
+  },
 ];
 
 const legacyZoneTemplates: Record<LegacyZoneType, ZoneTemplate> = {
@@ -245,12 +268,12 @@ const legacyZoneTemplates: Record<LegacyZoneType, ZoneTemplate> = {
   filter: {
     zoneType: 'filter',
     intent: '搜索、筛选、时间范围和查询操作区域',
-    layoutPattern: 'compact card wrapper, inline or vertical form, action buttons aligned at the end',
+    layoutPattern: 'compact card wrapper, horizontal search bar using Row/Col, max three fields in one row, wider date column, right-aligned tail action area',
     preferredGroups: ['data-display', 'filters-form', 'layout-shell', 'actions'],
     preferredComponents: ['Card', 'Form', 'Form.Item', 'Input', 'Select', 'DatePicker', 'DatePicker.RangePicker', 'Space', 'Button'],
     maxDepth: 4,
     maxChildrenPerArray: 6,
-    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"__FORM_ID__","props":{"layout":"inline"},"children":[{"component":"Form.Item","id":"__FIELD_ID__","props":{"label":"关键词","name":"keyword"},"children":[{"component":"Input","id":"__INPUT_ID__","props":{"placeholder":"请输入关键词"}}]},{"component":"Space","id":"__ACTION_ID__","props":{"size":"small"},"children":[{"component":"Button","id":"__QUERY_ID__","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"__RESET_ID__","props":{},"children":["重置"]}]}]}]}',
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"size":"small","bordered":true},"children":[{"component":"Form","id":"__FORM_ID__","props":{"layout":"vertical"},"children":[{"component":"Row","id":"__FILTER_ROW__","props":{"gutter":[16,16],"align":"bottom"},"children":[{"component":"Col","id":"__KEYWORD_COL__","props":{"span":5},"children":[{"component":"Form.Item","id":"__FIELD_ID__","props":{"label":"关键词","name":"keyword"},"children":[{"component":"Input","id":"__INPUT_ID__","props":{"placeholder":"请输入关键词"}}]}]},{"component":"Col","id":"__STATUS_COL__","props":{"span":5},"children":[{"component":"Form.Item","id":"__STATUS_ID__","props":{"label":"状态","name":"status"},"children":[{"component":"Select","id":"__STATUS_SELECT__","props":{"placeholder":"请选择状态"}}]}]},{"component":"Col","id":"__DATE_COL__","props":{"span":8},"children":[{"component":"Form.Item","id":"__DATE_ID__","props":{"label":"日期范围","name":"dateRange"},"children":[{"component":"DatePicker.RangePicker","id":"__RANGE_ID__","props":{"placeholder":["开始日期","结束日期"],"style":{"width":"100%"}}}]}]},{"component":"Col","id":"__ACTION_COL__","props":{"span":6},"children":[{"component":"Container","id":"__ACTION_WRAP__","props":{"direction":"row","justify":"end","style":{"paddingTop":"30px"}},"children":[{"component":"Space","id":"__ACTION_ID__","props":{"size":"small"},"children":[{"component":"Button","id":"__QUERY_ID__","props":{"type":"primary"},"children":["查询"]},{"component":"Button","id":"__RESET_ID__","props":{},"children":["重置"]},{"component":"Button","id":"__EXPORT_ID__","props":{"type":"dashed"},"children":["导出"]}]}]}]}]}]}]}',
     wrapper: {
       component: 'Card',
       props: {
@@ -262,12 +285,12 @@ const legacyZoneTemplates: Record<LegacyZoneType, ZoneTemplate> = {
   'kpi-row': {
     zoneType: 'kpi-row',
     intent: '展示关键业务指标，通常为 3-4 张统计卡片',
-    layoutPattern: '24-grid row with 3-4 equal columns, each column contains one concise KPI card',
+    layoutPattern: '24-grid row with at most 4 equal columns, each column contains one KPI card with title, main value, and one secondary line',
     preferredGroups: ['layout-shell', 'data-display', 'feedback-status'],
-    preferredComponents: ['Row', 'Col', 'Card', 'Statistic', 'Tag'],
+    preferredComponents: ['Row', 'Col', 'Card', 'Statistic', 'Typography.Text'],
     maxDepth: 4,
     maxChildrenPerArray: 4,
-    skeleton: '{"component":"Row","id":"__ZONE_ID__","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"__COL_1__","props":{"span":6},"children":[{"component":"Card","id":"__CARD_1__","props":{},"children":[{"component":"Statistic","id":"__STAT_1__","props":{"title":"__METRIC_TITLE__","value":96}}]}]}]}',
+    skeleton: '{"component":"Row","id":"__ZONE_ID__","props":{"gutter":[16,16]},"children":[{"component":"Col","id":"__COL_1__","props":{"span":6},"children":[{"component":"Card","id":"__CARD_1__","props":{},"children":[{"component":"Statistic","id":"__STAT_1__","props":{"title":"__METRIC_TITLE__","value":96}},{"component":"Typography.Text","id":"__NOTE_1__","props":{"type":"secondary"},"children":["较昨日 +2.5%"]}]}]}]}',
   },
   'data-table': {
     zoneType: 'data-table',
@@ -333,7 +356,7 @@ const legacyZoneTemplates: Record<LegacyZoneType, ZoneTemplate> = {
   'chart-area': {
     zoneType: 'chart-area',
     intent: '趋势、分布或图表替代的统计概览区域',
-    layoutPattern: 'card wrapper with one concise heading, one narrative paragraph, and 1-2 supporting stats',
+    layoutPattern: 'card wrapper with one concise heading, optional one alert, one narrative paragraph, and one main data area',
     preferredGroups: ['data-display', 'typography', 'feedback-status'],
     preferredComponents: ['Card', 'Typography.Title', 'Typography.Paragraph', 'Statistic', 'Tag'],
     maxDepth: 3,

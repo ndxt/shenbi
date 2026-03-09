@@ -79,6 +79,10 @@ interface RunTraceRecord {
     rawOutput: string;
     normalizedNode?: GenerateBlockResult['node'];
     sanitizationDiagnostics?: SanitizationDiagnostic[];
+    qualityDiagnostics?: BlockQualityDiagnostic[];
+    retryRawOutput?: string;
+    retryNormalizedNode?: GenerateBlockResult['node'];
+    retrySanitizationDiagnostics?: SanitizationDiagnostic[];
   }>;
   finalSchema?: PageSchema;
   error?: {
@@ -87,27 +91,425 @@ interface RunTraceRecord {
   };
 }
 
-function classifyPromptToPageType(prompt: string): PageType {
+export interface BlockQualityDiagnostic {
+  blockId: string;
+  rule: string;
+  message: string;
+  severity: 'warn' | 'retry';
+  componentType?: string;
+}
+
+export function classifyPromptToPageType(prompt: string): PageType {
   const normalized = prompt.toLowerCase();
   if (/自定义|自由|创意|landing|marketing/.test(prompt)) {
     return 'custom';
   }
-  if (/详情|detail|profile|信息页/.test(prompt)) {
+  if (
+    (/主从|master[-\s]?detail/i.test(prompt) || /左侧.*(树|列表)|右侧.*tabs?/i.test(prompt))
+    && /详情|tabs?|树|列表/i.test(prompt)
+  ) {
     return 'detail';
   }
-  if (/表单|新建|创建|编辑|录入|审批/.test(prompt)) {
-    return 'form';
+
+  const scores: Record<PageType, number> = {
+    dashboard: 0,
+    list: 0,
+    form: 0,
+    detail: 0,
+    statistics: 0,
+    custom: 0,
+  };
+
+  if (/首页|工作台|大屏|dashboard|概览|看板|驾驶舱/.test(prompt) || normalized.includes('home')) {
+    scores.dashboard += 5;
+  }
+  if (/趋势|报表|分析|统计|概览/.test(prompt)) {
+    scores.dashboard += 2;
+    scores.statistics += 3;
   }
   if (/列表|list|table|查询|管理/.test(prompt)) {
-    return 'list';
+    scores.list += 3;
   }
-  if (/统计|分析|趋势|报表/.test(prompt)) {
-    return 'statistics';
+  if (/表单|新建|创建|编辑|录入/.test(prompt)) {
+    scores.form += 3;
   }
-  if (/首页|大屏|dashboard|概览|看板|考勤/.test(prompt) || normalized.includes('home')) {
-    return 'dashboard';
+  if (/审批/.test(prompt)) {
+    scores.form += 1;
+    scores.detail += 1;
+    scores.dashboard += 1;
   }
-  return 'custom';
+  if (/详情|detail|profile|信息页/.test(prompt)) {
+    scores.detail += 3;
+  }
+  if (/抽屉|drawer/.test(prompt)) {
+    scores.dashboard += 1;
+    scores.detail += 1;
+  }
+
+  if (scores.dashboard > 0 && /表格|table|筛选|tabs|快捷操作/.test(prompt)) {
+    scores.dashboard += 2;
+  }
+
+  const orderedTypes: PageType[] = ['dashboard', 'statistics', 'list', 'detail', 'form', 'custom'];
+  let bestType: PageType = 'custom';
+  let bestScore = 0;
+  for (const pageType of orderedTypes) {
+    if (scores[pageType] > bestScore) {
+      bestType = pageType;
+      bestScore = scores[pageType];
+    }
+  }
+
+  return bestScore > 0 ? bestType : 'custom';
+}
+
+function walkSchemaNodes(
+  value: unknown,
+  visitor: (node: SchemaNode) => void,
+): void {
+  if (!value) {
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      walkSchemaNodes(item, visitor);
+    }
+    return;
+  }
+  if (typeof value === 'string') {
+    return;
+  }
+  if (!isNodeLike(value)) {
+    return;
+  }
+  visitor(value);
+  walkSchemaNodes(value.children, visitor);
+}
+
+function getNodeText(value: unknown): string {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value).trim();
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => getNodeText(item)).filter(Boolean).join(' ').trim();
+  }
+  if (isNodeLike(value)) {
+    return getNodeText(value.children);
+  }
+  return '';
+}
+
+function nodeHasComponent(node: SchemaNode, componentType: string): boolean {
+  let found = false;
+  walkSchemaNodes(node, (current) => {
+    if (current.component === componentType) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+function getChildNodes(value: unknown): SchemaNode[] {
+  return Array.isArray(value)
+    ? value.filter(isNodeLike)
+    : [];
+}
+
+function countDescendantComponents(value: unknown, componentType: string): number {
+  let count = 0;
+  walkSchemaNodes(value, (node) => {
+    if (node.component === componentType) {
+      count += 1;
+    }
+  });
+  return count;
+}
+
+function isKpiBlock(input: Pick<GenerateBlockInput, 'block'>): boolean {
+  return input.block.id.includes('kpi')
+    || /指标|kpi|概览|summary/.test(input.block.description)
+    || input.block.components.some((component) => ['Statistic', 'Progress', 'Tag'].includes(component));
+}
+
+function isFilterBlock(input: Pick<GenerateBlockInput, 'block'>): boolean {
+  return input.block.id.includes('filter')
+    || /筛选|查询|搜索/.test(input.block.description)
+    || input.block.components.some((component) => component.startsWith('Form') || component.includes('DatePicker'));
+}
+
+function isAdvancedFilterBlock(input: Pick<GenerateBlockInput, 'block'>): boolean {
+  return /高级筛选|高级查询|高级搜索|折叠筛选|折叠查询|更多条件|多条件|advanced/i.test(input.block.description);
+}
+
+function isMasterListBlock(input: Pick<GenerateBlockInput, 'block'>): boolean {
+  return input.block.id.includes('master')
+    || /左侧主数据列表|主从|主列表|主数据列表|左侧树|左侧列表|选中状态/.test(input.block.description);
+}
+
+function isMasterDetailPrompt(prompt: string): boolean {
+  return (/主从|master[-\s]?detail/i.test(prompt) || /左侧.*(树|列表)|右侧.*tabs?/i.test(prompt))
+    && /详情|tabs?|树|列表/i.test(prompt);
+}
+
+function isTabsOrTrendBlock(input: Pick<GenerateBlockInput, 'block'>): boolean {
+  return input.block.components.includes('Tabs')
+    || /趋势|tab|tabs/.test(input.block.description.toLowerCase())
+    || input.block.id.includes('tab');
+}
+
+function isActionFocusedBlock(input: Pick<GenerateBlockInput, 'block'>): boolean {
+  return input.block.id.includes('header')
+    || input.block.id.includes('action')
+    || /操作|按钮|快捷入口|快捷操作|主操作/.test(input.block.description);
+}
+
+function getKpiCardKind(card: SchemaNode): string {
+  const childNodes = Array.isArray(card.children)
+    ? card.children.filter(isNodeLike)
+    : [];
+  const hasStatistic = childNodes.some((child) => child.component === 'Statistic');
+  const hasProgress = childNodes.some((child) => child.component === 'Progress');
+  const hasTag = nodeHasComponent(card, 'Tag');
+  const hasText = nodeHasComponent(card, 'Typography.Text');
+  if (hasTag && !hasStatistic && !hasProgress && !hasText) {
+    return 'tag-only';
+  }
+  if (hasProgress && !hasStatistic) {
+    return 'progress';
+  }
+  if (hasStatistic && !hasProgress && !hasTag) {
+    return 'statistic';
+  }
+  return 'mixed';
+}
+
+export function assessBlockQuality(
+  node: GenerateBlockResult['node'],
+  input: Pick<GenerateBlockInput, 'block'>,
+): BlockQualityDiagnostic[] {
+  const diagnostics: BlockQualityDiagnostic[] = [];
+
+  walkSchemaNodes(node, (current) => {
+    if (current.component === 'Alert') {
+      const message = getNodeText(current.props?.message);
+      const description = getNodeText(current.props?.description);
+      if (!message && !description) {
+        diagnostics.push({
+          blockId: input.block.id,
+          componentType: 'Alert',
+          rule: 'alert-missing-copy',
+          message: 'Alert must provide message or description; empty alerts create a blank highlighted box.',
+          severity: 'retry',
+        });
+      }
+      return;
+    }
+
+    if (current.component === 'Button') {
+      const text = getNodeText(current.children);
+      if (!text) {
+        diagnostics.push({
+          blockId: input.block.id,
+          componentType: 'Button',
+          rule: 'button-missing-text',
+          message: isFilterBlock(input) || isActionFocusedBlock(input)
+            ? 'Buttons in filter or action regions must include visible text in top-level children.'
+            : 'Button has no visible text. Use top-level children for the label unless this is an intentional icon-only button.',
+          severity: isFilterBlock(input) || isActionFocusedBlock(input) ? 'retry' : 'warn',
+        });
+      }
+    }
+  });
+
+  if (isFilterBlock(input)) {
+    walkSchemaNodes(node, (current) => {
+      if (current.component !== 'Form') {
+        return;
+      }
+      const children = Array.isArray(current.children)
+        ? current.children.filter(isNodeLike)
+        : [];
+      const formItems = children.filter((child) => child.component === 'Form.Item');
+      const inlineLayout = current.props?.layout === 'inline';
+      const hasRangePicker = nodeHasComponent(current, 'DatePicker.RangePicker');
+      if (inlineLayout && (formItems.length > 3 || hasRangePicker)) {
+        diagnostics.push({
+          blockId: input.block.id,
+          componentType: 'Form',
+          rule: 'filter-inline-overflow',
+          message: 'Filter blocks with RangePicker or more than 3 fields should use a Row/Col-based horizontal search bar or a controlled second row, not a single cramped inline row.',
+          severity: 'retry',
+        });
+      }
+      if (formItems.some((item) => !getNodeText(item.props?.label))) {
+        diagnostics.push({
+          blockId: input.block.id,
+          componentType: 'Form.Item',
+          rule: 'filter-actions-mixed-with-fields',
+          message: 'Filter action buttons should be separated into a tail action area instead of an empty-label Form.Item.',
+          severity: 'retry',
+        });
+      }
+      if (!isAdvancedFilterBlock(input) && current.props?.layout === 'vertical') {
+        const directChildren = getChildNodes(current.children);
+        const directRows = directChildren.filter((child) => child.component === 'Row');
+        const rowColumns = directRows.flatMap((row) =>
+          getChildNodes(row.children).filter((child) => child.component === 'Col'));
+        const totalFormItems = countDescendantComponents(current.children, 'Form.Item');
+        const directFieldCount = directChildren.filter((child) => child.component === 'Form.Item').length;
+        const fieldColumns = rowColumns.filter((column) => countDescendantComponents(column.children, 'Form.Item') > 0);
+        const actionColumns = rowColumns.filter((column) =>
+          countDescendantComponents(column.children, 'Button') > 0
+          && countDescendantComponents(column.children, 'Form.Item') === 0);
+        const stackedFieldColumn = fieldColumns.some((column) =>
+          countDescendantComponents(column.children, 'Form.Item') >= 2);
+        const separateActionArea = actionColumns.length > 0
+          || directChildren.some((child) =>
+            child.component === 'Container'
+            && countDescendantComponents(child.children, 'Button') > 0
+            && countDescendantComponents(child.children, 'Form.Item') === 0);
+        if (
+          totalFormItems >= 2
+          && totalFormItems <= 3
+          && separateActionArea
+          && (stackedFieldColumn || directFieldCount >= 2)
+        ) {
+          diagnostics.push({
+            blockId: input.block.id,
+            componentType: 'Form',
+            rule: 'filter-vertical-stacked-layout',
+            message: 'Dashboard/list filters with 2-3 fields should stay in one horizontal search bar. Keep fields and action buttons in the same row, and use a wider date column instead of a left stacked field column.',
+            severity: 'retry',
+          });
+        }
+      }
+    });
+  }
+
+  if (isKpiBlock(input)) {
+    walkSchemaNodes(node, (current) => {
+      if (current.component !== 'Row') {
+        return;
+      }
+      const columns = Array.isArray(current.children)
+        ? current.children.filter((child): child is SchemaNode => isNodeLike(child) && child.component === 'Col')
+        : [];
+      if (columns.length > 4) {
+        diagnostics.push({
+          blockId: input.block.id,
+          componentType: 'Row',
+          rule: 'kpi-too-many-cards',
+          message: 'A KPI row should contain at most 4 cards to preserve even rhythm and visual weight.',
+          severity: 'retry',
+        });
+      }
+      const kinds = new Set<string>();
+      for (const column of columns) {
+        const card = Array.isArray(column.children)
+          ? column.children.find((child): child is SchemaNode => isNodeLike(child) && child.component === 'Card')
+          : undefined;
+        if (!card) {
+          continue;
+        }
+        kinds.add(getKpiCardKind(card));
+      }
+      if (kinds.has('tag-only')) {
+        diagnostics.push({
+          blockId: input.block.id,
+          componentType: 'Card',
+          rule: 'kpi-tag-only-card',
+          message: 'A KPI card should not be tag-only; it must include a main value and one secondary line.',
+          severity: 'retry',
+        });
+      }
+      if (kinds.size > 1) {
+        diagnostics.push({
+          blockId: input.block.id,
+          componentType: 'Row',
+          rule: 'kpi-mixed-card-structures',
+          message: 'KPI cards in one row should share a consistent structure instead of mixing progress-only, text-heavy, and mixed-detail cards.',
+          severity: 'retry',
+        });
+      }
+    });
+  }
+
+  if (isTabsOrTrendBlock(input)) {
+    walkSchemaNodes(node, (current) => {
+      if (current.component !== 'Tabs.TabPane') {
+        return;
+      }
+      let alertCount = 0;
+      let cardCount = 0;
+      walkSchemaNodes(current.children, (child) => {
+        if (child.component === 'Alert') {
+          alertCount += 1;
+        }
+        if (child.component === 'Card') {
+          cardCount += 1;
+        }
+      });
+      if (alertCount > 1 || cardCount > 4) {
+        diagnostics.push({
+          blockId: input.block.id,
+          componentType: 'Tabs.TabPane',
+          rule: 'tab-pane-fragmented-layout',
+          message: 'Each tab pane should stay focused: one alert, one short description, and one main data area instead of many tiny cards.',
+          severity: 'retry',
+        });
+      }
+    });
+  }
+
+  if (isMasterListBlock(input)) {
+    let multilineButtonCardCount = 0;
+    let overdenseItemFound = false;
+    walkSchemaNodes(node, (current) => {
+      if (current.component !== 'Button' || current.props?.type !== 'text' || current.props?.block !== true) {
+        return;
+      }
+      const tagCount = countDescendantComponents(current.children, 'Tag');
+      const typographyCount = countDescendantComponents(current.children, 'Typography.Text');
+      const nestedTextLength = getNodeText(current.children).length;
+      if (tagCount > 0 && typographyCount >= 2) {
+        multilineButtonCardCount += 1;
+      }
+      if (tagCount >= 2 || nestedTextLength > 32) {
+        overdenseItemFound = true;
+      }
+    });
+    if (multilineButtonCardCount > 0) {
+      diagnostics.push({
+        blockId: input.block.id,
+        componentType: 'Button',
+        rule: 'master-list-button-card-layout',
+        message: 'Left-side master lists should not use Button type="text" as a multi-line card wrapper. Use compact Container/Card list items with one title line, one status line, and one short description.',
+        severity: 'retry',
+      });
+    }
+    if (overdenseItemFound) {
+      diagnostics.push({
+        blockId: input.block.id,
+        componentType: 'Container',
+        rule: 'side-list-overdense',
+        message: 'Items in a narrow master list column are too dense. Keep each item compact: short title, one meta line, and one short truncated description.',
+        severity: 'retry',
+      });
+    }
+  }
+
+  return diagnostics;
+}
+
+function qualityScore(diagnostics: BlockQualityDiagnostic[]): number {
+  return diagnostics.reduce((score, item) => score + (item.severity === 'retry' ? 2 : 1), 0);
+}
+
+function shouldUseRetryResult(
+  currentDiagnostics: BlockQualityDiagnostic[],
+  retryDiagnostics: BlockQualityDiagnostic[],
+): boolean {
+  return qualityScore(retryDiagnostics) < qualityScore(currentDiagnostics);
 }
 
 function defaultLayoutFromBlocks(blockIds: string[]): LayoutRow[] {
@@ -880,12 +1282,20 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         '- If the prompt mentions chart/趋势图 but no real chart component exists in the supported set, plan a dedicated trend-summary block using Card/Statistic/Typography instead of inventing an unsupported chart component.',
         `- For this request, prefer pageType "${suggestedPageType}" unless the user clearly asks for a custom mixed layout.`,
         '- Favor clean B2B admin layouts: clear page title, concise helper text, grouped filters, summary cards, primary data area, moderate whitespace.',
+        '- Prompts describing master-detail, left tree/list + right detail Tabs, or 主从详情 should use a detail-oriented or custom split layout, not a generic list page.',
+        '- For master-detail pages, prefer a 7/17 or 8/16 split. The left block should be a compact master navigation/list panel; the right block should hold detail tabs/body.',
+        '- For dashboard pages, prefer this rhythm: header full-width -> filter full-width -> KPI full-width -> main-content + side-info.',
+        '- Dashboard filters should not be squeezed into one inline row when they include a RangePicker or more than 3 fields.',
+        '- Dashboard KPI rows should contain at most 4 cards and should avoid mixing unrelated card structures in the same row.',
+        '- Put primary actions near the title first. Add a side quick-action card only when the prompt clearly requires a separate side region.',
         '- Use free-layout patterns when they create a stronger composition, especially for custom or mixed business pages.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Valid example 1:',
-        '{"pageTitle":"考勤首页","pageType":"dashboard","layout":[{"blocks":["header-block"]},{"columns":[{"span":16,"blocks":["kpi-block","records-block"]},{"span":8,"blocks":["timeline-block"]}]}],"blocks":[{"id":"header-block","description":"页面标题、描述和主操作区","components":["Typography.Title","Typography.Text","Button"],"priority":1,"complexity":"simple"},{"id":"kpi-block","description":"考勤核心指标区域","components":["Statistic","Tag"],"priority":2,"complexity":"simple"},{"id":"records-block","description":"最近考勤记录表格","components":["Table","Tag","Pagination"],"priority":3,"complexity":"medium"},{"id":"timeline-block","description":"审批动态时间线","components":["Timeline","Typography.Text"],"priority":4,"complexity":"medium"}]}',
+        '{"pageTitle":"经营工作台","pageType":"dashboard","layout":[{"blocks":["header-block"]},{"blocks":["filter-block"]},{"blocks":["kpi-block"]},{"columns":[{"span":18,"blocks":["trend-tabs-block","records-block"]},{"span":6,"blocks":["side-info-block"]}]}],"blocks":[{"id":"header-block","description":"页面标题、说明和顶部主操作","components":["Typography.Title","Typography.Text","Button","Breadcrumb"],"priority":1,"complexity":"simple"},{"id":"filter-block","description":"全宽筛选查询区，包含日期范围、状态和关键词","components":["Form","Form.Item","DatePicker.RangePicker","Select","Input","Button"],"priority":2,"complexity":"medium"},{"id":"kpi-block","description":"核心业务指标卡片，单行 3 到 4 张统一结构的指标卡","components":["Row","Col","Card","Statistic","Typography.Text"],"priority":3,"complexity":"medium"},{"id":"trend-tabs-block","description":"趋势分析 Tabs 区域，每个 tab 保持一个主数据区","components":["Tabs","Alert","Typography.Paragraph","Card"],"priority":4,"complexity":"medium"},{"id":"records-block","description":"主数据表格列表","components":["Table","Tag","Pagination"],"priority":5,"complexity":"medium"},{"id":"side-info-block","description":"紧凑侧边补充说明或快捷入口","components":["Card","Typography.Text","Button"],"priority":6,"complexity":"simple"}]}',
         'Valid example 2:',
         '{"pageTitle":"员工详情","pageType":"detail","layout":[{"blocks":["detail-header"]},{"columns":[{"span":10,"blocks":["profile-block","contact-block"]},{"span":14,"blocks":["attendance-block","approval-block"]}]}],"blocks":[{"id":"detail-header","description":"页面标题、说明和操作按钮","components":["Typography.Title","Typography.Text","Button","Breadcrumb"],"priority":1,"complexity":"simple"},{"id":"profile-block","description":"员工基本信息","components":["Descriptions","Tag","Avatar"],"priority":2,"complexity":"simple"},{"id":"contact-block","description":"联系方式","components":["Descriptions","Typography.Text"],"priority":3,"complexity":"simple"},{"id":"attendance-block","description":"最近考勤记录","components":["Table","Pagination","Tag"],"priority":4,"complexity":"medium"},{"id":"approval-block","description":"审批动态","components":["Timeline","Badge"],"priority":5,"complexity":"medium"}]}',
+        'Valid example 3:',
+        '{"pageTitle":"主从详情管理页","pageType":"detail","layout":[{"blocks":["header-block"]},{"columns":[{"span":8,"blocks":["master-list-block"]},{"span":16,"blocks":["detail-tabs-block","timeline-block"]}]}],"blocks":[{"id":"header-block","description":"页面标题、面包屑及顶部操作区","components":["Typography.Title","Typography.Text","Breadcrumb","Button"],"priority":1,"complexity":"simple"},{"id":"master-list-block","description":"左侧主数据列表或树导航，项结构紧凑，支持搜索和选中状态","components":["Card","Form","Form.Item","Input","Tag","Typography.Text","Container"],"priority":2,"complexity":"medium"},{"id":"detail-tabs-block","description":"右侧详情 Tabs 区域，包含基本信息、记录和编辑入口","components":["Tabs","Descriptions","Tag","Button","Form","Form.Item","Input","Select"],"priority":3,"complexity":"medium"},{"id":"timeline-block","description":"底部时间线或操作记录","components":["Timeline","Timeline.Item","Card"],"priority":4,"complexity":"simple"}]}',
         'Invalid example:',
         '{"pageTitle":"考勤首页","pageType":"dashboard","layout":[{"columns":[{"span":16,"blocks":["records"]},{"span":8,"blocks":["records"]}]}],"blocks":[{"id":"records","description":"最近记录","components":["Table"],"priority":1,"complexity":"simple"}]}',
         'Return exactly this JSON shape:',
@@ -905,9 +1315,21 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
   ];
 }
 
-function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage[] {
+function createBlockMessages(
+  input: GenerateBlockInput,
+  qualityFeedback: BlockQualityDiagnostic[] = [],
+): OpenAICompatibleMessage[] {
   const expandedComponents = expandComponents(input.block.components);
   const componentSchemaContracts = getFullComponentContracts(expandedComponents);
+  const isDashboardBlock = classifyPromptToPageType(input.request.prompt) === 'dashboard';
+  const isMasterListRegion = isMasterListBlock(input) || isMasterDetailPrompt(input.request.prompt);
+  const qualityFeedbackSummary = qualityFeedback.length > 0
+    ? [
+      'Targeted quality corrections for this retry:',
+      ...qualityFeedback.map((item) => `- ${item.rule}: ${item.message}`),
+      '- Apply the corrections above while keeping the block semantic intent unchanged.',
+    ].join('\n')
+    : '';
   return [
     {
       role: 'system',
@@ -932,14 +1354,38 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         '- Do NOT output page-level Row/Col or Tabs split layouts unless the current block description explicitly requires an internal split inside this one block.',
         '- Prefer Card as a self-contained wrapper for data, detail, timeline, result, empty-state, and status regions.',
         '- KPI regions may use Row > Col > Statistic inside a single block.',
+        '- For dashboard and list filter regions, prefer one horizontal search bar with at most 3 fields in the same row.',
+        '- Use Row + Col for filters. Date range may use a wider column, but should stay in the same horizontal row when possible.',
+        '- Only use vertical/two-row filter layouts for advanced search, more than 3 fields, or clearly narrow widths.',
+        '- Filter action buttons should be placed in a separate tail action area aligned to the right and kept in the same horizontal band as the fields, not in an empty-label Form.Item mixed with fields.',
+        '- Do not generate a left stacked field column plus a far-right isolated button group for normal dashboard/list filters.',
+        '- For KPI rows, use at most 4 cards and keep a consistent card structure: title + main value + one secondary line.',
+        '- In Tabs trend regions, keep at most one Alert, one short description, and one main data area per tab pane.',
         '- Never use raw HTML tags like div, span, section, header, footer. Use Container instead of div/section/header/footer.',
         '- For Table, include sample data in props.dataSource and props.columns.',
         '- For Statistic, include props.title and props.value.',
         '- For Form.Item, include a label prop and exactly one input-like child when possible.',
+        '- For Button, put button text in top-level children. Never put button text inside props.children.',
+        '- For filter/action regions, query/reset/export buttons must be normal text buttons with visible children.',
+        '- For Alert, use props.message for the main copy and props.description for secondary copy. Do not use props.title for Alert.',
         '- For Descriptions, include props.column and Descriptions.Item children with label props.',
         '- For Timeline, return Timeline.Item children with short text content.',
         '- Use realistic Chinese B-end copy such as 今日出勤率, 本周迟到人数, 最近考勤记录, 审批状态.',
         '- Avoid high-risk callback props unless the block explicitly needs them. If a function prop is unnecessary, omit it.',
+        ...(isDashboardBlock
+          ? [
+            '- This request is dashboard-like. Favor clean business workbench rhythm over maximal density.',
+            '- Prefer compact side info; do not create a large side card that competes with the main KPI rhythm unless explicitly required.',
+          ]
+          : []),
+        ...(isMasterListRegion
+          ? [
+            '- This request includes a master-detail layout. Keep the left master list region compact and the right detail region visually dominant.',
+            '- If tree semantics are supported for this block, prefer a tree-like structure. Otherwise, use compact Container/Card master items instead of multiline text Buttons.',
+            '- Do NOT use Button type="text" as a multi-line card wrapper for master list items.',
+            '- Each master item should contain at most one title line, one status/meta line, and one short description line.',
+          ]
+          : []),
         '- Keep braces and brackets balanced. Your answer must be parseable by JSON.parse without any cleanup.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Return exactly this JSON shape:',
@@ -955,6 +1401,7 @@ function createBlockMessages(input: GenerateBlockInput): OpenAICompatibleMessage
         `Placement: ${input.placementSummary ?? '默认纵向堆叠区域'}`,
         `Block Description: ${input.block.description}`,
         `Suggested Components: ${input.block.components.join(', ')}`,
+        ...(qualityFeedbackSummary ? [qualityFeedbackSummary] : []),
         'Your response must start with { and end with }. No other text.',
       ].join('\n'),
     },
@@ -967,18 +1414,51 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
   const text = await client.chat(model, createBlockMessages(input), getThinking(input.request));
   const rawNode = extractJson<GenerateBlockResult['node']>(text, 'block', input.request, model);
   const { node, diagnostics } = validateGeneratedBlockNodeWithDiagnostics(rawNode, input.block.id);
+  const qualityDiagnostics = assessBlockQuality(node, input);
+
+  let finalText = text;
+  let finalNode = node;
+  let finalDiagnostics = diagnostics;
+  let finalQualityDiagnostics = qualityDiagnostics;
+  let retryText: string | undefined;
+  let retryNode: GenerateBlockResult['node'] | undefined;
+  let retryDiagnostics: SanitizationDiagnostic[] | undefined;
+
+  if (qualityDiagnostics.some((item) => item.severity === 'retry')) {
+    try {
+      retryText = await client.chat(model, createBlockMessages(input, qualityDiagnostics), getThinking(input.request));
+      const retryRawNode = extractJson<GenerateBlockResult['node']>(retryText, 'block', input.request, model);
+      const validatedRetry = validateGeneratedBlockNodeWithDiagnostics(retryRawNode, input.block.id);
+      retryNode = validatedRetry.node;
+      retryDiagnostics = validatedRetry.diagnostics;
+      const retryQualityDiagnostics = assessBlockQuality(retryNode, input);
+      if (shouldUseRetryResult(qualityDiagnostics, retryQualityDiagnostics)) {
+        finalText = retryText;
+        finalNode = retryNode;
+        finalDiagnostics = retryDiagnostics;
+        finalQualityDiagnostics = retryQualityDiagnostics;
+      }
+    } catch (error) {
+      logger.warn(`Block quality retry failed; keeping original block output for ${input.block.id}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   trace?.blocks.push({
     blockId: input.block.id,
     description: input.block.description,
     suggestedComponents: input.block.components,
     model,
-    rawOutput: text,
-    normalizedNode: node,
-    sanitizationDiagnostics: diagnostics,
+    rawOutput: finalText,
+    normalizedNode: finalNode,
+    sanitizationDiagnostics: finalDiagnostics,
+    qualityDiagnostics: finalQualityDiagnostics,
+    ...(retryText ? { retryRawOutput: retryText } : {}),
+    ...(retryNode ? { retryNormalizedNode: retryNode } : {}),
+    ...(retryDiagnostics ? { retrySanitizationDiagnostics: retryDiagnostics } : {}),
   });
   return {
     blockId: input.block.id,
-    node,
+    node: finalNode,
     summary: `Generated ${input.block.description} via ${model}`,
   };
 }

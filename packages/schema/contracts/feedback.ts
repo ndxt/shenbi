@@ -43,7 +43,7 @@ export const alertContract: ComponentContract = {
       type: 'SchemaNode',
       description: '自定义图标',
     },
-    title: {
+    message: {
       type: 'SchemaNode',
       required: true,
       description: '警告提示内容',

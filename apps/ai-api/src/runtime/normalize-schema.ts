@@ -24,6 +24,14 @@ const componentAliasMapping: Record<string, string> = {
   FormItem: 'Form.Item',
 };
 
+const formLayoutChildComponents = new Set([
+  'Container',
+  'Row',
+  'Col',
+  'Space',
+  'Flex',
+]);
+
 export interface SanitizationDiagnostic {
   componentType: string;
   propPath: string;
@@ -168,6 +176,29 @@ function normalizeLegacyPropAliases(node: SchemaNode): void {
   const props = node.props;
   if (!props || typeof props !== 'object') {
     return;
+  }
+
+  const propsRecord = props as Record<string, unknown>;
+  if ('children' in propsRecord) {
+    const legacyChildren = propsRecord.children;
+    const hasTopLevelChildren = Array.isArray(node.children)
+      ? node.children.length > 0
+      : node.children != null;
+    if (!hasTopLevelChildren && (
+      isTextLike(legacyChildren)
+      || isNodeLike(legacyChildren)
+      || (Array.isArray(legacyChildren) && legacyChildren.every((item) => isTextLike(item) || isNodeLike(item)))
+    )) {
+      node.children = legacyChildren as PropValue | SchemaNode[];
+    }
+    delete propsRecord.children;
+  }
+
+  if (node.component === 'Alert') {
+    if (!('message' in props) && 'title' in props) {
+      props.message = props.title as PropValue;
+    }
+    delete props.title;
   }
 
   if (node.component === 'Tabs.TabPane' && !('label' in props) && 'tab' in props) {
@@ -412,7 +443,7 @@ function normalizeNodeProps(node: SchemaNode): void {
     return;
   }
 
-  const textPropKeys = ['title', 'label', 'description', 'placeholder', 'subTitle'];
+  const textPropKeys = ['title', 'label', 'message', 'description', 'placeholder', 'subTitle'];
   for (const key of textPropKeys) {
     if (key in props) {
       const value = props[key];
@@ -428,12 +459,23 @@ function normalizeNodeProps(node: SchemaNode): void {
   }
 
   if (node.component === 'Alert') {
-    if (isNodeLike(props.title) || Array.isArray(props.title)) {
-      props.title = flattenToText(props.title) || '提示';
+    if (isNodeLike(props.message) || Array.isArray(props.message)) {
+      const message = flattenToText(props.message);
+      if (message) {
+        props.message = message;
+      } else {
+        delete props.message;
+      }
     }
     if (isNodeLike(props.description) || Array.isArray(props.description)) {
-      props.description = flattenToText(props.description);
+      const description = flattenToText(props.description);
+      if (description) {
+        props.description = description;
+      } else {
+        delete props.description;
+      }
     }
+    delete props.title;
     delete props.action;
     delete props.closeText;
     delete props.icon;
@@ -851,6 +893,9 @@ function normalizeChildren(node: SchemaNode): SchemaNode {
               ...child,
               component: 'Form.Item',
             };
+          }
+          if (formLayoutChildComponents.has(child.component)) {
+            return child;
           }
           return {
             id: `${node.id ?? 'form'}-form-item-${index + 1}`,

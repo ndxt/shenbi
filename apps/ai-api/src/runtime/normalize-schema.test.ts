@@ -28,6 +28,116 @@ describe('normalizeGeneratedNode', () => {
     expect(normalized.children).toBeUndefined();
   });
 
+  it('keeps alert message and maps legacy title to message', () => {
+    const messageNode = normalizeGeneratedNode({
+      component: 'Alert',
+      props: {
+        type: 'info',
+        message: ['当前条件下暂无记录'],
+      },
+    });
+    const titleNode = normalizeGeneratedNode({
+      component: 'Alert',
+      props: {
+        type: 'warning',
+        title: '旧版标题提示',
+      },
+    });
+
+    expect(messageNode.props?.message).toBe('当前条件下暂无记录');
+    expect(messageNode.props?.title).toBeUndefined();
+    expect(titleNode.props?.message).toBe('旧版标题提示');
+    expect(titleNode.props?.title).toBeUndefined();
+  });
+
+  it('migrates legacy props.children into top-level children', () => {
+    const migrated = normalizeGeneratedNode({
+      component: 'Button',
+      props: {
+        type: 'primary',
+        children: ['查询'],
+      },
+    });
+    const keepsTopLevel = normalizeGeneratedNode({
+      component: 'Button',
+      props: {
+        children: ['错误文本'],
+      },
+      children: ['保留顶层'],
+    });
+
+    expect(migrated.children).toBe('查询');
+    expect((migrated.props as Record<string, unknown>).children).toBeUndefined();
+    expect(keepsTopLevel.children).toBe('保留顶层');
+    expect((keepsTopLevel.props as Record<string, unknown>).children).toBeUndefined();
+  });
+
+  it('preserves low-risk button style props without recording unknown prop diagnostics', () => {
+    const result = normalizeGeneratedNodeWithDiagnostics({
+      component: 'Button',
+      props: {
+        type: 'text',
+        block: true,
+        style: {
+          textAlign: 'left',
+          padding: '8px 12px',
+        },
+      },
+      children: ['查看详情'],
+    });
+
+    expect(result.node.props?.style).toEqual({
+      textAlign: 'left',
+      padding: '8px 12px',
+    });
+    expect(result.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        componentType: 'Button',
+        propPath: 'style',
+        action: 'drop',
+      }),
+    ]));
+  });
+
+  it('keeps layout containers directly under Form without generating fake form labels', () => {
+    const normalized = normalizeGeneratedNode({
+      component: 'Form',
+      id: 'filter-form',
+      props: { layout: 'vertical' },
+      children: [
+        {
+          component: 'Container',
+          id: 'fields-wrap',
+          props: { direction: 'row', gap: 16 },
+          children: [{
+            component: 'Form.Item',
+            id: 'keyword-item',
+            props: { label: '关键词', name: 'keyword' },
+            children: [{ component: 'Input', id: 'keyword-input', props: { placeholder: '请输入关键词' } }],
+          }],
+        },
+        {
+          component: 'Container',
+          id: 'actions-wrap',
+          props: { direction: 'row' },
+          children: [{
+            component: 'Space',
+            id: 'actions-space',
+            props: { size: 'small' },
+            children: [{ component: 'Button', id: 'search-btn', props: { type: 'primary' }, children: '查询' }],
+          }],
+        },
+      ],
+    });
+
+    expect(Array.isArray(normalized.children)).toBe(true);
+    const formChildren = normalized.children as SchemaNode[];
+    expect(formChildren[0]?.component).toBe('Container');
+    expect(formChildren[1]?.component).toBe('Container');
+    expect(formChildren.some((child) => child.component === 'Form.Item' && child.props?.label === '字段1')).toBe(false);
+    expect(formChildren.some((child) => child.component === 'Form.Item' && child.props?.label === '字段2')).toBe(false);
+  });
+
   it('normalizes typography children to text safely', () => {
     const node: SchemaNode = {
       component: 'Typography.Title',

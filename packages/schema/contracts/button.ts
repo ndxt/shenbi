@@ -37,6 +37,11 @@ export const buttonContract: ComponentContract = {
       enum: ['button', 'submit', 'reset'],
       default: 'button',
     },
+    style: {
+      type: 'object',
+      allowExpression: true,
+      description: '按钮样式对象',
+    },
     icon: { type: 'SchemaNode', description: '按钮图标节点' },
   },
   events: {
