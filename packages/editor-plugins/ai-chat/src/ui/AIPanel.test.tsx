@@ -22,7 +22,7 @@ function createBridge(): EditorAIBridge {
 
 function createPersistenceStateContext(): PluginContext {
   const persistedState = new Map<string, unknown>([
-    ['ai-chat:model-selection', { plannerModel: 'GLM-4.6', blockModel: 'GLM-4.7' }],
+    ['ai-chat:model-selection', { plannerModel: 'GLM-4.6', blockModel: 'openai-compatible::GLM-4.7' }],
     ['ai-chat:ui', { thinkingEnabled: true, draftText: '已保存草稿' }],
     ['ai-chat:prompt-history', ['历史提示词']],
     ['ai-chat:session', {
@@ -60,8 +60,9 @@ describe('AIPanel', () => {
       json: async () => ({
         success: true,
         data: [
-          { id: 'GLM-4.7', name: 'GLM-4.7' },
-          { id: 'GLM-4.6', name: 'GLM-4.6' },
+          { id: 'openai-compatible::GLM-4.7', name: 'GLM-4.7', provider: 'openai-compatible' },
+          { id: 'openai-compatible::GLM-4.6', name: 'GLM-4.6', provider: 'openai-compatible' },
+          { id: 'nextai::gemini-2.5-pro', name: 'gemini-2.5-pro', provider: 'nextai' },
         ],
       }),
     } satisfies Partial<Response>);
@@ -80,14 +81,14 @@ describe('AIPanel', () => {
     render(<AIPanel bridge={bridge} pluginContext={pluginContext} />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Planner')).toHaveValue('GLM-4.6');
-      expect(screen.getByLabelText('Block')).toHaveValue('GLM-4.7');
+      expect(screen.getByLabelText('Planner')).toHaveValue('openai-compatible::GLM-4.6');
+      expect(screen.getByLabelText('Block')).toHaveValue('openai-compatible::GLM-4.7');
     });
     expect(screen.getByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行')).toHaveValue('已保存草稿');
     expect(screen.getByText('已保存消息')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '历史输入' })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Planner'), { target: { value: 'GLM-4.7' } });
+    fireEvent.change(screen.getByLabelText('Planner'), { target: { value: 'nextai::gemini-2.5-pro' } });
     fireEvent.change(
       screen.getByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行'),
       { target: { value: '更新后的草稿' } },
@@ -99,8 +100,8 @@ describe('AIPanel', () => {
       expect(pluginContext.persistence?.getJSON).toHaveBeenCalledWith('ai-chat', 'prompt-history');
       expect(pluginContext.persistence?.getJSON).toHaveBeenCalledWith('ai-chat', 'session');
       expect(pluginContext.persistence?.setJSON).toHaveBeenCalledWith('ai-chat', 'model-selection', {
-        plannerModel: 'GLM-4.7',
-        blockModel: 'GLM-4.7',
+        plannerModel: 'nextai::gemini-2.5-pro',
+        blockModel: 'openai-compatible::GLM-4.7',
       });
       expect(pluginContext.persistence?.setJSON).toHaveBeenCalledWith('ai-chat', 'ui', {
         thinkingEnabled: true,
@@ -144,7 +145,7 @@ describe('AIPanel', () => {
     render(<AIPanel bridge={createBridge()} />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Planner')).toHaveValue('GLM-4.7');
+      expect(screen.getByLabelText('Planner')).toHaveValue('openai-compatible::GLM-4.7');
     });
     expect(screen.getByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行')).toHaveValue('');
   });

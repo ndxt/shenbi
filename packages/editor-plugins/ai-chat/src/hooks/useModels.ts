@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { PluginPersistenceService } from '@shenbi/editor-plugin-api';
 
-const FALLBACK_PLANNER_MODELS = ['GLM-4.7', 'GLM-4.6', 'GLM-5'];
-const FALLBACK_BLOCK_MODELS = ['GLM-4.6', 'GLM-4.7', 'GLM-5'];
+const FALLBACK_PLANNER_MODELS = ['openai-compatible::GLM-4.7', 'openai-compatible::GLM-4.6', 'openai-compatible::GLM-5'];
+const FALLBACK_BLOCK_MODELS = ['openai-compatible::GLM-4.6', 'openai-compatible::GLM-4.7', 'openai-compatible::GLM-5'];
 const DEFAULT_PLANNER_MODEL = FALLBACK_PLANNER_MODELS[0]!;
 const DEFAULT_BLOCK_MODEL = FALLBACK_BLOCK_MODELS[0]!;
 const PERSISTENCE_NAMESPACE = 'ai-chat';
@@ -11,7 +11,46 @@ const PERSISTENCE_KEY = 'model-selection';
 interface ModelInfo {
     id: string;
     name: string;
+    provider?: string;
     [key: string]: unknown;
+}
+
+export interface ModelOption {
+    value: string;
+    label: string;
+    provider: string;
+}
+
+export interface ModelGroup {
+    provider: string;
+    label: string;
+    options: ModelOption[];
+}
+
+function humanizeProviderLabel(provider: string): string {
+    return provider
+        .split(/[-_]/g)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+}
+
+function flattenModelGroups(groups: ModelGroup[]): ModelOption[] {
+    return groups.flatMap((group) => group.options);
+}
+
+function normalizeSelectionValue(value: string | undefined, options: ModelOption[], fallback: string): string {
+    if (!value) {
+        return fallback;
+    }
+    if (options.some((option) => option.value === value)) {
+        return value;
+    }
+    const byLabel = options.find((option) => option.label === value);
+    if (byLabel) {
+        return byLabel.value;
+    }
+    return fallback;
 }
 
 export function useModels(
@@ -21,7 +60,7 @@ export function useModels(
 ) {
     const [plannerModel, setPlannerModel] = useState<string>(defaultPlannerModel ?? DEFAULT_PLANNER_MODEL);
     const [blockModel, setBlockModel] = useState<string>(defaultBlockModel ?? DEFAULT_BLOCK_MODEL);
-    const [availableModels, setAvailableModels] = useState<string[]>([]);
+    const [availableModelGroups, setAvailableModelGroups] = useState<ModelGroup[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectionHydrated, setSelectionHydrated] = useState(!persistence);
@@ -78,18 +117,35 @@ export function useModels(
             .then((body) => {
                 if (cancelled) return;
                 if (body.success && Array.isArray(body.data)) {
-                    const ids = body.data.map((m) => m.id);
-                    if (ids.length === 0) {
+                    const groupsMap = new Map<string, ModelOption[]>();
+                    body.data.forEach((model) => {
+                        const provider = typeof model.provider === 'string' && model.provider
+                            ? model.provider
+                            : 'default';
+                        const options = groupsMap.get(provider) ?? [];
+                        options.push({
+                            value: model.id,
+                            label: model.name,
+                            provider,
+                        });
+                        groupsMap.set(provider, options);
+                    });
+                    const groups = Array.from(groupsMap.entries()).map(([provider, options]) => ({
+                        provider,
+                        label: humanizeProviderLabel(provider),
+                        options,
+                    }));
+                    if (groups.length === 0 || flattenModelGroups(groups).length === 0) {
                         throw new Error('Model list is empty');
                     }
-                    setAvailableModels(ids);
+                    setAvailableModelGroups(groups);
                     return;
                 }
                 throw new Error('Model list response is invalid');
             })
             .catch((err: unknown) => {
                 if (cancelled) return;
-                setAvailableModels([]);
+                setAvailableModelGroups([]);
                 setError(err instanceof Error ? err.message : 'Failed to load models');
             })
             .finally(() => {
@@ -113,27 +169,34 @@ export function useModels(
             .catch(() => undefined);
     }, [blockModel, persistence, plannerModel, selectionHydrated]);
 
+    const flatOptions = useMemo(() => flattenModelGroups(availableModelGroups), [availableModelGroups]);
+
     useEffect(() => {
-        if (availableModels.length === 0) {
+        if (flatOptions.length === 0) {
             return;
         }
 
-        if (!availableModels.includes(plannerModel)) {
-            setPlannerModel(availableModels[0] ?? DEFAULT_PLANNER_MODEL);
+        const fallbackPlanner = flatOptions[0]?.value ?? DEFAULT_PLANNER_MODEL;
+        const fallbackBlock = flatOptions[0]?.value ?? DEFAULT_BLOCK_MODEL;
+        const nextPlanner = normalizeSelectionValue(plannerModel, flatOptions, fallbackPlanner);
+        const nextBlock = normalizeSelectionValue(blockModel, flatOptions, fallbackBlock);
+
+        if (nextPlanner !== plannerModel) {
+            setPlannerModel(nextPlanner);
         }
 
-        if (!availableModels.includes(blockModel)) {
-            setBlockModel(availableModels[0] ?? DEFAULT_BLOCK_MODEL);
+        if (nextBlock !== blockModel) {
+            setBlockModel(nextBlock);
         }
-    }, [availableModels, blockModel, plannerModel]);
+    }, [blockModel, flatOptions, plannerModel]);
 
-    const models = availableModels.length > 0 ? availableModels : [];
+    const modelGroups = availableModelGroups.length > 0 ? availableModelGroups : [];
 
     return {
-        plannerModels: models,
+        plannerModels: modelGroups,
         plannerModel,
         setPlannerModel,
-        blockModels: models,
+        blockModels: modelGroups,
         blockModel,
         setBlockModel,
         isLoading,

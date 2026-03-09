@@ -886,29 +886,62 @@ function extractJson<T>(
   }
 }
 
-let _client: OpenAICompatibleClient | null = null;
+const clientCache = new Map<string, OpenAICompatibleClient>();
 
-function createClient(): OpenAICompatibleClient {
-  if (_client) {
-    return _client;
+function parseProviderModelRef(modelRef: string | undefined): { provider?: string; model?: string } {
+  if (!modelRef) {
+    return {};
   }
-  if (!env.AI_PROVIDER) {
+  const separatorIndex = modelRef.indexOf('::');
+  if (separatorIndex === -1) {
+    return env.AI_PROVIDER
+      ? { provider: env.AI_PROVIDER, model: modelRef }
+      : { model: modelRef };
+  }
+  const provider = modelRef.slice(0, separatorIndex);
+  const model = modelRef.slice(separatorIndex + 2);
+  return {
+    ...(provider ? { provider } : {}),
+    ...(model ? { model } : {}),
+  };
+}
+
+function resolveProviderConfig(providerName: string | undefined): {
+  provider: string;
+  baseUrl?: string | undefined;
+  apiKey?: string | undefined;
+} {
+  const provider = providerName ?? env.AI_PROVIDER;
+  if (!provider) {
     throw new LLMError('AI_PROVIDER is not configured. Set AI_PROVIDER in .env.local.', 'MISSING_PROVIDER');
   }
-  if (env.AI_PROVIDER !== 'openai-compatible') {
-    throw new LLMError(`Unsupported AI provider: ${env.AI_PROVIDER}`, 'UNSUPPORTED_PROVIDER');
+
+  const matched = env.providers.find((item) => item.provider === provider);
+  return {
+    provider,
+    baseUrl: matched?.baseUrl ?? (provider === env.AI_PROVIDER ? env.AI_OPENAI_COMPAT_BASE_URL : undefined),
+    apiKey: matched?.apiKey ?? (provider === env.AI_PROVIDER ? env.AI_OPENAI_COMPAT_API_KEY : undefined),
+  };
+}
+
+function createClient(providerName?: string): OpenAICompatibleClient {
+  const config = resolveProviderConfig(providerName);
+  const cached = clientCache.get(config.provider);
+  if (cached) {
+    return cached;
   }
-  if (!env.AI_OPENAI_COMPAT_BASE_URL) {
-    throw new LLMError('Missing AI_OPENAI_COMPAT_BASE_URL', 'MISSING_PROVIDER_BASE_URL');
+  if (!config.baseUrl) {
+    throw new LLMError(`Missing base URL for provider "${config.provider}"`, 'MISSING_PROVIDER_BASE_URL');
   }
-  if (!env.AI_OPENAI_COMPAT_API_KEY) {
-    throw new LLMError('Missing AI_OPENAI_COMPAT_API_KEY', 'MISSING_PROVIDER_API_KEY');
+  if (!config.apiKey) {
+    throw new LLMError(`Missing API key for provider "${config.provider}"`, 'MISSING_PROVIDER_API_KEY');
   }
-  _client = new OpenAICompatibleClient({
-    baseUrl: env.AI_OPENAI_COMPAT_BASE_URL,
-    apiKey: env.AI_OPENAI_COMPAT_API_KEY,
+  const client = new OpenAICompatibleClient({
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
   });
-  return _client;
+  clientCache.set(config.provider, client);
+  return client;
 }
 
 function requireModel(model: string | undefined, kind: 'planner' | 'block' | 'chat'): string {
@@ -1409,8 +1442,10 @@ function createBlockMessages(
 }
 
 async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord): Promise<GenerateBlockResult> {
-  const client = createClient();
-  const model = requireModel(input.request.blockModel ?? env.AI_BLOCK_MODEL, 'block');
+  const requestedBlockModel = input.request.blockModel ?? env.AI_BLOCK_MODEL;
+  const blockModelRef = parseProviderModelRef(requestedBlockModel);
+  const client = createClient(blockModelRef.provider);
+  const model = requireModel(blockModelRef.model ?? requestedBlockModel, 'block');
   const text = await client.chat(model, createBlockMessages(input), getThinking(input.request));
   const rawNode = extractJson<GenerateBlockResult['node']>(text, 'block', input.request, model);
   const { node, diagnostics } = validateGeneratedBlockNodeWithDiagnostics(rawNode, input.block.id);
@@ -1584,8 +1619,10 @@ async function assembleSchema(input: AssembleSchemaInput, trace?: RunTraceRecord
 }
 
 async function planWithModel(input: PlanPageInput, trace?: RunTraceRecord): Promise<PagePlan> {
-  const client = createClient();
-  const model = requireModel(input.request.plannerModel ?? env.AI_PLANNER_MODEL, 'planner');
+  const requestedPlannerModel = input.request.plannerModel ?? env.AI_PLANNER_MODEL;
+  const plannerModelRef = parseProviderModelRef(requestedPlannerModel);
+  const client = createClient(plannerModelRef.provider);
+  const model = requireModel(plannerModelRef.model ?? requestedPlannerModel, 'planner');
   const text = await client.chat(model, createPlannerMessages(input), getThinking(input.request));
   const plan = extractJson<PagePlan>(text, 'planner', input.request, model);
   const normalizedPlan = normalizePlan(plan);
@@ -1603,8 +1640,10 @@ function createRuntimeDeps(trace?: RunTraceRecord): AgentRuntimeDeps {
   return {
     llm: {
       async chat(request: unknown) {
-        const client = createClient();
-        const model = requireModel(getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL, 'chat');
+        const requestedChatModel = getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL;
+        const chatModelRef = parseProviderModelRef(requestedChatModel);
+        const client = createClient(chatModelRef.provider);
+        const model = requireModel(chatModelRef.model ?? requestedChatModel, 'chat');
         const prompt = typeof request === 'object' && request && 'prompt' in request
           ? String((request as { prompt: unknown }).prompt)
           : 'No prompt';
@@ -1619,8 +1658,10 @@ function createRuntimeDeps(trace?: RunTraceRecord): AgentRuntimeDeps {
         const prompt = typeof request === 'object' && request && 'prompt' in request
           ? String((request as { prompt: unknown }).prompt)
           : 'No prompt';
-        const client = createClient();
-        const model = requireModel(getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL, 'chat');
+        const requestedChatModel = getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL;
+        const chatModelRef = parseProviderModelRef(requestedChatModel);
+        const client = createClient(chatModelRef.provider);
+        const model = requireModel(chatModelRef.model ?? requestedChatModel, 'chat');
         const thinking = getThinkingFromUnknown(request);
         yield* client.streamChat(model, [
           { role: 'system', content: 'You are a helpful low-code assistant.' },

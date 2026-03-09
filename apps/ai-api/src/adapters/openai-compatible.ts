@@ -8,6 +8,7 @@ export interface OpenAICompatibleMessage {
 export interface OpenAICompatibleClientOptions {
   baseUrl: string;
   apiKey: string;
+  temperature?: number;
 }
 
 export interface OpenAICompatibleThinking {
@@ -70,10 +71,12 @@ async function readErrorMessage(response: Response): Promise<string> {
 export class OpenAICompatibleClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
+  private readonly temperature: number;
 
   constructor(options: OpenAICompatibleClientOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.apiKey = options.apiKey;
+    this.temperature = options.temperature ?? 0.6;
   }
 
   async chat(
@@ -90,7 +93,7 @@ export class OpenAICompatibleClient {
       body: JSON.stringify({
         model,
         messages,
-        temperature: 0.2,
+        temperature: this.temperature,
         stream: false,
         response_format: {
           type: 'json_object',
@@ -125,7 +128,7 @@ export class OpenAICompatibleClient {
       body: JSON.stringify({
         model,
         messages,
-        temperature: 0.2,
+        temperature: this.temperature,
         stream: true,
         ...(thinking ? { thinking } : {}),
       }),

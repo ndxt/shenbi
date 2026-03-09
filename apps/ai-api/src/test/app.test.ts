@@ -73,8 +73,12 @@ describe('GET /health', () => {
 describe('GET /api/ai/models', () => {
   it('returns model list', async () => {
     const previousProvider = process.env.AI_PROVIDER;
+    const previousProviders = process.env.AI_PROVIDERS;
+    const previousModels = process.env.AI_AVAILABLE_MODELS;
     try {
       process.env.AI_PROVIDER = 'openai-compatible';
+      process.env.AI_PROVIDERS = 'openai-compatible';
+      process.env.AI_AVAILABLE_MODELS = 'GLM-4.7,GLM-4.6';
       const app = createApp();
       const res = await app.request('/api/ai/models');
       expect(res.status).toBe(200);
@@ -85,11 +89,67 @@ describe('GET /api/ai/models', () => {
       const model = (json.data as Array<{ id: string; provider: string }>)[0];
       expect(typeof model?.id).toBe('string');
       expect(typeof model?.provider).toBe('string');
+      expect(model?.id).toContain('openai-compatible::');
     } finally {
       if (previousProvider === undefined) {
         delete process.env.AI_PROVIDER;
       } else {
         process.env.AI_PROVIDER = previousProvider;
+      }
+      if (previousProviders === undefined) {
+        delete process.env.AI_PROVIDERS;
+      } else {
+        process.env.AI_PROVIDERS = previousProviders;
+      }
+      if (previousModels === undefined) {
+        delete process.env.AI_AVAILABLE_MODELS;
+      } else {
+        process.env.AI_AVAILABLE_MODELS = previousModels;
+      }
+    }
+  });
+
+  it('returns provider-specific model list for arbitrary openai-compatible vendors', async () => {
+    const previousProvider = process.env.AI_PROVIDER;
+    const previousProviders = process.env.AI_PROVIDERS;
+    const previousModels = process.env.NEXTAI_MODELS;
+    try {
+      process.env.AI_PROVIDER = 'nextai';
+      process.env.AI_PROVIDERS = 'openai-compatible,nextai';
+      process.env.NEXTAI_MODELS = 'gemini-2.5-pro, gemini-2.5-flash';
+      const app = createApp();
+      const res = await app.request('/api/ai/models');
+      expect(res.status).toBe(200);
+      const json = await res.json() as {
+        success: boolean;
+        data: Array<{ id: string; provider: string }>;
+      };
+      expect(json.success).toBe(true);
+      expect(json.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: 'nextai::gemini-2.5-pro',
+          provider: 'nextai',
+        }),
+        expect.objectContaining({
+          id: 'nextai::gemini-2.5-flash',
+          provider: 'nextai',
+        }),
+      ]));
+    } finally {
+      if (previousProvider === undefined) {
+        delete process.env.AI_PROVIDER;
+      } else {
+        process.env.AI_PROVIDER = previousProvider;
+      }
+      if (previousProviders === undefined) {
+        delete process.env.AI_PROVIDERS;
+      } else {
+        process.env.AI_PROVIDERS = previousProviders;
+      }
+      if (previousModels === undefined) {
+        delete process.env.NEXTAI_MODELS;
+      } else {
+        process.env.NEXTAI_MODELS = previousModels;
       }
     }
   });

@@ -38,8 +38,10 @@ describe('OpenAICompatibleClient', () => {
     const body = JSON.parse(String(init.body)) as {
       response_format?: { type?: string };
       stream?: boolean;
+      temperature?: number;
     };
     expect(body.response_format).toEqual({ type: 'json_object' });
     expect(body.stream).toBe(false);
+    expect(body.temperature).toBe(0.6);
   });
 });

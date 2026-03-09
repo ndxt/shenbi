@@ -9,6 +9,18 @@ export interface Env {
   AI_OPENAI_COMPAT_API_KEY?: string | undefined;
   AI_PLANNER_MODEL?: string | undefined;
   AI_BLOCK_MODEL?: string | undefined;
+  AI_AVAILABLE_MODELS?: string[] | undefined;
+  providers: ProviderEnvConfig[];
+}
+
+export interface ProviderEnvConfig {
+  provider: string;
+  baseUrl?: string | undefined;
+  apiKey?: string | undefined;
+  plannerModel?: string | undefined;
+  blockModel?: string | undefined;
+  models?: string[] | undefined;
+  temperature?: number | undefined;
 }
 
 function parseEnvFile(filePath: string): Record<string, string> {
@@ -54,6 +66,100 @@ function readEnvValue(loaded: Record<string, string>, keys: string[]): string | 
   return undefined;
 }
 
+function toProviderEnvPrefix(provider: string): string | undefined {
+  const normalized = provider.trim().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!normalized || normalized === 'openai_compatible') {
+    return undefined;
+  }
+  return normalized.toUpperCase();
+}
+
+function parseModelList(raw: string | undefined): string[] | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const models = raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return models.length > 0 ? Array.from(new Set(models)) : undefined;
+}
+
+function parseProviderList(raw: string | undefined): string[] {
+  if (!raw) {
+    return [];
+  }
+  return Array.from(new Set(
+    raw
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  ));
+}
+
+function parseTemperature(raw: string | undefined): number | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function resolveProviderConfig(
+  loaded: Record<string, string>,
+  provider: string,
+  isActiveProvider: boolean,
+): ProviderEnvConfig {
+  const providerPrefix = toProviderEnvPrefix(provider);
+  const providerKeys = (suffix: string): string[] => (
+    providerPrefix ? [`${providerPrefix}_${suffix}`] : []
+  );
+
+  return {
+    provider,
+    baseUrl: readEnvValue(loaded, [
+      ...providerKeys('BASE_URL'),
+      ...(isActiveProvider ? [
+        'AI_OPENAI_COMPAT_BASE_URL',
+        'OPENAI_BASE_URL',
+        'VITE_OPENAI_BASE_URL',
+      ] : []),
+    ]),
+    apiKey: readEnvValue(loaded, [
+      ...providerKeys('API_KEY'),
+      ...(isActiveProvider ? [
+        'AI_OPENAI_COMPAT_API_KEY',
+        'OPENAI_API_KEY',
+        'VITE_OPENAI_API_KEY',
+      ] : []),
+    ]),
+    plannerModel: readEnvValue(loaded, [
+      ...providerKeys('PLANNER_MODEL'),
+      ...(isActiveProvider ? [
+        'AI_PLANNER_MODEL',
+        'OPENAI_PLANNER_MODEL',
+        'VITE_OPENAI_PLANNER_MODEL',
+      ] : []),
+    ]),
+    blockModel: readEnvValue(loaded, [
+      ...providerKeys('BLOCK_MODEL'),
+      ...(isActiveProvider ? [
+        'AI_BLOCK_MODEL',
+        'OPENAI_BLOCK_MODEL',
+        'VITE_OPENAI_BLOCK_MODEL',
+      ] : []),
+    ]),
+    models: parseModelList(readEnvValue(loaded, [
+      ...providerKeys('MODELS'),
+      ...(isActiveProvider ? ['AI_AVAILABLE_MODELS'] : []),
+    ])),
+    temperature: parseTemperature(readEnvValue(loaded, [
+      ...providerKeys('TEMPERATURE'),
+      ...(isActiveProvider ? ['AI_TEMPERATURE'] : []),
+    ])),
+  };
+}
+
 function loadLocalEnvFiles(): Record<string, string> {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const rootDir = path.resolve(currentDir, '../../../../');
@@ -65,29 +171,24 @@ function loadLocalEnvFiles(): Record<string, string> {
 
 export function loadEnv(): Env {
   const loaded = loadLocalEnvFiles();
+  const provider = readEnvValue(loaded, ['AI_PROVIDER']) ?? '';
+  const configuredProviders = parseProviderList(readEnvValue(loaded, ['AI_PROVIDERS']));
+  const providers = Array.from(new Set([
+    ...(provider ? [provider] : []),
+    ...configuredProviders,
+  ])).map((providerName) => resolveProviderConfig(loaded, providerName, providerName === provider));
+  const activeProviderConfig = provider
+    ? providers.find((item) => item.provider === provider) ?? resolveProviderConfig(loaded, provider, true)
+    : undefined;
 
   return {
     PORT: parseInt(readEnvValue(loaded, ['PORT']) ?? '3100', 10),
-    AI_PROVIDER: readEnvValue(loaded, ['AI_PROVIDER']) ?? '',
-    AI_OPENAI_COMPAT_BASE_URL: readEnvValue(loaded, [
-      'AI_OPENAI_COMPAT_BASE_URL',
-      'OPENAI_BASE_URL',
-      'VITE_OPENAI_BASE_URL',
-    ]),
-    AI_OPENAI_COMPAT_API_KEY: readEnvValue(loaded, [
-      'AI_OPENAI_COMPAT_API_KEY',
-      'OPENAI_API_KEY',
-      'VITE_OPENAI_API_KEY',
-    ]),
-    AI_PLANNER_MODEL: readEnvValue(loaded, [
-      'AI_PLANNER_MODEL',
-      'OPENAI_PLANNER_MODEL',
-      'VITE_OPENAI_PLANNER_MODEL',
-    ]),
-    AI_BLOCK_MODEL: readEnvValue(loaded, [
-      'AI_BLOCK_MODEL',
-      'OPENAI_BLOCK_MODEL',
-      'VITE_OPENAI_BLOCK_MODEL',
-    ]),
+    AI_PROVIDER: provider,
+    AI_OPENAI_COMPAT_BASE_URL: activeProviderConfig?.baseUrl,
+    AI_OPENAI_COMPAT_API_KEY: activeProviderConfig?.apiKey,
+    AI_PLANNER_MODEL: activeProviderConfig?.plannerModel,
+    AI_BLOCK_MODEL: activeProviderConfig?.blockModel,
+    AI_AVAILABLE_MODELS: activeProviderConfig?.models,
+    providers,
   };
 }

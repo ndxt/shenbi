@@ -1,8 +1,9 @@
 import React from 'react';
+import type { ModelGroup } from '../hooks/useModels';
 
 interface ModelSelectorProps {
     label: string;
-    models: string[];
+    models: ModelGroup[];
     value: string;
     onChange: (val: string) => void;
     disabled?: boolean;
@@ -21,7 +22,15 @@ export function ModelSelector({ label, models, value, onChange, disabled }: Mode
                     onChange={(e) => onChange(e.target.value)}
                     disabled={disabled}
                 >
-                    {models.map(m => <option key={m} value={m}>{m}</option>)}
+                    {models.map((group) => (
+                        <optgroup key={group.provider} label={group.label}>
+                            {group.options.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </optgroup>
+                    ))}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-text-secondary">
                     <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
