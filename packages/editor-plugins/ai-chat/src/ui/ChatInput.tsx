@@ -173,7 +173,7 @@ export function ChatInput({
                 {(promptPresets.length > 0) && (
                     <DropdownMenu
                         icon={Lightbulb}
-                        label="常用场景"
+                        label="常用覆盖场景"
                         items={promptPresets}
                         onSelect={handleSelectPreset}
                         disabled={disabled || isRunning}
@@ -182,7 +182,7 @@ export function ChatInput({
                 {(promptHistory.length > 0) && (
                     <DropdownMenu
                         icon={History}
-                        label="历史记录"
+                        label="历史输入"
                         items={promptHistory.map(h => ({ label: h, value: h }))}
                         onSelect={handleSelectHistory}
                         disabled={disabled || isRunning}

@@ -4,6 +4,16 @@ export interface PluginCommandService {
   execute: (commandId: string, payload?: unknown) => unknown | Promise<unknown>;
 }
 
+export interface PluginWorkspaceService {
+  getWorkspaceId: () => string;
+}
+
+export interface PluginPersistenceService {
+  getJSON: <T>(namespace: string, key: string) => Promise<T | undefined>;
+  setJSON: <T>(namespace: string, key: string, value: T) => Promise<void>;
+  remove: (namespace: string, key: string) => Promise<void>;
+}
+
 export interface PluginNotifications {
   info?: (message: string) => void;
   success?: (message: string) => void;
@@ -36,6 +46,8 @@ export interface PluginContext {
   commands?: PluginCommandService;
   document?: PluginDocumentService;
   selection?: PluginSelectionService;
+  workspace?: PluginWorkspaceService;
+  persistence?: PluginPersistenceService;
   notifications?: PluginNotifications;
 
   // Backward-compatible aliases during migration.
@@ -117,4 +129,12 @@ export function executePluginCommand(
 
 export function getPluginNotifications(context: PluginContext): PluginNotifications | undefined {
   return context.notifications ?? context.notify;
+}
+
+export function getPluginWorkspaceId(context: PluginContext): string | undefined {
+  return context.workspace?.getWorkspaceId();
+}
+
+export function getPluginPersistence(context: PluginContext): PluginPersistenceService | undefined {
+  return context.persistence;
 }

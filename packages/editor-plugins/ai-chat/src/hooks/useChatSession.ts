@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { PluginPersistenceService } from '@shenbi/editor-plugin-api';
 import type { RunMetadata } from '../ai/api-types';
-import { readJSONFromStorage, writeJSONToStorage } from '../utils/local-storage';
 
-const STORAGE_KEY = 'shenbi:ai-chat:session';
+const PERSISTENCE_NAMESPACE = 'ai-chat';
+const PERSISTENCE_KEY = 'session';
 
 export interface ChatMessage {
     id: string;
@@ -11,24 +12,61 @@ export interface ChatMessage {
     timestamp: number;
 }
 
-export function useChatSession() {
-    const storedState = readJSONFromStorage<{
-        messages?: ChatMessage[];
-        conversationId?: string;
-        lastMetadata?: RunMetadata;
-    }>(STORAGE_KEY, {});
-    const [messages, setMessages] = useState<ChatMessage[]>(storedState.messages ?? []);
-    const [conversationId, setConversationId] = useState<string | undefined>(storedState.conversationId);
+export function useChatSession(persistence?: PluginPersistenceService) {
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [conversationId, setConversationId] = useState<string | undefined>();
     const [activeRunId, setActiveRunId] = useState<string | undefined>();
-    const [lastMetadata, setLastMetadata] = useState<RunMetadata | undefined>(storedState.lastMetadata);
+    const [lastMetadata, setLastMetadata] = useState<RunMetadata | undefined>();
+    const [sessionHydrated, setSessionHydrated] = useState(!persistence);
 
     useEffect(() => {
-        writeJSONToStorage(STORAGE_KEY, {
-            messages,
-            conversationId,
-            lastMetadata,
-        });
-    }, [conversationId, lastMetadata, messages]);
+        let cancelled = false;
+        if (!persistence) {
+            setSessionHydrated(true);
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        void persistence
+            .getJSON<{
+                messages?: ChatMessage[];
+                conversationId?: string;
+                lastMetadata?: RunMetadata;
+            }>(PERSISTENCE_NAMESPACE, PERSISTENCE_KEY)
+            .then((storedState) => {
+                if (cancelled || !storedState) {
+                    return;
+                }
+                setMessages(storedState.messages ?? []);
+                setConversationId(storedState.conversationId);
+                setLastMetadata(storedState.lastMetadata);
+            })
+            .catch(() => undefined)
+            .finally(() => {
+                if (!cancelled) {
+                    setSessionHydrated(true);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [persistence]);
+
+    useEffect(() => {
+        if (!persistence || !sessionHydrated) {
+            return;
+        }
+
+        void persistence
+            .setJSON(PERSISTENCE_NAMESPACE, PERSISTENCE_KEY, {
+                messages,
+                conversationId,
+                lastMetadata,
+            })
+            .catch(() => undefined);
+    }, [conversationId, lastMetadata, messages, persistence, sessionHydrated]);
 
     const addMessage = useCallback((msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
         const id = Date.now().toString() + Math.random().toString(36).slice(2, 6);

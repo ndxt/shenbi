@@ -517,7 +517,8 @@ describe('preview/App integration', () => {
     await user.click(screen.getByTitle('Toggle AI Assistant'));
 
     const input = await screen.findByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行');
-    await user.selectOptions(screen.getByLabelText('常用覆盖场景'), '生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作，重点覆盖卡片、表格、Tabs、Drawer、Form、按钮和响应式布局组合。');
+    await user.click(screen.getByRole('button', { name: '常用覆盖场景' }));
+    await user.click(screen.getByRole('button', { name: '工作台总览' }));
     expect(input).toHaveValue('生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作，重点覆盖卡片、表格、Tabs、Drawer、Form、按钮和响应式布局组合。');
 
     await user.type(input, '{enter}');
@@ -526,6 +527,7 @@ describe('preview/App integration', () => {
       expect(screen.getByRole('button', { name: '清空' })).toBeEnabled();
     }, { timeout: 9000 });
 
+    await user.click(screen.getByRole('button', { name: '历史输入' }));
     await user.click(screen.getByRole('button', { name: /生成一个复杂工作台首页/ }));
     await waitFor(() => {
       expect(input).toHaveValue('生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作，重点覆盖卡片、表格、Tabs、Drawer、Form、按钮和响应式布局组合。');

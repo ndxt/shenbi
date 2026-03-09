@@ -1,5 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { Sparkles, Loader2, Info, BrainCircuit, Trash2 } from 'lucide-react';
+import {
+  executePluginCommand,
+  type PluginContext,
+} from '@shenbi/editor-plugin-api';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import { useModels } from '../hooks/useModels';
 import { useChatSession } from '../hooks/useChatSession';
@@ -7,17 +11,17 @@ import { useAgentRun } from '../hooks/useAgentRun';
 import { ChatMessageList } from './ChatMessageList';
 import { ChatInput } from './ChatInput';
 import { ModelSelector } from './ModelSelector';
-import { readJSONFromStorage, writeJSONToStorage } from '../utils/local-storage';
 
 export interface AIPanelProps {
   bridge?: EditorAIBridge;
+  pluginContext?: PluginContext;
   defaultPlannerModel?: string;
   defaultBlockModel?: string;
-  onResetWorkspace?: () => void;
 }
 
-const UI_STORAGE_KEY = 'shenbi:ai-chat:ui';
-const PROMPT_HISTORY_STORAGE_KEY = 'shenbi:ai-chat:prompt-history';
+const PERSISTENCE_NAMESPACE = 'ai-chat';
+const UI_PERSISTENCE_KEY = 'ui';
+const PROMPT_HISTORY_PERSISTENCE_KEY = 'prompt-history';
 const MAX_PROMPT_HISTORY = 12;
 
 const PROMPT_PRESETS = [
@@ -45,19 +49,15 @@ const PROMPT_PRESETS = [
 
 export function AIPanel({
   bridge,
+  pluginContext,
   defaultPlannerModel,
   defaultBlockModel,
-  onResetWorkspace,
 }: AIPanelProps) {
-  const storedUIState = readJSONFromStorage<{
-    thinkingEnabled?: boolean;
-    draftText?: string;
-  }>(UI_STORAGE_KEY, {});
-  const [thinkingEnabled, setThinkingEnabled] = React.useState(Boolean(storedUIState.thinkingEnabled));
-  const [draftText, setDraftText] = React.useState(storedUIState.draftText ?? '');
-  const [promptHistory, setPromptHistory] = React.useState<string[]>(
-    readJSONFromStorage<string[]>(PROMPT_HISTORY_STORAGE_KEY, [])
-  );
+  const persistence = pluginContext?.persistence;
+  const [thinkingEnabled, setThinkingEnabled] = React.useState(false);
+  const [draftText, setDraftText] = React.useState('');
+  const [promptHistory, setPromptHistory] = React.useState<string[]>([]);
+  const [uiHydrated, setUIHydrated] = React.useState(!persistence);
   const {
     plannerModels,
     plannerModel,
@@ -67,7 +67,7 @@ export function AIPanel({
     setBlockModel,
     isLoading: isLoadingModels,
     error: modelsError,
-  } = useModels(defaultPlannerModel, defaultBlockModel);
+  } = useModels(defaultPlannerModel, defaultBlockModel, persistence);
 
   const {
     messages,
@@ -78,7 +78,7 @@ export function AIPanel({
     lastMetadata,
     setLastMetadata,
     resetSession,
-  } = useChatSession();
+  } = useChatSession(persistence);
 
   const {
     isRunning,
@@ -93,6 +93,42 @@ export function AIPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const modelsReady = plannerModels.length > 0 && blockModels.length > 0;
   const modelSelectionBlocked = isLoadingModels || Boolean(modelsError) || !modelsReady;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!persistence) {
+      setUIHydrated(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void Promise.all([
+      persistence.getJSON<{
+        thinkingEnabled?: boolean;
+        draftText?: string;
+      }>(PERSISTENCE_NAMESPACE, UI_PERSISTENCE_KEY),
+      persistence.getJSON<string[]>(PERSISTENCE_NAMESPACE, PROMPT_HISTORY_PERSISTENCE_KEY),
+    ])
+      .then(([storedUIState, storedPromptHistory]) => {
+        if (cancelled) {
+          return;
+        }
+        setThinkingEnabled(Boolean(storedUIState?.thinkingEnabled));
+        setDraftText(storedUIState?.draftText ?? '');
+        setPromptHistory(storedPromptHistory ?? []);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) {
+          setUIHydrated(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [persistence]);
 
   useEffect(() => {
     if (!bridge) return;
@@ -110,15 +146,27 @@ export function AIPanel({
   }, [messages, progressText]);
 
   useEffect(() => {
-    writeJSONToStorage(UI_STORAGE_KEY, {
-      thinkingEnabled,
-      draftText,
-    });
-  }, [draftText, thinkingEnabled]);
+    if (!persistence || !uiHydrated) {
+      return;
+    }
+
+    void persistence
+      .setJSON(PERSISTENCE_NAMESPACE, UI_PERSISTENCE_KEY, {
+        thinkingEnabled,
+        draftText,
+      })
+      .catch(() => undefined);
+  }, [draftText, persistence, thinkingEnabled, uiHydrated]);
 
   useEffect(() => {
-    writeJSONToStorage(PROMPT_HISTORY_STORAGE_KEY, promptHistory);
-  }, [promptHistory]);
+    if (!persistence || !uiHydrated) {
+      return;
+    }
+
+    void persistence
+      .setJSON(PERSISTENCE_NAMESPACE, PROMPT_HISTORY_PERSISTENCE_KEY, promptHistory)
+      .catch(() => undefined);
+  }, [persistence, promptHistory, uiHydrated]);
 
   const applyPromptText = React.useCallback((text: string) => {
     setDraftText(text);
@@ -137,8 +185,8 @@ export function AIPanel({
     }
     resetSession();
     setDraftText('');
-    onResetWorkspace?.();
-  }, [isRunning, onResetWorkspace, resetSession]);
+    void executePluginCommand(pluginContext ?? {}, 'workspace.resetDocument');
+  }, [isRunning, pluginContext, resetSession]);
 
   const handleSend = (text: string) => {
     if (modelSelectionBlocked) {
@@ -180,9 +228,13 @@ export function AIPanel({
           className="rounded p-1.5 text-text-secondary transition-colors hover:bg-bg-canvas hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
           onClick={handleClear}
           disabled={isRunning}
-          title="清空会话"
+          aria-label="清空"
+          title="清空当前会话和页面"
         >
-          <Trash2 size={13} />
+          <span className="flex items-center gap-1">
+            <Trash2 size={13} />
+            <span>清空</span>
+          </span>
         </button>
       </div>
 

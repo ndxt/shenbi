@@ -30,8 +30,10 @@ import {
 } from './schemas';
 import { ScenarioRuntimeView } from './runtime/ScenarioRuntimeView';
 
-import { AppShell } from '@shenbi/editor-ui';
 import {
+  AppShell,
+  createWorkspacePersistenceService,
+  LocalWorkspacePersistenceAdapter,
   useEditorHostBridge,
   useEditorSession,
   useNodePatchDispatch,
@@ -55,7 +57,9 @@ type ScenarioKey =
   | 'nine-grid';
 
 type AppMode = ShellMode;
-const ACTIVE_SCENARIO_STORAGE_KEY = 'shenbi:preview:active-scenario';
+const WORKSPACE_ID = 'shenbi-preview-debug';
+const PREVIEW_PERSISTENCE_NAMESPACE = 'preview-debug';
+const ACTIVE_SCENARIO_PERSISTENCE_KEY = 'active-scenario';
 
 const scenarioOptions: { label: string; value: ScenarioKey }[] = [
   { label: '用户管理场景', value: 'user-management' },
@@ -121,22 +125,15 @@ function createEmptyShellSchema(): PageSchema {
   };
 }
 
-function getStoredActiveScenario(): ScenarioKey {
-  if (typeof window === 'undefined') {
-    return 'user-management';
-  }
-
-  const storedScenario = window.localStorage.getItem(ACTIVE_SCENARIO_STORAGE_KEY);
-  if (storedScenario && scenarioOptions.some((option) => option.value === storedScenario)) {
-    return storedScenario as ScenarioKey;
-  }
-
-  return 'user-management';
-}
-
 export function App() {
   const [appMode, setAppMode] = useShellModeUrl();
-  const [activeScenario, setActiveScenario] = useState<ScenarioKey>(() => getStoredActiveScenario());
+  const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
+  const persistenceAdapter = useMemo(() => new LocalWorkspacePersistenceAdapter(), []);
+  const workspacePersistence = useMemo(
+    () => createWorkspacePersistenceService(WORKSPACE_ID, persistenceAdapter),
+    [persistenceAdapter],
+  );
+  const [scenarioPersistenceHydrated, setScenarioPersistenceHydrated] = useState(false);
   const initialScenarioSnapshots = useMemo(() => createInitialScenarioSnapshots(), []);
   const initialScenarioSchemas = useMemo(() => createInitialScenarioState(), []);
   const [activityMessage, setActivityMessage] = useState<string>('');
@@ -260,7 +257,7 @@ export function App() {
     }
     return window.prompt('请输入文件名', defaultName);
   }, []);
-  const { executePluginCommand } = useEditorHostBridge({
+  const { executePluginCommand: executeHostPluginCommand } = useEditorHostBridge({
     mode: appMode === 'shell' ? 'shell' : 'scenarios',
     shellCommands: fileEditor.commands,
     scenarioCommands: executeScenarioCommand,
@@ -269,15 +266,6 @@ export function App() {
       : activeScenarioSnapshot.currentFileId,
     schemaName: activeSchema.name,
     promptFileName,
-  });
-  const pluginContext = usePluginContext({
-    schema: activeSchema,
-    selectedNode,
-    selectedNodeId,
-    replaceSchema: (schema) => updateActiveSchema(() => schema),
-    patchSelectedNode,
-    executeCommand: executePluginCommand,
-    notifications,
   });
   const handleResetWorkspace = useCallback(() => {
     if (appMode === 'shell') {
@@ -301,8 +289,41 @@ export function App() {
     updateActiveSchema,
     updateScenarioSnapshot,
   ]);
+  const executeAppCommand = useCallback((commandId: string, payload?: unknown) => {
+    if (commandId === 'workspace.resetDocument') {
+      handleResetWorkspace();
+      return undefined;
+    }
+    return executeHostPluginCommand(commandId, payload);
+  }, [executeHostPluginCommand, handleResetWorkspace]);
+  const pluginContext = usePluginContext({
+    schema: activeSchema,
+    selectedNode,
+    selectedNodeId,
+    replaceSchema: (schema) => updateActiveSchema(() => schema),
+    patchSelectedNode,
+    executeCommand: executeAppCommand,
+    notifications,
+  });
   const plugins = useMemo(() => {
     const registeredPlugins = [
+      defineEditorPlugin({
+        id: 'preview.workspace',
+        name: 'Preview Workspace Commands',
+        contributes: {
+          commands: [
+            {
+              id: 'workspace.resetDocument',
+              title: 'Reset Document',
+              category: 'Workspace',
+              description: 'Reset the current shell page or restore the active scenario baseline.',
+              execute: () => {
+                handleResetWorkspace();
+              },
+            },
+          ],
+        },
+      }),
       createSetterPlugin({
         inspectorTabs: [
           {
@@ -352,7 +373,6 @@ export function App() {
       createAIChatPlugin({
         defaultWidth: 300,
         getAvailableComponents: () => builtinContracts,
-        onResetWorkspace: handleResetWorkspace,
       }),
     ];
     if (appMode === 'shell' && filesSidebarTabOptions) {
@@ -366,14 +386,50 @@ export function App() {
   };
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    let cancelled = false;
+
+    void workspacePersistence
+      .getJSON<ScenarioKey>(PREVIEW_PERSISTENCE_NAMESPACE, ACTIVE_SCENARIO_PERSISTENCE_KEY)
+      .then((storedScenario) => {
+        if (
+          cancelled
+          || !storedScenario
+          || !scenarioOptions.some((option) => option.value === storedScenario)
+        ) {
+          return;
+        }
+        setActiveScenario(storedScenario);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) {
+          setScenarioPersistenceHydrated(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspacePersistence]);
+
+  useEffect(() => {
+    if (!scenarioPersistenceHydrated) {
       return;
     }
-    window.localStorage.setItem(ACTIVE_SCENARIO_STORAGE_KEY, activeScenario);
-  }, [activeScenario]);
+
+    void workspacePersistence
+      .setJSON(
+        PREVIEW_PERSISTENCE_NAMESPACE,
+        ACTIVE_SCENARIO_PERSISTENCE_KEY,
+        activeScenario,
+      )
+      .catch(() => undefined);
+  }, [activeScenario, scenarioPersistenceHydrated, workspacePersistence]);
 
   return (
     <AppShell
+      workspaceId={WORKSPACE_ID}
+      persistenceAdapter={persistenceAdapter}
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,
@@ -457,7 +513,9 @@ export function App() {
             type="button"
             aria-label="清空页面"
             className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary"
-            onClick={handleResetWorkspace}
+            onClick={() => {
+              void executeAppCommand('workspace.resetDocument');
+            }}
             title="清空页面"
           >
             <Trash2 size={15} />

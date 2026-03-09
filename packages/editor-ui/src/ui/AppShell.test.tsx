@@ -1,11 +1,20 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { AppShell } from './AppShell';
+import { AppShell as RawAppShell } from './AppShell';
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { defineEditorPlugin, type ActivityBarItemIconProps } from '@shenbi/editor-plugin-api';
+import type { WorkspacePersistenceAdapter } from '../persistence/workspace-persistence';
 
 function MockIcon(_props: ActivityBarItemIconProps) {
   return <span aria-hidden>Icon</span>;
+}
+
+type AppShellProps = Omit<React.ComponentProps<typeof RawAppShell>, 'workspaceId'> & {
+  workspaceId?: string;
+};
+
+function AppShell(props: AppShellProps) {
+  return <RawAppShell {...props} workspaceId={props.workspaceId ?? 'test-workspace'} />;
 }
 
 describe('AppShell', () => {
@@ -57,7 +66,59 @@ describe('AppShell', () => {
 
     const secondPanel = screen.getByText('Plugin AI Width Panel').closest('div[style]');
     expect(secondPanel).not.toBeNull();
-    expect(secondPanel).toHaveStyle({ width: '400px' });
+    await waitFor(() => {
+      expect(secondPanel).toHaveStyle({ width: '400px' });
+    });
+  });
+
+  it('不同 workspaceId 的布局状态互不污染', async () => {
+    window.localStorage.clear();
+
+    const firstRender = render(
+      <AppShell workspaceId="workspace-a">
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Toggle Sidebar'));
+    firstRender.unmount();
+
+    render(
+      <AppShell workspaceId="workspace-b">
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Components')).toBeInTheDocument();
+    });
+  });
+
+  it('会通过自定义 persistenceAdapter 读写布局状态', async () => {
+    const adapter: WorkspacePersistenceAdapter = {
+      getJSON: vi.fn().mockResolvedValue({
+        showSidebar: false,
+      }),
+      setJSON: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <AppShell persistenceAdapter={adapter}>
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    await waitFor(() => {
+      expect(adapter.getJSON).toHaveBeenCalledWith('test-workspace', 'layout', 'workbench');
+    });
+    expect(screen.queryByText('Components')).toBeNull();
+
+    fireEvent.click(screen.getByTitle('Toggle Sidebar'));
+
+    await waitFor(() => {
+      expect(adapter.setJSON).toHaveBeenCalled();
+    });
   });
 
   it('renders all main shell regions', () => {

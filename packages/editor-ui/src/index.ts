@@ -11,6 +11,7 @@ export * from './ui/AIPanel';
 export * from './ui/CommandPalette';
 
 export * from './panels';
+export * from './persistence';
 
 export * from './hooks/useResize';
 export * from './hooks/useSelectionSync';
