@@ -21,6 +21,8 @@ export interface ProviderEnvConfig {
   blockModel?: string | undefined;
   models?: string[] | undefined;
   temperature?: number | undefined;
+  thinkingModels?: string[] | undefined;
+  nonThinkingModels?: string[] | undefined;
 }
 
 function parseEnvFile(filePath: string): Record<string, string> {
@@ -114,12 +116,13 @@ function resolveProviderConfig(
   const providerKeys = (suffix: string): string[] => (
     providerPrefix ? [`${providerPrefix}_${suffix}`] : []
   );
+  const useSharedCompatKeys = isActiveProvider || provider === 'openai-compatible';
 
   return {
     provider,
     baseUrl: readEnvValue(loaded, [
       ...providerKeys('BASE_URL'),
-      ...(isActiveProvider ? [
+      ...(useSharedCompatKeys ? [
         'AI_OPENAI_COMPAT_BASE_URL',
         'OPENAI_BASE_URL',
         'VITE_OPENAI_BASE_URL',
@@ -127,7 +130,7 @@ function resolveProviderConfig(
     ]),
     apiKey: readEnvValue(loaded, [
       ...providerKeys('API_KEY'),
-      ...(isActiveProvider ? [
+      ...(useSharedCompatKeys ? [
         'AI_OPENAI_COMPAT_API_KEY',
         'OPENAI_API_KEY',
         'VITE_OPENAI_API_KEY',
@@ -135,7 +138,7 @@ function resolveProviderConfig(
     ]),
     plannerModel: readEnvValue(loaded, [
       ...providerKeys('PLANNER_MODEL'),
-      ...(isActiveProvider ? [
+      ...(useSharedCompatKeys ? [
         'AI_PLANNER_MODEL',
         'OPENAI_PLANNER_MODEL',
         'VITE_OPENAI_PLANNER_MODEL',
@@ -143,7 +146,7 @@ function resolveProviderConfig(
     ]),
     blockModel: readEnvValue(loaded, [
       ...providerKeys('BLOCK_MODEL'),
-      ...(isActiveProvider ? [
+      ...(useSharedCompatKeys ? [
         'AI_BLOCK_MODEL',
         'OPENAI_BLOCK_MODEL',
         'VITE_OPENAI_BLOCK_MODEL',
@@ -151,11 +154,19 @@ function resolveProviderConfig(
     ]),
     models: parseModelList(readEnvValue(loaded, [
       ...providerKeys('MODELS'),
-      ...(isActiveProvider ? ['AI_AVAILABLE_MODELS'] : []),
+      ...(useSharedCompatKeys ? ['AI_AVAILABLE_MODELS'] : []),
     ])),
     temperature: parseTemperature(readEnvValue(loaded, [
       ...providerKeys('TEMPERATURE'),
-      ...(isActiveProvider ? ['AI_TEMPERATURE'] : []),
+      ...(useSharedCompatKeys ? ['AI_TEMPERATURE'] : []),
+    ])),
+    thinkingModels: parseModelList(readEnvValue(loaded, [
+      ...providerKeys('THINKING_MODELS'),
+      ...(useSharedCompatKeys ? ['AI_THINKING_MODELS'] : []),
+    ])),
+    nonThinkingModels: parseModelList(readEnvValue(loaded, [
+      ...providerKeys('NON_THINKING_MODELS'),
+      ...(useSharedCompatKeys ? ['AI_NON_THINKING_MODELS'] : []),
     ])),
   };
 }

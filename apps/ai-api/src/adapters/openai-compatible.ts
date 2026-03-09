@@ -9,10 +9,22 @@ export interface OpenAICompatibleClientOptions {
   baseUrl: string;
   apiKey: string;
   temperature?: number;
+  thinkingModels?: string[];
+  nonThinkingModels?: string[];
 }
 
 export interface OpenAICompatibleThinking {
   type: 'enabled' | 'disabled';
+}
+
+export interface OpenAICompatibleRequestDebugSummary {
+  model: string;
+  stream: boolean;
+  temperature: number;
+  messageCount: number;
+  responseFormat: 'json_object' | null;
+  hasThinking: boolean;
+  thinking?: OpenAICompatibleThinking | undefined;
 }
 
 interface ChatCompletionChoice {
@@ -40,6 +52,29 @@ interface StreamChunk {
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, '');
+}
+
+function normalizeModelName(model: string): string {
+  return model.trim().toLowerCase();
+}
+
+function serializeThinking(
+  model: string,
+  thinkingModels: ReadonlySet<string>,
+  nonThinkingModels: ReadonlySet<string>,
+  thinking?: OpenAICompatibleThinking,
+): OpenAICompatibleThinking | undefined {
+  if (!thinking) {
+    return undefined;
+  }
+  const normalizedModel = normalizeModelName(model);
+  if (nonThinkingModels.has(normalizedModel)) {
+    return undefined;
+  }
+  if (thinkingModels.size === 0) {
+    return thinking;
+  }
+  return thinkingModels.has(normalizedModel) ? thinking : undefined;
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
@@ -72,11 +107,33 @@ export class OpenAICompatibleClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly temperature: number;
+  private readonly thinkingModels: ReadonlySet<string>;
+  private readonly nonThinkingModels: ReadonlySet<string>;
 
   constructor(options: OpenAICompatibleClientOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.apiKey = options.apiKey;
     this.temperature = options.temperature ?? 0.6;
+    this.thinkingModels = new Set((options.thinkingModels ?? []).map((model) => normalizeModelName(model)));
+    this.nonThinkingModels = new Set((options.nonThinkingModels ?? []).map((model) => normalizeModelName(model)));
+  }
+
+  buildRequestDebugSummary(
+    model: string,
+    messages: OpenAICompatibleMessage[],
+    thinking: OpenAICompatibleThinking | undefined,
+    stream: boolean,
+  ): OpenAICompatibleRequestDebugSummary {
+    const serializedThinking = serializeThinking(model, this.thinkingModels, this.nonThinkingModels, thinking);
+    return {
+      model,
+      stream,
+      temperature: this.temperature,
+      messageCount: messages.length,
+      responseFormat: stream ? null : 'json_object',
+      hasThinking: Boolean(serializedThinking),
+      ...(serializedThinking ? { thinking: serializedThinking } : {}),
+    };
   }
 
   async chat(
@@ -84,6 +141,7 @@ export class OpenAICompatibleClient {
     messages: OpenAICompatibleMessage[],
     thinking?: OpenAICompatibleThinking,
   ): Promise<string> {
+    const serializedThinking = serializeThinking(model, this.thinkingModels, this.nonThinkingModels, thinking);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -98,7 +156,7 @@ export class OpenAICompatibleClient {
         response_format: {
           type: 'json_object',
         },
-        ...(thinking ? { thinking } : {}),
+        ...(serializedThinking ? { thinking: serializedThinking } : {}),
       }),
     });
 
@@ -119,6 +177,7 @@ export class OpenAICompatibleClient {
     messages: OpenAICompatibleMessage[],
     thinking?: OpenAICompatibleThinking,
   ): AsyncIterable<{ text: string }> {
+    const serializedThinking = serializeThinking(model, this.thinkingModels, this.nonThinkingModels, thinking);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -130,7 +189,7 @@ export class OpenAICompatibleClient {
         messages,
         temperature: this.temperature,
         stream: true,
-        ...(thinking ? { thinking } : {}),
+        ...(serializedThinking ? { thinking: serializedThinking } : {}),
       }),
     });
 

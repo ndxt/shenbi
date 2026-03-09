@@ -31,6 +31,7 @@ import { logger } from '../adapters/logger.ts';
 import {
   OpenAICompatibleClient,
   type OpenAICompatibleMessage,
+  type OpenAICompatibleRequestDebugSummary,
   type OpenAICompatibleThinking,
 } from '../adapters/openai-compatible.ts';
 import {
@@ -63,10 +64,15 @@ const supportedPageTypes = ['dashboard', 'list', 'form', 'detail', 'statistics',
 const plannerContractSummary = getPlannerContractSummary();
 const designPolicySummary = getDesignPolicySummary();
 
+interface ProviderRequestTraceSummary extends OpenAICompatibleRequestDebugSummary {
+  provider: string;
+}
+
 interface RunTraceRecord {
   request: RunRequest;
   suggestedPageType?: PageType;
   planner?: {
+    requestSummary?: ProviderRequestTraceSummary;
     model: string;
     rawOutput: string;
     normalizedPlan?: PagePlan;
@@ -75,11 +81,13 @@ interface RunTraceRecord {
     blockId: string;
     description: string;
     suggestedComponents: string[];
+    requestSummary?: ProviderRequestTraceSummary;
     model: string;
     rawOutput: string;
     normalizedNode?: GenerateBlockResult['node'];
     sanitizationDiagnostics?: SanitizationDiagnostic[];
     qualityDiagnostics?: BlockQualityDiagnostic[];
+    retryRequestSummary?: ProviderRequestTraceSummary;
     retryRawOutput?: string;
     retryNormalizedNode?: GenerateBlockResult['node'];
     retrySanitizationDiagnostics?: SanitizationDiagnostic[];
@@ -910,6 +918,8 @@ function resolveProviderConfig(providerName: string | undefined): {
   provider: string;
   baseUrl?: string | undefined;
   apiKey?: string | undefined;
+  thinkingModels?: string[] | undefined;
+  nonThinkingModels?: string[] | undefined;
 } {
   const provider = providerName ?? env.AI_PROVIDER;
   if (!provider) {
@@ -921,6 +931,8 @@ function resolveProviderConfig(providerName: string | undefined): {
     provider,
     baseUrl: matched?.baseUrl ?? (provider === env.AI_PROVIDER ? env.AI_OPENAI_COMPAT_BASE_URL : undefined),
     apiKey: matched?.apiKey ?? (provider === env.AI_PROVIDER ? env.AI_OPENAI_COMPAT_API_KEY : undefined),
+    thinkingModels: matched?.thinkingModels,
+    nonThinkingModels: matched?.nonThinkingModels,
   };
 }
 
@@ -939,6 +951,8 @@ function createClient(providerName?: string): OpenAICompatibleClient {
   const client = new OpenAICompatibleClient({
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,
+    ...(config.thinkingModels ? { thinkingModels: config.thinkingModels } : {}),
+    ...(config.nonThinkingModels ? { nonThinkingModels: config.nonThinkingModels } : {}),
   });
   clientCache.set(config.provider, client);
   return client;
@@ -1446,7 +1460,13 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
   const blockModelRef = parseProviderModelRef(requestedBlockModel);
   const client = createClient(blockModelRef.provider);
   const model = requireModel(blockModelRef.model ?? requestedBlockModel, 'block');
-  const text = await client.chat(model, createBlockMessages(input), getThinking(input.request));
+  const messages = createBlockMessages(input);
+  const thinking = getThinking(input.request);
+  const requestSummary: ProviderRequestTraceSummary = {
+    provider: blockModelRef.provider ?? env.AI_PROVIDER,
+    ...client.buildRequestDebugSummary(model, messages, thinking, false),
+  };
+  const text = await client.chat(model, messages, thinking);
   const rawNode = extractJson<GenerateBlockResult['node']>(text, 'block', input.request, model);
   const { node, diagnostics } = validateGeneratedBlockNodeWithDiagnostics(rawNode, input.block.id);
   const qualityDiagnostics = assessBlockQuality(node, input);
@@ -1458,10 +1478,17 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
   let retryText: string | undefined;
   let retryNode: GenerateBlockResult['node'] | undefined;
   let retryDiagnostics: SanitizationDiagnostic[] | undefined;
+  let retryRequestSummary: ProviderRequestTraceSummary | undefined;
 
   if (qualityDiagnostics.some((item) => item.severity === 'retry')) {
     try {
-      retryText = await client.chat(model, createBlockMessages(input, qualityDiagnostics), getThinking(input.request));
+      const retryMessages = createBlockMessages(input, qualityDiagnostics);
+      const retryThinking = getThinking(input.request);
+      retryRequestSummary = {
+        provider: blockModelRef.provider ?? env.AI_PROVIDER,
+        ...client.buildRequestDebugSummary(model, retryMessages, retryThinking, false),
+      };
+      retryText = await client.chat(model, retryMessages, retryThinking);
       const retryRawNode = extractJson<GenerateBlockResult['node']>(retryText, 'block', input.request, model);
       const validatedRetry = validateGeneratedBlockNodeWithDiagnostics(retryRawNode, input.block.id);
       retryNode = validatedRetry.node;
@@ -1482,11 +1509,13 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
     blockId: input.block.id,
     description: input.block.description,
     suggestedComponents: input.block.components,
+    requestSummary,
     model,
     rawOutput: finalText,
     normalizedNode: finalNode,
     sanitizationDiagnostics: finalDiagnostics,
     qualityDiagnostics: finalQualityDiagnostics,
+    ...(retryRequestSummary ? { retryRequestSummary } : {}),
     ...(retryText ? { retryRawOutput: retryText } : {}),
     ...(retryNode ? { retryNormalizedNode: retryNode } : {}),
     ...(retryDiagnostics ? { retrySanitizationDiagnostics: retryDiagnostics } : {}),
@@ -1623,11 +1652,17 @@ async function planWithModel(input: PlanPageInput, trace?: RunTraceRecord): Prom
   const plannerModelRef = parseProviderModelRef(requestedPlannerModel);
   const client = createClient(plannerModelRef.provider);
   const model = requireModel(plannerModelRef.model ?? requestedPlannerModel, 'planner');
-  const text = await client.chat(model, createPlannerMessages(input), getThinking(input.request));
+  const messages = createPlannerMessages(input);
+  const thinking = getThinking(input.request);
+  const text = await client.chat(model, messages, thinking);
   const plan = extractJson<PagePlan>(text, 'planner', input.request, model);
   const normalizedPlan = normalizePlan(plan);
   if (trace) {
     trace.planner = {
+      requestSummary: {
+        provider: plannerModelRef.provider ?? env.AI_PROVIDER,
+        ...client.buildRequestDebugSummary(model, messages, thinking, false),
+      },
       model,
       rawOutput: text,
       normalizedPlan,
