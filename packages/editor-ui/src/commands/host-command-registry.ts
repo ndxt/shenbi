@@ -181,37 +181,10 @@ export function hostCommandsToShortcuts(hostCommands: readonly HostCommandDefini
     }));
 }
 
-export function hostCommandsToMenus(hostCommands: readonly HostCommandDefinition[]): MenuContribution[] {
-  const menuCommandIds = new Set([
-    'file.saveSchema',
-    'file.saveAs',
-    'editor.undo',
-    'editor.redo',
-    'layout.toggleSidebar',
-    'layout.toggleConsole',
-    'layout.toggleInspector',
-    'commandPalette.open',
-  ]);
-
-  return hostCommands
-    .filter((command) => menuCommandIds.has(command.id))
-    .map((command, index) => ({
-      id: `host.menu.${command.id}`,
-      label: command.title,
-      commandId: command.id,
-      order: (index + 1) * 10,
-      section: command.id.startsWith('layout.') ? 'secondary' : 'primary',
-      target: command.id.startsWith('layout.') || command.id === 'commandPalette.open'
-        ? 'toolbar-end'
-        : 'toolbar-start',
-      group: command.id.startsWith('file.')
-        ? 'file'
-        : command.id.startsWith('editor.')
-          ? 'edit'
-          : command.id.startsWith('layout.')
-            ? 'layout'
-            : 'workbench',
-    }));
+export function hostCommandsToMenus(_hostCommands: readonly HostCommandDefinition[]): MenuContribution[] {
+  // 初始阶段不在工具栏上显示内置命令按钮。
+  // 用户仍然可以通过快捷键和命令面板 (Cmd+Shift+P) 访问全部命令。
+  return [];
 }
 
 export function hostCommandsToContextMenus(hostCommands: readonly HostCommandDefinition[]): ContextMenuContribution[] {

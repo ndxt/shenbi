@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as antd from 'antd';
-import { Rocket } from 'lucide-react';
+import { Rocket, Undo2, Redo2, Trash2 } from 'lucide-react';
 import {
   builtinContracts,
   getBuiltinContract,
@@ -389,9 +389,10 @@ export function App() {
       onCanvasSelectNode={handleCanvasSelectNode}
       toolbarExtra={(
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-text-secondary">模式</span>
+          <span className="text-text-secondary" style={{ fontSize: '11px' }}>模式</span>
           <select
-            className="h-7 w-[110px] rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
+            className="h-7 w-[110px] rounded border border-border-ide bg-bg-panel px-2 text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
+            style={{ fontSize: '12px' }}
             aria-label="模式切换"
             value={appMode}
             onChange={(event) => setAppMode(event.target.value as AppMode)}
@@ -404,9 +405,10 @@ export function App() {
           </select>
           {appMode === 'scenarios' ? (
             <>
-              <span className="text-[11px] text-text-secondary">场景</span>
+              <span className="text-text-secondary" style={{ fontSize: '11px' }}>场景</span>
               <select
-                className="h-7 w-[180px] rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
+                className="h-7 w-[180px] rounded border border-border-ide bg-bg-panel px-2 text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
+                style={{ fontSize: '12px' }}
                 aria-label="场景切换"
                 value={activeScenario}
                 onChange={(event) => setActiveScenario(event.target.value as ScenarioKey)}
@@ -423,7 +425,8 @@ export function App() {
             <>
               <span
                 aria-label="当前文件"
-                className="max-w-[220px] truncate text-[11px] text-text-secondary"
+                className="max-w-[220px] truncate text-text-secondary"
+                style={{ fontSize: '11px' }}
               >
                 {activeFileName ?? '未命名页面'}
                 {isDirty ? ' *' : ''}
@@ -431,33 +434,36 @@ export function App() {
               <button
                 type="button"
                 aria-label="撤销"
-                className="h-7 rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary transition-colors hover:bg-bg-activity-bar disabled:cursor-not-allowed disabled:opacity-50"
+                className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!canUndo}
                 onClick={handleUndo}
+                title="撤销 (Ctrl+Z)"
               >
-                撤销
+                <Undo2 size={15} />
               </button>
               <button
                 type="button"
                 aria-label="重做"
-                className="h-7 rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary transition-colors hover:bg-bg-activity-bar disabled:cursor-not-allowed disabled:opacity-50"
+                className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!canRedo}
                 onClick={handleRedo}
+                title="重做 (Ctrl+Shift+Z)"
               >
-                重做
+                <Redo2 size={15} />
               </button>
             </>
           ) : null}
           <button
             type="button"
             aria-label="清空页面"
-            className="h-7 rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary transition-colors hover:bg-bg-activity-bar"
+            className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary"
             onClick={handleResetWorkspace}
+            title="清空页面"
           >
-            清空页面
+            <Trash2 size={15} />
           </button>
           {activityMessage ? (
-            <span className="ml-2 text-[11px] text-text-secondary">{activityMessage}</span>
+            <span className="ml-2 text-text-secondary" style={{ fontSize: '11px' }}>{activityMessage}</span>
           ) : null}
         </div>
       )}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Sparkles, Loader2, Info } from 'lucide-react';
+import { Sparkles, Loader2, Info, BrainCircuit, Trash2 } from 'lucide-react';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import { useModels } from '../hooks/useModels';
 import { useChatSession } from '../hooks/useChatSession';
@@ -173,29 +173,32 @@ export function AIPanel({
       <div className="h-9 px-4 border-b border-border-ide flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 text-text-primary">
           <Sparkles size={14} className="text-blue-500" />
-          <span className="text-[11px] font-bold uppercase tracking-wider">AI Assistant</span>
+          <span className="font-bold uppercase tracking-wider" style={{ fontSize: '11px' }}>AI Assistant</span>
         </div>
         <button
           type="button"
-          className="rounded border border-border-ide px-2 py-1 text-[10px] text-text-secondary transition-colors hover:border-blue-500 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded p-1.5 text-text-secondary transition-colors hover:bg-bg-canvas hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
           onClick={handleClear}
           disabled={isRunning}
+          title="清空会话"
         >
-          清空
+          <Trash2 size={13} />
         </button>
       </div>
 
-      <div className="flex-none p-3 border-b border-border-ide flex gap-4 bg-bg-canvas">
-        <ModelSelector label="Planner" models={plannerModels} value={plannerModel} onChange={setPlannerModel} disabled={isRunning || modelSelectionBlocked} />
-        <ModelSelector label="Block" models={blockModels} value={blockModel} onChange={setBlockModel} disabled={isRunning || modelSelectionBlocked} />
-      </div>
-
-      <div className="flex-none px-3 py-2 border-b border-border-ide bg-bg-canvas flex items-center justify-between text-[11px] text-text-secondary">
-        <span>思考</span>
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <span className={thinkingEnabled ? 'text-blue-400' : 'opacity-70'}>{thinkingEnabled ? '已开启' : '已关闭'}</span>
+      <div className="flex-none px-3 py-2 border-b border-border-ide flex gap-3 bg-bg-panel items-center justify-between">
+        <div className="flex gap-2 flex-1">
+            <ModelSelector label="Planner" models={plannerModels} value={plannerModel} onChange={setPlannerModel} disabled={isRunning || modelSelectionBlocked} />
+            <ModelSelector label="Block" models={blockModels} value={blockModel} onChange={setBlockModel} disabled={isRunning || modelSelectionBlocked} />
+        </div>
+        <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0" title="思考模式">
+          <span className="text-text-secondary uppercase tracking-wider" style={{ fontSize: '10px' }}>思考</span>
+          <div className={`relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${thinkingEnabled ? 'bg-blue-500' : 'bg-bg-canvas border border-border-ide'}`}>
+            <span className={`pointer-events-none inline-block h-[12px] w-[12px] transform rounded-full shadow transition duration-200 ease-in-out ${thinkingEnabled ? 'bg-white translate-x-1.5' : 'bg-text-secondary -translate-x-1.5'}`} />
+          </div>
           <input
             type="checkbox"
+            className="sr-only"
             checked={thinkingEnabled}
             onChange={(e) => setThinkingEnabled(e.target.checked)}
             disabled={isRunning || modelSelectionBlocked}
@@ -204,44 +207,44 @@ export function AIPanel({
       </div>
 
       {isLoadingModels && (
-        <div className="px-4 py-2 text-[11px] text-text-secondary border-b border-border-ide bg-bg-canvas">
+        <div className="px-4 py-2 text-text-secondary border-b border-border-ide bg-bg-panel" style={{ fontSize: '11px' }}>
           正在加载模型列表...
         </div>
       )}
 
       {modelsError && (
-        <div className="px-4 py-2 text-[11px] text-red-400 border-b border-border-ide bg-bg-canvas">
+        <div className="px-4 py-2 text-red-400 border-b border-border-ide bg-bg-panel" style={{ fontSize: '11px' }}>
           模型列表加载失败: {modelsError}
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
         {messages.length === 0 && (
-          <div className="text-[12px] text-text-secondary text-center py-10 opacity-60">
-            你好！我是 Shenbi 智能开发助手。可以帮您生成布局、绑定数据、调整样式。<br />有什么我可以帮您的吗？
+          <div className="text-text-secondary text-center py-10 opacity-60" style={{ fontSize: '12px' }}>
+            你好！我是 Shenbi 智能开发助手。<br />可以帮您生成布局、绑定数据、调整样式。<br />有什么我可以帮您的吗？
           </div>
         )}
 
         <ChatMessageList messages={messages} />
 
         {isRunning && (
-          <div className="bg-bg-activity-bar border border-border-ide rounded-md p-3 flex flex-col gap-2 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 left-0 h-1 bg-blue-500 animate-pulse w-full"></div>
-            <div className="flex items-center gap-2 text-[11px] text-text-primary">
-              <Loader2 size={12} className="animate-spin text-blue-500" />
-              <span className="font-semibold text-blue-500">正在生成</span>
-              <span className="opacity-70 ml-auto truncate flex-1 text-right">{progressText}</span>
+          <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-2 shadow-sm relative overflow-hidden mt-2">
+            <div className="absolute top-0 left-0 h-[2px] bg-blue-500 animate-[pulse_2s_ease-in-out_infinite] w-full"></div>
+            <div className="flex items-center gap-2 text-text-primary" style={{ fontSize: '11px' }}>
+              <Loader2 size={12} className="animate-spin text-blue-500 shrink-0" />
+              <span className="font-semibold text-blue-500 shrink-0">正在生成</span>
+              <span className="opacity-70 ml-2 truncate flex-1 text-right">{progressText}</span>
             </div>
             {currentPlan && (
               <div className="mt-2 border-t border-border-ide pt-2">
-                <div className="text-[10px] text-text-secondary font-bold uppercase mb-1 flex items-center gap-1">
+                <div className="text-text-secondary font-bold uppercase mb-1 flex items-center gap-1" style={{ fontSize: '10px' }}>
                   <Info size={10} /> {currentPlan.pageTitle || '架构计划'}
                 </div>
                 <ul className="flex flex-col gap-1 pl-2">
                   {currentPlan.blocks.map((b) => (
-                    <li key={b.id} className="text-[11px] text-text-primary flex gap-2">
-                      <span className="opacity-80 truncate">{b.description}</span>
-                      <span className={`ml-auto text-[10px] font-mono ${
+                    <li key={b.id} className="text-text-primary flex gap-2" style={{ fontSize: '11px' }}>
+                      <span className="opacity-80 truncate" title={b.description}>{b.description}</span>
+                      <span className={`ml-auto font-mono shrink-0 ${
                         blockStatuses[b.id] === 'done'
                           ? 'text-emerald-400'
                           : blockStatuses[b.id] === 'generating'
@@ -259,13 +262,13 @@ export function AIPanel({
         )}
 
         {messages.length > 0 && !isRunning && lastMetadata && (
-          <div className="text-[10px] text-text-secondary flex flex-col items-center gap-1 opacity-50">
+          <div className="text-text-secondary flex flex-col items-center gap-1 opacity-50 mb-2" style={{ fontSize: '10px' }}>
             <div className="flex justify-center gap-4">
-            <span>耗时: {lastMetadata.durationMs}ms</span>
-            <span>Tokens: {lastMetadata.tokensUsed}</span>
+              <span>耗时: {lastMetadata.durationMs}ms</span>
+              <span>Tokens: {lastMetadata.tokensUsed}</span>
             </div>
             {lastMetadata.debugFile && (
-              <span className="font-mono break-all text-center">Debug file: {lastMetadata.debugFile}</span>
+              <span className="font-mono break-all text-center">Debug: {lastMetadata.debugFile.split(/[/\\]/).pop()}</span>
             )}
           </div>
         )}
@@ -273,9 +276,9 @@ export function AIPanel({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-3 border-t border-border-ide shrink-0 bg-bg-canvas flex flex-col gap-2">
-        <div className="text-[10px] text-text-secondary flex justify-between">
-          <span>选中: <span className="text-blue-400">{selectedNodeLabel}</span></span>
+      <div className="border-t border-border-ide shrink-0 bg-bg-panel flex flex-col gap-2" style={{ padding: '8px' }}>
+        <div className="text-text-secondary flex justify-between px-1" style={{ fontSize: '11px' }}>
+          <span>选中: <span className="text-text-primary">{selectedNodeLabel}</span></span>
           {!bridge && <span className="text-red-400">Bridge 未连接</span>}
         </div>
         <ChatInput

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Send, Square } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Square, Lightbulb, History } from 'lucide-react';
 
 export interface PromptOption {
     label: string;
@@ -19,6 +19,103 @@ interface ChatInputProps {
     onSelectHistory?: (text: string) => void;
 }
 
+// 简单的自定义 Popover/Menu 组件 — 使用 fixed 定位逃逸 overflow-hidden 祖先
+function DropdownMenu({
+    icon: Icon,
+    label,
+    items,
+    onSelect,
+    disabled
+}: {
+    icon: React.ElementType;
+    label: string;
+    items: Array<{ label: string; value: string; title?: string }>;
+    onSelect: (val: string) => void;
+    disabled?: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+
+    // 点击外部关闭
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node;
+            if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+            setOpen(false);
+        };
+        if (open) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [open]);
+
+    // 计算 fixed 定位 - 在点击时同步计算，避免首帧位置错误
+    const calcAndToggle = () => {
+        if (disabled) return;
+        if (open) {
+            setOpen(false);
+            return;
+        }
+        if (btnRef.current) {
+            const rect = btnRef.current.getBoundingClientRect();
+            setMenuStyle({
+                position: 'fixed',
+                left: rect.left,
+                bottom: window.innerHeight - rect.top + 4,
+                zIndex: 9999,
+            });
+        }
+        setOpen(true);
+    };
+
+    return (
+        <>
+            <button
+                ref={btnRef}
+                type="button"
+                className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${open ? 'bg-bg-activity-bar text-text-primary' : 'text-text-secondary hover:bg-bg-activity-bar hover:text-text-primary'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                style={{ fontSize: '11px' }}
+                onClick={calcAndToggle}
+                title={label}
+                disabled={disabled}
+            >
+                <Icon size={12} />
+                <span>{label}</span>
+            </button>
+            {open && (
+                <div
+                    ref={menuRef}
+                    className="w-[420px] max-w-[calc(100vw-32px)] max-h-[400px] overflow-y-auto bg-bg-panel border border-border-ide rounded-md shadow-[0_4px_16px_rgba(0,0,0,0.5)] py-1"
+                    style={menuStyle}
+                >
+                    {items.length === 0 ? (
+                        <div className="px-3 py-2 text-text-secondary text-center" style={{ fontSize: '12px' }}>空</div>
+                    ) : (
+                        items.map((item, idx) => (
+                            <button
+                                key={idx}
+                                className="w-full text-left px-3 py-2 text-text-primary whitespace-normal break-words leading-relaxed border-b border-border-ide last:border-b-0 cursor-pointer"
+                                style={{ transition: 'background-color 0.15s ease', fontSize: '12px' }}
+                                title={item.title || item.value}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#27272a'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                                onClick={() => {
+                                    onSelect(item.value);
+                                    setOpen(false);
+                                }}
+                            >
+                                {item.label}
+                            </button>
+                        ))
+                    )}
+                </div>
+            )}
+        </>
+    );
+}
+
 export function ChatInput({
     onSend,
     onCancel,
@@ -31,6 +128,21 @@ export function ChatInput({
     onSelectPreset,
     onSelectHistory,
 }: ChatInputProps) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Auto-resize logic
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        // Reset height to recalculate
+        textarea.style.height = 'auto';
+        
+        // Calculate new height, bounded by CSS min/max-height, using scrollHeight
+        const paddingOffset = 10; // extra padding allowance for pb-8 vs py-2
+        textarea.style.height = `${Math.min(textarea.scrollHeight + paddingOffset, 250)}px`;
+    }, [text]);
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -42,99 +154,74 @@ export function ChatInput({
         if (text.trim() && !isRunning) {
             onSend(text.trim());
         }
+        // focus input after typing/sending finishes ideally handled by the wrapper
+    };
+
+    const handleSelectPreset = (val: string) => {
+        onSelectPreset?.(val);
+        setTimeout(() => textareaRef.current?.focus(), 0);
+    };
+
+    const handleSelectHistory = (val: string) => {
+        onSelectHistory?.(val);
+        setTimeout(() => textareaRef.current?.focus(), 0);
     };
 
     return (
-        <div className="flex w-full flex-col gap-2">
-            {(promptPresets.length > 0 || promptHistory.length > 0) && (
-                <div className="grid grid-cols-2 gap-2">
-                    <select
-                        aria-label="常用覆盖场景"
-                        className="h-8 rounded border border-border-ide bg-bg-panel px-2 text-[11px] text-text-primary outline-none transition-colors focus:border-blue-500 disabled:opacity-50"
-                        defaultValue=""
-                        disabled={disabled || isRunning || promptPresets.length === 0}
-                        onChange={(event) => {
-                            const nextValue = event.target.value;
-                            if (nextValue) {
-                                onSelectPreset?.(nextValue);
-                                event.target.value = '';
-                            }
-                        }}
-                    >
-                        <option value="">常用覆盖场景</option>
-                        {promptPresets.map((option) => (
-                            <option key={option.label} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        aria-label="历史输入"
-                        className="h-8 rounded border border-border-ide bg-bg-panel px-2 text-[11px] text-text-primary outline-none transition-colors focus:border-blue-500 disabled:opacity-50"
-                        defaultValue=""
-                        disabled={disabled || isRunning || promptHistory.length === 0}
-                        onChange={(event) => {
-                            const nextValue = event.target.value;
-                            if (nextValue) {
-                                onSelectHistory?.(nextValue);
-                                event.target.value = '';
-                            }
-                        }}
-                    >
-                        <option value="">历史输入</option>
-                        {promptHistory.map((historyItem) => (
-                            <option key={historyItem} value={historyItem}>
-                                {historyItem}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            )}
-            <div className="relative flex items-center w-full">
+        <div className="flex w-full flex-col gap-1.5">
+            <div className="flex items-center gap-2 mb-0.5">
+                {(promptPresets.length > 0) && (
+                    <DropdownMenu
+                        icon={Lightbulb}
+                        label="常用场景"
+                        items={promptPresets}
+                        onSelect={handleSelectPreset}
+                        disabled={disabled || isRunning}
+                    />
+                )}
+                {(promptHistory.length > 0) && (
+                    <DropdownMenu
+                        icon={History}
+                        label="历史记录"
+                        items={promptHistory.map(h => ({ label: h, value: h }))}
+                        onSelect={handleSelectHistory}
+                        disabled={disabled || isRunning}
+                    />
+                )}
+            </div>
+
+            <div className="relative flex items-stretch w-full">
                 <textarea
-                    className="w-full bg-bg-canvas border border-border-ide text-text-primary text-[12px] rounded-md pl-3 pr-9 py-2 min-h-[40px] max-h-[120px] focus:outline-none focus:border-blue-500 transition-colors shadow-inner resize-none overflow-hidden break-words"
+                    ref={textareaRef}
+                    className="shenbi-custom-scrollbar w-full bg-bg-activity-bar border border-border-ide text-text-primary rounded pl-3 pr-3 pt-2 pb-8 min-h-[60px] max-h-[250px] focus:outline-none focus:border-blue-500 transition-colors shadow-sm resize-none leading-relaxed"
+                    style={{ fontSize: '12px' }}
                     placeholder="输入调试提示词，Enter 发送，Shift+Enter 换行"
                     value={text}
                     onChange={(e) => onTextChange(e.target.value)}
                     onKeyDown={handleKeyDown}
                     disabled={disabled || isRunning}
-                    style={{ scrollbarWidth: 'none' }}
                 />
-                {isRunning ? (
-                    <button
-                        onClick={onCancel}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-red-500 hover:text-red-400 transition-colors"
-                        title="Cancel"
-                    >
-                        <Square size={14} fill="currentColor" />
-                    </button>
-                ) : (
-                    <button
-                        onClick={handleSend}
-                        disabled={!text.trim() || disabled}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-text-secondary hover:text-blue-500 disabled:opacity-50 disabled:hover:text-text-secondary transition-colors"
-                        title="Send"
-                    >
-                        <Send size={14} />
-                    </button>
-                )}
-            </div>
-            {promptHistory.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                    {promptHistory.slice(0, 5).map((historyItem) => (
+                <div className="absolute right-1.5 bottom-1.5 flex items-center justify-center bg-bg-activity-bar rounded">
+                    {isRunning ? (
                         <button
-                            key={historyItem}
-                            type="button"
-                            className="max-w-full truncate rounded border border-border-ide bg-bg-panel px-2 py-1 text-[10px] text-text-secondary transition-colors hover:border-blue-500 hover:text-text-primary"
-                            onClick={() => onSelectHistory?.(historyItem)}
-                            disabled={disabled || isRunning}
-                            title={historyItem}
+                            onClick={onCancel}
+                            className="p-1 text-text-primary hover:bg-bg-panel rounded transition-colors border border-border-ide bg-bg-canvas"
+                            title="Cancel"
                         >
-                            {historyItem}
+                            <Square size={13} fill="currentColor" />
                         </button>
-                    ))}
+                    ) : (
+                        <button
+                            onClick={handleSend}
+                            disabled={!text.trim() || disabled}
+                            className="p-1 text-white bg-blue-600 hover:bg-blue-500 disabled:bg-bg-canvas disabled:text-text-secondary disabled:border disabled:border-border-ide rounded transition-colors shadow-sm flex items-center justify-center h-[26px] w-[26px]"
+                            title="Send"
+                        >
+                            <Send size={13} className="-ml-0.5 mt-0.5" />
+                        </button>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
 }

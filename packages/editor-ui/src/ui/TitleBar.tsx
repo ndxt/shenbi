@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Palette, Check, PanelLeft, PanelBottom, PanelRight, Command, Sparkles, Maximize, Minimize } from 'lucide-react';
+import { Palette, Check, PanelLeft, PanelBottom, PanelRight, Command, Search, Sparkles, Maximize, Minimize } from 'lucide-react';
 import { ThemeMode } from './AppShell';
 
 interface TitleBarProps {
@@ -98,29 +98,27 @@ export function TitleBar({
           <button 
             onClick={onToggleAssistantPanel}
             disabled={!hasAssistantPanel}
-            className={`p-1 rounded transition-colors ml-1 ${showAssistantPanel ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'} ${!hasAssistantPanel ? 'cursor-not-allowed opacity-40' : ''}`}
+            className={`p-1 rounded transition-colors ${showAssistantPanel ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'} ${!hasAssistantPanel ? 'cursor-not-allowed opacity-40' : ''}`}
             title="Toggle AI Assistant"
           >
             <Sparkles size={14} />
+          </button>
+          <div className="w-[1px] h-3 bg-border-ide mx-0.5" />
+          <button
+            onClick={onOpenCommandPalette}
+            className="p-1 rounded transition-colors text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar"
+            title="Open Command Palette (Ctrl+Shift+P)"
+          >
+            <Search size={14} />
           </button>
         </div>
 
         <button 
           onClick={onToggleMaximize}
-          className={`p-1.5 rounded transition-colors mr-2 ${isMaximized ? 'bg-bg-panel text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-panel'}`}
+          className={`p-1.5 rounded transition-colors ${isMaximized ? 'bg-bg-panel text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-panel'}`}
           title={isMaximized ? "Restore Layout" : "Maximize Center Area"}
         >
           {isMaximized ? <Minimize size={16} /> : <Maximize size={16} />}
-        </button>
-
-        <div className="w-[1px] h-4 bg-border-ide mx-1" />
-
-        <button
-          onClick={onOpenCommandPalette}
-          className="flex items-center gap-1.5 rounded p-1.5 text-text-secondary transition-colors hover:bg-bg-panel hover:text-text-primary"
-          title="Open Command Palette"
-        >
-          <Command size={16} />
         </button>
 
         <div className="relative" ref={dropdownRef}>
