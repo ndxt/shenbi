@@ -1,6 +1,6 @@
-import type { PagePlan, AgentEvent, RunMetadata, RunRequest } from '@shenbi/ai-contracts';
+import type { AgentEvent, AgentIntent, AgentOperation, PagePlan, RunMetadata, RunRequest } from '@shenbi/ai-contracts';
 
-export type { AgentEvent, PagePlan, RunMetadata, RunRequest } from '@shenbi/ai-contracts';
+export type { AgentEvent, AgentIntent, AgentOperation, PagePlan, RunMetadata, RunRequest } from '@shenbi/ai-contracts';
 
 export interface RunStreamOptions {
   signal?: AbortSignal;

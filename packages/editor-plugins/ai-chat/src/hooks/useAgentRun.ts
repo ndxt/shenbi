@@ -2,7 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import { aiClient } from '../ai/sse-client';
-import type { PagePlan, RunMetadata, RunRequest } from '../ai/api-types';
+import { executeAgentOperation } from '../ai/operation-executor';
+import type { AgentIntent, PagePlan, RunMetadata, RunRequest } from '../ai/api-types';
 
 export type PlanConfig = PagePlan;
 export type BlockRunStatus = 'waiting' | 'generating' | 'done';
@@ -106,6 +107,8 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
 
     // store preGenerationSchema for rollback
     const preGenerationSchemaRef = useRef<PageSchema | null>(null);
+    const historyBatchActiveRef = useRef(false);
+    const currentIntentRef = useRef<AgentIntent | null>(null);
 
     // Block undo/redo globally during generation
     useEffect(() => {
@@ -127,16 +130,42 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         return () => window.removeEventListener('keydown', handleKeyDown, true);
     }, [isRunning]);
 
-    const lockHistory = useCallback(async () => {
+    const beginHistoryBatch = useCallback(async () => {
         if (bridgeRef.current) {
-            await bridgeRef.current.execute('history.lock');
+            const result = await bridgeRef.current.execute('history.beginBatch');
+            historyBatchActiveRef.current = result.success;
+            return result;
         }
+        return { success: false, error: 'editor bridge unavailable' };
     }, []);
 
-    const unlockHistory = useCallback(async () => {
+    const commitHistoryBatch = useCallback(async () => {
         if (bridgeRef.current) {
-            await bridgeRef.current.execute('history.unlock');
+            const result = await bridgeRef.current.execute('history.commitBatch');
+            if (result.success) {
+                historyBatchActiveRef.current = false;
+            }
+            return result;
         }
+        return { success: false, error: 'editor bridge unavailable' };
+    }, []);
+
+    const ensureHistoryBatch = useCallback(async () => {
+        if (historyBatchActiveRef.current) {
+            return { success: true };
+        }
+        return beginHistoryBatch();
+    }, [beginHistoryBatch]);
+
+    const discardHistoryBatch = useCallback(async () => {
+        if (bridgeRef.current) {
+            const result = await bridgeRef.current.execute('history.discardBatch');
+            if (result.success) {
+                historyBatchActiveRef.current = false;
+            }
+            return result;
+        }
+        return { success: false, error: 'editor bridge unavailable' };
     }, []);
 
     const cancelRun = useCallback(async () => {
@@ -148,11 +177,13 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         setProgressText('已取消');
         setCurrentPlan(null);
         setBlockStatuses({});
-        await unlockHistory();
-        if (preGenerationSchemaRef.current && bridgeRef.current) {
+        const discardResult = historyBatchActiveRef.current
+            ? await discardHistoryBatch()
+            : { success: true };
+        if (!discardResult.success && preGenerationSchemaRef.current && bridgeRef.current) {
             await bridgeRef.current.execute('schema.restore', { schema: preGenerationSchemaRef.current });
         }
-    }, [unlockHistory]);
+    }, [discardHistoryBatch]);
 
     const runAgent = useCallback(
         async (
@@ -173,15 +204,16 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             setProgressText('初始化...');
             setCurrentPlan(null);
             setBlockStatuses({});
+            currentIntentRef.current = null;
 
             const ac = new AbortController();
             abortControllerRef.current = ac;
 
             // Pre-run setup
             preGenerationSchemaRef.current = bridgeRef.current.getSchema();
-            await lockHistory();
+            const currentSchema = bridgeRef.current.getSchema();
 
-            const schemaSummary = summarizeSchema(bridgeRef.current.getSchema());
+            const schemaSummary = summarizeSchema(currentSchema);
             const componentSummary = summarizeComponents(bridgeRef.current.getAvailableComponents());
             const selectedNodeId = bridgeRef.current.getSelectedNodeId();
 
@@ -195,6 +227,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                 context: {
                     schemaSummary,
                     componentSummary,
+                    schemaJson: currentSchema,
                 },
             };
 
@@ -210,6 +243,16 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                     switch (event.type) {
                         case 'run:start':
                             setProgressText('运行开始');
+                            break;
+                        case 'intent':
+                            currentIntentRef.current = event.data.intent;
+                            setProgressText(
+                                event.data.intent === 'schema.modify'
+                                    ? '识别为页面修改任务'
+                                    : event.data.intent === 'schema.create'
+                                        ? '识别为页面生成任务'
+                                        : '识别为对话任务'
+                            );
                             break;
                         case 'message:start':
                             activeMessageId = onMessageStart();
@@ -233,6 +276,12 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             setProgressText('获取到架构计划');
                             break;
                         case 'schema:skeleton':
+                            {
+                                const batchResult = await ensureHistoryBatch();
+                                if (!batchResult.success) {
+                                    throw new Error(batchResult.error || 'history.beginBatch failed');
+                                }
+                            }
                             setProgressText('渲染页面骨架');
                             bridgeRef.current?.replaceSchema(event.data.schema);
                             break;
@@ -244,6 +293,12 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             setProgressText(`正在生成区块: ${event.data.description}`);
                             break;
                         case 'schema:block':
+                            {
+                                const batchResult = await ensureHistoryBatch();
+                                if (!batchResult.success) {
+                                    throw new Error(batchResult.error || 'history.beginBatch failed');
+                                }
+                            }
                             setProgressText(`正在替换区块: ${event.data.node.component}`);
                             if (bridgeRef.current) {
                                 const nextSchema = replaceSkeletonNode(
@@ -259,11 +314,41 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             }));
                             break;
                         case 'schema:done':
+                            {
+                                const batchResult = await ensureHistoryBatch();
+                                if (!batchResult.success) {
+                                    throw new Error(batchResult.error || 'history.beginBatch failed');
+                                }
+                            }
                             setProgressText('更新页面 Schema');
                             bridgeRef.current?.replaceSchema(event.data.schema);
                             setBlockStatuses((prev) => Object.fromEntries(
                                 Object.keys(prev).map((blockId) => [blockId, 'done' as const])
                             ));
+                            break;
+                        case 'modify:start':
+                            {
+                                const batchResult = await ensureHistoryBatch();
+                                if (!batchResult.success) {
+                                    throw new Error(batchResult.error || 'history.beginBatch failed');
+                                }
+                            }
+                            setProgressText(`准备执行 ${event.data.operationCount} 个修改`);
+                            break;
+                        case 'modify:op':
+                            setProgressText(`执行修改 ${event.data.index + 1}`);
+                            if (!bridgeRef.current) {
+                                throw new Error('editor bridge unavailable');
+                            }
+                            {
+                                const result = await executeAgentOperation(bridgeRef.current, event.data.operation);
+                                if (!result.success) {
+                                    throw new Error(result.error || `modify operation ${event.data.index + 1} failed`);
+                                }
+                            }
+                            break;
+                        case 'modify:done':
+                            setProgressText('页面修改已应用');
                             break;
                         case 'done':
                             onDone(event.data.metadata);
@@ -281,11 +366,16 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                 if (!ac.signal.aborted) {
                     setIsRunning(false);
                     setProgressText('');
-                    await unlockHistory();
+                    if (historyBatchActiveRef.current) {
+                        const commitResult = await commitHistoryBatch();
+                        if (!commitResult.success) {
+                            onError(commitResult.error || 'history.commitBatch failed');
+                        }
+                    }
                 }
             }
         },
-        [cancelRun, lockHistory, unlockHistory]
+        [cancelRun, commitHistoryBatch, ensureHistoryBatch]
     );
 
     return {
