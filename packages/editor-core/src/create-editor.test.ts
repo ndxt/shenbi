@@ -78,6 +78,9 @@ describe('createEditor', () => {
     expect(editor.commands.has('node.patchStyle')).toBe(true);
     expect(editor.commands.has('node.patchLogic')).toBe(true);
     expect(editor.commands.has('node.patchColumns')).toBe(true);
+    expect(editor.commands.has('history.beginBatch')).toBe(true);
+    expect(editor.commands.has('history.commitBatch')).toBe(true);
+    expect(editor.commands.has('history.discardBatch')).toBe(true);
     expect(editor.commands.has('file.listSchemas')).toBe(true);
     expect(editor.commands.has('file.openSchema')).toBe(true);
     expect(editor.commands.has('file.saveSchema')).toBe(true);
@@ -287,6 +290,82 @@ describe('createEditor', () => {
     expect(editor.state.getSchema()).toBe(initialSchema);
     expect(editor.state.getIsDirty()).toBe(false);
     expect(editor.history.getSize()).toBe(0);
+  });
+
+  it('history batch merges multiple operations into one undo point', async () => {
+    const editor = createEditor({
+      initialSchema: {
+        id: 'batch-id',
+        name: 'batch-target',
+        body: [
+          { id: 'a', component: 'Text', props: { text: 'A' } },
+          { id: 'b', component: 'Text', props: { text: 'B' } },
+        ],
+      },
+      fileStorage: createMemoryStorage(),
+    });
+
+    await editor.commands.execute('history.beginBatch');
+    await editor.commands.execute('node.patchProps', {
+      treeId: 'body.0',
+      patch: { text: 'A1' },
+    });
+    await editor.commands.execute('node.remove', { treeId: 'body.1' });
+    await editor.commands.execute('history.commitBatch');
+
+    expect(editor.history.getSize()).toBe(1);
+    expect(editor.state.getSchema().body).toEqual([
+      { id: 'a', component: 'Text', props: { text: 'A1' } },
+    ]);
+
+    await editor.commands.execute('editor.undo');
+    expect(editor.state.getSchema().body).toEqual([
+      { id: 'a', component: 'Text', props: { text: 'A' } },
+      { id: 'b', component: 'Text', props: { text: 'B' } },
+    ]);
+  });
+
+  it('history.discardBatch restores the pre-batch snapshot', async () => {
+    const initialSchema = createSchemaWithCard('discard-target');
+    const editor = createEditor({
+      initialSchema,
+      fileStorage: createMemoryStorage(),
+    });
+
+    await editor.commands.execute('history.beginBatch');
+    await editor.commands.execute('node.patchProps', {
+      treeId: 'body.0',
+      patch: { title: 'changed' },
+    });
+    await editor.commands.execute('history.discardBatch');
+
+    expect(editor.state.getSchema()).toEqual(initialSchema);
+    expect(editor.history.getSize()).toBe(0);
+    expect(editor.state.getIsDirty()).toBe(false);
+  });
+
+  it('editor.undo and editor.redo are disabled while history batch is locked', async () => {
+    const editor = createEditor({
+      initialSchema: createSchemaWithCard('locked-undo'),
+      fileStorage: createMemoryStorage(),
+    });
+
+    await editor.commands.execute('node.patchProps', {
+      treeId: 'body.0',
+      patch: { title: 'changed-once' },
+    });
+    await editor.commands.execute('history.beginBatch');
+    await editor.commands.execute('editor.undo');
+    await editor.commands.execute('editor.redo');
+
+    expect(editor.state.getSchema().body).toEqual([
+      {
+        id: 'card-1',
+        component: 'Card',
+        props: { title: 'changed-once' },
+      },
+    ]);
+    expect(editor.history.isLocked()).toBe(true);
   });
 
   it('saveAs clears dirty flag after node patch', async () => {

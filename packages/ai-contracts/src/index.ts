@@ -4,6 +4,21 @@ export interface ThinkingConfig {
   type: 'enabled' | 'disabled';
 }
 
+export type AgentIntent =
+  | 'schema.create'
+  | 'schema.modify'
+  | 'chat';
+
+export type AgentOperation =
+  | { op: 'schema.patchProps'; nodeId: string; patch: Record<string, unknown> }
+  | { op: 'schema.patchStyle'; nodeId: string; patch: Record<string, unknown> }
+  | { op: 'schema.patchEvents'; nodeId: string; patch: Record<string, unknown> }
+  | { op: 'schema.patchLogic'; nodeId: string; patch: Record<string, unknown> }
+  | { op: 'schema.patchColumns'; nodeId: string; columns: unknown }
+  | { op: 'schema.insertNode'; parentId: string; index?: number; node: SchemaNode }
+  | { op: 'schema.removeNode'; nodeId: string }
+  | { op: 'schema.replace'; schema: PageSchema };
+
 export type PageType = 'dashboard' | 'list' | 'form' | 'detail' | 'statistics' | 'custom';
 
 export type LayoutRow =
@@ -20,6 +35,8 @@ export interface RunRequest {
   context: {
     schemaSummary: string;
     componentSummary: string;
+    schemaJson?: PageSchema;
+    workspaceFileIds?: string[];
   };
 }
 
@@ -47,13 +64,22 @@ export interface PagePlan {
   }>;
 }
 
+export interface ModifyResult {
+  explanation: string;
+  operations: AgentOperation[];
+}
+
 export type AgentEvent =
   | { type: 'run:start'; data: { sessionId: string; conversationId?: string } }
+  | { type: 'intent'; data: { intent: AgentIntent; confidence: number } }
   | { type: 'message:start'; data: { role: 'assistant' } }
   | { type: 'message:delta'; data: { text: string } }
   | { type: 'tool:start'; data: { tool: string; label?: string } }
   | { type: 'tool:result'; data: { tool: string; ok: boolean; summary?: string } }
   | { type: 'plan'; data: PagePlan }
+  | { type: 'modify:start'; data: { operationCount: number; explanation: string } }
+  | { type: 'modify:op'; data: { index: number; operation: AgentOperation } }
+  | { type: 'modify:done'; data: {} }
   | { type: 'schema:skeleton'; data: { schema: PageSchema } }
   | { type: 'schema:block:start'; data: { blockId: string; description: string } }
   | { type: 'schema:block'; data: { blockId: string; node: SchemaNode } }

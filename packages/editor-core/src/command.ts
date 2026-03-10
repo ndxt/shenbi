@@ -62,10 +62,12 @@ export class CommandManager {
 
       if (isRootExecution) {
         const afterSnapshot = this.state.getSnapshot();
-        const shouldRecordHistory = command.recordHistory !== false
-          && beforeSnapshot
-          && !snapshotsEqual(beforeSnapshot, afterSnapshot);
-        if (shouldRecordHistory) {
+        const stateChanged = Boolean(beforeSnapshot && !snapshotsEqual(beforeSnapshot, afterSnapshot));
+        if (this.history.isLocked()) {
+          if (stateChanged) {
+            this.history.push(afterSnapshot);
+          }
+        } else if (command.recordHistory !== false && stateChanged) {
           this.history.push(afterSnapshot);
           this.eventBus.emit('history:pushed', undefined);
         }

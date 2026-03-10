@@ -117,4 +117,43 @@ describe('CommandManager', () => {
     await commands.execute('noop');
     expect(executed).toHaveBeenCalledWith({ commandId: 'noop' });
   });
+
+  it('syncs history current state for locked commands even when recordHistory is false', async () => {
+    const { state, commands, history } = createFixture();
+    commands.register({
+      id: 'node.insertAt',
+      label: 'Insert Node',
+      recordHistory: false,
+      execute(currentState) {
+        currentState.setSchema(createSchema('batched'));
+      },
+    });
+
+    history.lock();
+    await commands.execute('node.insertAt');
+
+    expect(history.getCurrent().schema.name).toBe('batched');
+    expect(history.getSize()).toBe(0);
+    expect(state.getSchema().name).toBe('batched');
+    expect(history.isBatchDirty()).toBe(true);
+  });
+
+  it('does not emit history:pushed for locked commands before batch commit', async () => {
+    const { commands, eventBus, history } = createFixture();
+    const pushed = vi.fn();
+    eventBus.on('history:pushed', pushed);
+    commands.register({
+      id: 'schema.lockedChange',
+      label: 'Locked Change',
+      execute(currentState) {
+        currentState.setSchema(createSchema('locked'));
+      },
+    });
+
+    history.lock();
+    await commands.execute('schema.lockedChange');
+
+    expect(pushed).not.toHaveBeenCalled();
+    expect(history.getSize()).toBe(0);
+  });
 });
