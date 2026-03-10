@@ -5,6 +5,7 @@
 import {
   createInMemoryAgentMemoryStore,
   createToolRegistry,
+  formatConversationHistory,
   type LayoutRow,
   runAgent,
   runAgentStream,
@@ -51,6 +52,7 @@ import {
   expandComponents,
   getFullComponentContracts,
 } from './component-catalog.ts';
+import { executeModifySchema, type ModifySchemaTraceEntry } from './modify-schema.ts';
 import type { AgentRuntime } from './types.ts';
 
 const memory = createInMemoryAgentMemoryStore();
@@ -92,6 +94,7 @@ interface RunTraceRecord {
     retryNormalizedNode?: GenerateBlockResult['node'];
     retrySanitizationDiagnostics?: SanitizationDiagnostic[];
   }>;
+  modify?: ModifySchemaTraceEntry;
   finalSchema?: PageSchema;
   error?: {
     message: string;
@@ -1292,6 +1295,8 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
   const suggestedSkeletonSummary = getPageSkeletonSummary(suggestedPageType);
   const freeLayoutPatternSummary = getFreeLayoutPatternSummary(suggestedPageType);
   const skeleton = getPageSkeleton(suggestedPageType);
+  const conversationHistory = formatConversationHistory(input.context.conversation.history);
+  const documentTree = input.context.document.tree ?? '[schema tree unavailable]';
   return [
     {
       role: 'system',
@@ -1353,8 +1358,12 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
       role: 'user',
       content: [
         `Prompt: ${input.request.prompt}`,
-        `Schema Summary: ${input.context.schemaSummary}`,
+        `Schema Summary: ${input.context.document.summary}`,
+        'Schema Tree:',
+        documentTree,
         `Component Summary: ${input.context.componentSummary}`,
+        'Conversation History:',
+        conversationHistory,
         `Selected Node: ${input.context.selectedNodeId ?? 'none'}`,
         'Your response must start with { and end with }. No other text.',
       ].join('\n'),
@@ -1370,6 +1379,8 @@ function createBlockMessages(
   const componentSchemaContracts = getFullComponentContracts(expandedComponents);
   const isDashboardBlock = classifyPromptToPageType(input.request.prompt) === 'dashboard';
   const isMasterListRegion = isMasterListBlock(input) || isMasterDetailPrompt(input.request.prompt);
+  const conversationHistory = formatConversationHistory(input.context.conversation.history);
+  const documentTree = input.context.document.tree ?? '[schema tree unavailable]';
   const qualityFeedbackSummary = qualityFeedback.length > 0
     ? [
       'Targeted quality corrections for this retry:',
@@ -1448,6 +1459,10 @@ function createBlockMessages(
         `Placement: ${input.placementSummary ?? '默认纵向堆叠区域'}`,
         `Block Description: ${input.block.description}`,
         `Suggested Components: ${input.block.components.join(', ')}`,
+        'Schema Tree:',
+        documentTree,
+        'Conversation History:',
+        conversationHistory,
         ...(qualityFeedbackSummary ? [qualityFeedbackSummary] : []),
         'Your response must start with { and end with }. No other text.',
       ].join('\n'),
@@ -1705,6 +1720,12 @@ function createRuntimeDeps(trace?: RunTraceRecord): AgentRuntimeDeps {
       },
     },
     tools: createToolRegistry([
+      {
+        name: 'modifySchema',
+        async execute(input: unknown) {
+          return executeModifySchema(input as import('@shenbi/ai-agents').ModifySchemaInput, trace);
+        },
+      },
       {
         name: 'planPage',
         async execute(input: unknown) {
