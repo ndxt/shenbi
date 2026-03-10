@@ -1,0 +1,71 @@
+import { describe, expect, it } from 'vitest';
+import type { PageSchema } from '@shenbi/schema';
+import type { BuildContextInput } from '../types';
+import { buildRuntimeContext } from './build-context';
+
+const schema: PageSchema = {
+  id: 'page-1',
+  name: 'Users',
+  body: [
+    {
+      id: 'card-1',
+      component: 'Card',
+      props: { title: '用户统计' },
+    },
+  ],
+};
+
+function createInput(): BuildContextInput {
+  return {
+    request: {
+      prompt: '把标题改成活跃用户',
+      selectedNodeId: 'card-1',
+      context: {
+        schemaSummary: 'pageId=page-1; nodeCount=1',
+        componentSummary: 'Card',
+        schemaJson: schema,
+        workspaceFileIds: ['page-1.json'],
+      },
+    },
+    conversation: [
+      { role: 'user', text: '生成一个用户页面' },
+      {
+        role: 'assistant',
+        text: '已生成用户页面。',
+        meta: {
+          operations: [{ op: 'schema.replace', schema }],
+        },
+      },
+      { role: 'user', text: '再给我加一个统计卡片' },
+      {
+        role: 'assistant',
+        text: '已添加统计卡片。',
+        meta: {
+          operations: [{ op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '活跃用户' } }],
+        },
+      },
+    ],
+    lastRunMetadata: { sessionId: 'session-1' },
+    lastBlockIds: ['hero'],
+  };
+}
+
+describe('buildRuntimeContext', () => {
+  it('builds structured document and conversation context', () => {
+    const context = buildRuntimeContext(createInput());
+
+    expect(context.prompt).toBe('把标题改成活跃用户');
+    expect(context.selectedNodeId).toBe('card-1');
+    expect(context.document.exists).toBe(true);
+    expect(context.document.summary).toContain('pageId=page-1');
+    expect(context.document.schema).toEqual(schema);
+    expect(context.document.tree).toContain('Card#card-1(title="用户统计")');
+    expect(context.componentSummary).toBe('Card');
+    expect(context.conversation.turnCount).toBe(2);
+    expect(context.conversation.history).toHaveLength(4);
+    expect(context.conversation.lastOperations).toEqual([
+      { op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '活跃用户' } },
+    ]);
+    expect(context.lastBlockIds).toEqual(['hero']);
+  });
+});

@@ -8,6 +8,20 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+function isSchemaNodeLike(value: unknown): boolean {
+  return isRecord(value) && typeof value['component'] === 'string';
+}
+
+function isPageSchemaLike(value: unknown): boolean {
+  if (!isRecord(value) || !('body' in value)) {
+    return false;
+  }
+  const body = value['body'];
+  return Array.isArray(body)
+    ? body.every((item) => isSchemaNodeLike(item))
+    : isSchemaNodeLike(body);
+}
+
 export function validateRunRequest(body: unknown): RunRequest {
   if (!isRecord(body)) {
     throw new ValidationError('Request body must be a JSON object');
@@ -38,6 +52,20 @@ export function validateRunRequest(body: unknown): RunRequest {
       componentSummary: ctx['componentSummary'],
     },
   };
+
+  if (ctx['schemaJson'] !== undefined) {
+    if (!isPageSchemaLike(ctx['schemaJson'])) {
+      throw new ValidationError('context.schemaJson must be a valid PageSchema');
+    }
+    req.context.schemaJson = ctx['schemaJson'] as NonNullable<RunRequest['context']['schemaJson']>;
+  }
+
+  if (ctx['workspaceFileIds'] !== undefined) {
+    if (!Array.isArray(ctx['workspaceFileIds']) || !ctx['workspaceFileIds'].every((item) => typeof item === 'string')) {
+      throw new ValidationError('context.workspaceFileIds must be an array of strings');
+    }
+    req.context.workspaceFileIds = [...ctx['workspaceFileIds']];
+  }
 
   if (typeof body['plannerModel'] === 'string') req.plannerModel = body['plannerModel'];
   if (typeof body['blockModel'] === 'string') req.blockModel = body['blockModel'];
