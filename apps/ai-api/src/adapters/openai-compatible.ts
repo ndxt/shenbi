@@ -11,6 +11,7 @@ export interface OpenAICompatibleClientOptions {
   temperature?: number;
   thinkingModels?: string[];
   nonThinkingModels?: string[];
+  provider?: string;
 }
 
 export interface OpenAICompatibleThinking {
@@ -116,6 +117,7 @@ export class OpenAICompatibleClient {
   private readonly temperature: number;
   private readonly thinkingModels: ReadonlySet<string>;
   private readonly nonThinkingModels: ReadonlySet<string>;
+  private readonly provider?: string;
 
   constructor(options: OpenAICompatibleClientOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
@@ -123,6 +125,7 @@ export class OpenAICompatibleClient {
     this.temperature = options.temperature ?? 0.6;
     this.thinkingModels = new Set((options.thinkingModels ?? []).map((model) => normalizeModelName(model)));
     this.nonThinkingModels = new Set((options.nonThinkingModels ?? []).map((model) => normalizeModelName(model)));
+    this.provider = options.provider?.toLowerCase();
   }
 
   buildRequestDebugSummary(
@@ -143,12 +146,24 @@ export class OpenAICompatibleClient {
     };
   }
 
+  private shouldSendEnableThinking(): boolean {
+    return this.provider === 'qwen';
+  }
+
+  private buildEnableThinkingFlag(serializedThinking: OpenAICompatibleThinking | undefined): boolean | undefined {
+    if (!this.shouldSendEnableThinking()) {
+      return undefined;
+    }
+    return serializedThinking?.type === 'enabled';
+  }
+
   async chat(
     model: string,
     messages: OpenAICompatibleMessage[],
     thinking?: OpenAICompatibleThinking,
   ): Promise<string> {
     const serializedThinking = serializeThinking(model, this.thinkingModels, this.nonThinkingModels, thinking);
+    const enableThinking = this.buildEnableThinkingFlag(serializedThinking);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -163,6 +178,7 @@ export class OpenAICompatibleClient {
         response_format: {
           type: 'json_object',
         },
+        ...(typeof enableThinking === 'boolean' ? { enable_thinking: enableThinking } : {}),
         ...(serializedThinking ? { thinking: serializedThinking } : {}),
       }),
     });
@@ -185,6 +201,7 @@ export class OpenAICompatibleClient {
     thinking?: OpenAICompatibleThinking,
   ): AsyncIterable<{ text: string }> {
     const serializedThinking = serializeThinking(model, this.thinkingModels, this.nonThinkingModels, thinking);
+    const enableThinking = this.buildEnableThinkingFlag(serializedThinking);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -196,6 +213,7 @@ export class OpenAICompatibleClient {
         messages,
         temperature: this.temperature,
         stream: true,
+        ...(typeof enableThinking === 'boolean' ? { enable_thinking: enableThinking } : {}),
         ...(serializedThinking ? { thinking: serializedThinking } : {}),
       }),
     });

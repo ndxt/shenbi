@@ -135,7 +135,8 @@ export async function* pageBuilderOrchestrator(
   yield { type: 'schema:skeleton', data: { schema: skeletonSchema } };
 
   const blocks = new Map<string, GenerateBlockResult>();
-  const semaphore = createSemaphore(5);
+  const concurrency = Math.min(8, Math.max(1, request.blockConcurrency ?? 3));
+  const semaphore = createSemaphore(concurrency);
   const pending = new Map<string, PendingBlockTask>();
   for (const [index, block] of plan.blocks.entries()) {
     yield { type: 'schema:block:start', data: { blockId: block.id, description: block.description } };

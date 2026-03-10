@@ -1,9 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Square, Lightbulb, History } from 'lucide-react';
+import { Send, Square, Lightbulb, History, X } from 'lucide-react';
 
 export interface PromptOption {
     label: string;
     value: string;
+}
+
+interface DropdownItem {
+    label: string;
+    value: string;
+    title?: string;
+    onRemove?: (value: string) => void;
 }
 
 interface ChatInputProps {
@@ -17,6 +24,7 @@ interface ChatInputProps {
     promptHistory?: string[];
     onSelectPreset?: (text: string) => void;
     onSelectHistory?: (text: string) => void;
+    onRemoveHistory?: (text: string) => void;
 }
 
 // 简单的自定义 Popover/Menu 组件 — 使用 fixed 定位逃逸 overflow-hidden 祖先
@@ -29,7 +37,7 @@ function DropdownMenu({
 }: {
     icon: React.ElementType;
     label: string;
-    items: Array<{ label: string; value: string; title?: string }>;
+    items: DropdownItem[];
     onSelect: (val: string) => void;
     disabled?: boolean;
 }) {
@@ -94,20 +102,37 @@ function DropdownMenu({
                         <div className="px-3 py-2 text-text-secondary text-center" style={{ fontSize: '12px' }}>空</div>
                     ) : (
                         items.map((item, idx) => (
-                            <button
+                            <div
                                 key={idx}
-                                className="w-full text-left px-3 py-2 text-text-primary whitespace-normal break-words leading-relaxed border-b border-border-ide last:border-b-0 cursor-pointer"
-                                style={{ transition: 'background-color 0.15s ease', fontSize: '12px' }}
-                                title={item.title || item.value}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#27272a'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                                onClick={() => {
-                                    onSelect(item.value);
-                                    setOpen(false);
-                                }}
+                                className="flex items-center justify-between border-b border-border-ide last:border-b-0 px-3 py-2"
+                                style={{ fontSize: '12px' }}
                             >
-                                {item.label}
-                            </button>
+                                <button
+                                    type="button"
+                                    className="text-left text-text-primary whitespace-normal break-words leading-relaxed flex-1 pr-2"
+                                    style={{ transition: 'background-color 0.15s ease' }}
+                                    title={item.title || item.value}
+                                    onClick={() => {
+                                        onSelect(item.value);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    {item.label}
+                                </button>
+                                {item.onRemove && (
+                                    <button
+                                        type="button"
+                                        className="ml-2 text-text-secondary hover:text-text-primary"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            item.onRemove?.(item.value);
+                                        }}
+                                        title="删除"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                )}
+                            </div>
                         ))
                     )}
                 </div>
@@ -127,6 +152,7 @@ export function ChatInput({
     promptHistory = [],
     onSelectPreset,
     onSelectHistory,
+    onRemoveHistory,
 }: ChatInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -183,7 +209,11 @@ export function ChatInput({
                     <DropdownMenu
                         icon={History}
                         label="历史输入"
-                        items={promptHistory.map(h => ({ label: h, value: h }))}
+                        items={promptHistory.map((h) => ({
+                            label: h,
+                            value: h,
+                            onRemove: onRemoveHistory,
+                        }))}
                         onSelect={handleSelectHistory}
                         disabled={disabled || isRunning}
                     />

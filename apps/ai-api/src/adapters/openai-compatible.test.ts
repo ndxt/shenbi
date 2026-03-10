@@ -114,6 +114,52 @@ describe('OpenAICompatibleClient', () => {
     expect(body.thinking).toEqual({ type: 'enabled' });
   });
 
+  it('sends enable_thinking flag for qwen provider requests', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      choices: [
+        {
+          message: {
+            content: '{"ok":true}',
+          },
+        },
+      ],
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new OpenAICompatibleClient({
+      baseUrl: 'https://example.com/v1',
+      apiKey: 'test-key',
+      provider: 'qwen',
+    });
+
+    await client.chat('glm-4.7', [
+      { role: 'system', content: 'system prompt' },
+      { role: 'user', content: 'user prompt' },
+    ], { type: 'enabled' });
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as {
+      enable_thinking?: boolean;
+    };
+    expect(body.enable_thinking).toBe(true);
+
+    await client.chat('glm-4.7', [
+      { role: 'system', content: 'system prompt' },
+      { role: 'user', content: 'user prompt' },
+    ], { type: 'disabled' });
+
+    const [, secondInit] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+    const secondBody = JSON.parse(String(secondInit.body)) as {
+      enable_thinking?: boolean;
+    };
+    expect(secondBody.enable_thinking).toBe(false);
+  });
+
   it('builds a request summary that matches the serialized thinking behavior', () => {
     const client = new OpenAICompatibleClient({
       baseUrl: 'https://example.com/v1',

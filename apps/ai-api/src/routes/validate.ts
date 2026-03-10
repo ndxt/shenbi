@@ -52,5 +52,12 @@ export function validateRunRequest(body: unknown): RunRequest {
     }
   }
 
+  if (typeof body['blockConcurrency'] === 'number') {
+    const c = Math.floor(body['blockConcurrency']);
+    if (c >= 1 && c <= 8) {
+      req.blockConcurrency = c;
+    }
+  }
+
   return req;
 }

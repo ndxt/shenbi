@@ -953,6 +953,7 @@ function createClient(providerName?: string): OpenAICompatibleClient {
     apiKey: config.apiKey,
     ...(config.thinkingModels ? { thinkingModels: config.thinkingModels } : {}),
     ...(config.nonThinkingModels ? { nonThinkingModels: config.nonThinkingModels } : {}),
+    provider: config.provider,
   });
   clientCache.set(config.provider, client);
   return client;
