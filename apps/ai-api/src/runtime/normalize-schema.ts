@@ -757,7 +757,7 @@ function normalizeNodeProps(node: SchemaNode): void {
       if (isNodeLike(col.title) || Array.isArray(col.title)) {
         col.title = flattenToText(col.title) || `列${index + 1}`;
       }
-      if (isNodeLike(col.render) || Array.isArray(col.render) || typeof col.render === 'object') {
+      if (isNodeLike(col.render) || Array.isArray(col.render) || (typeof col.render === 'object' && !isJsFunctionValue(col.render))) {
         delete col.render;
       }
       if (isNodeLike(col.editRender) || Array.isArray(col.editRender) || typeof col.editRender === 'object') {
