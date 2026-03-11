@@ -543,6 +543,8 @@ function createPlanMessages(input: ModifySchemaInput): OpenAICompatibleMessage[]
         '- explanation should be a short Chinese sentence summarizing what will change.',
         '- Do not invent node ids that are not grounded in the schema tree.',
         '- For insertNode: always provide description (Chinese) and components array. Do NOT generate the full node JSON yourself.',
+        '- Layout/style commands (e.g. "fill space", "center", "stretch") may require modifying a PARENT container (Col, Row, Container, Flex) rather than the focused node itself. Analyze the schema tree to find the correct node.',
+
       ].join('\n'),
     },
     {

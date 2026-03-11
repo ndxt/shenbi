@@ -8,8 +8,8 @@ import { createSchemaDigest, type AgentIntent, type PagePlan, type RunMetadata, 
 export type PlanConfig = PagePlan;
 export type BlockRunStatus = 'waiting' | 'generating' | 'done';
 
-const MODIFY_INTENT_PATTERN = /修改|调整|删除|添加|增加|替换|移动|隐藏|显示|改成|换成|update|change|remove|delete|insert|add|replace|move|hide|show/i;
-const CREATE_INTENT_PATTERN = /生成|创建|新建|搭建|做一个|做个|产出|生成一个|build|create|generate/i;
+
+
 
 function isSchemaNode(value: unknown): value is SchemaNode {
     return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
@@ -136,15 +136,8 @@ function resolveSelectedNodeId(schema: PageSchema, rawId: string | undefined): s
     return undefined;
 }
 
-function resolveRequestedIntent(prompt: string, hasDocument: boolean): AgentIntent {
-    if (hasDocument && MODIFY_INTENT_PATTERN.test(prompt)) {
-        return 'schema.modify';
-    }
-    if (!hasDocument || CREATE_INTENT_PATTERN.test(prompt)) {
-        return 'schema.create';
-    }
-    return 'chat';
-}
+
+
 
 export function useAgentRun(bridge: EditorAIBridge | undefined) {
     const [isRunning, setIsRunning] = useState(false);
@@ -268,7 +261,6 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             preGenerationSchemaRef.current = bridgeRef.current.getSchema();
             const currentSchema = bridgeRef.current.getSchema();
 
-            const requestedIntent = resolveRequestedIntent(prompt, hasSchemaContent(currentSchema));
             const schemaSummary = summarizeSchema(currentSchema);
             const componentSummary = summarizeComponents(bridgeRef.current.getAvailableComponents());
             const rawSelectedNodeId = bridgeRef.current.getSelectedNodeId();
@@ -276,7 +268,6 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
 
             const request: RunRequest = {
                 prompt,
-                intent: requestedIntent,
                 ...(conversationId ? { conversationId } : {}),
                 ...(selectedNodeId ? { selectedNodeId } : {}),
                 ...(plannerModel ? { plannerModel } : {}),

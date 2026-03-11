@@ -120,7 +120,7 @@ describe('runAgentStream', () => {
     ]);
     expect(events[1]).toEqual({
       type: 'intent',
-      data: { intent: 'schema.modify', confidence: 1 },
+      data: { intent: 'schema.modify', confidence: 0.9 },
     });
 
     const runStart = events.find((event) => event.type === 'run:start');
@@ -277,7 +277,7 @@ describe('runAgentStream', () => {
 
     expect(events[1]).toEqual({
       type: 'intent',
-      data: { intent: 'schema.create', confidence: 1 },
+      data: { intent: 'schema.create', confidence: 0.85 },
     });
     expect(events.some((event) => event.type === 'plan')).toBe(true);
   });
@@ -317,7 +317,7 @@ describe('runAgentStream', () => {
 
     expect(events[1]).toEqual({
       type: 'intent',
-      data: { intent: 'chat', confidence: 0.85 },
+      data: { intent: 'chat', confidence: 0.9 },
     });
     expect(events.some((event) => event.type === 'modify:start')).toBe(false);
     expect(events.some((event) => event.type === 'message:delta')).toBe(true);
@@ -363,8 +363,8 @@ describe('runAgentStream', () => {
 
     const events = [];
     for await (const event of runAgentStream({
+      // No selectedNodeId + vague prompt → rule gives chat 0.4 → LLM tool is invoked
       prompt: '帮我处理一下当前页面',
-      selectedNodeId: 'card-1',
       conversationId: 'classify-tool-conv',
       context: {
         schemaSummary: 'pageId=page-1; nodeCount=1',

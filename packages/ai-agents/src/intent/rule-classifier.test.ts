@@ -31,10 +31,10 @@ describe('classifyIntentByRules', () => {
     expect(classifyIntentByRules(createContext({
       prompt: '把当前卡片标题改成活跃用户',
       selectedNodeId: 'card-1',
-    }))).toEqual({ intent: 'schema.modify', confidence: 0.85 });
+    }))).toEqual({ intent: 'schema.modify', confidence: 0.9 });
   });
 
   it('uses chat as the default when no other signal is present', () => {
-    expect(classifyIntentByRules(createContext())).toEqual({ intent: 'chat', confidence: 0.5 });
+    expect(classifyIntentByRules(createContext())).toEqual({ intent: 'chat', confidence: 0.4 });
   });
 });

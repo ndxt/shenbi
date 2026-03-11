@@ -23,15 +23,15 @@ async function classifyIntent(
   context: AgentRuntimeContext,
   deps: AgentRuntimeDeps,
 ): Promise<{ intent: AgentIntent; confidence: number }> {
-  if (request.intent === 'schema.modify' && request.context.schemaJson && hasModifyTool(deps)) {
-    return { intent: 'schema.modify', confidence: 1 };
+  // Step 1: Rule-based classification — fast, zero-cost
+  const ruleResult = classifyIntentByRules(context);
+
+  // High-confidence rule result: skip LLM to save latency
+  if (ruleResult.confidence >= 0.85) {
+    return ruleResult;
   }
-  if (request.intent === 'schema.create' && hasPageBuilderTools(deps)) {
-    return { intent: 'schema.create', confidence: 1 };
-  }
-  if (request.intent === 'chat') {
-    return { intent: 'chat', confidence: 1 };
-  }
+
+  // Step 2: LLM classification — handles ambiguous prompts
   const classifyIntentTool = deps.tools.get('classifyIntent');
   if (classifyIntentTool) {
     try {
@@ -57,8 +57,11 @@ async function classifyIntent(
       });
     }
   }
-  return classifyIntentByRules(context);
+
+  // Step 3: Fall back to rule result
+  return ruleResult;
 }
+
 
 function createDefaultRegistry() {
   const registry = createOrchestratorRegistry();
