@@ -547,7 +547,8 @@ function createPlanMessages(input: ModifySchemaInput): OpenAICompatibleMessage[]
         '- explanation should be a short Chinese sentence summarizing what will change.',
         '- Do not invent node ids that are not grounded in the schema tree.',
         '- For insertNode: always provide description (Chinese) and components array. Do NOT generate the full node JSON yourself.',
-        '- Layout/style commands (e.g. "fill space", "center", "stretch") may require modifying a PARENT container (Col, Row, Container, Flex) rather than the focused node itself. Analyze the schema tree to find the correct node.',
+        '- Layout/style commands that mean "fill remaining space", "center", "stretch full width" may require modifying a PARENT container (Col, Row, Container, Flex). Analyze the schema tree to find the correct node.',
+        '- IMPORTANT: When user refers to "左边(left)", "右边(right)", "标签(label)", "宽度(width)" while focused on a specific component (e.g. Timeline, Table, Card), FIRST try to solve it within or on that focused node using schema.patchStyle (e.g. CSS variables like --ant-timeline-item-label-width). Only go to parent layout nodes if the focused node itself has no relevant style or prop to modify.',
 
       ].join('\n'),
     },
