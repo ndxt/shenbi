@@ -17,6 +17,7 @@ export function useChatSession(persistence?: PluginPersistenceService) {
     const [conversationId, setConversationId] = useState<string | undefined>();
     const [activeRunId, setActiveRunId] = useState<string | undefined>();
     const [lastMetadata, setLastMetadata] = useState<RunMetadata | undefined>();
+    const [lastDebugFile, setLastDebugFile] = useState<string | undefined>();
     const [sessionHydrated, setSessionHydrated] = useState(!persistence);
 
     useEffect(() => {
@@ -33,6 +34,7 @@ export function useChatSession(persistence?: PluginPersistenceService) {
                 messages?: ChatMessage[];
                 conversationId?: string;
                 lastMetadata?: RunMetadata;
+                lastDebugFile?: string;
             }>(PERSISTENCE_NAMESPACE, PERSISTENCE_KEY)
             .then((storedState) => {
                 if (cancelled || !storedState) {
@@ -41,6 +43,7 @@ export function useChatSession(persistence?: PluginPersistenceService) {
                 setMessages(storedState.messages ?? []);
                 setConversationId(storedState.conversationId);
                 setLastMetadata(storedState.lastMetadata);
+                setLastDebugFile(storedState.lastDebugFile);
             })
             .catch(() => undefined)
             .finally(() => {
@@ -64,9 +67,10 @@ export function useChatSession(persistence?: PluginPersistenceService) {
                 messages,
                 conversationId,
                 lastMetadata,
+                lastDebugFile,
             })
             .catch(() => undefined);
-    }, [conversationId, lastMetadata, messages, persistence, sessionHydrated]);
+    }, [conversationId, lastDebugFile, lastMetadata, messages, persistence, sessionHydrated]);
 
     const addMessage = useCallback((msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
         const id = Date.now().toString() + Math.random().toString(36).slice(2, 6);
@@ -85,6 +89,7 @@ export function useChatSession(persistence?: PluginPersistenceService) {
         setConversationId(undefined);
         setActiveRunId(undefined);
         setLastMetadata(undefined);
+        setLastDebugFile(undefined);
     }, []);
 
     return {
@@ -97,6 +102,8 @@ export function useChatSession(persistence?: PluginPersistenceService) {
         setActiveRunId,
         lastMetadata,
         setLastMetadata,
+        lastDebugFile,
+        setLastDebugFile,
         resetSession,
     };
 }
