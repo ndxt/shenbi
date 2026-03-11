@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PageSchema } from '@shenbi/schema';
+import { createSchemaDigest } from '@shenbi/ai-contracts';
 import type { BuildContextInput } from '../types';
 import { buildRuntimeContext } from './build-context';
 
@@ -33,6 +34,7 @@ function createInput(): BuildContextInput {
         role: 'assistant',
         text: '已生成用户页面。',
         meta: {
+          schemaDigest: createSchemaDigest(schema),
           operations: [{ op: 'schema.replace', schema }],
         },
       },
@@ -41,6 +43,7 @@ function createInput(): BuildContextInput {
         role: 'assistant',
         text: '已添加统计卡片。',
         meta: {
+          schemaDigest: createSchemaDigest(schema),
           operations: [{ op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '活跃用户' } }],
         },
       },
@@ -59,6 +62,7 @@ describe('buildRuntimeContext', () => {
     expect(context.document.exists).toBe(true);
     expect(context.document.summary).toContain('pageId=page-1');
     expect(context.document.schema).toEqual(schema);
+    expect(context.document.schemaDigest).toBe(createSchemaDigest(schema));
     expect(context.document.tree).toContain('Card#card-1(title="用户统计")');
     expect(context.componentSummary).toBe('Card');
     expect(context.conversation.turnCount).toBe(2);
@@ -86,5 +90,24 @@ describe('buildRuntimeContext', () => {
     });
 
     expect(context.document.exists).toBe(false);
+  });
+
+  it('ignores stale operation history when schema digest no longer matches', () => {
+    const context = buildRuntimeContext({
+      ...createInput(),
+      conversation: [
+        { role: 'user', text: '把标题改成活跃用户' },
+        {
+          role: 'assistant',
+          text: '已修改标题。',
+          meta: {
+            schemaDigest: 'fnv1a-deadbeef',
+            operations: [{ op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '活跃用户' } }],
+          },
+        },
+      ],
+    });
+
+    expect(context.conversation.lastOperations).toBeUndefined();
   });
 });

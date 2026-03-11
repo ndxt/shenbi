@@ -122,6 +122,12 @@ export function validateFinalizeRequest(body: unknown): FinalizeRequest {
     }
     request.error = body['error'];
   }
+  if (body['schemaDigest'] !== undefined) {
+    if (typeof body['schemaDigest'] !== 'string' || body['schemaDigest'].trim() === '') {
+      throw new ValidationError('schemaDigest must be a non-empty string');
+    }
+    request.schemaDigest = body['schemaDigest'];
+  }
 
   return request;
 }

@@ -106,6 +106,7 @@ export interface AgentRuntimeContext {
     summary: string;
     tree?: string;
     schema?: PageSchema;
+    schemaDigest?: string;
   };
   componentSummary: string;
   conversation: {

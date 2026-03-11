@@ -1303,7 +1303,9 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
   const suggestedSkeletonSummary = getPageSkeletonSummary(suggestedPageType);
   const freeLayoutPatternSummary = getFreeLayoutPatternSummary(suggestedPageType);
   const skeleton = getPageSkeleton(suggestedPageType);
-  const conversationHistory = formatConversationHistory(input.context.conversation.history);
+  const conversationHistory = formatConversationHistory(input.context.conversation.history, {
+    ...(input.context.document.schemaDigest ? { schemaDigest: input.context.document.schemaDigest } : {}),
+  });
   const documentTree = input.context.document.tree ?? '[schema tree unavailable]';
   return [
     {
@@ -1387,7 +1389,9 @@ function createBlockMessages(
   const componentSchemaContracts = getFullComponentContracts(expandedComponents);
   const isDashboardBlock = classifyPromptToPageType(input.request.prompt) === 'dashboard';
   const isMasterListRegion = isMasterListBlock(input) || isMasterDetailPrompt(input.request.prompt);
-  const conversationHistory = formatConversationHistory(input.context.conversation.history);
+  const conversationHistory = formatConversationHistory(input.context.conversation.history, {
+    ...(input.context.document.schemaDigest ? { schemaDigest: input.context.document.schemaDigest } : {}),
+  });
   const documentTree = input.context.document.tree ?? '[schema tree unavailable]';
   const qualityFeedbackSummary = qualityFeedback.length > 0
     ? [
@@ -1883,7 +1887,19 @@ export const agentRuntime: AgentRuntime = {
   },
 
   async finalize(request: FinalizeRequest) {
-    if (request.success || typeof memory.patchAssistantMessage !== 'function') {
+    if (typeof memory.patchAssistantMessage !== 'function') {
+      return;
+    }
+
+    if (request.success) {
+      if (!request.schemaDigest) {
+        return;
+      }
+      await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
+        meta: {
+          schemaDigest: request.schemaDigest,
+        },
+      });
       return;
     }
 
@@ -1897,6 +1913,7 @@ export const agentRuntime: AgentRuntime = {
       text: nextText,
       meta: {
         failed: true,
+        ...(request.schemaDigest ? { schemaDigest: request.schemaDigest } : {}),
       },
       clearOperations: true,
     });

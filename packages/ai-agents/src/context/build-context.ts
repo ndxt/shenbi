@@ -1,3 +1,4 @@
+import { createSchemaDigest } from '@shenbi/ai-contracts';
 import type { AgentRuntimeContext, BuildContextInput } from '../types';
 import { serializeSchemaTree } from './schema-tree';
 
@@ -9,10 +10,17 @@ function getTurnCount(messages: BuildContextInput['conversation']): number {
   return messages.length > 0 ? 1 : 0;
 }
 
-function getLastOperations(messages: BuildContextInput['conversation']) {
+function getLastOperations(
+  messages: BuildContextInput['conversation'],
+  currentSchemaDigest: string | undefined,
+) {
   return [...messages]
     .reverse()
-    .find((message) => message.role === 'assistant' && message.meta?.operations?.length && message.meta.failed !== true)
+    .find((message) =>
+      message.role === 'assistant'
+      && message.meta?.operations?.length
+      && message.meta.failed !== true
+      && (!currentSchemaDigest || !message.meta?.schemaDigest || message.meta.schemaDigest === currentSchemaDigest))
     ?.meta?.operations;
 }
 
@@ -36,7 +44,8 @@ function hasDocumentSummary(summary: string): boolean {
 export function buildRuntimeContext(input: BuildContextInput): AgentRuntimeContext {
   const schema = input.request.context.schemaJson;
   const conversationHistory = input.conversation;
-  const lastOperations = getLastOperations(conversationHistory);
+  const schemaDigest = createSchemaDigest(schema);
+  const lastOperations = getLastOperations(conversationHistory, schemaDigest);
   const tree = schema ? serializeSchemaTree(schema) : undefined;
 
   return {
@@ -47,6 +56,7 @@ export function buildRuntimeContext(input: BuildContextInput): AgentRuntimeConte
       summary: input.request.context.schemaSummary,
       ...(tree ? { tree } : {}),
       ...(schema ? { schema } : {}),
+      ...(schemaDigest ? { schemaDigest } : {}),
     },
     componentSummary: input.request.context.componentSummary,
     conversation: {

@@ -67,12 +67,14 @@ describe('validateFinalizeRequest', () => {
       success: false,
       failedOpIndex: 2,
       error: 'node not found',
+      schemaDigest: 'fnv1a-12345678',
     })).toEqual({
       conversationId: 'conv-1',
       sessionId: 'session-1',
       success: false,
       failedOpIndex: 2,
       error: 'node not found',
+      schemaDigest: 'fnv1a-12345678',
     });
   });
 

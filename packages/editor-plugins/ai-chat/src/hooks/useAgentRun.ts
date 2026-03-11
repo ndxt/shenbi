@@ -3,7 +3,7 @@ import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import { aiClient } from '../ai/sse-client';
 import { executeAgentOperation } from '../ai/operation-executor';
-import type { AgentIntent, PagePlan, RunMetadata, RunRequest } from '../ai/api-types';
+import { createSchemaDigest, type AgentIntent, type PagePlan, type RunMetadata, type RunRequest } from '../ai/api-types';
 
 export type PlanConfig = PagePlan;
 export type BlockRunStatus = 'waiting' | 'generating' | 'done';
@@ -263,6 +263,9 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                     return;
                 }
                 try {
+                    const schemaDigest = bridgeRef.current
+                        ? createSchemaDigest(bridgeRef.current.getSchema())
+                        : undefined;
                     const finalizeRequest = modifyFailed
                         ? {
                             conversationId: finalizeConversationId,
@@ -270,11 +273,13 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             success: false as const,
                             failedOpIndex: failedOpIndex ?? 0,
                             error: failedError ?? `modify operation ${typeof failedOpIndex === 'number' ? failedOpIndex + 1 : '?'} failed`,
+                            ...(schemaDigest ? { schemaDigest } : {}),
                         }
                         : {
                             conversationId: finalizeConversationId,
                             sessionId: metadata.sessionId,
                             success: true as const,
+                            ...(schemaDigest ? { schemaDigest } : {}),
                         };
                     await aiClient.finalize({
                         ...finalizeRequest,

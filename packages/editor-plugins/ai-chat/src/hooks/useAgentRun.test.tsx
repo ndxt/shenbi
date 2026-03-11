@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { RunRequest } from '../ai/api-types';
+import { createSchemaDigest, type RunRequest } from '../ai/api-types';
 import { resetAIClient, setAIClient } from '../ai/sse-client';
 import { useAgentRun } from './useAgentRun';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
@@ -118,6 +118,7 @@ describe('useAgentRun', () => {
       conversationId: 'conv-1',
       sessionId: 'session-1',
       success: true,
+      schemaDigest: createSchemaDigest(bridge.getSchema()),
     });
     expect(execute.mock.calls.map(([commandId]) => commandId)).toEqual([
       'history.beginBatch',
@@ -188,6 +189,7 @@ describe('useAgentRun', () => {
       success: false,
       failedOpIndex: 0,
       error: 'node missing',
+      schemaDigest: createSchemaDigest(bridge.getSchema()),
     });
   });
 
@@ -256,6 +258,7 @@ describe('useAgentRun', () => {
       success: false,
       failedOpIndex: 0,
       error: expect.stringContaining('rollback failed'),
+      schemaDigest: createSchemaDigest(bridge.getSchema()),
     });
   });
 });

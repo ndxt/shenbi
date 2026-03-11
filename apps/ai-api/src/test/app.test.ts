@@ -243,6 +243,7 @@ describe('POST /api/ai/run/finalize', () => {
         success: false,
         failedOpIndex: 0,
         error: 'node not found',
+        schemaDigest: 'fnv1a-12345678',
       }),
     });
 
@@ -254,6 +255,7 @@ describe('POST /api/ai/run/finalize', () => {
       success: false,
       failedOpIndex: 0,
       error: 'node not found',
+      schemaDigest: 'fnv1a-12345678',
     });
   });
 });

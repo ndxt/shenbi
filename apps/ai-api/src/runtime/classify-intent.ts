@@ -125,6 +125,7 @@ function createMessages(input: ClassifyIntentInput): OpenAICompatibleMessage[] {
   const conversationHistory = formatConversationHistory(input.context.conversation.history, {
     maxTurns: 4,
     maxCharsPerTurn: 240,
+    ...(input.context.document.schemaDigest ? { schemaDigest: input.context.document.schemaDigest } : {}),
   });
   return [
     {

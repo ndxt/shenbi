@@ -4,6 +4,7 @@ export interface FormatHistoryOptions {
   maxTurns?: number;
   maxCharsPerTurn?: number;
   includeOperations?: boolean;
+  schemaDigest?: string;
 }
 
 interface ConversationTurn {
@@ -58,6 +59,19 @@ function summarizeOperations(operations: AgentOperation[]): string {
   return operations.map((operation) => summarizeOperation(operation)).join(', ');
 }
 
+function shouldIncludeOperations(
+  message: AgentMemoryMessage,
+  schemaDigest: string | undefined,
+): boolean {
+  if (!message.meta?.operations || message.meta.operations.length === 0 || message.meta.failed === true) {
+    return false;
+  }
+  if (!schemaDigest || !message.meta.schemaDigest) {
+    return true;
+  }
+  return message.meta.schemaDigest === schemaDigest;
+}
+
 export function formatConversationHistory(
   messages: AgentMemoryMessage[],
   options: FormatHistoryOptions = {},
@@ -65,6 +79,7 @@ export function formatConversationHistory(
   const maxTurns = options.maxTurns ?? 6;
   const maxCharsPerTurn = options.maxCharsPerTurn ?? 500;
   const includeOperations = options.includeOperations ?? true;
+  const schemaDigest = options.schemaDigest;
   const turns = groupConversationTurns(messages).slice(-maxTurns);
 
   if (turns.length === 0) {
@@ -79,12 +94,13 @@ export function formatConversationHistory(
     }
     for (const assistantMessage of turn.assistantMessages) {
       lines.push(`助手: ${truncateText(assistantMessage.text, maxCharsPerTurn)}`);
+      const operations = assistantMessage.meta?.operations;
       if (
         includeOperations
-        && assistantMessage.meta?.operations
-        && assistantMessage.meta.operations.length > 0
+        && operations
+        && shouldIncludeOperations(assistantMessage, schemaDigest)
       ) {
-        lines.push(`      [执行: ${summarizeOperations(assistantMessage.meta.operations)}]`);
+        lines.push(`      [执行: ${summarizeOperations(operations)}]`);
       }
     }
   }

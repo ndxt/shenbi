@@ -439,7 +439,9 @@ function isModifyResult(value: unknown): value is ModifyResult {
 }
 
 function createModifyMessages(input: ModifySchemaInput): OpenAICompatibleMessage[] {
-  const conversationHistory = formatConversationHistory(input.context.conversation.history);
+  const conversationHistory = formatConversationHistory(input.context.conversation.history, {
+    ...(input.context.document.schemaDigest ? { schemaDigest: input.context.document.schemaDigest } : {}),
+  });
   const selectedNodeHint = buildSelectedNodeHint(input.request.selectedNodeId);
   const documentTree = input.context.document.tree ?? '[schema tree unavailable]';
   const lastOperations = input.context.conversation.lastOperations?.length

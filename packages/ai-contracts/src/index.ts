@@ -71,6 +71,7 @@ export interface FinalizeRequest {
   success: boolean;
   failedOpIndex?: number;
   error?: string;
+  schemaDigest?: string;
 }
 
 export interface ModifyResult {
@@ -126,4 +127,17 @@ export interface ErrorResponse {
   success: false;
   error: string;
   code?: string;
+}
+
+export function createSchemaDigest(schema: PageSchema | undefined): string | undefined {
+  if (!schema) {
+    return undefined;
+  }
+  const text = JSON.stringify(schema);
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, '0')}`;
 }
