@@ -83,6 +83,12 @@ interface ProviderRequestTraceSummary extends OpenAICompatibleRequestDebugSummar
 interface RunTraceRecord {
   request: RunRequest;
   suggestedPageType?: PageType;
+  memory?: {
+    finalAssistantMessage?: AgentMemoryMessage;
+    conversationTail?: AgentMemoryMessage[];
+    lastRunMetadata?: RunMetadata;
+    lastBlockIds?: string[];
+  };
   classifyIntent?: ClassifyIntentTraceEntry;
   planner?: {
     requestSummary?: ProviderRequestTraceSummary;
@@ -1883,6 +1889,21 @@ async function captureMemoryDebugSnapshot(
   };
 }
 
+export async function attachTraceMemory(
+  trace: RunTraceRecord,
+  memory: AgentMemoryStore,
+  conversationId: string,
+  sessionId: string,
+): Promise<void> {
+  const snapshot = await captureMemoryDebugSnapshot(memory, conversationId, sessionId);
+  trace.memory = {
+    ...(snapshot.assistantMessage ? { finalAssistantMessage: snapshot.assistantMessage } : {}),
+    conversationTail: snapshot.conversationTail,
+    ...(snapshot.lastRunMetadata ? { lastRunMetadata: snapshot.lastRunMetadata } : {}),
+    lastBlockIds: snapshot.lastBlockIds,
+  };
+}
+
 export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): AgentRuntime {
   return {
     async run(request) {
@@ -1890,6 +1911,9 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
       try {
         const events = await runAgent(request, createRuntimeDeps(memory, trace));
         const metadata = extractMetadata(events);
+        if (metadata.conversationId) {
+          await attachTraceMemory(trace, memory, metadata.conversationId, metadata.sessionId);
+        }
         finalizeTrace(trace, 'success', metadata);
         return { events, metadata };
       } catch (error) {
@@ -1917,6 +1941,9 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
 
         if (terminalEvent?.type === 'done') {
           const metadata = terminalEvent.data.metadata;
+          if (metadata.conversationId) {
+            await attachTraceMemory(trace, memory, metadata.conversationId, metadata.sessionId);
+          }
           finalizeTrace(trace, 'success', metadata);
           yield terminalEvent;
           return;

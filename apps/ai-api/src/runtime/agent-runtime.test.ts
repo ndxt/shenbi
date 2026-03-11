@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createInMemoryAgentMemoryStore } from '@shenbi/ai-agents';
 import {
   assessBlockQuality,
+  attachTraceMemory,
   classifyPromptToPageType,
   createAgentRuntime,
   validateGeneratedBlockNode,
@@ -438,6 +439,80 @@ describe('agent runtime finalize', () => {
       },
     });
     expect(dump.memory.after.assistantMessage.meta.operations).toBeUndefined();
+  });
+});
+
+describe('agent runtime trace memory', () => {
+  it('writes assistant memory meta into the success trace after run', async () => {
+    const sessionId = 'trace-session-1';
+    const conversationId = 'trace-memory-conv';
+    const memory = {
+      async getConversation() {
+        return [
+          { role: 'user', text: 'hi' },
+          {
+            role: 'assistant',
+            text: 'hello back',
+            meta: {
+              sessionId,
+              intent: 'chat',
+            },
+          },
+        ];
+      },
+      async appendConversationMessage() {},
+      async getLastRunMetadata() {
+        return {
+          sessionId,
+          conversationId,
+        };
+      },
+      async setLastRunMetadata() {},
+      async getLastBlockIds() {
+        return [];
+      },
+      async setLastBlockIds() {},
+    };
+    const trace: {
+      request: {
+        prompt: string;
+        conversationId: string;
+        context: {
+          schemaSummary: string;
+          componentSummary: string;
+        };
+      };
+      blocks: never[];
+      memory?: unknown;
+    } = {
+      request: {
+        prompt: 'hi',
+        conversationId,
+        context: {
+          schemaSummary: 'Existing dashboard',
+          componentSummary: 'Card',
+        },
+      },
+      blocks: [],
+    };
+
+    await attachTraceMemory(trace as never, memory as never, conversationId, sessionId);
+
+    expect(trace.memory).toMatchObject({
+      finalAssistantMessage: {
+        role: 'assistant',
+        meta: {
+          sessionId,
+          intent: 'chat',
+        },
+      },
+      lastRunMetadata: {
+        sessionId,
+        conversationId,
+      },
+      lastBlockIds: [],
+    });
+    expect(Array.isArray((trace.memory as { conversationTail?: unknown[] }).conversationTail)).toBe(true);
   });
 });
 
