@@ -920,6 +920,7 @@ function resolveProviderConfig(providerName: string | undefined): {
   apiKey?: string | undefined;
   thinkingModels?: string[] | undefined;
   nonThinkingModels?: string[] | undefined;
+  enableThinkingModels?: string[] | undefined;
 } {
   const provider = providerName ?? env.AI_PROVIDER;
   if (!provider) {
@@ -933,6 +934,7 @@ function resolveProviderConfig(providerName: string | undefined): {
     apiKey: matched?.apiKey ?? (provider === env.AI_PROVIDER ? env.AI_OPENAI_COMPAT_API_KEY : undefined),
     thinkingModels: matched?.thinkingModels,
     nonThinkingModels: matched?.nonThinkingModels,
+    enableThinkingModels: matched?.enableThinkingModels,
   };
 }
 
@@ -953,7 +955,7 @@ function createClient(providerName?: string): OpenAICompatibleClient {
     apiKey: config.apiKey,
     ...(config.thinkingModels ? { thinkingModels: config.thinkingModels } : {}),
     ...(config.nonThinkingModels ? { nonThinkingModels: config.nonThinkingModels } : {}),
-    provider: config.provider,
+    ...(config.enableThinkingModels ? { enableThinkingModels: config.enableThinkingModels } : {}),
   });
   clientCache.set(config.provider, client);
   return client;

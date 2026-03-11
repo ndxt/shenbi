@@ -11,6 +11,8 @@ export interface OpenAICompatibleClientOptions {
   temperature?: number;
   thinkingModels?: string[];
   nonThinkingModels?: string[];
+  /** Models that use Qwen-style `enable_thinking: boolean` instead of the Anthropic `thinking` object. */
+  enableThinkingModels?: string[];
   provider?: string;
 }
 
@@ -26,6 +28,8 @@ export interface OpenAICompatibleRequestDebugSummary {
   responseFormat: 'json_object' | null;
   hasThinking: boolean;
   thinking?: OpenAICompatibleThinking | undefined;
+  /** Set only for Qwen-style models that use `enable_thinking` instead of the `thinking` object. */
+  enableThinking?: boolean | undefined;
 }
 
 interface ChatCompletionChoice {
@@ -60,29 +64,60 @@ function normalizeModelName(model: string): string {
 }
 
 function matchesModelRule(model: string, rule: string): boolean {
+  // Strip provider prefix (e.g. "openai/gpt-4o-mini" → "gpt-4o-mini") so that
+  // patterns like "gpt*" match both bare and provider-prefixed model names.
+  const bareModel = model.includes('/') ? model.slice(model.indexOf('/') + 1) : model;
   if (rule.endsWith('*')) {
-    return model.startsWith(rule.slice(0, -1));
+    const prefix = rule.slice(0, -1);
+    return model.startsWith(prefix) || bareModel.startsWith(prefix);
   }
-  return model === rule;
+  return model === rule || bareModel === rule;
 }
 
-function serializeThinking(
+type ThinkingFormat =
+  | { kind: 'none' }
+  | { kind: 'anthropic'; value: OpenAICompatibleThinking }
+  | { kind: 'qwen'; enabled: boolean };
+
+function matchesAnyRule(normalizedModel: string, rules: ReadonlySet<string>): boolean {
+  return Array.from(rules).some((rule) => matchesModelRule(normalizedModel, rule));
+}
+
+/**
+ * Determine which thinking format to use for a given model:
+ *   - 'none'     (Format A): gpt*, gemini*, or other non-thinking models
+ *   - 'anthropic' (Format B): claude*, glm*, and other models → `thinking: { type }`
+ *   - 'qwen'     (Format C): qwen* models → `enable_thinking: boolean` only
+ */
+function resolveThinkingFormat(
   model: string,
   thinkingModels: ReadonlySet<string>,
   nonThinkingModels: ReadonlySet<string>,
+  enableThinkingModels: ReadonlySet<string>,
   thinking?: OpenAICompatibleThinking,
-): OpenAICompatibleThinking | undefined {
+): ThinkingFormat {
   if (!thinking) {
-    return undefined;
+    return { kind: 'none' };
   }
-  const normalizedModel = normalizeModelName(model);
-  if (Array.from(nonThinkingModels).some((rule) => matchesModelRule(normalizedModel, rule))) {
-    return undefined;
+  const normalized = normalizeModelName(model);
+
+  // Format C: Qwen-style enable_thinking bool — checked before nonThinkingModels
+  if (matchesAnyRule(normalized, enableThinkingModels)) {
+    return { kind: 'qwen', enabled: thinking.type === 'enabled' };
   }
-  if (thinkingModels.size === 0) {
-    return thinking;
+
+  // Format A: model explicitly excluded from thinking
+  if (matchesAnyRule(normalized, nonThinkingModels)) {
+    return { kind: 'none' };
   }
-  return Array.from(thinkingModels).some((rule) => matchesModelRule(normalizedModel, rule)) ? thinking : undefined;
+
+  // Format B: Anthropic-style thinking object
+  // Only send if thinkingModels is empty (allow-all default) or model is whitelisted
+  if (thinkingModels.size === 0 || matchesAnyRule(normalized, thinkingModels)) {
+    return { kind: 'anthropic', value: thinking };
+  }
+
+  return { kind: 'none' };
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
@@ -117,7 +152,7 @@ export class OpenAICompatibleClient {
   private readonly temperature: number;
   private readonly thinkingModels: ReadonlySet<string>;
   private readonly nonThinkingModels: ReadonlySet<string>;
-  private readonly provider?: string;
+  private readonly enableThinkingModels: ReadonlySet<string>;
 
   constructor(options: OpenAICompatibleClientOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
@@ -125,7 +160,17 @@ export class OpenAICompatibleClient {
     this.temperature = options.temperature ?? 0.6;
     this.thinkingModels = new Set((options.thinkingModels ?? []).map((model) => normalizeModelName(model)));
     this.nonThinkingModels = new Set((options.nonThinkingModels ?? []).map((model) => normalizeModelName(model)));
-    this.provider = options.provider?.toLowerCase();
+    this.enableThinkingModels = new Set((options.enableThinkingModels ?? []).map((model) => normalizeModelName(model)));
+  }
+
+  private resolveFormat(model: string, thinking?: OpenAICompatibleThinking): ThinkingFormat {
+    return resolveThinkingFormat(
+      model,
+      this.thinkingModels,
+      this.nonThinkingModels,
+      this.enableThinkingModels,
+      thinking,
+    );
   }
 
   buildRequestDebugSummary(
@@ -134,27 +179,17 @@ export class OpenAICompatibleClient {
     thinking: OpenAICompatibleThinking | undefined,
     stream: boolean,
   ): OpenAICompatibleRequestDebugSummary {
-    const serializedThinking = serializeThinking(model, this.thinkingModels, this.nonThinkingModels, thinking);
+    const fmt = this.resolveFormat(model, thinking);
     return {
       model,
       stream,
       temperature: this.temperature,
       messageCount: messages.length,
       responseFormat: stream ? null : 'json_object',
-      hasThinking: Boolean(serializedThinking),
-      ...(serializedThinking ? { thinking: serializedThinking } : {}),
+      hasThinking: fmt.kind !== 'none',
+      ...(fmt.kind === 'anthropic' ? { thinking: fmt.value } : {}),
+      ...(fmt.kind === 'qwen' ? { enableThinking: fmt.enabled } : {}),
     };
-  }
-
-  private shouldSendEnableThinking(): boolean {
-    return this.provider === 'qwen';
-  }
-
-  private buildEnableThinkingFlag(serializedThinking: OpenAICompatibleThinking | undefined): boolean | undefined {
-    if (!this.shouldSendEnableThinking()) {
-      return undefined;
-    }
-    return serializedThinking?.type === 'enabled';
   }
 
   async chat(
@@ -162,8 +197,7 @@ export class OpenAICompatibleClient {
     messages: OpenAICompatibleMessage[],
     thinking?: OpenAICompatibleThinking,
   ): Promise<string> {
-    const serializedThinking = serializeThinking(model, this.thinkingModels, this.nonThinkingModels, thinking);
-    const enableThinking = this.buildEnableThinkingFlag(serializedThinking);
+    const fmt = this.resolveFormat(model, thinking);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -178,8 +212,8 @@ export class OpenAICompatibleClient {
         response_format: {
           type: 'json_object',
         },
-        ...(typeof enableThinking === 'boolean' ? { enable_thinking: enableThinking } : {}),
-        ...(serializedThinking ? { thinking: serializedThinking } : {}),
+        ...(fmt.kind === 'qwen' ? { enable_thinking: fmt.enabled } : {}),
+        ...(fmt.kind === 'anthropic' ? { thinking: fmt.value } : {}),
       }),
     });
 
@@ -200,8 +234,7 @@ export class OpenAICompatibleClient {
     messages: OpenAICompatibleMessage[],
     thinking?: OpenAICompatibleThinking,
   ): AsyncIterable<{ text: string }> {
-    const serializedThinking = serializeThinking(model, this.thinkingModels, this.nonThinkingModels, thinking);
-    const enableThinking = this.buildEnableThinkingFlag(serializedThinking);
+    const fmt = this.resolveFormat(model, thinking);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -213,8 +246,8 @@ export class OpenAICompatibleClient {
         messages,
         temperature: this.temperature,
         stream: true,
-        ...(typeof enableThinking === 'boolean' ? { enable_thinking: enableThinking } : {}),
-        ...(serializedThinking ? { thinking: serializedThinking } : {}),
+        ...(fmt.kind === 'qwen' ? { enable_thinking: fmt.enabled } : {}),
+        ...(fmt.kind === 'anthropic' ? { thinking: fmt.value } : {}),
       }),
     });
 

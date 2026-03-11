@@ -15,6 +15,8 @@ describe('loadEnv', () => {
     vi.stubEnv('AI_BLOCK_MODEL', 'GLM-4.6');
     vi.stubEnv('AI_AVAILABLE_MODELS', 'GLM-4.6,GLM-4.7');
     vi.stubEnv('AI_THINKING_MODELS', 'GLM-4.6,GLM-4.7');
+    vi.stubEnv('AI_NON_THINKING_MODELS', 'gpt*');
+    vi.stubEnv('AI_ENABLE_THINKING_MODELS', 'qwen*');
     vi.stubEnv('NEXTAI_BASE_URL', 'https://api.nextaicore.com/v1');
     vi.stubEnv('NEXTAI_API_KEY', 'nextai-key');
     vi.stubEnv('NEXTAI_PLANNER_MODEL', 'gpt-4o-mini');
@@ -33,6 +35,7 @@ describe('loadEnv', () => {
       models: ['GLM-4.6', 'GLM-4.7'],
       thinkingModels: ['GLM-4.6', 'GLM-4.7'],
       nonThinkingModels: ['gpt*'],
+      enableThinkingModels: ['qwen*'],
     });
   });
 

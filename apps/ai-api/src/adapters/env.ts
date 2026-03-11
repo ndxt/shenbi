@@ -23,6 +23,8 @@ export interface ProviderEnvConfig {
   temperature?: number | undefined;
   thinkingModels?: string[] | undefined;
   nonThinkingModels?: string[] | undefined;
+  /** Models using Qwen-style `enable_thinking: boolean` format (e.g. `qwen*`). */
+  enableThinkingModels?: string[] | undefined;
 }
 
 function parseEnvFile(filePath: string): Record<string, string> {
@@ -139,6 +141,14 @@ function resolveProviderConfig(
     ? undefined
     : parseModelList(readEnvValue(loaded, ['AI_NON_THINKING_MODELS']));
 
+  const providerEnableThinkingModels = parseModelList(readEnvValue(loaded, [
+    ...providerKeys('ENABLE_THINKING_MODELS'),
+    ...(useSharedCompatKeys ? ['AI_ENABLE_THINKING_MODELS'] : []),
+  ]));
+  const globalEnableThinkingModels = provider === 'openai-compatible'
+    ? undefined
+    : parseModelList(readEnvValue(loaded, ['AI_ENABLE_THINKING_MODELS']));
+
   return {
     provider,
     baseUrl: readEnvValue(loaded, [
@@ -183,6 +193,7 @@ function resolveProviderConfig(
     ])),
     thinkingModels: providerThinkingModels,
     nonThinkingModels: mergeModelLists(providerNonThinkingModels, globalNonThinkingModels),
+    enableThinkingModels: mergeModelLists(providerEnableThinkingModels, globalEnableThinkingModels),
   };
 }
 
