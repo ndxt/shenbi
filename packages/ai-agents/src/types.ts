@@ -137,6 +137,16 @@ export interface ModifySchemaInput {
   context: AgentRuntimeContext;
 }
 
+export interface IntentClassification {
+  intent: AgentIntent;
+  confidence: number;
+}
+
+export interface ClassifyIntentInput {
+  request: RunRequest;
+  context: AgentRuntimeContext;
+}
+
 export interface GenerateBlockResult {
   blockId: string;
   node: SchemaNode;

@@ -322,4 +322,66 @@ describe('runAgentStream', () => {
     expect(events.some((event) => event.type === 'modify:start')).toBe(false);
     expect(events.some((event) => event.type === 'message:delta')).toBe(true);
   });
+
+  it('prefers classifyIntent tool over rule routing when explicit intent is absent', async () => {
+    const deps: AgentRuntimeDeps = {
+      llm: {
+        chat: vi.fn(async () => ({ text: 'unused' })),
+        streamChat: vi.fn(async function* () {
+          yield { text: 'unused' };
+        }),
+      },
+      tools: createToolRegistry([
+        {
+          name: 'classifyIntent',
+          async execute() {
+            return { intent: 'schema.modify' as const, confidence: 0.97 };
+          },
+        },
+        {
+          name: 'modifySchema',
+          async execute() {
+            return {
+              explanation: '会更新当前卡片标题。',
+              operations: [
+                {
+                  op: 'schema.patchProps' as const,
+                  nodeId: 'card-1',
+                  patch: { title: '本月营收' },
+                },
+              ],
+            };
+          },
+        },
+      ]),
+      memory: createInMemoryAgentMemoryStore(),
+      logger: {
+        info: vi.fn(),
+        error: vi.fn(),
+      },
+    };
+
+    const events = [];
+    for await (const event of runAgentStream({
+      prompt: '帮我处理一下当前页面',
+      selectedNodeId: 'card-1',
+      conversationId: 'classify-tool-conv',
+      context: {
+        schemaSummary: 'pageId=page-1; nodeCount=1',
+        componentSummary: 'Card',
+        schemaJson: {
+          id: 'page-1',
+          body: [{ id: 'card-1', component: 'Card', children: [] }],
+        },
+      },
+    }, deps)) {
+      events.push(event);
+    }
+
+    expect(events[1]).toEqual({
+      type: 'intent',
+      data: { intent: 'schema.modify', confidence: 0.97 },
+    });
+    expect(events.some((event) => event.type === 'modify:start')).toBe(true);
+  });
 });

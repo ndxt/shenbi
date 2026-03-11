@@ -5,8 +5,10 @@
 import {
   createInMemoryAgentMemoryStore,
   createToolRegistry,
+  type ClassifyIntentInput,
   formatConversationHistory,
   type FinalizeRequest,
+  type IntentClassification,
   type LayoutRow,
   runAgent,
   runAgentStream,
@@ -45,6 +47,10 @@ import {
   supportedComponentList,
 } from './normalize-schema.ts';
 import {
+  classifyIntentWithModel,
+  type ClassifyIntentTraceEntry,
+} from './classify-intent.ts';
+import {
   getDesignPolicySummary,
   getFreeLayoutPatternSummary,
   getPageSkeleton,
@@ -74,6 +80,7 @@ interface ProviderRequestTraceSummary extends OpenAICompatibleRequestDebugSummar
 interface RunTraceRecord {
   request: RunRequest;
   suggestedPageType?: PageType;
+  classifyIntent?: ClassifyIntentTraceEntry;
   planner?: {
     requestSummary?: ProviderRequestTraceSummary;
     model: string;
@@ -1721,6 +1728,15 @@ function createRuntimeDeps(trace?: RunTraceRecord): AgentRuntimeDeps {
       },
     },
     tools: createToolRegistry([
+      {
+        name: 'classifyIntent',
+        async execute(input: unknown) {
+          return classifyIntentWithModel(
+            input as ClassifyIntentInput,
+            trace ? (trace.classifyIntent = { model: 'unknown', rawOutput: '' }) : undefined,
+          ) as Promise<IntentClassification>;
+        },
+      },
       {
         name: 'modifySchema',
         async execute(input: unknown) {

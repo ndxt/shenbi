@@ -18,11 +18,11 @@ function hasModifyTool(deps: AgentRuntimeDeps): boolean {
   return Boolean(deps.tools.get('modifySchema'));
 }
 
-function classifyIntent(
+async function classifyIntent(
   request: RunRequest,
   context: AgentRuntimeContext,
   deps: AgentRuntimeDeps,
-): { intent: AgentIntent; confidence: number } {
+): Promise<{ intent: AgentIntent; confidence: number }> {
   if (request.intent === 'schema.modify' && request.context.schemaJson && hasModifyTool(deps)) {
     return { intent: 'schema.modify', confidence: 1 };
   }
@@ -31,6 +31,31 @@ function classifyIntent(
   }
   if (request.intent === 'chat') {
     return { intent: 'chat', confidence: 1 };
+  }
+  const classifyIntentTool = deps.tools.get('classifyIntent');
+  if (classifyIntentTool) {
+    try {
+      const result = await classifyIntentTool.execute({ request, context });
+      if (
+        result
+        && typeof result === 'object'
+        && 'intent' in result
+        && 'confidence' in result
+      ) {
+        const candidate = result as { intent: AgentIntent; confidence: number };
+        if (
+          (candidate.intent === 'schema.create' || candidate.intent === 'schema.modify' || candidate.intent === 'chat')
+          && Number.isFinite(candidate.confidence)
+        ) {
+          return candidate;
+        }
+      }
+      deps.logger?.info('runAgentStream.classify_intent_invalid_result', {});
+    } catch (error) {
+      deps.logger?.error('runAgentStream.classify_intent_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
   return classifyIntentByRules(context);
 }
@@ -105,7 +130,7 @@ export async function* runAgentStream(
 
     yield { type: 'run:start', data: { sessionId, conversationId } };
 
-    const classifiedIntent = classifyIntent(request, context, deps);
+    const classifiedIntent = await classifyIntent(request, context, deps);
     const registry = createDefaultRegistry();
     const resolved = registry.resolve(classifiedIntent.intent, context, deps);
     const fallback = resolved
