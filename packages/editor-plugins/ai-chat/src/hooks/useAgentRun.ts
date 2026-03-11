@@ -284,6 +284,17 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                 }
             };
 
+            const discardHistoryBatchOnFailure = async () => {
+                if (!historyBatchActiveRef.current) {
+                    return { success: true };
+                }
+                const discardResult = await discardHistoryBatch();
+                if (!discardResult.success) {
+                    failedError = `${failedError ?? 'modify failed'}; rollback failed: ${discardResult.error || 'history.discardBatch failed'}`;
+                }
+                return discardResult;
+            };
+
             try {
                 const stream = aiClient.runStream(request, { signal: ac.signal });
                 for await (const event of stream) {
@@ -403,10 +414,12 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     modifyFailed = true;
                                     failedOpIndex = event.data.index;
                                     failedError = result.error || `modify operation ${event.data.index + 1} failed`;
-                                    if (historyBatchActiveRef.current) {
-                                        await discardHistoryBatch();
+                                    const discardResult = await discardHistoryBatchOnFailure();
+                                    if (!discardResult.success) {
+                                        onError(`修改失败且回滚失败：第 ${event.data.index + 1} 条 ${event.data.operation.op} 执行出错 - ${discardResult.error || 'history.discardBatch failed'}`);
+                                    } else {
+                                        setProgressText(`修改已回滚：第 ${event.data.index + 1} 条失败`);
                                     }
-                                    setProgressText(`修改已回滚：第 ${event.data.index + 1} 条失败`);
                                     onError(`修改失败：第 ${event.data.index + 1} 条 ${event.data.operation.op} 执行出错${failedError ? ` - ${failedError}` : ''}`);
                                 }
                             }
@@ -414,7 +427,10 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                         case 'modify:done':
                             if (historyBatchActiveRef.current) {
                                 if (modifyFailed) {
-                                    historyBatchActiveRef.current = false;
+                                    const discardResult = await discardHistoryBatchOnFailure();
+                                    if (!discardResult.success) {
+                                        throw new Error(discardResult.error || 'history.discardBatch failed');
+                                    }
                                 } else {
                                     const commitResult = await commitHistoryBatch();
                                     if (!commitResult.success) {

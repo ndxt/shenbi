@@ -60,14 +60,14 @@ function createDefaultRegistry() {
 function resolveFallbackOrchestrator(
   intent: AgentIntent,
   deps: AgentRuntimeDeps,
-): OrchestratorFunction {
+): { intent: AgentIntent; orchestrator: OrchestratorFunction } {
   if (intent === 'schema.create' && hasPageBuilderTools(deps)) {
-    return pageBuilderOrchestrator;
+    return { intent: 'schema.create', orchestrator: pageBuilderOrchestrator };
   }
   if (intent === 'schema.modify' && hasModifyTool(deps)) {
-    return modifyOrchestrator;
+    return { intent: 'schema.modify', orchestrator: modifyOrchestrator };
   }
-  return chatOrchestrator;
+  return { intent: 'chat', orchestrator: chatOrchestrator };
 }
 
 export async function* runAgentStream(
@@ -105,11 +105,23 @@ export async function* runAgentStream(
 
     yield { type: 'run:start', data: { sessionId, conversationId } };
 
-    const resolvedIntent = classifyIntent(request, context, deps);
-    if (request.intent === 'schema.modify' && resolvedIntent.intent !== 'schema.modify') {
-      deps.logger?.info('runAgentStream.modify_intent_downgraded', {
+    const classifiedIntent = classifyIntent(request, context, deps);
+    const registry = createDefaultRegistry();
+    const resolved = registry.resolve(classifiedIntent.intent, context, deps);
+    const fallback = resolved
+      ? undefined
+      : resolveFallbackOrchestrator(classifiedIntent.intent, deps);
+    const resolvedIntent = fallback
+      ? { intent: fallback.intent, confidence: classifiedIntent.confidence }
+      : classifiedIntent;
+    if (resolvedIntent.intent !== classifiedIntent.intent) {
+      deps.logger?.info('runAgentStream.intent_downgraded', {
+        requestedIntent: request.intent,
+        classifiedIntent: classifiedIntent.intent,
+        effectiveIntent: resolvedIntent.intent,
         hasSchema: Boolean(request.context.schemaJson),
         hasModifyTool: hasModifyTool(deps),
+        hasPageBuilderTools: hasPageBuilderTools(deps),
       });
     }
     yield {
@@ -120,9 +132,7 @@ export async function* runAgentStream(
     const events: AgentEvent[] = [];
     const assistantDeltas: string[] = [];
     const operations: AgentOperation[] = [];
-    const registry = createDefaultRegistry();
-    const orchestrator = registry.resolve(resolvedIntent.intent, context, deps)
-      ?? resolveFallbackOrchestrator(resolvedIntent.intent, deps);
+    const orchestrator = resolved ?? fallback?.orchestrator ?? chatOrchestrator;
     const generator = orchestrator(request, context, deps, metadata);
 
     for await (const event of generator) {

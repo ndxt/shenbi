@@ -281,4 +281,45 @@ describe('runAgentStream', () => {
     });
     expect(events.some((event) => event.type === 'plan')).toBe(true);
   });
+
+  it('downgrades modify intent to chat when no modify handler is available', async () => {
+    const deps: AgentRuntimeDeps = {
+      llm: {
+        chat: vi.fn(async () => ({ text: 'unused' })),
+        streamChat: vi.fn(async function* () {
+          yield { text: 'Hello' };
+        }),
+      },
+      tools: createToolRegistry([]),
+      memory: createInMemoryAgentMemoryStore(),
+      logger: {
+        info: vi.fn(),
+        error: vi.fn(),
+      },
+    };
+
+    const events = [];
+    for await (const event of runAgentStream({
+      prompt: '把当前卡片标题改掉',
+      selectedNodeId: 'card-1',
+      conversationId: 'chat-fallback-conv',
+      context: {
+        schemaSummary: 'pageId=page-1; nodeCount=1',
+        componentSummary: 'Card',
+        schemaJson: {
+          id: 'page-1',
+          body: [{ id: 'card-1', component: 'Card', children: [] }],
+        },
+      },
+    }, deps)) {
+      events.push(event);
+    }
+
+    expect(events[1]).toEqual({
+      type: 'intent',
+      data: { intent: 'chat', confidence: 0.85 },
+    });
+    expect(events.some((event) => event.type === 'modify:start')).toBe(false);
+    expect(events.some((event) => event.type === 'message:delta')).toBe(true);
+  });
 });
