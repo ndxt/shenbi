@@ -7,6 +7,7 @@ import {
   type EditorPluginManifest,
   type PluginContext,
 } from '@shenbi/editor-plugin-api';
+import type { TabState } from '@shenbi/editor-core';
 import { ActivityBar } from './ActivityBar';
 import { Sidebar } from './Sidebar';
 import { WorkbenchToolbar } from './WorkbenchToolbar';
@@ -57,6 +58,11 @@ interface AppShellProps {
   onCanvasSelectNode?: (nodeId: string) => void;
   schemaName?: string | undefined;
   breadcrumbItems?: { id: string; label: string }[];
+  /** Multi-tab mode */
+  tabs?: TabState[] | undefined;
+  activeTabId?: string | undefined;
+  onActivateTab?: ((fileId: string) => void) | undefined;
+  onCloseTab?: ((fileId: string) => void) | undefined;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -105,6 +111,10 @@ export function AppShell({
   onCanvasSelectNode,
   schemaName,
   breadcrumbItems,
+  tabs,
+  activeTabId,
+  onActivateTab,
+  onCloseTab,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const resolvedPersistenceAdapter = React.useMemo(
@@ -808,7 +818,13 @@ export function AppShell({
         )}
         
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <EditorTabs label={schemaName ?? undefined} />
+          <EditorTabs
+            label={schemaName ?? undefined}
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onActivateTab={onActivateTab}
+            onCloseTab={onCloseTab}
+          />
           <WorkbenchToolbar
             extra={toolbarExtra}
             menus={allMenus}

@@ -1,4 +1,5 @@
 import type { PageSchema } from '@shenbi/schema';
+import type { FSNodeMetadata } from './adapters/file-storage';
 
 export interface Disposable {
   dispose(): void;
@@ -25,4 +26,17 @@ export interface EditorEventMap {
   'file:currentChanged': { fileId?: string };
   'file:opened': { fileId: string };
   'file:saved': { fileId: string };
+
+  // File system events
+  'fs:nodeCreated': { node: FSNodeMetadata };
+  'fs:nodeDeleted': { nodeId: string; path: string };
+  'fs:nodeRenamed': { nodeId: string; oldName: string; newName: string };
+  'fs:nodeMoved': { nodeId: string; oldParentId: string | null; newParentId: string | null };
+  'fs:treeChanged': undefined;
+
+  // Tab events
+  'tab:opened': { fileId: string };
+  'tab:closed': { fileId: string };
+  'tab:activated': { fileId: string };
+  'tab:dirtyChanged': { fileId: string; isDirty: boolean };
 }

@@ -165,6 +165,9 @@ importers:
       '@shenbi/ai-contracts':
         specifier: workspace:*
         version: link:../../ai-contracts
+      '@shenbi/editor-core':
+        specifier: workspace:*
+        version: link:../../editor-core
       '@shenbi/editor-plugin-api':
         specifier: workspace:*
         version: link:../api
@@ -233,9 +236,15 @@ importers:
 
   packages/editor-plugins/files:
     dependencies:
+      '@shenbi/editor-core':
+        specifier: workspace:*
+        version: link:../../editor-core
       '@shenbi/editor-plugin-api':
         specifier: workspace:*
         version: link:../api
+      lucide-react:
+        specifier: ^0.575.0
+        version: 0.575.0(react@19.2.4)
       react:
         specifier: ^19.0.0
         version: 19.2.4

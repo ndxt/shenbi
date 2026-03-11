@@ -9,7 +9,12 @@ import {
 import { defineEditorPlugin } from '@shenbi/editor-plugin-api';
 import {
   type EditorStateSnapshot,
+  type FSTreeNode,
+  IndexedDBFileSystemAdapter,
+  TabManager,
   buildEditorTree,
+  buildFSTree,
+  createEditor,
   getAncestorChain,
   getDefaultSelectedNodeId,
   getSchemaNodeByTreeId,
@@ -42,10 +47,11 @@ import {
   useScenarioSession,
   useShellModeUrl,
   useSelectionSync,
+  useTabManager,
   type ShellMode,
 } from '@shenbi/editor-ui';
 import { createAIChatPlugin } from '@shenbi/editor-plugin-ai-chat';
-import { createFilesPlugin, useFileWorkspace } from '@shenbi/editor-plugin-files';
+import { createFilesPlugin, useFileWorkspace, FileExplorer } from '@shenbi/editor-plugin-files';
 import { createSetterPlugin } from '@shenbi/editor-plugin-setter';
 
 type ScenarioKey =
@@ -59,6 +65,7 @@ type ScenarioKey =
 
 type AppMode = ShellMode;
 const WORKSPACE_ID = 'shenbi-preview-debug';
+const PROJECT_ID = 'default';
 const PREVIEW_PERSISTENCE_NAMESPACE = 'preview-debug';
 const ACTIVE_SCENARIO_PERSISTENCE_KEY = 'active-scenario';
 
@@ -139,6 +146,20 @@ export function App() {
   const initialScenarioSchemas = useMemo(() => createInitialScenarioState(), []);
   const [activityMessage, setActivityMessage] = useState<string>('');
   const initialShellSchema = useMemo(() => createEmptyShellSchema(), []);
+
+  // VFS & TabManager instances
+  const vfs = useMemo(() => new IndexedDBFileSystemAdapter(), []);
+  const tabManager = useMemo(() => new TabManager(), []);
+  const [vfsInitialized, setVfsInitialized] = useState(false);
+  const [fsTree, setFsTree] = useState<FSTreeNode[]>([]);
+
+  // Initialize VFS
+  useEffect(() => {
+    void vfs.initialize(PROJECT_ID).then(() => {
+      setVfsInitialized(true);
+    });
+  }, [vfs]);
+
   const {
     activeScenarioSnapshot,
     updateScenarioSnapshot,
@@ -162,7 +183,42 @@ export function App() {
     onError: (message) => {
       antd.message.error(message);
     },
+    createEditorInstance: appMode === 'shell' ? () => {
+      return createEditor({
+        initialSchema: createEmptyShellSchema(),
+        vfs,
+        tabManager,
+        projectId: PROJECT_ID,
+      });
+    } : undefined,
   });
+
+  // Tab manager snapshot
+  const tabSnapshot = useTabManager(appMode === 'shell' ? tabManager : undefined);
+
+  // Refresh file tree
+  const refreshFsTree = useCallback(() => {
+    if (!vfsInitialized) return;
+    void vfs.listTree(PROJECT_ID).then((nodes) => {
+      setFsTree(buildFSTree(nodes));
+    });
+  }, [vfs, vfsInitialized]);
+
+  useEffect(() => {
+    if (vfsInitialized && appMode === 'shell') {
+      refreshFsTree();
+    }
+  }, [appMode, refreshFsTree, vfsInitialized]);
+
+  // Listen for fs tree changes
+  useEffect(() => {
+    if (appMode !== 'shell') return;
+    const unsub = fileEditor.eventBus?.on?.('fs:treeChanged', () => {
+      refreshFsTree();
+    });
+    return unsub;
+  }, [appMode, fileEditor.eventBus, refreshFsTree]);
+
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : activeScenarioSnapshot.schema;
   const {
     activeFileName,
@@ -301,6 +357,25 @@ export function App() {
     }
     return executeHostPluginCommand(commandId, payload);
   }, [executeHostPluginCommand, handleResetWorkspace]);
+
+  // File system service for plugin context
+  const filesystemService = useMemo(() => {
+    if (!vfsInitialized) return undefined;
+    return {
+      createFile: async (name: string, fileType: string, content: Record<string, unknown>, parentId?: string) => {
+        const node = await vfs.createFile(PROJECT_ID, parentId ?? null, name, fileType as any, content);
+        refreshFsTree();
+        return node.id;
+      },
+      readFile: async (fileId: string) => {
+        return await vfs.readFile(PROJECT_ID, fileId) as Record<string, unknown>;
+      },
+      writeFile: async (fileId: string, content: Record<string, unknown>) => {
+        await vfs.writeFile(PROJECT_ID, fileId, content);
+      },
+    };
+  }, [refreshFsTree, vfs, vfsInitialized]);
+
   const pluginContext = usePluginContext({
     schema: activeSchema,
     selectedNode,
@@ -310,6 +385,52 @@ export function App() {
     executeCommand: executeAppCommand,
     notifications,
   });
+
+  // Enhance plugin context with filesystem
+  const enhancedPluginContext = useMemo(() => ({
+    ...pluginContext,
+    ...(filesystemService ? { filesystem: filesystemService } : {}),
+  }), [filesystemService, pluginContext]);
+
+  // Tab actions
+  const handleActivateTab = useCallback((fileId: string) => {
+    void fileEditor.commands.execute('tab.activate', { fileId });
+  }, [fileEditor.commands]);
+
+  const handleCloseTab = useCallback((fileId: string) => {
+    const tab = tabManager.getTab(fileId);
+    if (tab?.isDirty) {
+      if (!window.confirm('文件未保存，确定关闭？')) {
+        return;
+      }
+    }
+    void fileEditor.commands.execute('tab.close', { fileId });
+  }, [fileEditor.commands, tabManager]);
+
+  const handleOpenFileFromTree = useCallback((fileId: string) => {
+    void fileEditor.commands.execute('tab.open', { fileId });
+  }, [fileEditor.commands]);
+
+  const handleCreateFile = useCallback((parentId: string | null, name: string, fileType: string) => {
+    void fileEditor.commands.execute('fs.createFile', { parentId, name, fileType }).then((result: any) => {
+      if (result?.id) {
+        void fileEditor.commands.execute('tab.open', { fileId: result.id });
+      }
+    });
+  }, [fileEditor.commands]);
+
+  const handleCreateDirectory = useCallback((parentId: string | null, name: string) => {
+    void fileEditor.commands.execute('fs.createDirectory', { parentId, name });
+  }, [fileEditor.commands]);
+
+  const handleDeleteNode = useCallback((nodeId: string) => {
+    void fileEditor.commands.execute('fs.deleteNode', { nodeId });
+  }, [fileEditor.commands]);
+
+  const handleRenameNode = useCallback((nodeId: string, newName: string) => {
+    void fileEditor.commands.execute('fs.rename', { nodeId, newName });
+  }, [fileEditor.commands]);
+
   const plugins = useMemo(() => {
     const registeredPlugins = [
       defineEditorPlugin({
@@ -380,11 +501,53 @@ export function App() {
         getAvailableComponents: () => builtinContracts,
       }),
     ];
-    if (appMode === 'shell' && filesSidebarTabOptions) {
+
+    // VFS-based file explorer in shell mode
+    if (appMode === 'shell' && vfsInitialized) {
+      registeredPlugins.push(defineEditorPlugin({
+        id: 'shenbi.plugin.files',
+        name: 'Files Plugin',
+        contributes: {
+          sidebarTabs: [
+            {
+              id: 'files',
+              label: 'Files',
+              order: 35,
+              render: () => (
+                <FileExplorer
+                  tree={fsTree}
+                  activeFileId={tabSnapshot.activeTabId}
+                  onOpenFile={handleOpenFileFromTree}
+                  onCreateFile={handleCreateFile}
+                  onCreateDirectory={handleCreateDirectory}
+                  onDeleteNode={handleDeleteNode}
+                  onRenameNode={handleRenameNode}
+                  onRefresh={refreshFsTree}
+                />
+              ),
+            },
+          ],
+        },
+      }));
+    } else if (appMode === 'shell' && filesSidebarTabOptions) {
+      // Fallback to legacy file panel if VFS not ready
       registeredPlugins.push(createFilesPlugin(filesSidebarTabOptions));
     }
     return registeredPlugins;
-  }, [appMode, filesSidebarTabOptions, handleResetWorkspace]);
+  }, [
+    appMode,
+    filesSidebarTabOptions,
+    fsTree,
+    handleCreateDirectory,
+    handleCreateFile,
+    handleDeleteNode,
+    handleOpenFileFromTree,
+    handleRenameNode,
+    handleResetWorkspace,
+    refreshFsTree,
+    tabSnapshot.activeTabId,
+    vfsInitialized,
+  ]);
 
   const handleCanvasSelectNode = (schemaNodeId: string) => {
     selectSchemaNode(schemaNodeId);
@@ -446,10 +609,14 @@ export function App() {
         ...(selectedContract ? { contract: selectedContract } : {}),
       }}
       plugins={plugins}
-      pluginContext={pluginContext}
+      pluginContext={enhancedPluginContext}
       onCanvasSelectNode={handleCanvasSelectNode}
       schemaName={activeSchema.name}
       breadcrumbItems={breadcrumbItems}
+      tabs={appMode === 'shell' && tabSnapshot.tabs.length > 0 ? tabSnapshot.tabs : undefined}
+      activeTabId={tabSnapshot.activeTabId}
+      onActivateTab={handleActivateTab}
+      onCloseTab={handleCloseTab}
       toolbarExtra={(
         <div className="flex items-center gap-2">
           <span className="text-text-secondary" style={{ fontSize: '11px' }}>模式</span>
@@ -491,7 +658,7 @@ export function App() {
                 className="max-w-[220px] truncate text-text-secondary"
                 style={{ fontSize: '11px' }}
               >
-                {activeFileName ?? '未命名页面'}
+                {activeFileName ?? (tabSnapshot.activeTabId ? tabSnapshot.tabs.find((t) => t.fileId === tabSnapshot.activeTabId)?.fileName : '未命名页面')}
                 {isDirty ? ' *' : ''}
               </span>
               <button

@@ -1,5 +1,51 @@
 import type { PageSchema } from '@shenbi/schema';
 
+// ---------------------------------------------------------------------------
+// File type definitions (extensible)
+// ---------------------------------------------------------------------------
+
+export type FileType = 'page' | 'api' | 'flow' | 'db' | 'dict';
+
+export const FILE_TYPE_EXTENSIONS: Record<FileType, string> = {
+  page: '.page.json',
+  api: '.api.json',
+  flow: '.flow.json',
+  db: '.db.json',
+  dict: '.dict.json',
+};
+
+// ---------------------------------------------------------------------------
+// Virtual file system node metadata
+// ---------------------------------------------------------------------------
+
+export interface FSNodeMetadata {
+  id: string;
+  name: string;
+  type: 'file' | 'directory';
+  fileType?: FileType | undefined;
+  parentId: string | null;
+  path: string;
+  createdAt: number;
+  updatedAt: number;
+  size?: number | undefined;
+  sortOrder?: number | undefined;
+}
+
+export type FileContent = PageSchema | Record<string, unknown>;
+
+export interface FSTreeNode {
+  id: string;
+  name: string;
+  type: 'file' | 'directory';
+  fileType?: FileType | undefined;
+  path: string;
+  children?: FSTreeNode[] | undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy flat file metadata (kept for backward compatibility)
+// ---------------------------------------------------------------------------
+
 export interface FileMetadata {
   id: string;
   name: string;
