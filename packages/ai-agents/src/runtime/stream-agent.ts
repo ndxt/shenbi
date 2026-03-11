@@ -1,4 +1,3 @@
-import { createSchemaDigest } from '@shenbi/ai-contracts';
 import { buildRuntimeContext } from '../context/build-context';
 import { classifyIntentByRules } from '../intent/rule-classifier';
 import { chatOrchestrator } from '../orchestrators/chat-orchestrator';
@@ -96,20 +95,6 @@ function resolveFallbackOrchestrator(
   return { intent: 'chat', orchestrator: chatOrchestrator };
 }
 
-function getFinalSchemaDigest(events: AgentEvent[]): string | undefined {
-  const finalSchemaEvent = [...events]
-    .reverse()
-    .find((event): event is Extract<AgentEvent, { type: 'schema:done' }> => event.type === 'schema:done');
-  return createSchemaDigest(finalSchemaEvent?.data.schema);
-}
-
-function getOperationSchemaDigest(operations: AgentOperation[]): string | undefined {
-  if (operations.length !== 1 || operations[0]?.op !== 'schema.replace') {
-    return undefined;
-  }
-  return createSchemaDigest(operations[0].schema);
-}
-
 export async function* runAgentStream(
   request: RunRequest,
   deps: AgentRuntimeDeps,
@@ -187,7 +172,6 @@ export async function* runAgentStream(
     }
 
     metadata.durationMs = Date.now() - startedAt;
-    const finalSchemaDigest = getFinalSchemaDigest(events) ?? getOperationSchemaDigest(operations);
     const finalSchemaBlocks = events
       .filter((event): event is Extract<AgentEvent, { type: 'schema:block' }> => event.type === 'schema:block')
       .map((event) => event.data.blockId);
@@ -203,7 +187,6 @@ export async function* runAgentStream(
                 sessionId,
                 intent: resolvedIntent.intent,
                 ...(operations.length > 0 ? { operations } : {}),
-                ...(finalSchemaDigest ? { schemaDigest: finalSchemaDigest } : {}),
               },
             }),
           ]

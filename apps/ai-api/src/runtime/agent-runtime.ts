@@ -5,6 +5,7 @@
 import {
   createInMemoryAgentMemoryStore,
   createToolRegistry,
+  type AgentMemoryStore,
   type ClassifyIntentInput,
   formatConversationHistory,
   type FinalizeRequest,
@@ -62,7 +63,7 @@ import {
 import { executeModifySchema, type ModifySchemaTraceEntry } from './modify-schema.ts';
 import type { AgentRuntime } from './types.ts';
 
-const memory = createInMemoryAgentMemoryStore();
+const defaultMemory = createInMemoryAgentMemoryStore();
 const env = loadEnv();
 type JsonSalvageStrategy =
   | 'balanced_object'
@@ -1698,7 +1699,7 @@ async function planWithModel(input: PlanPageInput, trace?: RunTraceRecord): Prom
   return normalizedPlan;
 }
 
-function createRuntimeDeps(trace?: RunTraceRecord): AgentRuntimeDeps {
+function createRuntimeDeps(memory: AgentMemoryStore, trace?: RunTraceRecord): AgentRuntimeDeps {
   return {
     llm: {
       async chat(request: unknown) {
@@ -1829,93 +1830,97 @@ function buildFailedAssistantText(existingText: string, error?: string): string 
   return trimmed ? `${detail}\n${trimmed}` : detail;
 }
 
-export const agentRuntime: AgentRuntime = {
-  async run(request) {
-    const trace = createTrace(request);
-    try {
-      const events = await runAgent(request, createRuntimeDeps(trace));
-      const metadata = extractMetadata(events);
-      finalizeTrace(trace, 'success', metadata);
-      return { events, metadata };
-    } catch (error) {
-      const debugFile = finalizeTrace(trace, 'error', undefined, error);
-      throw new LLMError(
-        `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
-        'RUNTIME_TRACE_ERROR',
-      );
-    }
-  },
-
-  async *runStream(request) {
-    const trace = createTrace(request);
-    const generator = runAgentStream(request, createRuntimeDeps(trace));
-    let terminalEvent: AgentEvent | undefined;
-
-    try {
-      for await (const event of generator) {
-        if (event.type === 'done' || event.type === 'error') {
-          terminalEvent = event;
-          continue;
-        }
-        yield event;
-      }
-
-      if (terminalEvent?.type === 'done') {
-        const metadata = terminalEvent.data.metadata;
+export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): AgentRuntime {
+  return {
+    async run(request) {
+      const trace = createTrace(request);
+      try {
+        const events = await runAgent(request, createRuntimeDeps(memory, trace));
+        const metadata = extractMetadata(events);
         finalizeTrace(trace, 'success', metadata);
-        yield terminalEvent;
+        return { events, metadata };
+      } catch (error) {
+        const debugFile = finalizeTrace(trace, 'error', undefined, error);
+        throw new LLMError(
+          `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
+          'RUNTIME_TRACE_ERROR',
+        );
+      }
+    },
+
+    async *runStream(request) {
+      const trace = createTrace(request);
+      const generator = runAgentStream(request, createRuntimeDeps(memory, trace));
+      let terminalEvent: AgentEvent | undefined;
+
+      try {
+        for await (const event of generator) {
+          if (event.type === 'done' || event.type === 'error') {
+            terminalEvent = event;
+            continue;
+          }
+          yield event;
+        }
+
+        if (terminalEvent?.type === 'done') {
+          const metadata = terminalEvent.data.metadata;
+          finalizeTrace(trace, 'success', metadata);
+          yield terminalEvent;
+          return;
+        }
+
+        if (terminalEvent?.type === 'error') {
+          const debugFile = finalizeTrace(trace, 'error', undefined, terminalEvent.data.message);
+          yield {
+            type: 'error',
+            data: {
+              ...terminalEvent.data,
+              message: `${terminalEvent.data.message}. Trace file: ${debugFile}`,
+            },
+          };
+        }
+      } catch (error) {
+        const debugFile = finalizeTrace(trace, 'error', undefined, error);
+        throw new LLMError(
+          `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
+          'RUNTIME_TRACE_ERROR',
+        );
+      }
+    },
+
+    async finalize(request: FinalizeRequest) {
+      if (typeof memory.patchAssistantMessage !== 'function') {
         return;
       }
 
-      if (terminalEvent?.type === 'error') {
-        const debugFile = finalizeTrace(trace, 'error', undefined, terminalEvent.data.message);
-        yield {
-          type: 'error',
-          data: {
-            ...terminalEvent.data,
-            message: `${terminalEvent.data.message}. Trace file: ${debugFile}`,
+      if (request.success) {
+        if (!request.schemaDigest) {
+          return;
+        }
+        await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
+          meta: {
+            schemaDigest: request.schemaDigest,
           },
-        };
-      }
-    } catch (error) {
-      const debugFile = finalizeTrace(trace, 'error', undefined, error);
-      throw new LLMError(
-        `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
-        'RUNTIME_TRACE_ERROR',
-      );
-    }
-  },
-
-  async finalize(request: FinalizeRequest) {
-    if (typeof memory.patchAssistantMessage !== 'function') {
-      return;
-    }
-
-    if (request.success) {
-      if (!request.schemaDigest) {
+        });
         return;
       }
+
+      const conversation = await memory.getConversation(request.conversationId);
+      const target = [...conversation]
+        .reverse()
+        .find((message) => message.role === 'assistant' && message.meta?.sessionId === request.sessionId);
+      const nextText = buildFailedAssistantText(target?.text ?? '', request.error);
+
       await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
+        text: nextText,
         meta: {
-          schemaDigest: request.schemaDigest,
+          failed: true,
+          ...(request.schemaDigest ? { schemaDigest: request.schemaDigest } : {}),
         },
+        clearOperations: true,
       });
-      return;
-    }
+    },
+  };
+}
 
-    const conversation = await memory.getConversation(request.conversationId);
-    const target = [...conversation]
-      .reverse()
-      .find((message) => message.role === 'assistant' && message.meta?.sessionId === request.sessionId);
-    const nextText = buildFailedAssistantText(target?.text ?? '', request.error);
-
-    await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
-      text: nextText,
-      meta: {
-        failed: true,
-        ...(request.schemaDigest ? { schemaDigest: request.schemaDigest } : {}),
-      },
-      clearOperations: true,
-    });
-  },
-};
+export const agentRuntime = createAgentRuntime();

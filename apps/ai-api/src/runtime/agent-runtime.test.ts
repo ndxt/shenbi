@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { createInMemoryAgentMemoryStore } from '@shenbi/ai-agents';
 import {
   assessBlockQuality,
   classifyPromptToPageType,
+  createAgentRuntime,
   validateGeneratedBlockNode,
   validateGeneratedBlockNodeWithDiagnostics,
 } from './agent-runtime.ts';
@@ -275,6 +277,77 @@ describe('agent runtime json salvage', () => {
     expect(parsed).toMatchObject({ component: 'Descriptions.Item' });
     expect(Array.isArray(parsed.children)).toBe(true);
     expect(parsed.children[0]).toBe('北京市朝阳区科技园区A座15层');
+  });
+});
+
+describe('agent runtime finalize', () => {
+  it('patches confirmed schemaDigest onto the matching assistant message on success', async () => {
+    const memory = createInMemoryAgentMemoryStore();
+    const runtime = createAgentRuntime(memory);
+
+    await memory.appendConversationMessage('conv-1', {
+      role: 'assistant',
+      text: 'Planning page structure.',
+      meta: {
+        sessionId: 'run-1',
+        intent: 'schema.create',
+      },
+    });
+
+    await runtime.finalize({
+      conversationId: 'conv-1',
+      sessionId: 'run-1',
+      success: true,
+      schemaDigest: 'fnv1a-12345678',
+    });
+
+    await expect(memory.getConversation('conv-1')).resolves.toEqual([
+      {
+        role: 'assistant',
+        text: 'Planning page structure.',
+        meta: {
+          sessionId: 'run-1',
+          intent: 'schema.create',
+          schemaDigest: 'fnv1a-12345678',
+        },
+      },
+    ]);
+  });
+
+  it('marks the matching assistant message as failed and clears operations on failure', async () => {
+    const memory = createInMemoryAgentMemoryStore();
+    const runtime = createAgentRuntime(memory);
+
+    await memory.appendConversationMessage('conv-1', {
+      role: 'assistant',
+      text: '会更新当前卡片标题。',
+      meta: {
+        sessionId: 'run-1',
+        intent: 'schema.modify',
+        operations: [{ op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '本月营收' } }],
+      },
+    });
+
+    await runtime.finalize({
+      conversationId: 'conv-1',
+      sessionId: 'run-1',
+      success: false,
+      error: 'op 1 failed',
+      schemaDigest: 'fnv1a-deadbeef',
+    });
+
+    await expect(memory.getConversation('conv-1')).resolves.toEqual([
+      {
+        role: 'assistant',
+        text: '[修改失败] op 1 failed\n会更新当前卡片标题。',
+        meta: {
+          sessionId: 'run-1',
+          intent: 'schema.modify',
+          failed: true,
+          schemaDigest: 'fnv1a-deadbeef',
+        },
+      },
+    ]);
   });
 });
 

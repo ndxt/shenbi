@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSchemaDigest } from '@shenbi/ai-contracts';
 import type { AgentRuntimeDeps, RunRequest } from '../types';
 import { runAgentStream } from './stream-agent';
 import { createInMemoryAgentMemoryStore } from '../memory/memory-store';
@@ -141,72 +140,6 @@ describe('runAgentStream', () => {
         ],
       },
     });
-  });
-
-  it('persists schema digest immediately when modify returns a single schema.replace operation', async () => {
-    const memory = createInMemoryAgentMemoryStore();
-    const nextSchema = {
-      id: 'page-1',
-      body: [
-        {
-          id: 'card-1',
-          component: 'Card',
-          props: { title: '本月营收' },
-          children: [],
-        },
-      ],
-    };
-    const deps: AgentRuntimeDeps = {
-      llm: {
-        chat: vi.fn(async () => ({ text: 'unused' })),
-        streamChat: vi.fn(async function* () {
-          yield { text: 'unused' };
-        }),
-      },
-      tools: createToolRegistry([
-        {
-          name: 'modifySchema',
-          async execute() {
-            return {
-              explanation: '会整体替换当前页面。',
-              operations: [
-                {
-                  op: 'schema.replace' as const,
-                  schema: nextSchema,
-                },
-              ],
-            };
-          },
-        },
-      ]),
-      memory,
-      logger: {
-        info: vi.fn(),
-        error: vi.fn(),
-      },
-    };
-
-    for await (const _event of runAgentStream({
-      prompt: '整体重排这个页面',
-      intent: 'schema.modify',
-      conversationId: 'replace-conv',
-      context: {
-        schemaSummary: 'Existing dashboard',
-        componentSummary: 'Card',
-        schemaJson: {
-          id: 'page-1',
-          body: [{ id: 'card-1', component: 'Card', children: [] }],
-        },
-      },
-    }, deps)) {
-      // Drain the stream.
-    }
-
-    const conversation = await memory.getConversation('replace-conv');
-    expect(conversation.at(-1)?.meta).toEqual(expect.objectContaining({
-      intent: 'schema.modify',
-      schemaDigest: createSchemaDigest(nextSchema),
-    }));
   });
 
   it('writes assistant memory before yielding done so finalize can patch by sessionId', async () => {
