@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createInMemoryAgentMemoryStore } from '@shenbi/ai-agents';
@@ -233,6 +233,37 @@ function loadTrace(name: string): any {
   return JSON.parse(readFileSync(tracePath, 'utf8'));
 }
 
+function listMemoryDumps(): string[] {
+  const dumpDir = resolve(process.cwd(), '.ai-debug', 'memory');
+  try {
+    return readdirSync(dumpDir).filter((name) => name.endsWith('-finalize.json'));
+  } catch {
+    return [];
+  }
+}
+
+function findMemoryDump(
+  names: string[],
+  conversationId: string,
+  sessionId: string,
+): any {
+  const dumpDir = resolve(process.cwd(), '.ai-debug', 'memory');
+  const latest = [...names]
+    .reverse()
+    .map((name) => ({
+      name,
+      path: resolve(dumpDir, name),
+      dump: JSON.parse(readFileSync(resolve(dumpDir, name), 'utf8')),
+    }))
+    .find((entry) =>
+      entry.dump?.memory?.request?.conversationId === conversationId
+      && entry.dump?.memory?.request?.sessionId === sessionId);
+  if (!latest) {
+    throw new Error(`Expected a memory dump for ${conversationId}/${sessionId}`);
+  }
+  return latest.dump;
+}
+
 describe('agent runtime json salvage', () => {
   it('salvages near-valid json with trailing missing braces', () => {
     const raw = '```json\n{"component":"Card","children":[{"component":"Button","children":["确定"]}]\n```';
@@ -284,70 +315,129 @@ describe('agent runtime finalize', () => {
   it('patches confirmed schemaDigest onto the matching assistant message on success', async () => {
     const memory = createInMemoryAgentMemoryStore();
     const runtime = createAgentRuntime(memory);
+    const conversationId = 'conv-finalize-success';
+    const sessionId = 'run-finalize-success';
 
-    await memory.appendConversationMessage('conv-1', {
+    await memory.appendConversationMessage(conversationId, {
       role: 'assistant',
       text: 'Planning page structure.',
       meta: {
-        sessionId: 'run-1',
+        sessionId,
         intent: 'schema.create',
       },
     });
 
     await runtime.finalize({
-      conversationId: 'conv-1',
-      sessionId: 'run-1',
+      conversationId,
+      sessionId,
       success: true,
       schemaDigest: 'fnv1a-12345678',
     });
+    const dump = findMemoryDump(listMemoryDumps(), conversationId, sessionId);
 
-    await expect(memory.getConversation('conv-1')).resolves.toEqual([
+    await expect(memory.getConversation(conversationId)).resolves.toEqual([
       {
         role: 'assistant',
         text: 'Planning page structure.',
         meta: {
-          sessionId: 'run-1',
+          sessionId,
           intent: 'schema.create',
           schemaDigest: 'fnv1a-12345678',
         },
       },
     ]);
+    expect(dump.memory).toMatchObject({
+      request: {
+        conversationId,
+        sessionId,
+        success: true,
+        schemaDigest: 'fnv1a-12345678',
+      },
+      outcome: 'patched',
+      before: {
+        assistantMessage: {
+          text: 'Planning page structure.',
+          meta: {
+            intent: 'schema.create',
+          },
+        },
+      },
+      after: {
+        assistantMessage: {
+          text: 'Planning page structure.',
+          meta: {
+            intent: 'schema.create',
+            schemaDigest: 'fnv1a-12345678',
+          },
+        },
+      },
+    });
   });
 
   it('marks the matching assistant message as failed and clears operations on failure', async () => {
     const memory = createInMemoryAgentMemoryStore();
     const runtime = createAgentRuntime(memory);
+    const conversationId = 'conv-finalize-failure';
+    const sessionId = 'run-finalize-failure';
 
-    await memory.appendConversationMessage('conv-1', {
+    await memory.appendConversationMessage(conversationId, {
       role: 'assistant',
       text: '会更新当前卡片标题。',
       meta: {
-        sessionId: 'run-1',
+        sessionId,
         intent: 'schema.modify',
         operations: [{ op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '本月营收' } }],
       },
     });
 
     await runtime.finalize({
-      conversationId: 'conv-1',
-      sessionId: 'run-1',
+      conversationId,
+      sessionId,
       success: false,
       error: 'op 1 failed',
       schemaDigest: 'fnv1a-deadbeef',
     });
+    const dump = findMemoryDump(listMemoryDumps(), conversationId, sessionId);
 
-    await expect(memory.getConversation('conv-1')).resolves.toEqual([
+    await expect(memory.getConversation(conversationId)).resolves.toEqual([
       {
         role: 'assistant',
         text: '[修改失败] op 1 failed\n会更新当前卡片标题。',
         meta: {
-          sessionId: 'run-1',
+          sessionId,
           intent: 'schema.modify',
           failed: true,
           schemaDigest: 'fnv1a-deadbeef',
         },
       },
     ]);
+    expect(dump.memory).toMatchObject({
+      request: {
+        conversationId,
+        sessionId,
+        success: false,
+        error: 'op 1 failed',
+        schemaDigest: 'fnv1a-deadbeef',
+      },
+      outcome: 'patched',
+      before: {
+        assistantMessage: {
+          meta: {
+            operations: [{ op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '本月营收' } }],
+          },
+        },
+      },
+      after: {
+        assistantMessage: {
+          text: '[修改失败] op 1 failed\n会更新当前卡片标题。',
+          meta: {
+            failed: true,
+            schemaDigest: 'fnv1a-deadbeef',
+          },
+        },
+      },
+    });
+    expect(dump.memory.after.assistantMessage.meta.operations).toBeUndefined();
   });
 });
 

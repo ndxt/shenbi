@@ -5,6 +5,7 @@
 import {
   createInMemoryAgentMemoryStore,
   createToolRegistry,
+  type AgentMemoryMessage,
   type AgentMemoryStore,
   type ClassifyIntentInput,
   formatConversationHistory,
@@ -28,6 +29,7 @@ import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import { LLMError } from '../adapters/errors.ts';
 import {
   writeInvalidJsonDump,
+  writeMemoryDump,
   writeTraceDump,
   type InvalidJsonSource,
 } from '../adapters/debug-dump.ts';
@@ -109,6 +111,20 @@ interface RunTraceRecord {
     message: string;
     stack?: string;
   };
+}
+
+interface MemoryDebugSnapshot {
+  conversationId: string;
+  sessionId?: string;
+  conversationSize: number;
+  assistantMessage?: AgentMemoryMessage;
+  conversationTail: AgentMemoryMessage[];
+  lastRunMetadata?: RunMetadata;
+  lastBlockIds: string[];
+}
+
+function cloneDebugValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 export interface BlockQualityDiagnostic {
@@ -1830,6 +1846,43 @@ function buildFailedAssistantText(existingText: string, error?: string): string 
   return trimmed ? `${detail}\n${trimmed}` : detail;
 }
 
+function findAssistantMessageBySessionId(
+  conversation: AgentMemoryMessage[],
+  sessionId: string,
+): AgentMemoryMessage | undefined {
+  return [...conversation]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.meta?.sessionId === sessionId);
+}
+
+async function captureMemoryDebugSnapshot(
+  memory: AgentMemoryStore,
+  conversationId: string,
+  sessionId?: string,
+): Promise<MemoryDebugSnapshot> {
+  const [conversation, lastRunMetadata, lastBlockIds] = await Promise.all([
+    memory.getConversation(conversationId),
+    memory.getLastRunMetadata(conversationId),
+    memory.getLastBlockIds(conversationId),
+  ]);
+
+  return {
+    conversationId,
+    ...(sessionId ? { sessionId } : {}),
+    conversationSize: conversation.length,
+    ...(() => {
+      if (!sessionId) {
+        return {};
+      }
+      const assistantMessage = findAssistantMessageBySessionId(conversation, sessionId);
+      return assistantMessage ? { assistantMessage: cloneDebugValue(assistantMessage) } : {};
+    })(),
+    conversationTail: cloneDebugValue(conversation.slice(-6)),
+    ...(lastRunMetadata ? { lastRunMetadata: cloneDebugValue(lastRunMetadata) } : {}),
+    lastBlockIds: cloneDebugValue(lastBlockIds),
+  };
+}
+
 export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): AgentRuntime {
   return {
     async run(request) {
@@ -1893,31 +1946,55 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
         return;
       }
 
+      const before = await captureMemoryDebugSnapshot(
+        memory,
+        request.conversationId,
+        request.sessionId,
+      );
+      let outcome: 'patched' | 'skipped_missing_schema_digest' = 'patched';
+
       if (request.success) {
         if (!request.schemaDigest) {
-          return;
+          outcome = 'skipped_missing_schema_digest';
+        } else {
+          await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
+            meta: {
+              schemaDigest: request.schemaDigest,
+            },
+          });
         }
+      } else {
+        const nextText = buildFailedAssistantText(before.assistantMessage?.text ?? '', request.error);
+
         await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
+          text: nextText,
           meta: {
-            schemaDigest: request.schemaDigest,
+            failed: true,
+            ...(request.schemaDigest ? { schemaDigest: request.schemaDigest } : {}),
           },
+          clearOperations: true,
         });
-        return;
       }
 
-      const conversation = await memory.getConversation(request.conversationId);
-      const target = [...conversation]
-        .reverse()
-        .find((message) => message.role === 'assistant' && message.meta?.sessionId === request.sessionId);
-      const nextText = buildFailedAssistantText(target?.text ?? '', request.error);
-
-      await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
-        text: nextText,
-        meta: {
-          failed: true,
-          ...(request.schemaDigest ? { schemaDigest: request.schemaDigest } : {}),
+      const after = await captureMemoryDebugSnapshot(
+        memory,
+        request.conversationId,
+        request.sessionId,
+      );
+      const debugFile = writeMemoryDump({
+        category: 'finalize',
+        memory: {
+          request,
+          outcome,
+          before,
+          after,
         },
-        clearOperations: true,
+      });
+      logger.info('ai.runtime.memory_dump', {
+        conversationId: request.conversationId,
+        sessionId: request.sessionId,
+        success: request.success,
+        debugFile,
       });
     },
   };
