@@ -23,6 +23,51 @@ function resolveInsertParentTreeId(
   return undefined;
 }
 
+/**
+ * 对 AI 生成的 insertNode.node 做容错规范化：
+ * 1. AI 有时将组件类型写成 `type` 而非 `component`，自动修正。
+ * 2. AI 有时将文本内容放在 `props.children` 而非顶层 `children`，自动提升。
+ */
+function normalizeInsertNode(node: unknown): unknown {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) {
+    return node;
+  }
+  const raw = node as Record<string, unknown>;
+  const normalized: Record<string, unknown> = { ...raw };
+
+  // 修正 1：type -> component
+  if (typeof normalized.component !== 'string' && typeof normalized.type === 'string') {
+    normalized.component = normalized.type;
+    delete normalized.type;
+  }
+
+  // 修正 2：props.children -> 顶层 children
+  // 触发条件：顶层 children 缺失（undefined）或为空数组（AI 常生成 "children": []）
+  const topChildren = normalized.children;
+  const topChildrenIsEmpty = topChildren === undefined || (Array.isArray(topChildren) && topChildren.length === 0);
+  if (
+    topChildrenIsEmpty &&
+    normalized.props !== null &&
+    typeof normalized.props === 'object' &&
+    !Array.isArray(normalized.props)
+  ) {
+    const props = normalized.props as Record<string, unknown>;
+    if ('children' in props) {
+      normalized.children = props.children;
+      const { children: _omit, ...restProps } = props;
+      void _omit;
+      normalized.props = restProps;
+    }
+  }
+
+  // 递归处理子节点
+  if (Array.isArray(normalized.children)) {
+    normalized.children = normalized.children.map(normalizeInsertNode);
+  }
+
+  return normalized;
+}
+
 export async function executeAgentOperation(
   bridge: EditorAIBridge,
   operation: AgentOperation,
@@ -54,17 +99,19 @@ export async function executeAgentOperation(
           treeId: resolveTreeId(bridge, operation.nodeId, operation.op),
           columns: operation.columns,
         });
-      case 'schema.insertNode':
+      case 'schema.insertNode': {
+        const node = normalizeInsertNode(operation.node);
         return typeof operation.index === 'number'
           ? bridge.execute('node.insertAt', {
               parentTreeId: resolveInsertParentTreeId(bridge, operation),
               index: operation.index,
-              node: operation.node,
+              node,
             })
           : bridge.execute('node.append', {
               parentTreeId: resolveInsertParentTreeId(bridge, operation),
-              node: operation.node,
+              node,
             });
+      }
       case 'schema.removeNode':
         return bridge.execute('node.remove', {
           treeId: resolveTreeId(bridge, operation.nodeId, operation.op),

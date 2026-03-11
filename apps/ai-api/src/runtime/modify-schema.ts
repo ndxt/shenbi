@@ -61,6 +61,7 @@ function resolveProviderConfig(providerName: string | undefined): {
   apiKey?: string | undefined;
   thinkingModels?: string[] | undefined;
   nonThinkingModels?: string[] | undefined;
+  enableThinkingModels?: string[] | undefined;
 } {
   const provider = providerName ?? env.AI_PROVIDER;
   if (!provider) {
@@ -74,6 +75,7 @@ function resolveProviderConfig(providerName: string | undefined): {
     apiKey: matched?.apiKey ?? (provider === env.AI_PROVIDER ? env.AI_OPENAI_COMPAT_API_KEY : undefined),
     thinkingModels: matched?.thinkingModels,
     nonThinkingModels: matched?.nonThinkingModels,
+    enableThinkingModels: matched?.enableThinkingModels,
   };
 }
 
@@ -94,6 +96,7 @@ function createClient(providerName?: string): OpenAICompatibleClient {
     apiKey: config.apiKey,
     ...(config.thinkingModels ? { thinkingModels: config.thinkingModels } : {}),
     ...(config.nonThinkingModels ? { nonThinkingModels: config.nonThinkingModels } : {}),
+    ...(config.enableThinkingModels ? { enableThinkingModels: config.enableThinkingModels } : {}),
   });
   clientCache.set(config.provider, client);
   return client;
@@ -462,8 +465,9 @@ function createModifyMessages(input: ModifySchemaInput): OpenAICompatibleMessage
         '- schema.patchEvents: {"op":"schema.patchEvents","nodeId":"node-id","patch":{}}',
         '- schema.patchLogic: {"op":"schema.patchLogic","nodeId":"node-id","patch":{}}',
         '- schema.patchColumns: {"op":"schema.patchColumns","nodeId":"node-id","columns":[]}',
-        '- schema.insertNode: {"op":"schema.insertNode","parentId":"node-id","index":0,"node":{...}}',
-        '- root append: {"op":"schema.insertNode","container":"body","node":{...}} or {"op":"schema.insertNode","container":"dialogs","node":{...}}',
+        '- schema.insertNode: {"op":"schema.insertNode","parentId":"node-id","index":0,"node":{"id":"unique-id","component":"ComponentName","props":{},"children":[]}}',
+        '  IMPORTANT: node MUST have "component" field (NOT "type"). Text content goes in top-level "children" (NOT "props.children").',
+        '- root append: {"op":"schema.insertNode","container":"body","node":{"id":"unique-id","component":"ComponentName","props":{},"children":[]}} or same with "container":"dialogs"',
         '- schema.removeNode: {"op":"schema.removeNode","nodeId":"node-id"}',
         '- schema.replace: {"op":"schema.replace","schema":{...}}',
         'Rules:',
@@ -479,7 +483,6 @@ function createModifyMessages(input: ModifySchemaInput): OpenAICompatibleMessage
       content: [
         `Prompt: ${input.request.prompt}`,
         `Schema Summary: ${input.context.document.summary}`,
-        `Component Summary: ${input.context.componentSummary}`,
         ...(selectedNodeHint ? [selectedNodeHint] : []),
         'Schema Tree:',
         documentTree,

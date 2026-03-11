@@ -30,6 +30,10 @@ export interface OpenAICompatibleRequestDebugSummary {
   thinking?: OpenAICompatibleThinking | undefined;
   /** Set only for Qwen-style models that use `enable_thinking` instead of the `thinking` object. */
   enableThinking?: boolean | undefined;
+  /** The full URL of the chat completions endpoint. */
+  requestUrl: string;
+  /** The actual request body sent to the API (for debugging). */
+  requestBody: Record<string, unknown>;
 }
 
 interface ChatCompletionChoice {
@@ -173,6 +177,23 @@ export class OpenAICompatibleClient {
     );
   }
 
+  private buildRequestBody(
+    model: string,
+    messages: OpenAICompatibleMessage[],
+    fmt: ThinkingFormat,
+    stream: boolean,
+  ): Record<string, unknown> {
+    return {
+      model,
+      messages,
+      temperature: this.temperature,
+      stream,
+      ...(!stream ? { response_format: { type: 'json_object' } } : {}),
+      ...(fmt.kind === 'qwen' ? { enable_thinking: fmt.enabled } : {}),
+      ...(fmt.kind === 'anthropic' ? { thinking: fmt.value } : {}),
+    };
+  }
+
   buildRequestDebugSummary(
     model: string,
     messages: OpenAICompatibleMessage[],
@@ -180,6 +201,7 @@ export class OpenAICompatibleClient {
     stream: boolean,
   ): OpenAICompatibleRequestDebugSummary {
     const fmt = this.resolveFormat(model, thinking);
+    const requestBody = this.buildRequestBody(model, messages, fmt, stream);
     return {
       model,
       stream,
@@ -189,6 +211,8 @@ export class OpenAICompatibleClient {
       hasThinking: fmt.kind !== 'none',
       ...(fmt.kind === 'anthropic' ? { thinking: fmt.value } : {}),
       ...(fmt.kind === 'qwen' ? { enableThinking: fmt.enabled } : {}),
+      requestUrl: `${this.baseUrl}/chat/completions`,
+      requestBody,
     };
   }
 
@@ -198,23 +222,14 @@ export class OpenAICompatibleClient {
     thinking?: OpenAICompatibleThinking,
   ): Promise<string> {
     const fmt = this.resolveFormat(model, thinking);
+    const body = this.buildRequestBody(model, messages, fmt, false);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: this.temperature,
-        stream: false,
-        response_format: {
-          type: 'json_object',
-        },
-        ...(fmt.kind === 'qwen' ? { enable_thinking: fmt.enabled } : {}),
-        ...(fmt.kind === 'anthropic' ? { thinking: fmt.value } : {}),
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -235,20 +250,14 @@ export class OpenAICompatibleClient {
     thinking?: OpenAICompatibleThinking,
   ): AsyncIterable<{ text: string }> {
     const fmt = this.resolveFormat(model, thinking);
+    const body = this.buildRequestBody(model, messages, fmt, true);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: this.temperature,
-        stream: true,
-        ...(fmt.kind === 'qwen' ? { enable_thinking: fmt.enabled } : {}),
-        ...(fmt.kind === 'anthropic' ? { thinking: fmt.value } : {}),
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

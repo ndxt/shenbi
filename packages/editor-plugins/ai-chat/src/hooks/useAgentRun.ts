@@ -101,6 +101,41 @@ function hasSchemaContent(schema: PageSchema): boolean {
     return bodyCount + dialogCount > 0;
 }
 
+/**
+ * Resolve a selectedNodeId that may be a path expression (e.g. "body.0.children.1.children.0")
+ * into the actual schema node id (e.g. "block-1-kpi-overview").
+ * If the value is already a plain id (no dots / not a path), it is returned as-is.
+ * Returns undefined when the path cannot be resolved or the resolved node has no id.
+ */
+function resolveSelectedNodeId(schema: PageSchema, rawId: string | undefined): string | undefined {
+    if (!rawId) return undefined;
+    // Heuristic: path expressions start with "body" or "dialogs" and use dot notation
+    if (!/^(body|dialogs)(\.|$)/.test(rawId)) {
+        // Already looks like a plain node id
+        return rawId;
+    }
+    const parts = rawId.split('.');
+    // Walk the schema using the path segments
+    let current: unknown = schema;
+    for (const part of parts) {
+        if (current === null || current === undefined) return undefined;
+        if (Array.isArray(current)) {
+            const index = Number(part);
+            if (Number.isNaN(index)) return undefined;
+            current = current[index];
+        } else if (typeof current === 'object') {
+            current = (current as Record<string, unknown>)[part];
+        } else {
+            return undefined;
+        }
+    }
+    if (typeof current === 'object' && current !== null && 'id' in current) {
+        const id = (current as { id?: unknown }).id;
+        return typeof id === 'string' && id.length > 0 ? id : undefined;
+    }
+    return undefined;
+}
+
 function resolveRequestedIntent(prompt: string, hasDocument: boolean): AgentIntent {
     if (hasDocument && MODIFY_INTENT_PATTERN.test(prompt)) {
         return 'schema.modify';
@@ -236,7 +271,8 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             const requestedIntent = resolveRequestedIntent(prompt, hasSchemaContent(currentSchema));
             const schemaSummary = summarizeSchema(currentSchema);
             const componentSummary = summarizeComponents(bridgeRef.current.getAvailableComponents());
-            const selectedNodeId = bridgeRef.current.getSelectedNodeId();
+            const rawSelectedNodeId = bridgeRef.current.getSelectedNodeId();
+            const selectedNodeId = resolveSelectedNodeId(currentSchema, rawSelectedNodeId);
 
             const request: RunRequest = {
                 prompt,
