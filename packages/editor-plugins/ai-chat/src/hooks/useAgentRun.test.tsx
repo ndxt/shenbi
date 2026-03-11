@@ -65,10 +65,12 @@ function createBridge() {
 
 class ScenarioAIClient implements AIClient {
   readonly finalizeCalls: FinalizeRequest[] = [];
+  readonly requests: RunRequest[] = [];
 
   constructor(private readonly events: AgentEvent[]) {}
 
-  async *runStream(_request: RunRequest, _options: RunStreamOptions = {}): AsyncIterable<AgentEvent> {
+  async *runStream(request: RunRequest, _options: RunStreamOptions = {}): AsyncIterable<AgentEvent> {
+    this.requests.push(request);
     for (const event of this.events) {
       yield event;
     }
@@ -169,6 +171,16 @@ describe('useAgentRun', () => {
     expect(onDone).toHaveBeenCalledWith({
       sessionId: 'session-success',
       conversationId: 'conv-success',
+    });
+    expect(client.requests).toHaveLength(1);
+    expect(client.requests[0]).toMatchObject({
+      prompt: '把当前卡片标题改成新标题，并追加一段说明',
+      intent: 'schema.modify',
+      conversationId: 'conv-success',
+      selectedNodeId: 'card-1',
+      context: {
+        schemaJson: createInitialSchema(),
+      },
     });
     expect(client.finalizeCalls).toHaveLength(1);
     expect(client.finalizeCalls[0]).toMatchObject({
@@ -275,6 +287,16 @@ describe('useAgentRun', () => {
       sessionId: 'session-failure',
       conversationId: 'conv-failure',
     });
+    expect(client.requests).toHaveLength(1);
+    expect(client.requests[0]).toMatchObject({
+      prompt: '删除一个不存在的节点',
+      intent: 'schema.modify',
+      conversationId: 'conv-failure',
+      selectedNodeId: 'card-1',
+      context: {
+        schemaJson: createInitialSchema(),
+      },
+    });
     expect(onError).toHaveBeenCalledWith(
       expect.stringContaining('修改失败：第 2 条 schema.removeNode 执行出错'),
     );
@@ -299,5 +321,127 @@ describe('useAgentRun', () => {
     const container = Array.isArray(currentSchema.body) ? currentSchema.body[0] : currentSchema.body;
     const card = Array.isArray(container?.children) ? container.children[0] : undefined;
     expect(card?.props?.title).toBe('旧标题');
+  });
+
+  it('retries rollback during modify:done when the first discard attempt fails', async () => {
+    const editor = createEditor({
+      initialSchema: createInitialSchema(),
+    });
+    const commandLog: Array<{ commandId: string; args?: unknown }> = [];
+    let discardAttempts = 0;
+    const bridge: EditorAIBridge = {
+      getSchema: () => editor.state.getSchema(),
+      getSelectedNodeId: () => 'card-1',
+      getAvailableComponents: () => [],
+      execute: async (commandId, args) => {
+        commandLog.push({ commandId, args });
+        if (commandId === 'history.discardBatch') {
+          discardAttempts += 1;
+          if (discardAttempts === 1) {
+            return { success: false, error: 'rollback blocked' };
+          }
+        }
+        try {
+          await editor.commands.execute(commandId, args);
+          return { success: true };
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      },
+      replaceSchema: (schema) => {
+        void editor.commands.execute('schema.replace', { schema });
+      },
+      appendBlock: async (node, parentTreeId) => bridge.execute('node.append', { node, parentTreeId }),
+      removeNode: async (treeId) => bridge.execute('node.remove', { treeId }),
+      subscribe: () => () => undefined,
+    };
+    const client = new ScenarioAIClient([
+      {
+        type: 'run:start',
+        data: { sessionId: 'session-retry', conversationId: 'conv-retry' },
+      },
+      {
+        type: 'intent',
+        data: { intent: 'schema.modify', confidence: 1 },
+      },
+      {
+        type: 'modify:start',
+        data: { operationCount: 2, explanation: '第二条失败且第一次回滚失败' },
+      },
+      {
+        type: 'modify:op',
+        data: {
+          index: 0,
+          operation: {
+            op: 'schema.patchProps',
+            nodeId: 'card-1',
+            patch: { title: '临时标题' },
+          },
+        },
+      },
+      {
+        type: 'modify:op',
+        data: {
+          index: 1,
+          operation: {
+            op: 'schema.removeNode',
+            nodeId: 'missing-node',
+          },
+        },
+      },
+      {
+        type: 'modify:done',
+        data: {},
+      },
+      {
+        type: 'done',
+        data: {
+          metadata: {
+            sessionId: 'session-retry',
+            conversationId: 'conv-retry',
+          },
+        },
+      },
+    ]);
+    setAIClient(client);
+    const onDone = vi.fn();
+    const onError = vi.fn();
+
+    const { result } = renderHook(() => useAgentRun(bridge));
+
+    await act(async () => {
+      await result.current.runAgent(
+        '删除一个不存在的节点并触发回滚重试',
+        '',
+        '',
+        false,
+        'conv-retry',
+        () => 'message-3',
+        vi.fn(),
+        onDone,
+        onError,
+      );
+    });
+
+    expect(discardAttempts).toBe(2);
+    expect(onDone).toHaveBeenCalledWith({
+      sessionId: 'session-retry',
+      conversationId: 'conv-retry',
+    });
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('回滚失败'));
+    expect(client.finalizeCalls).toHaveLength(1);
+    expect(client.finalizeCalls[0]).toMatchObject({
+      conversationId: 'conv-retry',
+      sessionId: 'session-retry',
+      success: false,
+      failedOpIndex: 1,
+      error: expect.stringContaining('rollback failed'),
+    });
+    expect(commandLog.filter((entry) => entry.commandId === 'history.discardBatch')).toHaveLength(2);
+    expect(editor.history.getSize()).toBe(0);
+    expect(getSchemaNodeByTreeId(editor.state.getSchema(), 'body.0.children.0')?.props?.title).toBe('旧标题');
   });
 });
