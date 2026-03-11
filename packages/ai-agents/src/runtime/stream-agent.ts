@@ -103,6 +103,13 @@ function getFinalSchemaDigest(events: AgentEvent[]): string | undefined {
   return createSchemaDigest(finalSchemaEvent?.data.schema);
 }
 
+function getOperationSchemaDigest(operations: AgentOperation[]): string | undefined {
+  if (operations.length !== 1 || operations[0]?.op !== 'schema.replace') {
+    return undefined;
+  }
+  return createSchemaDigest(operations[0].schema);
+}
+
 export async function* runAgentStream(
   request: RunRequest,
   deps: AgentRuntimeDeps,
@@ -180,7 +187,7 @@ export async function* runAgentStream(
     }
 
     metadata.durationMs = Date.now() - startedAt;
-    const finalSchemaDigest = getFinalSchemaDigest(events);
+    const finalSchemaDigest = getFinalSchemaDigest(events) ?? getOperationSchemaDigest(operations);
     const finalSchemaBlocks = events
       .filter((event): event is Extract<AgentEvent, { type: 'schema:block' }> => event.type === 'schema:block')
       .map((event) => event.data.blockId);
