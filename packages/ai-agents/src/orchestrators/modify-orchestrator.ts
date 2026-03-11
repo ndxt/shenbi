@@ -47,6 +47,10 @@ export async function* modifyOrchestrator(
     data: {
       operationCount: result.operations.length,
       explanation: result.explanation,
+      operations: result.operations.map((o) => ({
+        op: o.op,
+        ...('nodeId' in o && o.nodeId ? { nodeId: o.nodeId } : {}),
+      })),
     },
   };
 

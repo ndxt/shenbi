@@ -94,7 +94,7 @@ export type AgentEvent =
   | { type: 'tool:start'; data: { tool: string; label?: string } }
   | { type: 'tool:result'; data: { tool: string; ok: boolean; summary?: string } }
   | { type: 'plan'; data: PagePlan }
-  | { type: 'modify:start'; data: { operationCount: number; explanation: string } }
+  | { type: 'modify:start'; data: { operationCount: number; explanation: string; operations: Array<{ op: string; nodeId?: string }> } }
   | { type: 'modify:op'; data: { index: number; operation: AgentOperation } }
   | { type: 'modify:done'; data: {} }
   | { type: 'schema:skeleton'; data: { schema: PageSchema } }

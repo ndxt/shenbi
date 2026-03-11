@@ -384,9 +384,8 @@ export function AIPanel({
                       }`}
                       style={{ fontSize: '11px' }}
                     >
-                      <span className="text-text-secondary tabular-nums shrink-0" style={{ fontSize: '10px' }}>#{i + 1}</span>
-                      <span className="text-text-primary opacity-80 truncate flex-1">
-                        {modifyStatuses[i] === 'generating' ? '执行中' : modifyStatuses[i] === 'done' ? '已完成' : '等待'}
+                      <span className="text-text-primary opacity-80 truncate flex-1" title={modifyPlan.operationLabels[i] ?? ''}>
+                        {modifyPlan.operationLabels[i] ?? `操作 ${i + 1}`}
                       </span>
                       {modifyStatuses[i] === 'done' && (
                         <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
@@ -437,8 +436,9 @@ export function AIPanel({
                 <ul className="flex flex-col gap-0.5">
                   {Array.from({ length: lastRunResult.modifyPlan.operationCount }, (_, i) => (
                     <li key={i} className="flex items-center gap-2 py-0.5 px-1" style={{ fontSize: '11px' }}>
-                      <span className="text-text-secondary tabular-nums shrink-0" style={{ fontSize: '10px' }}>#{i + 1}</span>
-                      <span className="text-text-primary opacity-80 truncate flex-1">已完成</span>
+                      <span className="text-text-primary opacity-80 truncate flex-1" title={lastRunResult.modifyPlan?.operationLabels[i] ?? ''}>
+                        {lastRunResult.modifyPlan?.operationLabels[i] ?? `操作 ${i + 1}`}
+                      </span>
                       <CheckCircle2 size={11} className={lastRunResult.modifyStatuses[i] === 'done' ? 'text-emerald-400 shrink-0' : 'text-red-400 shrink-0'} />
                     </li>
                   ))}

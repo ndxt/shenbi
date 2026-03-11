@@ -11,6 +11,7 @@ export type BlockRunStatus = 'waiting' | 'generating' | 'done';
 export interface ModifyPlan {
   operationCount: number;
   explanation: string;
+  operationLabels: string[];
 }
 
 export interface LastRunResult {
@@ -496,10 +497,17 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     throw new Error(batchResult.error || 'history.beginBatch failed');
                                 }
                             }
-                            localModifyPlan = {
-                                operationCount: event.data.operationCount,
-                                explanation: event.data.explanation,
-                            };
+                            {
+                                const labels = (event.data.operations ?? []).map((o: { op: string; nodeId?: string }) => {
+                                    const shortOp = o.op.replace('schema.', '');
+                                    return o.nodeId ? `${shortOp} → ${o.nodeId}` : shortOp;
+                                });
+                                localModifyPlan = {
+                                    operationCount: event.data.operationCount,
+                                    explanation: event.data.explanation,
+                                    operationLabels: labels,
+                                };
+                            }
                             setModifyPlan(localModifyPlan);
                             for (let j = 0; j < event.data.operationCount; j++) {
                                 localModifyStatuses[j] = 'waiting';
