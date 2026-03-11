@@ -2,7 +2,7 @@
  * RunRequest 校验 — 首版必须校验 prompt、context.schemaSummary、context.componentSummary
  */
 import { ValidationError } from '../adapters/errors.ts';
-import type { RunRequest } from '@shenbi/ai-contracts';
+import type { FinalizeRequest, RunRequest } from '@shenbi/ai-contracts';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -71,6 +71,13 @@ export function validateRunRequest(body: unknown): RunRequest {
   if (typeof body['blockModel'] === 'string') req.blockModel = body['blockModel'];
   if (typeof body['conversationId'] === 'string') req.conversationId = body['conversationId'];
   if (typeof body['selectedNodeId'] === 'string') req.selectedNodeId = body['selectedNodeId'];
+  if (body['intent'] !== undefined) {
+    if (body['intent'] === 'schema.create' || body['intent'] === 'schema.modify' || body['intent'] === 'chat') {
+      req.intent = body['intent'];
+    } else {
+      throw new ValidationError('intent must be "schema.create", "schema.modify", or "chat"');
+    }
+  }
   if (isRecord(body['thinking'])) {
     const thinkingType = body['thinking']['type'];
     if (thinkingType === 'enabled' || thinkingType === 'disabled') {
@@ -81,4 +88,40 @@ export function validateRunRequest(body: unknown): RunRequest {
   }
 
   return req;
+}
+
+export function validateFinalizeRequest(body: unknown): FinalizeRequest {
+  if (!isRecord(body)) {
+    throw new ValidationError('Request body must be a JSON object');
+  }
+  if (typeof body['conversationId'] !== 'string' || body['conversationId'].trim() === '') {
+    throw new ValidationError('conversationId is required and must be a non-empty string');
+  }
+  if (typeof body['sessionId'] !== 'string' || body['sessionId'].trim() === '') {
+    throw new ValidationError('sessionId is required and must be a non-empty string');
+  }
+  if (typeof body['success'] !== 'boolean') {
+    throw new ValidationError('success is required and must be a boolean');
+  }
+
+  const request: FinalizeRequest = {
+    conversationId: body['conversationId'].trim(),
+    sessionId: body['sessionId'].trim(),
+    success: body['success'],
+  };
+
+  if (body['failedOpIndex'] !== undefined) {
+    if (!Number.isInteger(body['failedOpIndex']) || Number(body['failedOpIndex']) < 0) {
+      throw new ValidationError('failedOpIndex must be a non-negative integer');
+    }
+    request.failedOpIndex = Number(body['failedOpIndex']);
+  }
+  if (body['error'] !== undefined) {
+    if (typeof body['error'] !== 'string' || body['error'].trim() === '') {
+      throw new ValidationError('error must be a non-empty string');
+    }
+    request.error = body['error'];
+  }
+
+  return request;
 }

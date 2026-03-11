@@ -3,6 +3,7 @@ import type {
   AgentEvent,
   AgentIntent,
   AgentOperation,
+  FinalizeRequest,
   FeedbackRequest,
   LayoutRow,
   ModelInfo,
@@ -18,6 +19,7 @@ export type {
   AgentEvent,
   AgentIntent,
   AgentOperation,
+  FinalizeRequest,
   FeedbackRequest,
   LayoutRow,
   ModelInfo,
@@ -45,6 +47,7 @@ export interface AgentMemoryMessage {
   role: 'user' | 'assistant';
   text: string;
   meta?: {
+    sessionId?: string;
     intent?: AgentIntent;
     operations?: AgentOperation[];
     schemaDigest?: string;
@@ -61,6 +64,15 @@ export interface AgentMemoryEntry {
 export interface AgentMemoryStore {
   getConversation(conversationId: string): Promise<AgentMemoryMessage[]>;
   appendConversationMessage(conversationId: string, message: AgentMemoryMessage): Promise<void>;
+  patchAssistantMessage?(
+    conversationId: string,
+    sessionId: string,
+    patch: {
+      text?: string;
+      meta?: Partial<NonNullable<AgentMemoryMessage['meta']>>;
+      clearOperations?: boolean;
+    },
+  ): Promise<void>;
   getLastRunMetadata(conversationId: string): Promise<RunMetadata | undefined>;
   setLastRunMetadata(conversationId: string, metadata: RunMetadata): Promise<void>;
   getLastBlockIds(conversationId: string): Promise<string[]>;

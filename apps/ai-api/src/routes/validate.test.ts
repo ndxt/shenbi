@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { validateRunRequest } from './validate.ts';
+import { validateFinalizeRequest, validateRunRequest } from './validate.ts';
 
 describe('validateRunRequest', () => {
   it('preserves optional schemaJson and workspaceFileIds', () => {
     const request = validateRunRequest({
       prompt: 'modify page',
+      intent: 'schema.modify',
       context: {
         schemaSummary: 'pageId=page-1',
         componentSummary: 'Card',
@@ -21,6 +22,7 @@ describe('validateRunRequest', () => {
       body: [{ id: 'card-1', component: 'Card' }],
     });
     expect(request.context.workspaceFileIds).toEqual(['page-1.json', 'shared.ts']);
+    expect(request.intent).toBe('schema.modify');
   });
 
   it('rejects invalid schemaJson payloads', () => {
@@ -43,5 +45,43 @@ describe('validateRunRequest', () => {
         workspaceFileIds: ['page-1.json', 1],
       },
     })).toThrow(/workspaceFileIds/i);
+  });
+
+  it('rejects invalid intent values', () => {
+    expect(() => validateRunRequest({
+      prompt: 'modify page',
+      intent: 'modify',
+      context: {
+        schemaSummary: 'pageId=page-1',
+        componentSummary: 'Card',
+      },
+    })).toThrow(/intent/i);
+  });
+});
+
+describe('validateFinalizeRequest', () => {
+  it('accepts finalize payloads', () => {
+    expect(validateFinalizeRequest({
+      conversationId: 'conv-1',
+      sessionId: 'session-1',
+      success: false,
+      failedOpIndex: 2,
+      error: 'node not found',
+    })).toEqual({
+      conversationId: 'conv-1',
+      sessionId: 'session-1',
+      success: false,
+      failedOpIndex: 2,
+      error: 'node not found',
+    });
+  });
+
+  it('rejects invalid failedOpIndex', () => {
+    expect(() => validateFinalizeRequest({
+      conversationId: 'conv-1',
+      sessionId: 'session-1',
+      success: false,
+      failedOpIndex: -1,
+    })).toThrow(/failedOpIndex/i);
   });
 });

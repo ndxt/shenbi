@@ -15,7 +15,7 @@ export type AgentOperation =
   | { op: 'schema.patchEvents'; nodeId: string; patch: Record<string, unknown> }
   | { op: 'schema.patchLogic'; nodeId: string; patch: Record<string, unknown> }
   | { op: 'schema.patchColumns'; nodeId: string; columns: unknown }
-  | { op: 'schema.insertNode'; parentId: string; index?: number; node: SchemaNode }
+  | { op: 'schema.insertNode'; parentId?: string; container?: 'body' | 'dialogs'; index?: number; node: SchemaNode }
   | { op: 'schema.removeNode'; nodeId: string }
   | { op: 'schema.replace'; schema: PageSchema };
 
@@ -27,6 +27,7 @@ export type LayoutRow =
 
 export interface RunRequest {
   prompt: string;
+  intent?: AgentIntent;
   plannerModel?: string;
   blockModel?: string;
   conversationId?: string;
@@ -62,6 +63,14 @@ export interface PagePlan {
     priority: number;
     complexity: 'simple' | 'medium' | 'complex';
   }>;
+}
+
+export interface FinalizeRequest {
+  conversationId: string;
+  sessionId: string;
+  success: boolean;
+  failedOpIndex?: number;
+  error?: string;
 }
 
 export interface ModifyResult {

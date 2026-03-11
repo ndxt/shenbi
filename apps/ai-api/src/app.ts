@@ -11,6 +11,7 @@ import { createRateLimitMiddleware } from './middleware/rate-limit.ts';
 import { handleError } from './middleware/error-handler.ts';
 import { createRunRoute } from './routes/run.ts';
 import { createRunStreamRoute } from './routes/run-stream.ts';
+import { createFinalizeRoute } from './routes/finalize.ts';
 import { createModelsRoute } from './routes/models.ts';
 import { agentRuntime } from './runtime/agent-runtime.ts';
 import type { AgentRuntime } from './runtime/types.ts';
@@ -37,6 +38,7 @@ export function createApp(options: AppOptions = {}): Hono {
 
   app.route('/api/ai/run/stream', createRunStreamRoute(runtime));
   app.route('/api/ai/run', createRunRoute(runtime));
+  app.route('/api/ai/run/finalize', createFinalizeRoute(runtime));
   app.route('/api/ai/models', createModelsRoute());
 
   app.get('/health', (c) => c.json({ status: 'ok' }));

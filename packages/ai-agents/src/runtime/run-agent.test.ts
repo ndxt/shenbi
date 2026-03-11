@@ -165,9 +165,10 @@ describe('runAgent', () => {
       {
         role: 'assistant',
         text: 'Planning page structure.',
-        meta: {
+        meta: expect.objectContaining({
+          sessionId: expect.any(String),
           intent: 'schema.create',
-        },
+        }),
       },
     ]);
     expect(await deps.memory.getLastBlockIds('conv-1')).toEqual(['hero', 'table']);

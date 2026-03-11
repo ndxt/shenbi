@@ -8,6 +8,9 @@ import type { AgentIntent, PagePlan, RunMetadata, RunRequest } from '../ai/api-t
 export type PlanConfig = PagePlan;
 export type BlockRunStatus = 'waiting' | 'generating' | 'done';
 
+const MODIFY_INTENT_PATTERN = /修改|调整|删除|添加|增加|替换|移动|隐藏|显示|改成|换成|update|change|remove|delete|insert|add|replace|move|hide|show/i;
+const CREATE_INTENT_PATTERN = /生成|创建|新建|搭建|做一个|做个|产出|生成一个|build|create|generate/i;
+
 function isSchemaNode(value: unknown): value is SchemaNode {
     return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
 }
@@ -90,6 +93,22 @@ function replaceSkeletonNode(schema: PageSchema, blockId: string, node: SchemaNo
         nextSchema.dialogs = replaceNodeInTree(schema.dialogs, skeletonId, node) as SchemaNode[];
     }
     return nextSchema;
+}
+
+function hasSchemaContent(schema: PageSchema): boolean {
+    const bodyCount = Array.isArray(schema.body) ? schema.body.length : (schema.body ? 1 : 0);
+    const dialogCount = Array.isArray(schema.dialogs) ? schema.dialogs.length : (schema.dialogs ? 1 : 0);
+    return bodyCount + dialogCount > 0;
+}
+
+function resolveRequestedIntent(prompt: string, hasDocument: boolean): AgentIntent {
+    if (hasDocument && MODIFY_INTENT_PATTERN.test(prompt)) {
+        return 'schema.modify';
+    }
+    if (!hasDocument || CREATE_INTENT_PATTERN.test(prompt)) {
+        return 'schema.create';
+    }
+    return 'chat';
 }
 
 export function useAgentRun(bridge: EditorAIBridge | undefined) {
@@ -213,12 +232,14 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             preGenerationSchemaRef.current = bridgeRef.current.getSchema();
             const currentSchema = bridgeRef.current.getSchema();
 
+            const requestedIntent = resolveRequestedIntent(prompt, hasSchemaContent(currentSchema));
             const schemaSummary = summarizeSchema(currentSchema);
             const componentSummary = summarizeComponents(bridgeRef.current.getAvailableComponents());
             const selectedNodeId = bridgeRef.current.getSelectedNodeId();
 
             const request: RunRequest = {
                 prompt,
+                intent: requestedIntent,
                 ...(conversationId ? { conversationId } : {}),
                 ...(selectedNodeId ? { selectedNodeId } : {}),
                 ...(plannerModel ? { plannerModel } : {}),
@@ -232,6 +253,36 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             };
 
             let activeMessageId: string | null = null;
+            let modifyFailed = false;
+            let failedOpIndex: number | undefined;
+            let failedError: string | undefined;
+
+            const finalizeModifyRun = async (metadata: RunMetadata) => {
+                const finalizeConversationId = metadata.conversationId ?? conversationId ?? metadata.sessionId;
+                if (currentIntentRef.current !== 'schema.modify') {
+                    return;
+                }
+                try {
+                    const finalizeRequest = modifyFailed
+                        ? {
+                            conversationId: finalizeConversationId,
+                            sessionId: metadata.sessionId,
+                            success: false as const,
+                            failedOpIndex: failedOpIndex ?? 0,
+                            error: failedError ?? `modify operation ${typeof failedOpIndex === 'number' ? failedOpIndex + 1 : '?'} failed`,
+                        }
+                        : {
+                            conversationId: finalizeConversationId,
+                            sessionId: metadata.sessionId,
+                            success: true as const,
+                        };
+                    await aiClient.finalize({
+                        ...finalizeRequest,
+                    });
+                } catch (finalizeError: any) {
+                    onError(finalizeError?.message || '修改结果回写失败');
+                }
+            };
 
             try {
                 const stream = aiClient.runStream(request, { signal: ac.signal });
@@ -327,6 +378,9 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             ));
                             break;
                         case 'modify:start':
+                            modifyFailed = false;
+                            failedOpIndex = undefined;
+                            failedError = undefined;
                             {
                                 const batchResult = await ensureHistoryBatch();
                                 if (!batchResult.success) {
@@ -336,6 +390,9 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             setProgressText(`准备执行 ${event.data.operationCount} 个修改`);
                             break;
                         case 'modify:op':
+                            if (modifyFailed) {
+                                break;
+                            }
                             setProgressText(`执行修改 ${event.data.index + 1}`);
                             if (!bridgeRef.current) {
                                 throw new Error('editor bridge unavailable');
@@ -343,14 +400,32 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             {
                                 const result = await executeAgentOperation(bridgeRef.current, event.data.operation);
                                 if (!result.success) {
-                                    throw new Error(result.error || `modify operation ${event.data.index + 1} failed`);
+                                    modifyFailed = true;
+                                    failedOpIndex = event.data.index;
+                                    failedError = result.error || `modify operation ${event.data.index + 1} failed`;
+                                    if (historyBatchActiveRef.current) {
+                                        await discardHistoryBatch();
+                                    }
+                                    setProgressText(`修改已回滚：第 ${event.data.index + 1} 条失败`);
+                                    onError(`修改失败：第 ${event.data.index + 1} 条 ${event.data.operation.op} 执行出错${failedError ? ` - ${failedError}` : ''}`);
                                 }
                             }
                             break;
                         case 'modify:done':
-                            setProgressText('页面修改已应用');
+                            if (historyBatchActiveRef.current) {
+                                if (modifyFailed) {
+                                    historyBatchActiveRef.current = false;
+                                } else {
+                                    const commitResult = await commitHistoryBatch();
+                                    if (!commitResult.success) {
+                                        throw new Error(commitResult.error || 'history.commitBatch failed');
+                                    }
+                                }
+                            }
+                            setProgressText(modifyFailed ? '页面修改失败，已回滚' : '页面修改已应用');
                             break;
                         case 'done':
+                            await finalizeModifyRun(event.data.metadata);
                             onDone(event.data.metadata);
                             break;
                         case 'error':
@@ -367,9 +442,11 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                     setIsRunning(false);
                     setProgressText('');
                     if (historyBatchActiveRef.current) {
-                        const commitResult = await commitHistoryBatch();
-                        if (!commitResult.success) {
-                            onError(commitResult.error || 'history.commitBatch failed');
+                        const result = modifyFailed
+                            ? await discardHistoryBatch()
+                            : await commitHistoryBatch();
+                        if (!result.success) {
+                            onError(result.error || (modifyFailed ? 'history.discardBatch failed' : 'history.commitBatch failed'));
                         }
                     }
                 }

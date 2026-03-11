@@ -53,6 +53,7 @@ describe('useAgentRun', () => {
   it('executes modify operations inside a single history batch and sends schemaJson', async () => {
     const { bridge, execute } = createBridge();
     const requests: RunRequest[] = [];
+    const finalize = vi.fn(async () => undefined);
     setAIClient({
       async *runStream(request) {
         requests.push(request);
@@ -75,6 +76,7 @@ describe('useAgentRun', () => {
         yield { type: 'modify:done', data: {} };
         yield { type: 'done', data: { metadata: { sessionId: 'session-1' } } };
       },
+      finalize,
     });
 
     const onMessageStart = vi.fn(() => 'message-1');
@@ -101,6 +103,7 @@ describe('useAgentRun', () => {
     expect(onError).not.toHaveBeenCalled();
     expect(onDone).toHaveBeenCalledWith({ sessionId: 'session-1' });
     expect(onMessageDelta).toHaveBeenCalledWith('message-1', '准备修改当前卡片。');
+    expect(requests[0]?.intent).toBe('schema.modify');
     expect(requests[0]?.context.schemaJson).toEqual({
       id: 'page-1',
       body: [
@@ -111,10 +114,80 @@ describe('useAgentRun', () => {
         },
       ],
     });
+    expect(finalize).toHaveBeenCalledWith({
+      conversationId: 'conv-1',
+      sessionId: 'session-1',
+      success: true,
+    });
     expect(execute.mock.calls.map(([commandId]) => commandId)).toEqual([
       'history.beginBatch',
       'node.patchProps',
       'history.commitBatch',
     ]);
+  });
+
+  it('discards failed modify batches and reports the failed op index', async () => {
+    const { bridge, execute } = createBridge();
+    execute.mockImplementation(async (commandId: string, args?: any) => {
+      if (commandId === 'node.patchProps' && args?.treeId === 'body.0') {
+        return { success: false, error: 'node missing' };
+      }
+      return { success: true };
+    });
+    const finalize = vi.fn(async () => undefined);
+
+    setAIClient({
+      async *runStream() {
+        yield { type: 'run:start', data: { sessionId: 'session-2' } };
+        yield { type: 'intent', data: { intent: 'schema.modify', confidence: 1 } };
+        yield { type: 'message:start', data: { role: 'assistant' } };
+        yield { type: 'modify:start', data: { operationCount: 1, explanation: '准备修改当前卡片。' } };
+        yield {
+          type: 'modify:op',
+          data: {
+            index: 0,
+            operation: {
+              op: 'schema.patchProps',
+              nodeId: 'card-1',
+              patch: { title: '本月营收' },
+            },
+          },
+        };
+        yield { type: 'modify:done', data: {} };
+        yield { type: 'done', data: { metadata: { sessionId: 'session-2' } } };
+      },
+      finalize,
+    });
+
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAgentRun(bridge));
+
+    await act(async () => {
+      await result.current.runAgent(
+        '把当前卡片标题改成本月营收',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-2',
+        () => 'message-1',
+        vi.fn(),
+        vi.fn(),
+        onError,
+      );
+    });
+
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('第 1 条'));
+    expect(execute.mock.calls.map(([commandId]) => commandId)).toEqual([
+      'history.beginBatch',
+      'node.patchProps',
+      'history.discardBatch',
+    ]);
+    expect(finalize).toHaveBeenCalledWith({
+      conversationId: 'conv-2',
+      sessionId: 'session-2',
+      success: false,
+      failedOpIndex: 0,
+      error: 'node missing',
+    });
   });
 });

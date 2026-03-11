@@ -27,6 +27,40 @@ export class InMemoryAgentMemoryStore implements AgentMemoryStore {
     entry.conversation.push(message);
   }
 
+  async patchAssistantMessage(
+    conversationId: string,
+    sessionId: string,
+    patch: {
+      text?: string;
+      meta?: Partial<NonNullable<AgentMemoryMessage['meta']>>;
+      clearOperations?: boolean;
+    },
+  ): Promise<void> {
+    const entry = this.getEntry(conversationId);
+    const target = [...entry.conversation]
+      .reverse()
+      .find((message) => message.role === 'assistant' && message.meta?.sessionId === sessionId);
+    if (!target) {
+      return;
+    }
+
+    if (patch.text !== undefined) {
+      target.text = patch.text;
+    }
+    if (patch.meta !== undefined) {
+      target.meta = {
+        ...(target.meta ?? {}),
+        ...patch.meta,
+      };
+    }
+    if (patch.clearOperations) {
+      if (!target.meta) {
+        target.meta = {};
+      }
+      delete target.meta.operations;
+    }
+  }
+
   async getLastRunMetadata(conversationId: string): Promise<RunMetadata | undefined> {
     return this.getEntry(conversationId).lastRunMetadata;
   }

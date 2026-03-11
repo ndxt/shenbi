@@ -1,6 +1,6 @@
-import type { AgentEvent, AgentIntent, AgentOperation, PagePlan, RunMetadata, RunRequest } from '@shenbi/ai-contracts';
+import type { AgentEvent, AgentIntent, AgentOperation, FinalizeRequest, PagePlan, RunMetadata, RunRequest } from '@shenbi/ai-contracts';
 
-export type { AgentEvent, AgentIntent, AgentOperation, PagePlan, RunMetadata, RunRequest } from '@shenbi/ai-contracts';
+export type { AgentEvent, AgentIntent, AgentOperation, FinalizeRequest, PagePlan, RunMetadata, RunRequest } from '@shenbi/ai-contracts';
 
 export interface RunStreamOptions {
   signal?: AbortSignal;
@@ -8,4 +8,5 @@ export interface RunStreamOptions {
 
 export interface AIClient {
   runStream(request: RunRequest, options?: RunStreamOptions): AsyncIterable<AgentEvent>;
+  finalize(request: FinalizeRequest): Promise<void>;
 }

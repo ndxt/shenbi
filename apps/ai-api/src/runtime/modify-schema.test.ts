@@ -121,4 +121,62 @@ describe('executeModifySchema', () => {
     });
     expect(fetchMock).toHaveBeenCalledOnce();
   });
+
+  it('salvages fenced modify JSON with trailing noise', async () => {
+    process.env.AI_PROVIDER = 'openai-compatible';
+    process.env.AI_OPENAI_COMPAT_BASE_URL = 'https://example.test/v1';
+    process.env.AI_OPENAI_COMPAT_API_KEY = 'test-key';
+    process.env.AI_BLOCK_MODEL = 'mock-model';
+
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      choices: [
+        {
+          message: {
+            content: "```json\n{\"explanation\":\"追加卡片。\",\"operations\":[{\"op\":\"schema.insertNode\",\"container\":\"body\",\"node\":{\"id\":\"card-2\",\"component\":\"Card\",\"children\":[]}}]}\n```\nextra noise",
+          },
+        },
+      ],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { executeModifySchema } = await import('./modify-schema.ts');
+    const result = await executeModifySchema({
+      request: {
+        prompt: '在页面底部加一个卡片',
+        context: {
+          schemaSummary: 'Dashboard page',
+          componentSummary: 'Card, Table',
+          schemaJson: { id: 'page-1', body: [] },
+        },
+      },
+      context: {
+        prompt: '在页面底部加一个卡片',
+        document: {
+          exists: true,
+          summary: 'Dashboard page',
+          tree: '[empty]',
+          schema: { id: 'page-1', body: [] },
+        },
+        componentSummary: 'Card, Table',
+        conversation: {
+          history: [],
+          turnCount: 0,
+        },
+        lastBlockIds: [],
+      },
+    });
+
+    expect(result.operations[0]).toEqual({
+      op: 'schema.insertNode',
+      container: 'body',
+      node: {
+        id: 'card-2',
+        component: 'Card',
+        children: [],
+      },
+    });
+  });
 });

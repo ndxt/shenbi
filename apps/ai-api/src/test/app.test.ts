@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createApp } from '../app.ts';
 import type { AgentRuntime } from '../runtime/types.ts';
-import type { AgentEvent, RunMetadata } from '@shenbi/ai-contracts';
+import type { AgentEvent, FinalizeRequest, RunMetadata } from '@shenbi/ai-contracts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -40,6 +40,9 @@ function makeRuntime(overrides: Partial<AgentRuntime> = {}): AgentRuntime {
       for (const e of FAKE_EVENTS) {
         yield e;
       }
+    },
+    async finalize() {
+      return;
     },
     ...overrides,
   };
@@ -217,6 +220,41 @@ describe('POST /api/ai/run — validation 400', () => {
       body: 'not json',
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/ai/run/finalize', () => {
+  it('passes FinalizeRequest to runtime.finalize', async () => {
+    let received: FinalizeRequest | undefined;
+    const app = createApp({
+      runtime: makeRuntime({
+        async finalize(request) {
+          received = request;
+        },
+      }),
+    });
+
+    const res = await app.request('/api/ai/run/finalize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: 'conv-1',
+        sessionId: 'session-1',
+        success: false,
+        failedOpIndex: 0,
+        error: 'node not found',
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(received).toEqual({
+      conversationId: 'conv-1',
+      sessionId: 'session-1',
+      success: false,
+      failedOpIndex: 0,
+      error: 'node not found',
+    });
   });
 });
 

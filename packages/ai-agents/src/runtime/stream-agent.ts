@@ -1,8 +1,10 @@
 import { buildRuntimeContext } from '../context/build-context';
+import { classifyIntentByRules } from '../intent/rule-classifier';
 import { chatOrchestrator } from '../orchestrators/chat-orchestrator';
 import { modifyOrchestrator } from '../orchestrators/modify-orchestrator';
 import { pageBuilderOrchestrator } from '../orchestrators/page-builder-orchestrator';
-import type { AgentEvent, AgentIntent, AgentOperation, AgentRuntimeDeps, RunMetadata, RunRequest } from '../types';
+import { createOrchestratorRegistry, type OrchestratorFunction } from '../orchestrators/registry';
+import type { AgentEvent, AgentIntent, AgentOperation, AgentRuntimeContext, AgentRuntimeDeps, RunMetadata, RunRequest } from '../types';
 
 function createSessionId(): string {
   return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -16,20 +18,56 @@ function hasModifyTool(deps: AgentRuntimeDeps): boolean {
   return Boolean(deps.tools.get('modifySchema'));
 }
 
-const modifyIntentPattern = /修改|调整|删除|添加|增加|替换|移动|隐藏|显示|改成|换成|update|change|remove|delete|insert|add|replace|move|hide|show/i;
+function classifyIntent(
+  request: RunRequest,
+  context: AgentRuntimeContext,
+  deps: AgentRuntimeDeps,
+): { intent: AgentIntent; confidence: number } {
+  if (request.intent === 'schema.modify' && request.context.schemaJson && hasModifyTool(deps)) {
+    return { intent: 'schema.modify', confidence: 1 };
+  }
+  if (request.intent === 'schema.create' && hasPageBuilderTools(deps)) {
+    return { intent: 'schema.create', confidence: 1 };
+  }
+  if (request.intent === 'chat') {
+    return { intent: 'chat', confidence: 1 };
+  }
+  return classifyIntentByRules(context);
+}
 
-function resolveIntent(request: RunRequest, deps: AgentRuntimeDeps): { intent: AgentIntent; confidence: number } {
-  const hasSchema = Boolean(request.context.schemaJson);
-  if (hasSchema && hasModifyTool(deps) && (Boolean(request.selectedNodeId) || modifyIntentPattern.test(request.prompt))) {
-    return {
-      intent: 'schema.modify',
-      confidence: request.selectedNodeId ? 0.92 : 0.76,
-    };
+function createDefaultRegistry() {
+  const registry = createOrchestratorRegistry();
+  registry.register({
+    id: 'page-builder',
+    intents: ['schema.create'],
+    canHandle: (_context, deps) => hasPageBuilderTools(deps),
+    orchestrate: pageBuilderOrchestrator,
+  });
+  registry.register({
+    id: 'page-modifier',
+    intents: ['schema.modify'],
+    canHandle: (context, deps) => context.document.exists && hasModifyTool(deps),
+    orchestrate: modifyOrchestrator,
+  });
+  registry.register({
+    id: 'chat',
+    intents: ['chat'],
+    orchestrate: chatOrchestrator,
+  });
+  return registry;
+}
+
+function resolveFallbackOrchestrator(
+  intent: AgentIntent,
+  deps: AgentRuntimeDeps,
+): OrchestratorFunction {
+  if (intent === 'schema.create' && hasPageBuilderTools(deps)) {
+    return pageBuilderOrchestrator;
   }
-  if (hasPageBuilderTools(deps)) {
-    return { intent: 'schema.create', confidence: 0.88 };
+  if (intent === 'schema.modify' && hasModifyTool(deps)) {
+    return modifyOrchestrator;
   }
-  return { intent: 'chat', confidence: 0.62 };
+  return chatOrchestrator;
 }
 
 export async function* runAgentStream(
@@ -67,7 +105,13 @@ export async function* runAgentStream(
 
     yield { type: 'run:start', data: { sessionId, conversationId } };
 
-    const resolvedIntent = resolveIntent(request, deps);
+    const resolvedIntent = classifyIntent(request, context, deps);
+    if (request.intent === 'schema.modify' && resolvedIntent.intent !== 'schema.modify') {
+      deps.logger?.info('runAgentStream.modify_intent_downgraded', {
+        hasSchema: Boolean(request.context.schemaJson),
+        hasModifyTool: hasModifyTool(deps),
+      });
+    }
     yield {
       type: 'intent',
       data: resolvedIntent,
@@ -76,11 +120,10 @@ export async function* runAgentStream(
     const events: AgentEvent[] = [];
     const assistantDeltas: string[] = [];
     const operations: AgentOperation[] = [];
-    const generator = resolvedIntent.intent === 'schema.modify'
-      ? modifyOrchestrator(request, context, deps, metadata)
-      : resolvedIntent.intent === 'schema.create'
-        ? pageBuilderOrchestrator(request, context, deps, metadata)
-        : chatOrchestrator(request, context, deps, metadata);
+    const registry = createDefaultRegistry();
+    const orchestrator = registry.resolve(resolvedIntent.intent, context, deps)
+      ?? resolveFallbackOrchestrator(resolvedIntent.intent, deps);
+    const generator = orchestrator(request, context, deps, metadata);
 
     for await (const event of generator) {
       events.push(event);
@@ -98,10 +141,6 @@ export async function* runAgentStream(
       .filter((event): event is Extract<AgentEvent, { type: 'schema:block' }> => event.type === 'schema:block')
       .map((event) => event.data.blockId);
 
-    const doneEvent: AgentEvent = { type: 'done', data: { metadata } };
-    events.push(doneEvent);
-    yield doneEvent;
-
     const assistantText = assistantDeltas.join('');
     await Promise.all([
       ...(assistantText || resolvedIntent.intent !== 'chat' || operations.length > 0
@@ -110,6 +149,7 @@ export async function* runAgentStream(
               role: 'assistant',
               text: assistantText,
               meta: {
+                sessionId,
                 intent: resolvedIntent.intent,
                 ...(operations.length > 0 ? { operations } : {}),
               },
@@ -119,6 +159,10 @@ export async function* runAgentStream(
       deps.memory.setLastRunMetadata(conversationId, metadata),
       deps.memory.setLastBlockIds(conversationId, finalSchemaBlocks),
     ]);
+
+    const doneEvent: AgentEvent = { type: 'done', data: { metadata } };
+    events.push(doneEvent);
+    yield doneEvent;
   } catch (error) {
     deps.logger?.error('runAgentStream failed', {
       error: error instanceof Error ? error.message : String(error),

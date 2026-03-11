@@ -68,4 +68,23 @@ describe('buildRuntimeContext', () => {
     ]);
     expect(context.lastBlockIds).toEqual(['hero']);
   });
+
+  it('treats empty schemas as document missing for routing heuristics', () => {
+    const context = buildRuntimeContext({
+      ...createInput(),
+      request: {
+        ...createInput().request,
+        context: {
+          schemaSummary: 'empty page; nodeCount=0',
+          componentSummary: 'Card',
+          schemaJson: {
+            id: 'page-empty',
+            body: [],
+          },
+        },
+      },
+    });
+
+    expect(context.document.exists).toBe(false);
+  });
 });

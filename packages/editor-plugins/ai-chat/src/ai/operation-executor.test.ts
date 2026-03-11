@@ -74,6 +74,26 @@ describe('executeAgentOperation', () => {
     });
   });
 
+  it('supports root-level body insertion without parentId', async () => {
+    const { bridge, execute } = createBridge(createSchema());
+    const node: SchemaNode = {
+      id: 'card-root',
+      component: 'Card',
+      children: [],
+    };
+
+    await executeAgentOperation(bridge, {
+      op: 'schema.insertNode',
+      container: 'body',
+      node,
+    });
+
+    expect(execute).toHaveBeenCalledWith('node.append', {
+      parentTreeId: undefined,
+      node,
+    });
+  });
+
   it('returns failure when node id cannot be resolved', async () => {
     const { bridge } = createBridge(createSchema());
 

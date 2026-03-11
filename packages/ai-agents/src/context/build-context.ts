@@ -16,6 +16,23 @@ function getLastOperations(messages: BuildContextInput['conversation']) {
     ?.meta?.operations;
 }
 
+function hasSchemaContent(schema: BuildContextInput['request']['context']['schemaJson']): boolean {
+  if (!schema) {
+    return false;
+  }
+  const bodyCount = Array.isArray(schema.body) ? schema.body.length : (schema.body ? 1 : 0);
+  const dialogCount = Array.isArray(schema.dialogs) ? schema.dialogs.length : (schema.dialogs ? 1 : 0);
+  return bodyCount + dialogCount > 0;
+}
+
+function hasDocumentSummary(summary: string): boolean {
+  const normalized = summary.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return !normalized.includes('nodecount=0') && normalized !== 'empty page';
+}
+
 export function buildRuntimeContext(input: BuildContextInput): AgentRuntimeContext {
   const schema = input.request.context.schemaJson;
   const conversationHistory = input.conversation;
@@ -26,7 +43,7 @@ export function buildRuntimeContext(input: BuildContextInput): AgentRuntimeConte
     prompt: input.request.prompt,
     ...(input.request.selectedNodeId ? { selectedNodeId: input.request.selectedNodeId } : {}),
     document: {
-      exists: Boolean(schema || input.request.context.schemaSummary.trim()),
+      exists: hasSchemaContent(schema) || hasDocumentSummary(input.request.context.schemaSummary),
       summary: input.request.context.schemaSummary,
       ...(tree ? { tree } : {}),
       ...(schema ? { schema } : {}),

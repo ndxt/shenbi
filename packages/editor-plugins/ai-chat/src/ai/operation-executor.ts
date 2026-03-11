@@ -10,6 +10,19 @@ function resolveTreeId(bridge: EditorAIBridge, nodeId: string, operation: AgentO
   return treeId;
 }
 
+function resolveInsertParentTreeId(
+  bridge: EditorAIBridge,
+  operation: Extract<AgentOperation, { op: 'schema.insertNode' }>,
+): string | undefined {
+  if (operation.parentId) {
+    return resolveTreeId(bridge, operation.parentId, operation.op);
+  }
+  if (operation.container === 'dialogs') {
+    return 'dialogs';
+  }
+  return undefined;
+}
+
 export async function executeAgentOperation(
   bridge: EditorAIBridge,
   operation: AgentOperation,
@@ -44,12 +57,12 @@ export async function executeAgentOperation(
       case 'schema.insertNode':
         return typeof operation.index === 'number'
           ? bridge.execute('node.insertAt', {
-              parentTreeId: resolveTreeId(bridge, operation.parentId, operation.op),
+              parentTreeId: resolveInsertParentTreeId(bridge, operation),
               index: operation.index,
               node: operation.node,
             })
           : bridge.execute('node.append', {
-              parentTreeId: resolveTreeId(bridge, operation.parentId, operation.op),
+              parentTreeId: resolveInsertParentTreeId(bridge, operation),
               node: operation.node,
             });
       case 'schema.removeNode':

@@ -20,6 +20,11 @@ import {
 
 const env = loadEnv();
 const clientCache = new Map<string, OpenAICompatibleClient>();
+type JsonSalvageStrategy =
+  | 'balanced_object'
+  | 'trimmed_trailing_noise'
+  | 'appended_missing_braces'
+  | 'trimmed_extra_closing_braces';
 
 export interface ModifySchemaTraceEntry {
   requestSummary?: OpenAICompatibleRequestDebugSummary & { provider: string };
@@ -110,6 +115,263 @@ function extractJsonCandidate(text: string): string {
   return (fenced?.[1] ?? text).trim();
 }
 
+function findBalancedJsonObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start < 0) {
+    return null;
+  }
+
+  const { chars } = normalizeMismatchedClosers(text.slice(start));
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === '{' || char === '[') {
+      stack.push(char);
+      continue;
+    }
+    if (char === '}') {
+      if (stack.at(-1) !== '{') {
+        return null;
+      }
+      stack.pop();
+      if (stack.length === 0) {
+        return chars.slice(0, index + 1).join('');
+      }
+      continue;
+    }
+    if (char === ']') {
+      if (stack.at(-1) !== '[') {
+        return null;
+      }
+      stack.pop();
+    }
+  }
+
+  return null;
+}
+
+function normalizeMismatchedClosers(text: string): { text: string; chars: string[] } {
+  const stack: string[] = [];
+  const chars = text.split('');
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === '{' || char === '[') {
+      stack.push(char);
+      continue;
+    }
+    if (char === '}') {
+      if (stack.at(-1) === '[') {
+        chars[index] = ']';
+        stack.pop();
+        continue;
+      }
+      if (stack.at(-1) === '{') {
+        stack.pop();
+      }
+      continue;
+    }
+    if (char === ']') {
+      if (stack.at(-1) === '{') {
+        chars[index] = '}';
+        stack.pop();
+        continue;
+      }
+      if (stack.at(-1) === '[') {
+        stack.pop();
+      }
+    }
+  }
+
+  return {
+    text: chars.join(''),
+    chars,
+  };
+}
+
+function countOutsideStrings(text: string, target: string): number {
+  let count = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (const char of text) {
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === target) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function trySalvageJsonCandidate(text: string): { candidate: string; strategy: JsonSalvageStrategy } | null {
+  const extracted = findBalancedJsonObject(text);
+  if (extracted) {
+    return {
+      candidate: extracted,
+      strategy: 'balanced_object',
+    };
+  }
+
+  const trimmed = text.trim();
+  for (let trimCount = 1; trimCount <= Math.min(24, trimmed.length); trimCount += 1) {
+    const candidate = trimmed.slice(0, trimmed.length - trimCount).trimEnd();
+    if (!candidate) {
+      break;
+    }
+    try {
+      JSON.parse(candidate);
+      return {
+        candidate,
+        strategy: 'trimmed_trailing_noise',
+      };
+    } catch {
+      // continue trimming
+    }
+  }
+
+  const start = text.indexOf('{');
+  if (start < 0) {
+    return null;
+  }
+
+  const fullBase = normalizeMismatchedClosers(text.slice(start).trim()).text;
+  const fullOpenCount = countOutsideStrings(fullBase, '{');
+  const fullCloseCount = countOutsideStrings(fullBase, '}');
+  if (fullOpenCount > fullCloseCount) {
+    if (fullOpenCount - fullCloseCount > 8) {
+      return null;
+    }
+    return {
+      candidate: `${fullBase}${'}'.repeat(fullOpenCount - fullCloseCount)}`,
+      strategy: 'appended_missing_braces',
+    };
+  }
+
+  const end = text.lastIndexOf('}');
+  const base = text.slice(start, end >= start ? end + 1 : text.length).trim();
+  const openCount = countOutsideStrings(base, '{');
+  const closeCount = countOutsideStrings(base, '}');
+  if (openCount === closeCount) {
+    return {
+      candidate: base,
+      strategy: 'balanced_object',
+    };
+  }
+  if (openCount < closeCount) {
+    let trimmedBase = base;
+    while (trimmedBase.length > 0) {
+      const next = trimmedBase.trimEnd().slice(0, -1);
+      if (!next) {
+        break;
+      }
+      const nextOpenCount = countOutsideStrings(next, '{');
+      const nextCloseCount = countOutsideStrings(next, '}');
+      trimmedBase = next;
+      if (nextOpenCount === nextCloseCount) {
+        return {
+          candidate: trimmedBase.trim(),
+          strategy: 'trimmed_extra_closing_braces',
+        };
+      }
+      if (nextCloseCount < nextOpenCount) {
+        break;
+      }
+    }
+  }
+
+  return null;
+}
+
+function stripArrowFunctions(text: string): { text: string; stripped: boolean } {
+  const arrowPattern = /:\s*\([^)]*\)\s*=>/g;
+  let match: RegExpExecArray | null;
+  const chunks: string[] = [];
+  let lastEnd = 0;
+  arrowPattern.lastIndex = 0;
+  while ((match = arrowPattern.exec(text)) !== null) {
+    const colonIdx = match.index;
+    let pos = match.index + match[0].length;
+    let inBacktick = false;
+    while (pos < text.length) {
+      const ch = text[pos];
+      if (inBacktick) {
+        if (ch === '`') {
+          inBacktick = false;
+        }
+        pos += 1;
+        continue;
+      }
+      if (ch === '`') {
+        inBacktick = true;
+        pos += 1;
+        continue;
+      }
+      if (ch === ',' || ch === '}' || ch === ']') {
+        break;
+      }
+      pos += 1;
+    }
+    chunks.push(text.slice(lastEnd, colonIdx), ': null');
+    lastEnd = pos;
+  }
+  if (chunks.length === 0) {
+    return { text, stripped: false };
+  }
+  chunks.push(text.slice(lastEnd));
+  return { text: chunks.join(''), stripped: true };
+}
+
 function summarizeModelOutput(text: string): string {
   const compact = text.replace(/\s+/g, ' ').trim();
   return compact.length > 400 ? `${compact.slice(0, 400)}...` : compact;
@@ -121,9 +383,33 @@ function extractJson<T>(
   request: ModifySchemaInput['request'],
   model: string,
 ): T {
+  let candidate = extractJsonCandidate(text);
+  const arrowResult = stripArrowFunctions(candidate);
+  if (arrowResult.stripped) {
+    candidate = arrowResult.text;
+    logger.warn('ai.model.invalid_json_salvaged', {
+      source,
+      model,
+      strategy: 'stripped_arrow_functions',
+    });
+  }
+
   try {
-    return JSON.parse(extractJsonCandidate(text)) as T;
+    return JSON.parse(candidate.trim()) as T;
   } catch {
+    const salvaged = trySalvageJsonCandidate(candidate);
+    if (salvaged) {
+      try {
+        logger.warn('ai.model.invalid_json_salvaged', {
+          source,
+          model,
+          strategy: salvaged.strategy,
+        });
+        return JSON.parse(salvaged.candidate) as T;
+      } catch {
+        // fall through to debug dump
+      }
+    }
     const summarizedOutput = summarizeModelOutput(text);
     const debugFile = writeInvalidJsonDump({
       source,
@@ -175,6 +461,7 @@ function createModifyMessages(input: ModifySchemaInput): OpenAICompatibleMessage
         '- schema.patchLogic: {"op":"schema.patchLogic","nodeId":"node-id","patch":{}}',
         '- schema.patchColumns: {"op":"schema.patchColumns","nodeId":"node-id","columns":[]}',
         '- schema.insertNode: {"op":"schema.insertNode","parentId":"node-id","index":0,"node":{...}}',
+        '- root append: {"op":"schema.insertNode","container":"body","node":{...}} or {"op":"schema.insertNode","container":"dialogs","node":{...}}',
         '- schema.removeNode: {"op":"schema.removeNode","nodeId":"node-id"}',
         '- schema.replace: {"op":"schema.replace","schema":{...}}',
         'Rules:',

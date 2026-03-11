@@ -6,6 +6,7 @@ import {
   createInMemoryAgentMemoryStore,
   createToolRegistry,
   formatConversationHistory,
+  type FinalizeRequest,
   type LayoutRow,
   runAgent,
   runAgentStream,
@@ -1798,6 +1799,16 @@ function finalizeTrace(
   return debugFile;
 }
 
+function buildFailedAssistantText(existingText: string, error?: string): string {
+  const prefix = '[修改失败]';
+  const trimmed = existingText.trim();
+  if (trimmed.startsWith(prefix)) {
+    return trimmed;
+  }
+  const detail = error ? `${prefix} ${error}` : prefix;
+  return trimmed ? `${detail}\n${trimmed}` : detail;
+}
+
 export const agentRuntime: AgentRuntime = {
   async run(request) {
     const trace = createTrace(request);
@@ -1853,5 +1864,25 @@ export const agentRuntime: AgentRuntime = {
         'RUNTIME_TRACE_ERROR',
       );
     }
+  },
+
+  async finalize(request: FinalizeRequest) {
+    if (request.success || typeof memory.patchAssistantMessage !== 'function') {
+      return;
+    }
+
+    const conversation = await memory.getConversation(request.conversationId);
+    const target = [...conversation]
+      .reverse()
+      .find((message) => message.role === 'assistant' && message.meta?.sessionId === request.sessionId);
+    const nextText = buildFailedAssistantText(target?.text ?? '', request.error);
+
+    await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
+      text: nextText,
+      meta: {
+        failed: true,
+      },
+      clearOperations: true,
+    });
   },
 };
