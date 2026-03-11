@@ -543,7 +543,7 @@ function createPlanMessages(input: ModifySchemaInput): OpenAICompatibleMessage[]
         'Rules:',
         '- nodeId and parentId must reference schema node ids from the provided schema tree.',
         '- Prefer patch operations over schema.replace when a local edit is enough.',
-        '- Omit index for append-like inserts when order is not explicit.',
+        '- For insertNode: include index when the user specifies a position (e.g. "上面/之前/before", "下面/之后/after", "第一个/最前"). To compute index, count the target sibling\'s position in the parent\'s children list (0-based). Example: if siblings are [A, B, Table], inserting "above Table" means index=2. Omit index ONLY when no position is specified (append to end).',
         '- explanation should be a short Chinese sentence summarizing what will change.',
         '- Do not invent node ids that are not grounded in the schema tree.',
         '- For insertNode: always provide description (Chinese) and components array. Do NOT generate the full node JSON yourself.',
