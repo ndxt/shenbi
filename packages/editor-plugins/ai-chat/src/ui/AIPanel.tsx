@@ -99,6 +99,9 @@ export function AIPanel({
     progressText,
     currentPlan,
     blockStatuses,
+    modifyPlan,
+    modifyStatuses,
+    elapsedMs,
     runAgent,
     cancelRun,
   } = useAgentRun(bridge);
@@ -333,15 +336,18 @@ export function AIPanel({
 
         {isRunning && (
           <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-2 shadow-sm relative overflow-hidden mt-2">
-            <div className="absolute top-0 left-0 h-[2px] bg-blue-500 animate-[pulse_2s_ease-in-out_infinite] w-full"></div>
+            <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-400 to-blue-500 animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
             <div className="flex items-center gap-2 text-text-primary" style={{ fontSize: '11px' }}>
               <Loader2 size={12} className="animate-spin text-blue-500 shrink-0" />
               <span className="font-semibold text-blue-500 shrink-0">正在生成</span>
-              <span className="opacity-70 ml-2 truncate flex-1 text-right">{progressText}</span>
+              <span className="opacity-70 ml-1 truncate flex-1">{progressText}</span>
+              <span className="text-text-secondary font-mono shrink-0 tabular-nums" style={{ fontSize: '10px' }}>
+                {Math.floor(elapsedMs / 1000)}s
+              </span>
             </div>
             {currentPlan && (
-              <div className="mt-2 border-t border-border-ide pt-2">
-                <div className="text-text-secondary font-bold uppercase mb-1 flex items-center gap-1" style={{ fontSize: '10px' }}>
+              <div className="mt-1 border-t border-border-ide pt-2">
+                <div className="text-text-secondary font-bold uppercase mb-1.5 flex items-center gap-1" style={{ fontSize: '10px' }}>
                   <Info size={10} /> {currentPlan.pageTitle || '架构计划'}
                 </div>
                 <ul className="flex flex-col gap-1 pl-2">
@@ -352,10 +358,36 @@ export function AIPanel({
                         blockStatuses[b.id] === 'done'
                           ? 'text-emerald-400'
                           : blockStatuses[b.id] === 'generating'
-                            ? 'text-blue-400'
+                            ? 'text-blue-400 animate-pulse'
                             : 'text-text-secondary'
                       }`}>
-                        {blockStatuses[b.id] ?? 'waiting'}
+                        {blockStatuses[b.id] === 'done' ? '✓' : blockStatuses[b.id] === 'generating' ? '⟳' : '·'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {modifyPlan && (
+              <div className="mt-1 border-t border-border-ide pt-2">
+                <div className="text-text-secondary font-bold uppercase mb-1.5 flex items-center gap-1" style={{ fontSize: '10px' }}>
+                  <BrainCircuit size={10} /> 修改计划 ({modifyPlan.operationCount} 步)
+                </div>
+                <ul className="flex flex-col gap-1 pl-2">
+                  {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
+                    <li key={i} className="text-text-primary flex gap-2" style={{ fontSize: '11px' }}>
+                      <span className="opacity-70 tabular-nums shrink-0" style={{ fontSize: '10px' }}>#{i + 1}</span>
+                      <span className="opacity-80 truncate flex-1">
+                        {modifyStatuses[i] === 'generating' ? '执行中...' : modifyStatuses[i] === 'done' ? '已完成' : '等待中'}
+                      </span>
+                      <span className={`ml-auto font-mono shrink-0 ${
+                        modifyStatuses[i] === 'done'
+                          ? 'text-emerald-400'
+                          : modifyStatuses[i] === 'generating'
+                            ? 'text-blue-400 animate-pulse'
+                            : 'text-text-secondary'
+                      }`}>
+                        {modifyStatuses[i] === 'done' ? '✓' : modifyStatuses[i] === 'generating' ? '⟳' : '·'}
                       </span>
                     </li>
                   ))}

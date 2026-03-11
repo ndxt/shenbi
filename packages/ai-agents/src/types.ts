@@ -154,6 +154,7 @@ export interface GenerateBlockResult {
   blockId: string;
   node: SchemaNode;
   summary?: string;
+  tokensUsed?: number;
 }
 
 export interface AssembleSchemaInput {

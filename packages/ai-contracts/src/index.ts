@@ -99,7 +99,7 @@ export type AgentEvent =
   | { type: 'modify:done'; data: {} }
   | { type: 'schema:skeleton'; data: { schema: PageSchema } }
   | { type: 'schema:block:start'; data: { blockId: string; description: string } }
-  | { type: 'schema:block'; data: { blockId: string; node: SchemaNode } }
+  | { type: 'schema:block'; data: { blockId: string; node: SchemaNode; tokensUsed?: number } }
   | { type: 'schema:done'; data: { schema: PageSchema } }
   | { type: 'done'; data: { metadata: RunMetadata } }
   | { type: 'error'; data: { message: string; code?: string } };

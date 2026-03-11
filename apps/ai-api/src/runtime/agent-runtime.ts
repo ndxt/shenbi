@@ -1127,26 +1127,13 @@ function createSkeletonBlock(blockId: string, description: string): GenerateBloc
     },
     children: [
       {
-        id: `${blockId}-skeleton-body`,
-        component: 'Container',
+        id: `${blockId}-skeleton-inner`,
+        component: 'Skeleton',
         props: {
-          direction: 'column',
-          gap: 12,
+          active: true,
+          paragraph: { rows: 3 },
         },
-        children: [
-          {
-            id: `${blockId}-skeleton-line-1`,
-            component: 'Typography.Text',
-            props: { type: 'secondary' },
-            children: ['Loading block...'],
-          },
-          {
-            id: `${blockId}-skeleton-line-2`,
-            component: 'Typography.Text',
-            props: { type: 'secondary' },
-            children: ['Preparing layout and content'],
-          },
-        ],
+        children: [],
       },
     ],
   };
@@ -1520,7 +1507,7 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
     provider: blockModelRef.provider ?? env.AI_PROVIDER,
     ...client.buildRequestDebugSummary(model, messages, thinking, false),
   };
-  const text = await client.chat(model, messages, thinking);
+  const { content: text, tokensUsed } = await client.chat(model, messages, thinking);
   const rawNode = extractJson<GenerateBlockResult['node']>(text, 'block', input.request, model);
   const { node, diagnostics } = validateGeneratedBlockNodeWithDiagnostics(rawNode, input.block.id);
   const qualityDiagnostics = assessBlockQuality(node, input);
@@ -1533,6 +1520,7 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
   let retryNode: GenerateBlockResult['node'] | undefined;
   let retryDiagnostics: SanitizationDiagnostic[] | undefined;
   let retryRequestSummary: ProviderRequestTraceSummary | undefined;
+  let retryTokensUsed: number | undefined;
 
   if (qualityDiagnostics.some((item) => item.severity === 'retry')) {
     try {
@@ -1542,7 +1530,9 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
         provider: blockModelRef.provider ?? env.AI_PROVIDER,
         ...client.buildRequestDebugSummary(model, retryMessages, retryThinking, false),
       };
-      retryText = await client.chat(model, retryMessages, retryThinking);
+      const retryResult = await client.chat(model, retryMessages, retryThinking);
+      retryText = retryResult.content;
+      retryTokensUsed = retryResult.tokensUsed;
       const retryRawNode = extractJson<GenerateBlockResult['node']>(retryText, 'block', input.request, model);
       const validatedRetry = validateGeneratedBlockNodeWithDiagnostics(retryRawNode, input.block.id);
       retryNode = validatedRetry.node;
@@ -1559,6 +1549,7 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
     }
   }
 
+  const totalTokens = (tokensUsed ?? 0) + (retryTokensUsed ?? 0) || undefined;
   trace?.blocks.push({
     blockId: input.block.id,
     description: input.block.description,
@@ -1578,6 +1569,7 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
     blockId: input.block.id,
     node: finalNode,
     summary: `Generated ${input.block.description} via ${model}`,
+    ...(totalTokens !== undefined ? { tokensUsed: totalTokens } : {}),
   };
 }
 
@@ -1708,7 +1700,7 @@ async function planWithModel(input: PlanPageInput, trace?: RunTraceRecord): Prom
   const model = requireModel(plannerModelRef.model ?? requestedPlannerModel, 'planner');
   const messages = createPlannerMessages(input);
   const thinking = getThinking(input.request);
-  const text = await client.chat(model, messages, thinking);
+  const { content: text, tokensUsed } = await client.chat(model, messages, thinking);
   const plan = extractJson<PagePlan>(text, 'planner', input.request, model);
   const normalizedPlan = normalizePlan(plan);
   if (trace) {
@@ -1720,6 +1712,7 @@ async function planWithModel(input: PlanPageInput, trace?: RunTraceRecord): Prom
       model,
       rawOutput: text,
       normalizedPlan,
+      ...(tokensUsed !== undefined ? { tokensUsed } : {}),
     };
   }
   return normalizedPlan;
@@ -1737,7 +1730,7 @@ function createRuntimeDeps(memory: AgentMemoryStore, trace?: RunTraceRecord): Ag
           ? String((request as { prompt: unknown }).prompt)
           : 'No prompt';
         const thinking = getThinkingFromUnknown(request);
-        const text = await client.chat(model, [
+        const { content: text } = await client.chat(model, [
           { role: 'system', content: 'You are a helpful low-code assistant.' },
           { role: 'user', content: prompt },
         ], thinking);

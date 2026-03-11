@@ -175,7 +175,7 @@ export async function classifyIntentWithModel(
   const model = requireModel(modelRef.model ?? requestedModel);
   const messages = createMessages(input);
   const thinking = getThinking(input.request);
-  const text = await client.chat(model, messages, thinking);
+  const { content: text } = await client.chat(model, messages, thinking);
   const normalized = normalizeClassification(JSON.parse(extractJsonCandidate(text)));
 
   if (trace) {

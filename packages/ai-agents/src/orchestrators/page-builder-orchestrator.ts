@@ -179,7 +179,11 @@ export async function* pageBuilderOrchestrator(
     };
     yield {
       type: 'schema:block',
-      data: { blockId: completed.result.blockId, node: completed.result.generated.node },
+      data: {
+        blockId: completed.result.blockId,
+        node: completed.result.generated.node,
+        ...(completed.result.generated.tokensUsed !== undefined ? { tokensUsed: completed.result.generated.tokensUsed } : {}),
+      },
     };
   }
 

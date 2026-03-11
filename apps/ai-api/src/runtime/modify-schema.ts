@@ -655,7 +655,7 @@ export async function executeModifySchema(
     provider,
     ...client.buildRequestDebugSummary(model, planMessages, thinking, false),
   };
-  const planText = await client.chat(model, planMessages, thinking);
+  const { content: planText } = await client.chat(model, planMessages, thinking);
   const planParsed = extractJson<unknown>(planText, 'modify', input.request, model);
   if (!isPlanResult(planParsed)) {
     throw new LLMError('modifySchema planner returned an invalid result shape', 'INVALID_MODIFY_RESULT');
@@ -707,7 +707,7 @@ export async function executeModifySchema(
     };
 
     try {
-      const insertText = await client.chat(model, insertMessages, thinking);
+      const { content: insertText } = await client.chat(model, insertMessages, thinking);
       const insertParsed = extractJson<unknown>(insertText, 'modify-insertNode', input.request, model);
 
       let node: unknown;

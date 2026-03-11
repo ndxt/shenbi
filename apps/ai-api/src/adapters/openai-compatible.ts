@@ -42,8 +42,13 @@ interface ChatCompletionChoice {
   };
 }
 
+interface ChatCompletionUsage {
+  total_tokens?: number;
+}
+
 interface ChatCompletionResponse {
   choices?: ChatCompletionChoice[];
+  usage?: ChatCompletionUsage;
 }
 
 interface StreamDelta {
@@ -220,7 +225,7 @@ export class OpenAICompatibleClient {
     model: string,
     messages: OpenAICompatibleMessage[],
     thinking?: OpenAICompatibleThinking,
-  ): Promise<string> {
+  ): Promise<{ content: string; tokensUsed?: number }> {
     const fmt = this.resolveFormat(model, thinking);
     const body = this.buildRequestBody(model, messages, fmt, false);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -241,7 +246,8 @@ export class OpenAICompatibleClient {
     if (!content) {
       throw new LLMError('Provider returned empty content', 'OPENAI_COMPAT_EMPTY');
     }
-    return content;
+    const tokensUsed = typeof payload.usage?.total_tokens === 'number' ? payload.usage.total_tokens : undefined;
+    return { content, ...(tokensUsed !== undefined ? { tokensUsed } : {}) };
   }
 
   async *streamChat(

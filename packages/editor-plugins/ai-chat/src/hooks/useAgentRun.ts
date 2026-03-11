@@ -8,6 +8,11 @@ import { createSchemaDigest, type AgentIntent, type PagePlan, type RunMetadata, 
 export type PlanConfig = PagePlan;
 export type BlockRunStatus = 'waiting' | 'generating' | 'done';
 
+export interface ModifyPlan {
+  operationCount: number;
+  explanation: string;
+}
+
 
 
 
@@ -144,6 +149,10 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
     const [progressText, setProgressText] = useState('');
     const [currentPlan, setCurrentPlan] = useState<PlanConfig | null>(null);
     const [blockStatuses, setBlockStatuses] = useState<Record<string, BlockRunStatus>>({});
+    const [modifyPlan, setModifyPlan] = useState<ModifyPlan | null>(null);
+    const [modifyStatuses, setModifyStatuses] = useState<Record<number, BlockRunStatus>>({});
+    const [elapsedMs, setElapsedMs] = useState(0);
+    const startTimeRef = useRef<number>(0);
     const abortControllerRef = useRef<AbortController | null>(null);
 
     // Stable refs to avoid unstable callback deps
@@ -175,6 +184,19 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
 
         window.addEventListener('keydown', handleKeyDown, true);
         return () => window.removeEventListener('keydown', handleKeyDown, true);
+    }, [isRunning]);
+
+    // Elapsed timer — ticks every second while running
+    useEffect(() => {
+        if (!isRunning) {
+            setElapsedMs(0);
+            return;
+        }
+        startTimeRef.current = Date.now();
+        const timer = setInterval(() => {
+            setElapsedMs(Date.now() - startTimeRef.current);
+        }, 500);
+        return () => clearInterval(timer);
     }, [isRunning]);
 
     const beginHistoryBatch = useCallback(async () => {
@@ -252,6 +274,10 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             setProgressText('初始化...');
             setCurrentPlan(null);
             setBlockStatuses({});
+            setModifyPlan(null);
+            setModifyStatuses({});
+            setElapsedMs(0);
+            startTimeRef.current = Date.now();
             currentIntentRef.current = null;
 
             const ac = new AbortController();
@@ -439,12 +465,22 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     throw new Error(batchResult.error || 'history.beginBatch failed');
                                 }
                             }
+                            setModifyPlan({
+                                operationCount: event.data.operationCount,
+                                explanation: event.data.explanation,
+                            });
+                            setModifyStatuses(
+                                Object.fromEntries(
+                                    Array.from({ length: event.data.operationCount }, (_, i) => [i, 'waiting' as const])
+                                )
+                            );
                             setProgressText(`准备执行 ${event.data.operationCount} 个修改`);
                             break;
                         case 'modify:op':
                             if (modifyFailed) {
                                 break;
                             }
+                            setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'generating' }));
                             setProgressText(`执行修改 ${event.data.index + 1}`);
                             if (!bridgeRef.current) {
                                 throw new Error('editor bridge unavailable');
@@ -455,6 +491,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     modifyFailed = true;
                                     failedOpIndex = event.data.index;
                                     failedError = result.error || `modify operation ${event.data.index + 1} failed`;
+                                    setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'done' }));
                                     const discardResult = await discardHistoryBatchOnFailure();
                                     if (!discardResult.success) {
                                         onError(`修改失败且回滚失败：第 ${event.data.index + 1} 条 ${event.data.operation.op} 执行出错 - ${discardResult.error || 'history.discardBatch failed'}`);
@@ -462,6 +499,8 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                         setProgressText(`修改已回滚：第 ${event.data.index + 1} 条失败`);
                                     }
                                     onError(`修改失败：第 ${event.data.index + 1} 条 ${event.data.operation.op} 执行出错${failedError ? ` - ${failedError}` : ''}`);
+                                } else {
+                                    setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'done' }));
                                 }
                             }
                             break;
@@ -516,6 +555,9 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         progressText,
         currentPlan,
         blockStatuses,
+        modifyPlan,
+        modifyStatuses,
+        elapsedMs,
         runAgent,
         cancelRun,
     };

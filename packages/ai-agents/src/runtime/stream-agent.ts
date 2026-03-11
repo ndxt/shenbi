@@ -179,6 +179,14 @@ export async function* runAgentStream(
       .filter((event): event is Extract<AgentEvent, { type: 'schema:block' }> => event.type === 'schema:block')
       .map((event) => event.data.blockId);
 
+    // Accumulate total token usage from block generation events
+    const totalTokensUsed = events
+      .filter((event): event is Extract<AgentEvent, { type: 'schema:block' }> => event.type === 'schema:block')
+      .reduce((sum, event) => sum + (event.data.tokensUsed ?? 0), 0);
+    if (totalTokensUsed > 0) {
+      metadata.tokensUsed = totalTokensUsed;
+    }
+
     const assistantText = assistantDeltas.join('');
     await Promise.all([
       ...(assistantText || resolvedIntent.intent !== 'chat' || operations.length > 0
