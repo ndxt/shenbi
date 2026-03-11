@@ -13,6 +13,16 @@ export interface ModifyPlan {
   explanation: string;
 }
 
+export interface LastRunResult {
+  plan: PlanConfig | null;
+  blockStatuses: Record<string, BlockRunStatus>;
+  blockTokens: Record<string, number>;
+  modifyPlan: ModifyPlan | null;
+  modifyStatuses: Record<number, BlockRunStatus>;
+  elapsedMs: number;
+  tokensUsed?: number;
+}
+
 
 
 
@@ -152,6 +162,8 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
     const [modifyPlan, setModifyPlan] = useState<ModifyPlan | null>(null);
     const [modifyStatuses, setModifyStatuses] = useState<Record<number, BlockRunStatus>>({});
     const [elapsedMs, setElapsedMs] = useState(0);
+    const [blockTokens, setBlockTokens] = useState<Record<string, number>>({});
+    const [lastRunResult, setLastRunResult] = useState<LastRunResult | null>(null);
     const startTimeRef = useRef<number>(0);
     const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -277,6 +289,8 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             setModifyPlan(null);
             setModifyStatuses({});
             setElapsedMs(0);
+            setBlockTokens({});
+            setLastRunResult(null);
             startTimeRef.current = Date.now();
             currentIntentRef.current = null;
 
@@ -364,6 +378,13 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
 
             try {
                 const stream = aiClient.runStream(request, { signal: ac.signal });
+                // Local tracking for lastRunResult snapshot
+                let localPlan: PlanConfig | null = null;
+                const localBlockStatuses: Record<string, BlockRunStatus> = {};
+                const localBlockTokens: Record<string, number> = {};
+                let localModifyPlan: ModifyPlan | null = null;
+                const localModifyStatuses: Record<number, BlockRunStatus> = {};
+
                 for await (const event of stream) {
                     if (ac.signal.aborted) {
                         break;
@@ -398,6 +419,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             setProgressText(`工具: ${event.data.tool} ${event.data.ok ? '完成' : '失败'}${event.data.summary ? `. ${event.data.summary}` : ''}`);
                             break;
                         case 'plan':
+                            localPlan = event.data as PlanConfig;
                             setCurrentPlan(event.data);
                             setBlockStatuses(
                                 Object.fromEntries(event.data.blocks.map((block) => [block.id, 'waiting' as const]))
@@ -415,6 +437,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             bridgeRef.current?.replaceSchema(event.data.schema);
                             break;
                         case 'schema:block:start':
+                            localBlockStatuses[event.data.blockId] = 'generating';
                             setBlockStatuses((prev) => ({
                                 ...prev,
                                 [event.data.blockId]: 'generating',
@@ -437,10 +460,18 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                 );
                                 bridgeRef.current.replaceSchema(nextSchema);
                             }
+                            localBlockStatuses[event.data.blockId] = 'done';
                             setBlockStatuses((prev) => ({
                                 ...prev,
                                 [event.data.blockId]: 'done',
                             }));
+                            if (typeof event.data.tokensUsed === 'number') {
+                                localBlockTokens[event.data.blockId] = event.data.tokensUsed;
+                                setBlockTokens((prev) => ({
+                                    ...prev,
+                                    [event.data.blockId]: event.data.tokensUsed as number,
+                                }));
+                            }
                             break;
                         case 'schema:done':
                             {
@@ -465,10 +496,14 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     throw new Error(batchResult.error || 'history.beginBatch failed');
                                 }
                             }
-                            setModifyPlan({
+                            localModifyPlan = {
                                 operationCount: event.data.operationCount,
                                 explanation: event.data.explanation,
-                            });
+                            };
+                            setModifyPlan(localModifyPlan);
+                            for (let j = 0; j < event.data.operationCount; j++) {
+                                localModifyStatuses[j] = 'waiting';
+                            }
                             setModifyStatuses(
                                 Object.fromEntries(
                                     Array.from({ length: event.data.operationCount }, (_, i) => [i, 'waiting' as const])
@@ -481,6 +516,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                 break;
                             }
                             setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'generating' }));
+                            localModifyStatuses[event.data.index] = 'generating';
                             setProgressText(`执行修改 ${event.data.index + 1}`);
                             if (!bridgeRef.current) {
                                 throw new Error('editor bridge unavailable');
@@ -492,6 +528,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     failedOpIndex = event.data.index;
                                     failedError = result.error || `modify operation ${event.data.index + 1} failed`;
                                     setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'done' }));
+                                    localModifyStatuses[event.data.index] = 'done';
                                     const discardResult = await discardHistoryBatchOnFailure();
                                     if (!discardResult.success) {
                                         onError(`修改失败且回滚失败：第 ${event.data.index + 1} 条 ${event.data.operation.op} 执行出错 - ${discardResult.error || 'history.discardBatch failed'}`);
@@ -501,6 +538,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     onError(`修改失败：第 ${event.data.index + 1} 条 ${event.data.operation.op} 执行出错${failedError ? ` - ${failedError}` : ''}`);
                                 } else {
                                     setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'done' }));
+                                    localModifyStatuses[event.data.index] = 'done';
                                 }
                             }
                             break;
@@ -521,6 +559,15 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             setProgressText(modifyFailed ? '页面修改失败，已回滚' : '页面修改已应用');
                             break;
                         case 'done':
+                            setLastRunResult({
+                                plan: localPlan,
+                                blockStatuses: { ...localBlockStatuses },
+                                blockTokens: { ...localBlockTokens },
+                                modifyPlan: localModifyPlan,
+                                modifyStatuses: { ...localModifyStatuses },
+                                elapsedMs: Date.now() - startTimeRef.current,
+                                ...(typeof event.data.metadata.tokensUsed === 'number' ? { tokensUsed: event.data.metadata.tokensUsed } : {}),
+                            });
                             onDone(await finalizeModifyRun(event.data.metadata));
                             break;
                         case 'error':
@@ -535,7 +582,6 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             } finally {
                 if (!ac.signal.aborted) {
                     setIsRunning(false);
-                    setProgressText('');
                     if (historyBatchActiveRef.current) {
                         const result = modifyFailed
                             ? await discardHistoryBatch()
@@ -558,6 +604,9 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         modifyPlan,
         modifyStatuses,
         elapsedMs,
+        blockTokens,
+        lastRunResult,
+        setLastRunResult,
         runAgent,
         cancelRun,
     };

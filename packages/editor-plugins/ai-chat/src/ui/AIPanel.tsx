@@ -102,6 +102,9 @@ export function AIPanel({
     modifyPlan,
     modifyStatuses,
     elapsedMs,
+    blockTokens,
+    lastRunResult,
+    setLastRunResult,
     runAgent,
     cancelRun,
   } = useAgentRun(bridge);
@@ -347,26 +350,24 @@ export function AIPanel({
             </div>
             {currentPlan && (
               <div className="mt-1 border-t border-border-ide pt-2">
-                <ul className="flex flex-col gap-1">
+                <ul className="flex flex-col gap-0.5">
                   {currentPlan.blocks.map((b) => (
                     <li
                       key={b.id}
-                      className={`flex items-center gap-2 ${
-                        blockStatuses[b.id] === 'generating' ? 'animate-pulse' : ''
+                      className={`flex items-center gap-2 py-0.5 rounded px-1 ${
+                        blockStatuses[b.id] === 'generating' ? 'animate-pulse bg-blue-500/5' : ''
                       }`}
                       style={{ fontSize: '11px' }}
                     >
-                      <span className={`opacity-80 truncate flex-1 ${
-                        blockStatuses[b.id] === 'generating' ? 'text-blue-400' : 'text-text-primary'
-                      }`} title={b.description}>{b.description}</span>
-                      <span className="shrink-0 flex items-center">
-                        {blockStatuses[b.id] === 'done'
-                          ? <CheckCircle2 size={11} className="text-emerald-400" />
-                          : blockStatuses[b.id] === 'generating'
-                            ? <Loader2 size={11} className="text-blue-400 animate-spin" />
-                            : <span className="w-[11px] h-[11px] flex items-center justify-center text-text-secondary" style={{ fontSize: '10px' }}>·</span>
-                        }
-                      </span>
+                      <span className="text-text-primary opacity-80 truncate flex-1" title={b.description}>{b.description}</span>
+                      {blockStatuses[b.id] === 'done' && (
+                        <>
+                          {typeof blockTokens[b.id] === 'number' && (
+                            <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '9px' }}>{blockTokens[b.id]}t</span>
+                          )}
+                          <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
+                        </>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -374,29 +375,71 @@ export function AIPanel({
             )}
             {modifyPlan && (
               <div className="mt-1 border-t border-border-ide pt-2">
-                <ul className="flex flex-col gap-1">
+                <ul className="flex flex-col gap-0.5">
                   {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
                     <li
                       key={i}
-                      className={`flex items-center gap-2 ${
-                        modifyStatuses[i] === 'generating' ? 'animate-pulse' : ''
+                      className={`flex items-center gap-2 py-0.5 rounded px-1 ${
+                        modifyStatuses[i] === 'generating' ? 'animate-pulse bg-blue-500/5' : ''
                       }`}
                       style={{ fontSize: '11px' }}
                     >
                       <span className="text-text-secondary tabular-nums shrink-0" style={{ fontSize: '10px' }}>#{i + 1}</span>
-                      <span className={`truncate flex-1 ${
-                        modifyStatuses[i] === 'generating' ? 'text-blue-400' : 'text-text-primary opacity-80'
-                      }`}>
+                      <span className="text-text-primary opacity-80 truncate flex-1">
                         {modifyStatuses[i] === 'generating' ? '执行中' : modifyStatuses[i] === 'done' ? '已完成' : '等待'}
                       </span>
-                      <span className="shrink-0 flex items-center">
-                        {modifyStatuses[i] === 'done'
-                          ? <CheckCircle2 size={11} className="text-emerald-400" />
-                          : modifyStatuses[i] === 'generating'
-                            ? <Loader2 size={11} className="text-blue-400 animate-spin" />
-                            : <span className="w-[11px] h-[11px] flex items-center justify-center text-text-secondary" style={{ fontSize: '10px' }}>·</span>
-                        }
-                      </span>
+                      {modifyStatuses[i] === 'done' && (
+                        <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isRunning && lastRunResult && (
+          <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-2 shadow-sm mt-2" style={{ fontSize: '11px' }}>
+            <div className="flex items-center gap-2 text-text-primary">
+              <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
+              <span className="font-semibold text-emerald-400 shrink-0">生成完成</span>
+              <span className="opacity-70 ml-1 truncate flex-1">{progressText}</span>
+              <span className="text-text-secondary font-mono shrink-0 tabular-nums" style={{ fontSize: '10px' }}>
+                {Math.round(lastRunResult.elapsedMs / 1000)}s
+                {typeof lastRunResult.tokensUsed === 'number' && ` · ${lastRunResult.tokensUsed}t`}
+              </span>
+              <button
+                className="text-text-secondary hover:text-text-primary opacity-50 hover:opacity-100 transition-opacity ml-1"
+                onClick={() => setLastRunResult(null)}
+                title="关闭"
+              >
+                ×
+              </button>
+            </div>
+            {lastRunResult.plan && (
+              <div className="mt-1 border-t border-border-ide pt-2">
+                <ul className="flex flex-col gap-0.5">
+                  {lastRunResult.plan.blocks.map((b) => (
+                    <li key={b.id} className="flex items-center gap-2 py-0.5 px-1" style={{ fontSize: '11px' }}>
+                      <span className="text-text-primary opacity-80 truncate flex-1" title={b.description}>{b.description}</span>
+                      {typeof lastRunResult.blockTokens[b.id] === 'number' && (
+                        <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '9px' }}>{lastRunResult.blockTokens[b.id]}t</span>
+                      )}
+                      <CheckCircle2 size={11} className={lastRunResult.blockStatuses[b.id] === 'done' ? 'text-emerald-400 shrink-0' : 'text-text-secondary shrink-0'} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {lastRunResult.modifyPlan && (
+              <div className="mt-1 border-t border-border-ide pt-2">
+                <ul className="flex flex-col gap-0.5">
+                  {Array.from({ length: lastRunResult.modifyPlan.operationCount }, (_, i) => (
+                    <li key={i} className="flex items-center gap-2 py-0.5 px-1" style={{ fontSize: '11px' }}>
+                      <span className="text-text-secondary tabular-nums shrink-0" style={{ fontSize: '10px' }}>#{i + 1}</span>
+                      <span className="text-text-primary opacity-80 truncate flex-1">已完成</span>
+                      <CheckCircle2 size={11} className={lastRunResult.modifyStatuses[i] === 'done' ? 'text-emerald-400 shrink-0' : 'text-red-400 shrink-0'} />
                     </li>
                   ))}
                 </ul>

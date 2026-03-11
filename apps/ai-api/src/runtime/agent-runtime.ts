@@ -1120,7 +1120,6 @@ function createSkeletonBlock(blockId: string, description: string): GenerateBloc
     id: `${blockId}-skeleton`,
     component: 'Card',
     props: {
-      title: description,
       style: {
         minHeight: 160,
       },
