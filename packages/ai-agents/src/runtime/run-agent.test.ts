@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createSchemaDigest } from '@shenbi/ai-contracts';
 import type { PageSchema } from '@shenbi/schema';
 import type { PagePlan, RunRequest, AgentRuntimeDeps, GenerateBlockResult } from '../types';
 import { runAgent } from './run-agent';
@@ -168,6 +169,7 @@ describe('runAgent', () => {
         meta: expect.objectContaining({
           sessionId: expect.any(String),
           intent: 'schema.create',
+          schemaDigest: createSchemaDigest(createSchema()),
         }),
       },
     ]);
