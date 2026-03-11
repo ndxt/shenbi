@@ -14,7 +14,7 @@ export function createFinalizeRoute(runtime: AgentRuntime): Hono {
     try {
       const body = await c.req.json().catch(() => null);
       const req = validateFinalizeRequest(body);
-      await runtime.finalize(req);
+      const result = await runtime.finalize(req);
 
       logRequest({
         requestId,
@@ -24,7 +24,7 @@ export function createFinalizeRoute(runtime: AgentRuntime): Hono {
         route: 'POST /api/ai/run/finalize',
       });
 
-      return c.json({ success: true });
+      return c.json({ success: true, data: result });
     } catch (error) {
       logRequest({
         requestId,

@@ -42,7 +42,7 @@ function makeRuntime(overrides: Partial<AgentRuntime> = {}): AgentRuntime {
       }
     },
     async finalize() {
-      return;
+      return {};
     },
     ...overrides,
   };
@@ -230,6 +230,9 @@ describe('POST /api/ai/run/finalize', () => {
       runtime: makeRuntime({
         async finalize(request) {
           received = request;
+          return {
+            memoryDebugFile: '.ai-debug/memory/finalize.json',
+          };
         },
       }),
     });
@@ -248,7 +251,12 @@ describe('POST /api/ai/run/finalize', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    expect(await res.json()).toEqual({
+      success: true,
+      data: {
+        memoryDebugFile: '.ai-debug/memory/finalize.json',
+      },
+    });
     expect(received).toEqual({
       conversationId: 'conv-1',
       sessionId: 'session-1',

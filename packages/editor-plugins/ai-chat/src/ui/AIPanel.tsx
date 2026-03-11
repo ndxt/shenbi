@@ -337,7 +337,10 @@ export function AIPanel({
               </div>
             )}
             {lastDebugFile && (
-              <span className="font-mono break-all text-center">Debug File: {lastDebugFile}</span>
+              <span className="font-mono break-all text-center">Trace File: {lastDebugFile}</span>
+            )}
+            {lastMetadata?.memoryDebugFile && (
+              <span className="font-mono break-all text-center">Memory Dump: {lastMetadata.memoryDebugFile}</span>
             )}
           </div>
         )}

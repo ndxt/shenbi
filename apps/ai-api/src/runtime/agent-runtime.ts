@@ -10,6 +10,7 @@ import {
   type ClassifyIntentInput,
   formatConversationHistory,
   type FinalizeRequest,
+  type FinalizeResult,
   type IntentClassification,
   type LayoutRow,
   runAgent,
@@ -1987,7 +1988,7 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
 
     async finalize(request: FinalizeRequest) {
       if (typeof memory.patchAssistantMessage !== 'function') {
-        return;
+        return {};
       }
 
       const before = await captureMemoryDebugSnapshot(
@@ -2040,6 +2041,10 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
         success: request.success,
         debugFile,
       });
+      const result: FinalizeResult = {
+        memoryDebugFile: debugFile,
+      };
+      return result;
     },
   };
 }

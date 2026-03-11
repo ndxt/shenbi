@@ -49,6 +49,7 @@ export interface RunMetadata {
   tokensUsed?: number;
   durationMs?: number;
   debugFile?: string;
+  memoryDebugFile?: string;
   repairs?: Array<{ message: string; path?: string }>;
 }
 
@@ -72,6 +73,10 @@ export interface FinalizeRequest {
   failedOpIndex?: number;
   error?: string;
   schemaDigest?: string;
+}
+
+export interface FinalizeResult {
+  memoryDebugFile?: string;
 }
 
 export interface ModifyResult {

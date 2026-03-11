@@ -359,7 +359,7 @@ export class MockAIClient implements AIClient {
         };
     }
 
-    async finalize(_request: FinalizeRequest): Promise<void> {
-        return;
+    async finalize(_request: FinalizeRequest): Promise<{ memoryDebugFile?: string }> {
+        return {};
     }
 }

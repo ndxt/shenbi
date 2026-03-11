@@ -1,4 +1,4 @@
-import type { AIClient, AgentEvent, FinalizeRequest, RunRequest, RunStreamOptions } from './api-types';
+import type { AIClient, AgentEvent, FinalizeRequest, FinalizeResult, RunRequest, RunStreamOptions } from './api-types';
 
 const DEFAULT_STREAM_ENDPOINT = '/api/ai/run/stream';
 const DEFAULT_FINALIZE_ENDPOINT = '/api/ai/run/finalize';
@@ -128,7 +128,7 @@ export class FetchAIClient implements AIClient {
         yield* parseEventStream(response.body);
     }
 
-    async finalize(request: FinalizeRequest): Promise<void> {
+    async finalize(request: FinalizeRequest): Promise<FinalizeResult> {
         const response = await this.fetchImplementation(this.finalizeEndpoint, {
             method: 'POST',
             headers: {
@@ -140,6 +140,8 @@ export class FetchAIClient implements AIClient {
         if (!response.ok) {
             throw new Error(await readResponseError(response));
         }
+        const payload = await response.json() as { success?: boolean; data?: FinalizeResult };
+        return payload.data ?? {};
     }
 }
 

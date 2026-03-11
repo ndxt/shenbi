@@ -329,11 +329,13 @@ describe('agent runtime finalize', () => {
       },
     });
 
-    await runtime.finalize({
+    await expect(runtime.finalize({
       conversationId,
       sessionId,
       success: true,
       schemaDigest: 'fnv1a-12345678',
+    })).resolves.toEqual({
+      memoryDebugFile: expect.stringContaining('.ai-debug'),
     });
     const dump = findMemoryDump(listMemoryDumps(), conversationId, sessionId);
 
@@ -392,12 +394,14 @@ describe('agent runtime finalize', () => {
       },
     });
 
-    await runtime.finalize({
+    await expect(runtime.finalize({
       conversationId,
       sessionId,
       success: false,
       error: 'op 1 failed',
       schemaDigest: 'fnv1a-deadbeef',
+    })).resolves.toEqual({
+      memoryDebugFile: expect.stringContaining('.ai-debug'),
     });
     const dump = findMemoryDump(listMemoryDumps(), conversationId, sessionId);
 

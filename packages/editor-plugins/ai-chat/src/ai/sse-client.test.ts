@@ -122,7 +122,12 @@ describe('FetchAIClient', () => {
         failedOpIndex: 0,
         error: 'node not found',
       });
-      return new Response(JSON.stringify({ success: true }), { status: 200 });
+      return new Response(JSON.stringify({
+        success: true,
+        data: {
+          memoryDebugFile: '.ai-debug/memory/finalize.json',
+        },
+      }), { status: 200 });
     });
 
     const client = new FetchAIClient({
@@ -130,12 +135,14 @@ describe('FetchAIClient', () => {
       fetchImplementation: fetchImplementation as typeof fetch,
     });
 
-    await client.finalize({
+    await expect(client.finalize({
       conversationId: 'conv-1',
       sessionId: 'session-1',
       success: false,
       failedOpIndex: 0,
       error: 'node not found',
+    })).resolves.toEqual({
+      memoryDebugFile: '.ai-debug/memory/finalize.json',
     });
 
     expect(fetchImplementation).toHaveBeenCalledOnce();

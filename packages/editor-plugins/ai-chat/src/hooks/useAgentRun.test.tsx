@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createEditor, getSchemaNodeByTreeId, getTreeIdBySchemaNodeId } from '@shenbi/editor-core';
 import type { PageSchema } from '@shenbi/schema';
 import { resetAIClient, setAIClient } from '../ai/sse-client';
-import type { AIClient, AgentEvent, FinalizeRequest, RunRequest, RunStreamOptions } from '../ai/api-types';
+import type { AIClient, AgentEvent, FinalizeRequest, FinalizeResult, RunRequest, RunStreamOptions } from '../ai/api-types';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import { useAgentRun } from './useAgentRun';
 
@@ -67,7 +67,10 @@ class ScenarioAIClient implements AIClient {
   readonly finalizeCalls: FinalizeRequest[] = [];
   readonly requests: RunRequest[] = [];
 
-  constructor(private readonly events: AgentEvent[]) {}
+  constructor(
+    private readonly events: AgentEvent[],
+    private readonly finalizeResult: FinalizeResult = {},
+  ) {}
 
   async *runStream(request: RunRequest, _options: RunStreamOptions = {}): AsyncIterable<AgentEvent> {
     this.requests.push(request);
@@ -76,8 +79,9 @@ class ScenarioAIClient implements AIClient {
     }
   }
 
-  async finalize(request: FinalizeRequest): Promise<void> {
+  async finalize(request: FinalizeRequest): Promise<FinalizeResult> {
     this.finalizeCalls.push(request);
+    return this.finalizeResult;
   }
 }
 
@@ -144,7 +148,9 @@ describe('useAgentRun', () => {
           },
         },
       },
-    ]);
+    ], {
+      memoryDebugFile: '.ai-debug/memory/finalize-success.json',
+    });
     setAIClient(client);
     const onMessageStart = vi.fn(() => 'message-1');
     const onMessageDelta = vi.fn();
@@ -171,6 +177,7 @@ describe('useAgentRun', () => {
     expect(onDone).toHaveBeenCalledWith({
       sessionId: 'session-success',
       conversationId: 'conv-success',
+      memoryDebugFile: '.ai-debug/memory/finalize-success.json',
     });
     expect(client.requests).toHaveLength(1);
     expect(client.requests[0]).toMatchObject({
@@ -262,7 +269,9 @@ describe('useAgentRun', () => {
           },
         },
       },
-    ]);
+    ], {
+      memoryDebugFile: '.ai-debug/memory/finalize-failure.json',
+    });
     setAIClient(client);
     const onDone = vi.fn();
     const onError = vi.fn();
@@ -286,6 +295,7 @@ describe('useAgentRun', () => {
     expect(onDone).toHaveBeenCalledWith({
       sessionId: 'session-failure',
       conversationId: 'conv-failure',
+      memoryDebugFile: '.ai-debug/memory/finalize-failure.json',
     });
     expect(client.requests).toHaveLength(1);
     expect(client.requests[0]).toMatchObject({
@@ -405,7 +415,9 @@ describe('useAgentRun', () => {
           },
         },
       },
-    ]);
+    ], {
+      memoryDebugFile: '.ai-debug/memory/finalize-retry.json',
+    });
     setAIClient(client);
     const onDone = vi.fn();
     const onError = vi.fn();
@@ -430,6 +442,7 @@ describe('useAgentRun', () => {
     expect(onDone).toHaveBeenCalledWith({
       sessionId: 'session-retry',
       conversationId: 'conv-retry',
+      memoryDebugFile: '.ai-debug/memory/finalize-retry.json',
     });
     expect(onError).toHaveBeenCalledWith(expect.stringContaining('回滚失败'));
     expect(client.finalizeCalls).toHaveLength(1);

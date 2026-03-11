@@ -257,10 +257,10 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             let failedOpIndex: number | undefined;
             let failedError: string | undefined;
 
-            const finalizeModifyRun = async (metadata: RunMetadata) => {
+            const finalizeModifyRun = async (metadata: RunMetadata): Promise<RunMetadata> => {
                 const finalizeConversationId = metadata.conversationId ?? conversationId ?? metadata.sessionId;
                 if (currentIntentRef.current !== 'schema.modify') {
-                    return;
+                    return metadata;
                 }
                 try {
                     const schemaDigest = bridgeRef.current
@@ -281,11 +281,18 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             success: true as const,
                             ...(schemaDigest ? { schemaDigest } : {}),
                         };
-                    await aiClient.finalize({
+                    const finalizeResult = await aiClient.finalize({
                         ...finalizeRequest,
                     });
+                    return finalizeResult.memoryDebugFile
+                        ? {
+                            ...metadata,
+                            memoryDebugFile: finalizeResult.memoryDebugFile,
+                        }
+                        : metadata;
                 } catch (finalizeError: any) {
                     onError(finalizeError?.message || '修改结果回写失败');
+                    return metadata;
                 }
             };
 
@@ -446,8 +453,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             setProgressText(modifyFailed ? '页面修改失败，已回滚' : '页面修改已应用');
                             break;
                         case 'done':
-                            await finalizeModifyRun(event.data.metadata);
-                            onDone(event.data.metadata);
+                            onDone(await finalizeModifyRun(event.data.metadata));
                             break;
                         case 'error':
                             throw new Error(event.data.message);
