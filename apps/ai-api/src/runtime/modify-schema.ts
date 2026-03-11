@@ -4,11 +4,13 @@ import {
   type ModifyResult,
   type ModifySchemaInput,
 } from '@shenbi/ai-agents';
+import type { AgentOperation } from '@shenbi/ai-contracts';
 import { LLMError } from '../adapters/errors.ts';
 import {
   writeInvalidJsonDump,
   type InvalidJsonSource,
 } from '../adapters/debug-dump.ts';
+import { getComponentSchemaContracts } from './component-catalog.ts';
 import { loadEnv } from '../adapters/env.ts';
 import { logger } from '../adapters/logger.ts';
 import {
@@ -31,6 +33,13 @@ export interface ModifySchemaTraceEntry {
   model: string;
   rawOutput: string;
   normalizedResult?: ModifyResult;
+  /** Phase 2 per-insertNode execution traces (only present when two-phase is used) */
+  executeTraces?: Array<{
+    operationIndex: number;
+    requestSummary?: OpenAICompatibleRequestDebugSummary & { provider: string };
+    rawOutput: string;
+    generatedNode?: unknown;
+  }>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -441,7 +450,60 @@ function isModifyResult(value: unknown): value is ModifyResult {
   return value.operations.every((operation) => isRecord(operation) && typeof operation.op === 'string');
 }
 
-function createModifyMessages(input: ModifySchemaInput): OpenAICompatibleMessage[] {
+// ---------------------------------------------------------------------------
+//  Plan operation: internal type returned by Phase 1 planner.
+//  For insertNode, the planner MAY return a lightweight skeleton with
+//  `description` + `components` instead of a full `node`, signalling that
+//  Phase 2 should generate the actual node with component contracts.
+// ---------------------------------------------------------------------------
+
+interface PlanInsertNodeSkeleton {
+  op: 'schema.insertNode';
+  parentId?: string;
+  container?: 'body' | 'dialogs';
+  index?: number;
+  /** What to generate – set by planner when it defers to Phase 2 */
+  description?: string;
+  /** Component types needed – drives contract injection in Phase 2 */
+  components?: string[];
+  /** If the planner already generated the full node, it lands here */
+  node?: unknown;
+}
+
+type PlanOperation = AgentOperation | PlanInsertNodeSkeleton;
+
+interface PlanResult {
+  explanation: string;
+  operations: PlanOperation[];
+}
+
+function isPlanResult(value: unknown): value is PlanResult {
+  if (!isRecord(value) || typeof value.explanation !== 'string' || !Array.isArray(value.operations)) {
+    return false;
+  }
+  return value.operations.every((operation) => isRecord(operation) && typeof operation.op === 'string');
+}
+
+/** Returns true when the plan operation needs Phase 2 generation */
+function needsPhase2(op: PlanOperation): op is PlanInsertNodeSkeleton {
+  if (op.op !== 'schema.insertNode') return false;
+  const insert = op as PlanInsertNodeSkeleton;
+  // If planner returned description + components but no node, it wants Phase 2
+  if (insert.description && Array.isArray(insert.components) && insert.components.length > 0) {
+    return true;
+  }
+  // If the node field is missing or empty, also defer to Phase 2
+  if (!insert.node) {
+    return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+//  Phase 1: Plan prompt
+// ---------------------------------------------------------------------------
+
+function createPlanMessages(input: ModifySchemaInput): OpenAICompatibleMessage[] {
   const conversationHistory = formatConversationHistory(input.context.conversation.history, {
     ...(input.context.document.schemaDigest ? { schemaDigest: input.context.document.schemaDigest } : {}),
   });
@@ -459,23 +521,28 @@ function createModifyMessages(input: ModifySchemaInput): OpenAICompatibleMessage
         'Return JSON only.',
         'Return exactly this shape: {"explanation":"string","operations":[...]}',
         'Use the smallest valid set of operations.',
+        '',
         'Supported operations:',
         '- schema.patchProps: {"op":"schema.patchProps","nodeId":"node-id","patch":{}}',
         '- schema.patchStyle: {"op":"schema.patchStyle","nodeId":"node-id","patch":{}}',
         '- schema.patchEvents: {"op":"schema.patchEvents","nodeId":"node-id","patch":{}}',
         '- schema.patchLogic: {"op":"schema.patchLogic","nodeId":"node-id","patch":{}}',
         '- schema.patchColumns: {"op":"schema.patchColumns","nodeId":"node-id","columns":[]}',
-        '- schema.insertNode: {"op":"schema.insertNode","parentId":"node-id","index":0,"node":{"id":"unique-id","component":"ComponentName","props":{},"children":[]}}',
-        '  IMPORTANT: node MUST have "component" field (NOT "type"). Text content goes in top-level "children" (NOT "props.children").',
-        '- root append: {"op":"schema.insertNode","container":"body","node":{"id":"unique-id","component":"ComponentName","props":{},"children":[]}} or same with "container":"dialogs"',
+        '- schema.insertNode: for inserting new nodes. Return a SKELETON with description and components:',
+        '  {"op":"schema.insertNode","parentId":"node-id","index":0,"description":"插入一个主要操作按钮","components":["Button"]}',
+        '  OR for root appends: {"op":"schema.insertNode","container":"body","description":"...","components":[...]}',
+        '  The description tells what to generate. The components array lists the component types needed (e.g. ["Button"], ["Form","Input","Select"]).',
+        '  A separate step will generate the full node schema with detailed component contracts.',
         '- schema.removeNode: {"op":"schema.removeNode","nodeId":"node-id"}',
-        '- schema.replace: {"op":"schema.replace","schema":{...}}',
+        '- schema.replace: {"op":"schema.replace","description":"...","components":[...]}',
+        '',
         'Rules:',
         '- nodeId and parentId must reference schema node ids from the provided schema tree.',
         '- Prefer patch operations over schema.replace when a local edit is enough.',
         '- Omit index for append-like inserts when order is not explicit.',
         '- explanation should be a short Chinese sentence summarizing what will change.',
-        '- Do not invent components or node ids that are not grounded in the schema tree unless you are inserting a new node.',
+        '- Do not invent node ids that are not grounded in the schema tree.',
+        '- For insertNode: always provide description (Chinese) and components array. Do NOT generate the full node JSON yourself.',
       ].join('\n'),
     },
     {
@@ -495,6 +562,62 @@ function createModifyMessages(input: ModifySchemaInput): OpenAICompatibleMessage
   ];
 }
 
+// ---------------------------------------------------------------------------
+//  Phase 2: InsertNode generation prompt (with component contracts)
+// ---------------------------------------------------------------------------
+
+function createInsertNodeMessages(
+  skeleton: PlanInsertNodeSkeleton,
+  input: ModifySchemaInput,
+): OpenAICompatibleMessage[] {
+  const componentContracts = getComponentSchemaContracts(skeleton.components ?? []);
+  const documentTree = input.context.document.tree ?? '';
+
+  const parentInfo = skeleton.parentId
+    ? `Parent node: ${skeleton.parentId}`
+    : skeleton.container
+      ? `Container: ${skeleton.container} (root level)`
+      : 'Append to page body';
+  const indexInfo = skeleton.index !== undefined ? `Insert position: index=${skeleton.index}` : 'Append at end';
+
+  return [
+    {
+      role: 'system',
+      content: [
+        'You are a low-code schema node generator.',
+        'Return JSON only: {"node": {...}}',
+        'The node MUST follow the component contracts below.',
+        '',
+        '## Component Contracts',
+        componentContracts,
+        '',
+        '## Rules',
+        '- node MUST have "id" (unique kebab-case string) and "component" field.',
+        '- Text content goes in top-level "children" (NOT "props.children").',
+        '- Use the schema-example format from contracts above.',
+        '- Generate realistic Chinese business content when applicable.',
+        '- Each nested node MUST have a unique "id".',
+        '- Keep the node structure minimal and clean.',
+      ].join('\n'),
+    },
+    {
+      role: 'user',
+      content: [
+        `Task: ${skeleton.description ?? 'Generate a node'}`,
+        parentInfo,
+        indexInfo,
+        '',
+        'Schema Tree (for context):',
+        documentTree,
+      ].join('\n'),
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+//  executeModifySchema: two-phase orchestration
+// ---------------------------------------------------------------------------
+
 export async function executeModifySchema(
   input: ModifySchemaInput,
   trace?: { modify?: ModifySchemaTraceEntry },
@@ -507,26 +630,156 @@ export async function executeModifySchema(
   const modelRef = parseProviderModelRef(requestedModel);
   const client = createClient(modelRef.provider);
   const model = requireModel(modelRef.model ?? requestedModel);
-  const messages = createModifyMessages(input);
   const thinking = getThinking(input.request);
-  const requestSummary = {
-    provider: modelRef.provider ?? env.AI_PROVIDER,
-    ...client.buildRequestDebugSummary(model, messages, thinking, false),
+  const provider = modelRef.provider ?? env.AI_PROVIDER;
+
+  // ========================
+  // Phase 1: Plan
+  // ========================
+  const planMessages = createPlanMessages(input);
+  const planRequestSummary = {
+    provider,
+    ...client.buildRequestDebugSummary(model, planMessages, thinking, false),
   };
-  const text = await client.chat(model, messages, thinking);
-  const parsed = extractJson<unknown>(text, 'modify', input.request, model);
-  if (!isModifyResult(parsed)) {
-    throw new LLMError('modifySchema returned an invalid result shape', 'INVALID_MODIFY_RESULT');
+  const planText = await client.chat(model, planMessages, thinking);
+  const planParsed = extractJson<unknown>(planText, 'modify', input.request, model);
+  if (!isPlanResult(planParsed)) {
+    throw new LLMError('modifySchema planner returned an invalid result shape', 'INVALID_MODIFY_RESULT');
   }
+
+  // Separate simple ops (ready to execute) from complex ops (need Phase 2)
+  const simpleOps: AgentOperation[] = [];
+  const complexEntries: Array<{ index: number; skeleton: PlanInsertNodeSkeleton }> = [];
+
+  for (const [index, op] of planParsed.operations.entries()) {
+    if (needsPhase2(op)) {
+      complexEntries.push({ index, skeleton: op as PlanInsertNodeSkeleton });
+    } else {
+      simpleOps.push(op as AgentOperation);
+    }
+  }
+
+  // ========================
+  // Fast path: no complex ops
+  // ========================
+  if (complexEntries.length === 0) {
+    const result: ModifyResult = {
+      explanation: planParsed.explanation,
+      operations: simpleOps,
+    };
+    if (trace) {
+      trace.modify = {
+        requestSummary: planRequestSummary,
+        model,
+        rawOutput: planText,
+        normalizedResult: result,
+      };
+    }
+    return result;
+  }
+
+  // ========================
+  // Phase 2: Execute complex insertNode ops with component contracts
+  // ========================
+  const executeTraces: NonNullable<ModifySchemaTraceEntry['executeTraces']> = [];
+  const executedOps: Array<{ index: number; operation: AgentOperation }> = [];
+
+  // Execute Phase 2 calls in parallel
+  const phase2Tasks = complexEntries.map(async ({ index, skeleton }) => {
+    const insertMessages = createInsertNodeMessages(skeleton, input);
+    const insertRequestSummary = {
+      provider,
+      ...client.buildRequestDebugSummary(model, insertMessages, thinking, false),
+    };
+
+    try {
+      const insertText = await client.chat(model, insertMessages, thinking);
+      const insertParsed = extractJson<unknown>(insertText, 'modify-insertNode', input.request, model);
+
+      let node: unknown;
+      if (isRecord(insertParsed) && 'node' in insertParsed) {
+        node = insertParsed.node;
+      } else if (isRecord(insertParsed) && 'component' in insertParsed) {
+        // LLM returned the node directly instead of wrapped in {node: ...}
+        node = insertParsed;
+      } else {
+        throw new LLMError('Phase 2 insertNode returned invalid shape', 'INVALID_INSERT_NODE_RESULT');
+      }
+
+      executeTraces.push({
+        operationIndex: index,
+        requestSummary: insertRequestSummary,
+        rawOutput: insertText,
+        generatedNode: node,
+      });
+
+      const finalOp: AgentOperation = {
+        op: 'schema.insertNode',
+        ...(skeleton.parentId ? { parentId: skeleton.parentId } : {}),
+        ...(skeleton.container ? { container: skeleton.container } : {}),
+        ...(skeleton.index !== undefined ? { index: skeleton.index } : {}),
+        node: node as AgentOperation extends { op: 'schema.insertNode'; node: infer N } ? N : never,
+      } as AgentOperation;
+
+      executedOps.push({ index, operation: finalOp });
+    } catch (error) {
+      // Fallback: generate a placeholder Typography.Text node
+      logger.error('modify.phase2_insertNode_failed', {
+        operationIndex: index,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      executeTraces.push({
+        operationIndex: index,
+        requestSummary: insertRequestSummary,
+        rawOutput: error instanceof Error ? error.message : String(error),
+      });
+
+      const fallbackOp: AgentOperation = {
+        op: 'schema.insertNode',
+        ...(skeleton.parentId ? { parentId: skeleton.parentId } : {}),
+        ...(skeleton.container ? { container: skeleton.container } : {}),
+        ...(skeleton.index !== undefined ? { index: skeleton.index } : {}),
+        node: {
+          id: `generated-${index}-${Date.now().toString(36)}`,
+          component: 'Typography.Text',
+          props: { type: 'secondary' },
+          children: skeleton.description ?? '(生成失败，请重试)',
+        },
+      } as AgentOperation;
+
+      executedOps.push({ index, operation: fallbackOp });
+    }
+  });
+
+  await Promise.all(phase2Tasks);
+
+  // Merge: rebuild operations array in original order
+  const mergedOps: AgentOperation[] = [];
+  let simpleIdx = 0;
+  for (const [planIdx, planOp] of planParsed.operations.entries()) {
+    const executed = executedOps.find((e) => e.index === planIdx);
+    if (executed) {
+      mergedOps.push(executed.operation);
+    } else {
+      mergedOps.push(simpleOps[simpleIdx]!);
+      simpleIdx += 1;
+    }
+  }
+
+  const result: ModifyResult = {
+    explanation: planParsed.explanation,
+    operations: mergedOps,
+  };
 
   if (trace) {
     trace.modify = {
-      requestSummary,
+      requestSummary: planRequestSummary,
       model,
-      rawOutput: text,
-      normalizedResult: parsed,
+      rawOutput: planText,
+      normalizedResult: result,
+      executeTraces,
     };
   }
 
-  return parsed;
+  return result;
 }

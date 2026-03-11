@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RunRequest } from '@shenbi/ai-contracts';
 
-export type InvalidJsonSource = 'planner' | 'block' | 'modify';
+export type InvalidJsonSource = 'planner' | 'block' | 'modify' | 'modify-insertNode';
 
 interface InvalidJsonDumpInput {
   source: InvalidJsonSource;
