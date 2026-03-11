@@ -151,6 +151,8 @@ describe('AIPanel', () => {
     });
     expect(screen.getByText('Trace File: .ai-debug/traces/persisted-success.json')).toBeInTheDocument();
     expect(screen.getByText('Memory Dump: .ai-debug/memory/persisted-finalize.json')).toBeInTheDocument();
+    expect(screen.queryByText(/耗时:/)).toBeNull();
+    expect(screen.queryByText(/Tokens:/)).toBeNull();
   });
 
   it('清空按钮会触发 workspace.resetDocument 并清空会话', async () => {
@@ -254,6 +256,41 @@ describe('AIPanel', () => {
     await waitFor(() => {
       expect(screen.getByText('Trace File: .ai-debug/traces/2026-03-11-error.json')).toBeInTheDocument();
       expect(screen.getByText('[Error]: Provider unavailable. Trace file: .ai-debug/traces/2026-03-11-error.json')).toBeInTheDocument();
+    });
+  });
+
+  it('在失败运行后对通用错误 dump 使用 Debug File 标签', async () => {
+    useAgentRunState.runAgent.mockImplementation(
+      async (
+        _text: string,
+        _plannerModel: string,
+        _blockModel: string,
+        _thinkingEnabled: boolean,
+        _conversationId: string | undefined,
+        _onMessageStart: () => string,
+        _onMessageDelta: (id: string, chunk: string) => void,
+        _onDone: (metadata: { sessionId: string; debugFile?: string; durationMs?: number; tokensUsed?: number }) => void,
+        onError: (error: string) => void,
+      ) => {
+        onError('prompt is required. Debug file: .ai-debug/errors/2026-03-11-error.json');
+      },
+    );
+
+    render(<AIPanel bridge={createBridge()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Planner')).toHaveValue('openai-compatible::GLM-4.7');
+    });
+
+    fireEvent.change(
+      screen.getByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行'),
+      { target: { value: '生成失败' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Debug File: .ai-debug/errors/2026-03-11-error.json')).toBeInTheDocument();
+      expect(screen.getByText('[Error]: prompt is required. Debug file: .ai-debug/errors/2026-03-11-error.json')).toBeInTheDocument();
     });
   });
 });

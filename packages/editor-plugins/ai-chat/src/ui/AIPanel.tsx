@@ -52,6 +52,12 @@ function extractDebugFilePath(message: string): string | undefined {
   return matched?.[1]?.trim();
 }
 
+function getDebugFileLabel(path: string): 'Trace File' | 'Debug File' {
+  return /(?:^|[\\/])(?:\.ai-debug[\\/])?traces(?:[\\/]|$)/i.test(path)
+    ? 'Trace File'
+    : 'Debug File';
+}
+
 export function AIPanel({
   bridge,
   pluginContext,
@@ -330,14 +336,18 @@ export function AIPanel({
 
         {messages.length > 0 && !isRunning && (lastMetadata || lastDebugFile) && (
           <div className="text-text-secondary flex flex-col items-center gap-1 opacity-50 mb-2" style={{ fontSize: '10px' }}>
-            {lastMetadata && (
+            {lastMetadata && (typeof lastMetadata.durationMs === 'number' || typeof lastMetadata.tokensUsed === 'number') && (
               <div className="flex justify-center gap-4">
-                <span>耗时: {lastMetadata.durationMs}ms</span>
-                <span>Tokens: {lastMetadata.tokensUsed}</span>
+                {typeof lastMetadata.durationMs === 'number' && (
+                  <span>耗时: {lastMetadata.durationMs}ms</span>
+                )}
+                {typeof lastMetadata.tokensUsed === 'number' && (
+                  <span>Tokens: {lastMetadata.tokensUsed}</span>
+                )}
               </div>
             )}
             {lastDebugFile && (
-              <span className="font-mono break-all text-center">Trace File: {lastDebugFile}</span>
+              <span className="font-mono break-all text-center">{getDebugFileLabel(lastDebugFile)}: {lastDebugFile}</span>
             )}
             {lastMetadata?.memoryDebugFile && (
               <span className="font-mono break-all text-center">Memory Dump: {lastMetadata.memoryDebugFile}</span>
