@@ -1904,6 +1904,23 @@ export async function attachTraceMemory(
   };
 }
 
+export async function attachTraceMemoryBestEffort(
+  trace: RunTraceRecord,
+  memory: AgentMemoryStore,
+  conversationId: string,
+  sessionId: string,
+): Promise<void> {
+  try {
+    await attachTraceMemory(trace, memory, conversationId, sessionId);
+  } catch (error) {
+    logger.warn('ai.runtime.trace_memory_failed', {
+      conversationId,
+      sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): AgentRuntime {
   return {
     async run(request) {
@@ -1912,7 +1929,7 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
         const events = await runAgent(request, createRuntimeDeps(memory, trace));
         const metadata = extractMetadata(events);
         if (metadata.conversationId) {
-          await attachTraceMemory(trace, memory, metadata.conversationId, metadata.sessionId);
+          await attachTraceMemoryBestEffort(trace, memory, metadata.conversationId, metadata.sessionId);
         }
         finalizeTrace(trace, 'success', metadata);
         return { events, metadata };
@@ -1942,7 +1959,7 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
         if (terminalEvent?.type === 'done') {
           const metadata = terminalEvent.data.metadata;
           if (metadata.conversationId) {
-            await attachTraceMemory(trace, memory, metadata.conversationId, metadata.sessionId);
+            await attachTraceMemoryBestEffort(trace, memory, metadata.conversationId, metadata.sessionId);
           }
           finalizeTrace(trace, 'success', metadata);
           yield terminalEvent;

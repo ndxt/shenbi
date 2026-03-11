@@ -5,6 +5,7 @@ import { createInMemoryAgentMemoryStore } from '@shenbi/ai-agents';
 import {
   assessBlockQuality,
   attachTraceMemory,
+  attachTraceMemoryBestEffort,
   classifyPromptToPageType,
   createAgentRuntime,
   validateGeneratedBlockNode,
@@ -513,6 +514,55 @@ describe('agent runtime trace memory', () => {
       lastBlockIds: [],
     });
     expect(Array.isArray((trace.memory as { conversationTail?: unknown[] }).conversationTail)).toBe(true);
+  });
+
+  it('does not throw when trace memory capture fails', async () => {
+    const trace: {
+      request: {
+        prompt: string;
+        conversationId: string;
+        context: {
+          schemaSummary: string;
+          componentSummary: string;
+        };
+      };
+      blocks: never[];
+      memory?: unknown;
+    } = {
+      request: {
+        prompt: 'hi',
+        conversationId: 'trace-memory-fail-conv',
+        context: {
+          schemaSummary: 'Existing dashboard',
+          componentSummary: 'Card',
+        },
+      },
+      blocks: [],
+    };
+    const memory = {
+      async getConversation() {
+        throw new Error('memory offline');
+      },
+      async appendConversationMessage() {},
+      async getLastRunMetadata() {
+        return undefined;
+      },
+      async setLastRunMetadata() {},
+      async getLastBlockIds() {
+        return [];
+      },
+      async setLastBlockIds() {},
+    };
+
+    await expect(
+      attachTraceMemoryBestEffort(
+        trace as never,
+        memory as never,
+        'trace-memory-fail-conv',
+        'trace-session-fail',
+      ),
+    ).resolves.toBeUndefined();
+    expect(trace.memory).toBeUndefined();
   });
 });
 
