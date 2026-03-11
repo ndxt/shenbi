@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Sparkles, Loader2, Info, BrainCircuit, Trash2 } from 'lucide-react';
+import { Sparkles, Loader2, BrainCircuit, Trash2, CheckCircle2 } from 'lucide-react';
 import {
   executePluginCommand,
   type PluginContext,
@@ -347,21 +347,25 @@ export function AIPanel({
             </div>
             {currentPlan && (
               <div className="mt-1 border-t border-border-ide pt-2">
-                <div className="text-text-secondary font-bold uppercase mb-1.5 flex items-center gap-1" style={{ fontSize: '10px' }}>
-                  <Info size={10} /> {currentPlan.pageTitle || '架构计划'}
-                </div>
-                <ul className="flex flex-col gap-1 pl-2">
+                <ul className="flex flex-col gap-1">
                   {currentPlan.blocks.map((b) => (
-                    <li key={b.id} className="text-text-primary flex gap-2" style={{ fontSize: '11px' }}>
-                      <span className="opacity-80 truncate" title={b.description}>{b.description}</span>
-                      <span className={`ml-auto font-mono shrink-0 ${
-                        blockStatuses[b.id] === 'done'
-                          ? 'text-emerald-400'
+                    <li
+                      key={b.id}
+                      className={`flex items-center gap-2 ${
+                        blockStatuses[b.id] === 'generating' ? 'animate-pulse' : ''
+                      }`}
+                      style={{ fontSize: '11px' }}
+                    >
+                      <span className={`opacity-80 truncate flex-1 ${
+                        blockStatuses[b.id] === 'generating' ? 'text-blue-400' : 'text-text-primary'
+                      }`} title={b.description}>{b.description}</span>
+                      <span className="shrink-0 flex items-center">
+                        {blockStatuses[b.id] === 'done'
+                          ? <CheckCircle2 size={11} className="text-emerald-400" />
                           : blockStatuses[b.id] === 'generating'
-                            ? 'text-blue-400 animate-pulse'
-                            : 'text-text-secondary'
-                      }`}>
-                        {blockStatuses[b.id] === 'done' ? '✓' : blockStatuses[b.id] === 'generating' ? '⟳' : '·'}
+                            ? <Loader2 size={11} className="text-blue-400 animate-spin" />
+                            : <span className="w-[11px] h-[11px] flex items-center justify-center text-text-secondary" style={{ fontSize: '10px' }}>·</span>
+                        }
                       </span>
                     </li>
                   ))}
@@ -370,24 +374,28 @@ export function AIPanel({
             )}
             {modifyPlan && (
               <div className="mt-1 border-t border-border-ide pt-2">
-                <div className="text-text-secondary font-bold uppercase mb-1.5 flex items-center gap-1" style={{ fontSize: '10px' }}>
-                  <BrainCircuit size={10} /> 修改计划 ({modifyPlan.operationCount} 步)
-                </div>
-                <ul className="flex flex-col gap-1 pl-2">
+                <ul className="flex flex-col gap-1">
                   {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
-                    <li key={i} className="text-text-primary flex gap-2" style={{ fontSize: '11px' }}>
-                      <span className="opacity-70 tabular-nums shrink-0" style={{ fontSize: '10px' }}>#{i + 1}</span>
-                      <span className="opacity-80 truncate flex-1">
-                        {modifyStatuses[i] === 'generating' ? '执行中...' : modifyStatuses[i] === 'done' ? '已完成' : '等待中'}
-                      </span>
-                      <span className={`ml-auto font-mono shrink-0 ${
-                        modifyStatuses[i] === 'done'
-                          ? 'text-emerald-400'
-                          : modifyStatuses[i] === 'generating'
-                            ? 'text-blue-400 animate-pulse'
-                            : 'text-text-secondary'
+                    <li
+                      key={i}
+                      className={`flex items-center gap-2 ${
+                        modifyStatuses[i] === 'generating' ? 'animate-pulse' : ''
+                      }`}
+                      style={{ fontSize: '11px' }}
+                    >
+                      <span className="text-text-secondary tabular-nums shrink-0" style={{ fontSize: '10px' }}>#{i + 1}</span>
+                      <span className={`truncate flex-1 ${
+                        modifyStatuses[i] === 'generating' ? 'text-blue-400' : 'text-text-primary opacity-80'
                       }`}>
-                        {modifyStatuses[i] === 'done' ? '✓' : modifyStatuses[i] === 'generating' ? '⟳' : '·'}
+                        {modifyStatuses[i] === 'generating' ? '执行中' : modifyStatuses[i] === 'done' ? '已完成' : '等待'}
+                      </span>
+                      <span className="shrink-0 flex items-center">
+                        {modifyStatuses[i] === 'done'
+                          ? <CheckCircle2 size={11} className="text-emerald-400" />
+                          : modifyStatuses[i] === 'generating'
+                            ? <Loader2 size={11} className="text-blue-400 animate-spin" />
+                            : <span className="w-[11px] h-[11px] flex items-center justify-center text-text-secondary" style={{ fontSize: '10px' }}>·</span>
+                        }
                       </span>
                     </li>
                   ))}
