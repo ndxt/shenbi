@@ -214,7 +214,8 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             onMessageStart: () => string,
             onMessageDelta: (id: string, chunk: string) => void,
             onDone: (metadata: RunMetadata) => void,
-            onError: (err: string) => void
+            onError: (err: string) => void,
+            blockConcurrency?: number,
         ) => {
             if (!bridgeRef.current) return;
             if (isRunningRef.current) return;
@@ -245,6 +246,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                 ...(plannerModel ? { plannerModel } : {}),
                 ...(blockModel ? { blockModel } : {}),
                 thinking: { type: thinkingEnabled ? 'enabled' : 'disabled' },
+                ...(blockConcurrency !== undefined ? { blockConcurrency } : {}),
                 context: {
                     schemaSummary,
                     componentSummary,

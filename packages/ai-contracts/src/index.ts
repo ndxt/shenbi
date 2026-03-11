@@ -33,6 +33,8 @@ export interface RunRequest {
   conversationId?: string;
   selectedNodeId?: string;
   thinking?: ThinkingConfig;
+  /** 并发生成 block 的最大数量，范围 1-8，默认 3 */
+  blockConcurrency?: number;
   context: {
     schemaSummary: string;
     componentSummary: string;

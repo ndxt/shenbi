@@ -66,6 +66,7 @@ export function AIPanel({
 }: AIPanelProps) {
   const persistence = pluginContext?.persistence;
   const [thinkingEnabled, setThinkingEnabled] = React.useState(false);
+  const [blockConcurrency, setBlockConcurrency] = React.useState(3);
   const [draftText, setDraftText] = React.useState('');
   const [promptHistory, setPromptHistory] = React.useState<string[]>([]);
   const [uiHydrated, setUIHydrated] = React.useState(!persistence);
@@ -119,6 +120,7 @@ export function AIPanel({
     void Promise.all([
       persistence.getJSON<{
         thinkingEnabled?: boolean;
+        blockConcurrency?: number;
         draftText?: string;
       }>(PERSISTENCE_NAMESPACE, UI_PERSISTENCE_KEY),
       persistence.getJSON<string[]>(PERSISTENCE_NAMESPACE, PROMPT_HISTORY_PERSISTENCE_KEY),
@@ -128,6 +130,9 @@ export function AIPanel({
           return;
         }
         setThinkingEnabled(Boolean(storedUIState?.thinkingEnabled));
+        if (typeof storedUIState?.blockConcurrency === 'number') {
+          setBlockConcurrency(Math.min(8, Math.max(1, storedUIState.blockConcurrency)));
+        }
         setDraftText(storedUIState?.draftText ?? '');
         setPromptHistory(storedPromptHistory ?? []);
       })
@@ -166,10 +171,11 @@ export function AIPanel({
     void persistence
       .setJSON(PERSISTENCE_NAMESPACE, UI_PERSISTENCE_KEY, {
         thinkingEnabled,
+        blockConcurrency,
         draftText,
       })
       .catch(() => undefined);
-  }, [draftText, persistence, thinkingEnabled, uiHydrated]);
+  }, [blockConcurrency, draftText, persistence, thinkingEnabled, uiHydrated]);
 
   useEffect(() => {
     if (!persistence || !uiHydrated) {
@@ -190,6 +196,10 @@ export function AIPanel({
       text,
       ...previous.filter((item) => item !== text),
     ].slice(0, MAX_PROMPT_HISTORY));
+  }, []);
+
+  const handleRemoveHistory = React.useCallback((value: string) => {
+    setPromptHistory((previous) => previous.filter((item) => item !== value));
   }, []);
 
   const handleClear = React.useCallback(() => {
@@ -233,7 +243,8 @@ export function AIPanel({
         setLastMetadata(undefined);
         setLastDebugFile(extractDebugFilePath(err));
         addMessage({ role: 'assistant', content: `[Error]: ${err}` });
-      }
+      },
+      blockConcurrency,
     );
   };
 
@@ -261,7 +272,10 @@ export function AIPanel({
 
       <div className="flex-none px-3 py-2 border-b border-border-ide flex gap-3 bg-bg-panel items-center justify-between">
         <div className="flex gap-2 flex-1">
-            <ModelSelector label="Planner" models={plannerModels} value={plannerModel} onChange={setPlannerModel} disabled={isRunning || modelSelectionBlocked} />
+            <ModelSelector label="Planner" models={plannerModels} value={plannerModel} onChange={(value) => {
+              setPlannerModel(value);
+              setBlockModel(value);
+            }} disabled={isRunning || modelSelectionBlocked} />
             <ModelSelector label="Block" models={blockModels} value={blockModel} onChange={setBlockModel} disabled={isRunning || modelSelectionBlocked} />
         </div>
         <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0" title="思考模式">
@@ -277,6 +291,23 @@ export function AIPanel({
             disabled={isRunning || modelSelectionBlocked}
           />
         </label>
+      </div>
+
+      <div className="flex-none px-3 py-1.5 border-b border-border-ide bg-bg-panel flex items-center gap-2">
+        <span className="text-text-secondary uppercase tracking-wider shrink-0" style={{ fontSize: '10px' }}>并发</span>
+        <input
+          type="range"
+          min={1}
+          max={8}
+          step={1}
+          value={blockConcurrency}
+          onChange={(e) => setBlockConcurrency(Number(e.target.value))}
+          disabled={isRunning}
+          className="flex-1 accent-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ height: '4px' }}
+          title={`并发 block 数: ${blockConcurrency}`}
+        />
+        <span className="text-text-primary font-mono shrink-0 w-4 text-center" style={{ fontSize: '11px' }}>{blockConcurrency}</span>
       </div>
 
       {isLoadingModels && (
@@ -374,6 +405,7 @@ export function AIPanel({
           promptHistory={promptHistory}
           onSelectPreset={applyPromptText}
           onSelectHistory={applyPromptText}
+          onRemoveHistory={handleRemoveHistory}
         />
       </div>
     </div>
