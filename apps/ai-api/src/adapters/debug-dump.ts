@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RunRequest } from '@shenbi/ai-contracts';
 
-export type InvalidJsonSource = 'planner' | 'block';
+export type InvalidJsonSource = 'planner' | 'block' | 'modify' | 'modify-insertNode';
 
 interface InvalidJsonDumpInput {
   source: InvalidJsonSource;
@@ -26,6 +26,11 @@ interface ErrorDumpInput {
 interface TraceDumpInput {
   status: 'success' | 'error';
   trace: unknown;
+}
+
+interface MemoryDumpInput {
+  category: 'finalize';
+  memory: unknown;
 }
 
 function toSafeStamp(date: Date): string {
@@ -137,4 +142,28 @@ export function writeTraceDump(input: TraceDumpInput): string {
   );
 
   return join('.ai-debug', 'traces', filename);
+}
+
+export function writeMemoryDump(input: MemoryDumpInput): string {
+  const dumpDir = join(process.cwd(), '.ai-debug', 'memory');
+  mkdirSync(dumpDir, { recursive: true });
+
+  const filename = `${toSafeStamp(new Date())}-${input.category}.json`;
+  const fullpath = join(dumpDir, filename);
+
+  writeFileSync(
+    fullpath,
+    JSON.stringify(
+      {
+        ts: new Date().toISOString(),
+        category: input.category,
+        memory: toSerializable(input.memory),
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  );
+
+  return join('.ai-debug', 'memory', filename);
 }

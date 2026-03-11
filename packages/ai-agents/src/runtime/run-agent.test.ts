@@ -124,6 +124,7 @@ describe('runAgent', () => {
     const events = await runAgent(createRequest(), deps);
     expect(events.map((event) => event.type)).toEqual([
       'run:start',
+      'intent',
       'message:start',
       'message:delta',
       'tool:start',
@@ -161,7 +162,14 @@ describe('runAgent', () => {
     const storedConversation = await deps.memory.getConversation('conv-1');
     expect(storedConversation).toEqual([
       { role: 'user', text: 'Generate an admin page' },
-      { role: 'assistant', text: 'Planning page structure.' },
+      {
+        role: 'assistant',
+        text: 'Planning page structure.',
+        meta: expect.objectContaining({
+          sessionId: expect.any(String),
+          intent: 'schema.create',
+        }),
+      },
     ]);
     expect(await deps.memory.getLastBlockIds('conv-1')).toEqual(['hero', 'table']);
   });
@@ -183,6 +191,7 @@ describe('runAgent', () => {
     const events = await runAgent(createRequest(), deps);
     expect(events.map((event) => event.type)).toEqual([
       'run:start',
+      'intent',
       'message:start',
       'message:delta',
       'tool:start',

@@ -27,6 +27,7 @@ function createStreamResponse(events: AgentEvent[]): Response {
 function createRequest(): RunRequest {
   return {
     prompt: 'Generate an admin page',
+    intent: 'schema.create',
     plannerModel: 'planner-demo',
     blockModel: 'block-demo',
     conversationId: 'conv-1',
@@ -109,6 +110,43 @@ describe('FetchAIClient', () => {
 
     await expect(Array.fromAsync(client.runStream(createRequest()))).rejects.toThrow('bad request');
   });
+
+  it('posts finalize payloads to the finalize endpoint', async () => {
+    const fetchImplementation = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe('/api/ai/run/finalize');
+      expect(init?.method).toBe('POST');
+      expect(JSON.parse(String(init?.body))).toEqual({
+        conversationId: 'conv-1',
+        sessionId: 'session-1',
+        success: false,
+        failedOpIndex: 0,
+        error: 'node not found',
+      });
+      return new Response(JSON.stringify({
+        success: true,
+        data: {
+          memoryDebugFile: '.ai-debug/memory/finalize.json',
+        },
+      }), { status: 200 });
+    });
+
+    const client = new FetchAIClient({
+      finalizeEndpoint: '/api/ai/run/finalize',
+      fetchImplementation: fetchImplementation as typeof fetch,
+    });
+
+    await expect(client.finalize({
+      conversationId: 'conv-1',
+      sessionId: 'session-1',
+      success: false,
+      failedOpIndex: 0,
+      error: 'node not found',
+    })).resolves.toEqual({
+      memoryDebugFile: '.ai-debug/memory/finalize.json',
+    });
+
+    expect(fetchImplementation).toHaveBeenCalledOnce();
+  });
 });
 
 describe('MockAIClient', () => {
@@ -138,5 +176,42 @@ describe('MockAIClient', () => {
         },
       },
     });
+  });
+
+  it('emits modify events for local demo flows', async () => {
+    const client = new MockAIClient();
+    const events: AgentEvent[] = [];
+
+    for await (const event of client.runStream({
+      ...createRequest(),
+      prompt: '把当前卡片标题改成本月营收',
+      intent: 'schema.modify',
+      selectedNodeId: 'card-1',
+      context: {
+        ...createRequest().context,
+        schemaJson: {
+          id: 'page-1',
+          body: [{ id: 'card-1', component: 'Card', children: [] }],
+        },
+      },
+    })) {
+      events.push(event);
+    }
+
+    expect(events.map((event) => event.type)).toEqual([
+      'run:start',
+      'intent',
+      'message:start',
+      'message:delta',
+      'message:delta',
+      'tool:start',
+      'tool:result',
+      'message:delta',
+      'modify:start',
+      'modify:op',
+      'modify:done',
+      'message:delta',
+      'done',
+    ]);
   });
 });

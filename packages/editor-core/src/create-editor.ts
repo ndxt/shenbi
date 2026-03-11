@@ -350,9 +350,50 @@ function registerBuiltinCommands(
   });
 
   commands.register({
+    id: 'history.beginBatch',
+    label: 'Begin History Batch',
+    recordHistory: false,
+    execute() {
+      history.lock();
+    },
+  });
+
+  commands.register({
+    id: 'history.commitBatch',
+    label: 'Commit History Batch',
+    recordHistory: false,
+    execute(currentState) {
+      const didCommit = history.commit();
+      currentState.setHistoryFlags(history.canUndo(), history.canRedo());
+      if (didCommit) {
+        eventBus.emit('history:pushed', undefined);
+      }
+    },
+  });
+
+  commands.register({
+    id: 'history.discardBatch',
+    label: 'Discard History Batch',
+    recordHistory: false,
+    execute(currentState) {
+      const restoredSnapshot = history.discard();
+      if (!restoredSnapshot) {
+        currentState.setHistoryFlags(history.canUndo(), history.canRedo());
+        return;
+      }
+      currentState.restoreSnapshot({
+        ...restoredSnapshot,
+        canUndo: history.canUndo(),
+        canRedo: history.canRedo(),
+      });
+    },
+  });
+
+  commands.register({
     id: 'editor.undo',
     label: 'Undo',
     recordHistory: false,
+    canExecute: () => !history.isLocked() && history.canUndo(),
     execute(currentState) {
       const snapshot = history.undo();
       if (!snapshot) {
@@ -371,6 +412,7 @@ function registerBuiltinCommands(
     id: 'editor.redo',
     label: 'Redo',
     recordHistory: false,
+    canExecute: () => !history.isLocked() && history.canRedo(),
     execute(currentState) {
       const snapshot = history.redo();
       if (!snapshot) {

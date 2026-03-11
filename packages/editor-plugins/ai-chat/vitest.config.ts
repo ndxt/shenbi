@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@shenbi/editor-core': path.resolve(__dirname, '../../editor-core/src/index.ts'),
       '@shenbi/editor-plugin-api': path.resolve(__dirname, '../api/src/index.ts'),
       '@shenbi/schema': path.resolve(__dirname, '../../schema/types/index.ts'),
     },

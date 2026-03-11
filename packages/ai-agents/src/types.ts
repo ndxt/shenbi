@@ -1,9 +1,14 @@
 import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import type {
   AgentEvent,
+  AgentIntent,
+  AgentOperation,
+  FinalizeRequest,
+  FinalizeResult,
   FeedbackRequest,
   LayoutRow,
   ModelInfo,
+  ModifyResult,
   PagePlan as SharedPagePlan,
   PageType,
   RunMetadata,
@@ -13,9 +18,14 @@ import type {
 
 export type {
   AgentEvent,
+  AgentIntent,
+  AgentOperation,
+  FinalizeRequest,
+  FinalizeResult,
   FeedbackRequest,
   LayoutRow,
   ModelInfo,
+  ModifyResult,
   PageType,
   RunMetadata,
   RunRequest,
@@ -38,6 +48,13 @@ export interface AgentToolRegistry {
 export interface AgentMemoryMessage {
   role: 'user' | 'assistant';
   text: string;
+  meta?: {
+    sessionId?: string;
+    intent?: AgentIntent;
+    operations?: AgentOperation[];
+    schemaDigest?: string;
+    failed?: boolean;
+  };
 }
 
 export interface AgentMemoryEntry {
@@ -49,6 +66,15 @@ export interface AgentMemoryEntry {
 export interface AgentMemoryStore {
   getConversation(conversationId: string): Promise<AgentMemoryMessage[]>;
   appendConversationMessage(conversationId: string, message: AgentMemoryMessage): Promise<void>;
+  patchAssistantMessage?(
+    conversationId: string,
+    sessionId: string,
+    patch: {
+      text?: string;
+      meta?: Partial<NonNullable<AgentMemoryMessage['meta']>>;
+      clearOperations?: boolean;
+    },
+  ): Promise<void>;
   getLastRunMetadata(conversationId: string): Promise<RunMetadata | undefined>;
   setLastRunMetadata(conversationId: string, metadata: RunMetadata): Promise<void>;
   getLastBlockIds(conversationId: string): Promise<string[]>;
@@ -77,9 +103,19 @@ export interface AgentRuntimeDeps {
 export interface AgentRuntimeContext {
   prompt: string;
   selectedNodeId?: string;
-  schemaSummary: string;
+  document: {
+    exists: boolean;
+    summary: string;
+    tree?: string;
+    schema?: PageSchema;
+    schemaDigest?: string;
+  };
   componentSummary: string;
-  recentConversation: AgentMemoryMessage[];
+  conversation: {
+    history: AgentMemoryMessage[];
+    turnCount: number;
+    lastOperations?: AgentOperation[];
+  };
   lastRunMetadata?: RunMetadata;
   lastBlockIds: string[];
 }
@@ -97,6 +133,21 @@ export interface GenerateBlockInput {
   pageTitle?: string;
   blockIndex?: number;
   placementSummary?: string;
+}
+
+export interface ModifySchemaInput {
+  request: RunRequest;
+  context: AgentRuntimeContext;
+}
+
+export interface IntentClassification {
+  intent: AgentIntent;
+  confidence: number;
+}
+
+export interface ClassifyIntentInput {
+  request: RunRequest;
+  context: AgentRuntimeContext;
 }
 
 export interface GenerateBlockResult {

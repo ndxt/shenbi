@@ -5,6 +5,13 @@
 import {
   createInMemoryAgentMemoryStore,
   createToolRegistry,
+  type AgentMemoryMessage,
+  type AgentMemoryStore,
+  type ClassifyIntentInput,
+  formatConversationHistory,
+  type FinalizeRequest,
+  type FinalizeResult,
+  type IntentClassification,
   type LayoutRow,
   runAgent,
   runAgentStream,
@@ -23,6 +30,7 @@ import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import { LLMError } from '../adapters/errors.ts';
 import {
   writeInvalidJsonDump,
+  writeMemoryDump,
   writeTraceDump,
   type InvalidJsonSource,
 } from '../adapters/debug-dump.ts';
@@ -43,6 +51,10 @@ import {
   supportedComponentList,
 } from './normalize-schema.ts';
 import {
+  classifyIntentWithModel,
+  type ClassifyIntentTraceEntry,
+} from './classify-intent.ts';
+import {
   getDesignPolicySummary,
   getFreeLayoutPatternSummary,
   getPageSkeleton,
@@ -51,9 +63,10 @@ import {
   expandComponents,
   getFullComponentContracts,
 } from './component-catalog.ts';
+import { executeModifySchema, type ModifySchemaTraceEntry } from './modify-schema.ts';
 import type { AgentRuntime } from './types.ts';
 
-const memory = createInMemoryAgentMemoryStore();
+const defaultMemory = createInMemoryAgentMemoryStore();
 const env = loadEnv();
 type JsonSalvageStrategy =
   | 'balanced_object'
@@ -71,6 +84,13 @@ interface ProviderRequestTraceSummary extends OpenAICompatibleRequestDebugSummar
 interface RunTraceRecord {
   request: RunRequest;
   suggestedPageType?: PageType;
+  memory?: {
+    finalAssistantMessage?: AgentMemoryMessage;
+    conversationTail?: AgentMemoryMessage[];
+    lastRunMetadata?: RunMetadata;
+    lastBlockIds?: string[];
+  };
+  classifyIntent?: ClassifyIntentTraceEntry;
   planner?: {
     requestSummary?: ProviderRequestTraceSummary;
     model: string;
@@ -92,11 +112,26 @@ interface RunTraceRecord {
     retryNormalizedNode?: GenerateBlockResult['node'];
     retrySanitizationDiagnostics?: SanitizationDiagnostic[];
   }>;
+  modify?: ModifySchemaTraceEntry;
   finalSchema?: PageSchema;
   error?: {
     message: string;
     stack?: string;
   };
+}
+
+interface MemoryDebugSnapshot {
+  conversationId: string;
+  sessionId?: string;
+  conversationSize: number;
+  assistantMessage?: AgentMemoryMessage;
+  conversationTail: AgentMemoryMessage[];
+  lastRunMetadata?: RunMetadata;
+  lastBlockIds: string[];
+}
+
+function cloneDebugValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 export interface BlockQualityDiagnostic {
@@ -1295,6 +1330,10 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
   const suggestedSkeletonSummary = getPageSkeletonSummary(suggestedPageType);
   const freeLayoutPatternSummary = getFreeLayoutPatternSummary(suggestedPageType);
   const skeleton = getPageSkeleton(suggestedPageType);
+  const conversationHistory = formatConversationHistory(input.context.conversation.history, {
+    ...(input.context.document.schemaDigest ? { schemaDigest: input.context.document.schemaDigest } : {}),
+  });
+  const documentTree = input.context.document.tree ?? '[schema tree unavailable]';
   return [
     {
       role: 'system',
@@ -1356,8 +1395,12 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
       role: 'user',
       content: [
         `Prompt: ${input.request.prompt}`,
-        `Schema Summary: ${input.context.schemaSummary}`,
+        `Schema Summary: ${input.context.document.summary}`,
+        'Schema Tree:',
+        documentTree,
         `Component Summary: ${input.context.componentSummary}`,
+        'Conversation History:',
+        conversationHistory,
         `Selected Node: ${input.context.selectedNodeId ?? 'none'}`,
         'Your response must start with { and end with }. No other text.',
       ].join('\n'),
@@ -1373,6 +1416,10 @@ function createBlockMessages(
   const componentSchemaContracts = getFullComponentContracts(expandedComponents);
   const isDashboardBlock = classifyPromptToPageType(input.request.prompt) === 'dashboard';
   const isMasterListRegion = isMasterListBlock(input) || isMasterDetailPrompt(input.request.prompt);
+  const conversationHistory = formatConversationHistory(input.context.conversation.history, {
+    ...(input.context.document.schemaDigest ? { schemaDigest: input.context.document.schemaDigest } : {}),
+  });
+  const documentTree = input.context.document.tree ?? '[schema tree unavailable]';
   const qualityFeedbackSummary = qualityFeedback.length > 0
     ? [
       'Targeted quality corrections for this retry:',
@@ -1451,6 +1498,10 @@ function createBlockMessages(
         `Placement: ${input.placementSummary ?? '默认纵向堆叠区域'}`,
         `Block Description: ${input.block.description}`,
         `Suggested Components: ${input.block.components.join(', ')}`,
+        'Schema Tree:',
+        documentTree,
+        'Conversation History:',
+        conversationHistory,
         ...(qualityFeedbackSummary ? [qualityFeedbackSummary] : []),
         'Your response must start with { and end with }. No other text.',
       ].join('\n'),
@@ -1674,7 +1725,7 @@ async function planWithModel(input: PlanPageInput, trace?: RunTraceRecord): Prom
   return normalizedPlan;
 }
 
-function createRuntimeDeps(trace?: RunTraceRecord): AgentRuntimeDeps {
+function createRuntimeDeps(memory: AgentMemoryStore, trace?: RunTraceRecord): AgentRuntimeDeps {
   return {
     llm: {
       async chat(request: unknown) {
@@ -1708,6 +1759,21 @@ function createRuntimeDeps(trace?: RunTraceRecord): AgentRuntimeDeps {
       },
     },
     tools: createToolRegistry([
+      {
+        name: 'classifyIntent',
+        async execute(input: unknown) {
+          return classifyIntentWithModel(
+            input as ClassifyIntentInput,
+            trace ? (trace.classifyIntent = { model: 'unknown', rawOutput: '' }) : undefined,
+          ) as Promise<IntentClassification>;
+        },
+      },
+      {
+        name: 'modifySchema',
+        async execute(input: unknown) {
+          return executeModifySchema(input as import('@shenbi/ai-agents').ModifySchemaInput, trace);
+        },
+      },
       {
         name: 'planPage',
         async execute(input: unknown) {
@@ -1780,60 +1846,210 @@ function finalizeTrace(
   return debugFile;
 }
 
-export const agentRuntime: AgentRuntime = {
-  async run(request) {
-    const trace = createTrace(request);
-    try {
-      const events = await runAgent(request, createRuntimeDeps(trace));
-      const metadata = extractMetadata(events);
-      finalizeTrace(trace, 'success', metadata);
-      return { events, metadata };
-    } catch (error) {
-      const debugFile = finalizeTrace(trace, 'error', undefined, error);
-      throw new LLMError(
-        `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
-        'RUNTIME_TRACE_ERROR',
-      );
-    }
-  },
+function buildFailedAssistantText(existingText: string, error?: string): string {
+  const prefix = '[修改失败]';
+  const trimmed = existingText.trim();
+  if (trimmed.startsWith(prefix)) {
+    return trimmed;
+  }
+  const detail = error ? `${prefix} ${error}` : prefix;
+  return trimmed ? `${detail}\n${trimmed}` : detail;
+}
 
-  async *runStream(request) {
-    const trace = createTrace(request);
-    const generator = runAgentStream(request, createRuntimeDeps(trace));
-    let terminalEvent: AgentEvent | undefined;
+function findAssistantMessageBySessionId(
+  conversation: AgentMemoryMessage[],
+  sessionId: string,
+): AgentMemoryMessage | undefined {
+  return [...conversation]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.meta?.sessionId === sessionId);
+}
 
-    try {
-      for await (const event of generator) {
-        if (event.type === 'done' || event.type === 'error') {
-          terminalEvent = event;
-          continue;
+async function captureMemoryDebugSnapshot(
+  memory: AgentMemoryStore,
+  conversationId: string,
+  sessionId?: string,
+): Promise<MemoryDebugSnapshot> {
+  const [conversation, lastRunMetadata, lastBlockIds] = await Promise.all([
+    memory.getConversation(conversationId),
+    memory.getLastRunMetadata(conversationId),
+    memory.getLastBlockIds(conversationId),
+  ]);
+
+  return {
+    conversationId,
+    ...(sessionId ? { sessionId } : {}),
+    conversationSize: conversation.length,
+    ...(() => {
+      if (!sessionId) {
+        return {};
+      }
+      const assistantMessage = findAssistantMessageBySessionId(conversation, sessionId);
+      return assistantMessage ? { assistantMessage: cloneDebugValue(assistantMessage) } : {};
+    })(),
+    conversationTail: cloneDebugValue(conversation.slice(-6)),
+    ...(lastRunMetadata ? { lastRunMetadata: cloneDebugValue(lastRunMetadata) } : {}),
+    lastBlockIds: cloneDebugValue(lastBlockIds),
+  };
+}
+
+export async function attachTraceMemory(
+  trace: RunTraceRecord,
+  memory: AgentMemoryStore,
+  conversationId: string,
+  sessionId: string,
+): Promise<void> {
+  const snapshot = await captureMemoryDebugSnapshot(memory, conversationId, sessionId);
+  trace.memory = {
+    ...(snapshot.assistantMessage ? { finalAssistantMessage: snapshot.assistantMessage } : {}),
+    conversationTail: snapshot.conversationTail,
+    ...(snapshot.lastRunMetadata ? { lastRunMetadata: snapshot.lastRunMetadata } : {}),
+    lastBlockIds: snapshot.lastBlockIds,
+  };
+}
+
+export async function attachTraceMemoryBestEffort(
+  trace: RunTraceRecord,
+  memory: AgentMemoryStore,
+  conversationId: string,
+  sessionId: string,
+): Promise<void> {
+  try {
+    await attachTraceMemory(trace, memory, conversationId, sessionId);
+  } catch (error) {
+    logger.warn('ai.runtime.trace_memory_failed', {
+      conversationId,
+      sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): AgentRuntime {
+  return {
+    async run(request) {
+      const trace = createTrace(request);
+      try {
+        const events = await runAgent(request, createRuntimeDeps(memory, trace));
+        const metadata = extractMetadata(events);
+        if (metadata.conversationId) {
+          await attachTraceMemoryBestEffort(trace, memory, metadata.conversationId, metadata.sessionId);
         }
-        yield event;
-      }
-
-      if (terminalEvent?.type === 'done') {
-        const metadata = terminalEvent.data.metadata;
         finalizeTrace(trace, 'success', metadata);
-        yield terminalEvent;
-        return;
+        return { events, metadata };
+      } catch (error) {
+        const debugFile = finalizeTrace(trace, 'error', undefined, error);
+        throw new LLMError(
+          `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
+          'RUNTIME_TRACE_ERROR',
+        );
+      }
+    },
+
+    async *runStream(request) {
+      const trace = createTrace(request);
+      const generator = runAgentStream(request, createRuntimeDeps(memory, trace));
+      let terminalEvent: AgentEvent | undefined;
+
+      try {
+        for await (const event of generator) {
+          if (event.type === 'done' || event.type === 'error') {
+            terminalEvent = event;
+            continue;
+          }
+          yield event;
+        }
+
+        if (terminalEvent?.type === 'done') {
+          const metadata = terminalEvent.data.metadata;
+          if (metadata.conversationId) {
+            await attachTraceMemoryBestEffort(trace, memory, metadata.conversationId, metadata.sessionId);
+          }
+          finalizeTrace(trace, 'success', metadata);
+          yield terminalEvent;
+          return;
+        }
+
+        if (terminalEvent?.type === 'error') {
+          const debugFile = finalizeTrace(trace, 'error', undefined, terminalEvent.data.message);
+          yield {
+            type: 'error',
+            data: {
+              ...terminalEvent.data,
+              message: `${terminalEvent.data.message}. Trace file: ${debugFile}`,
+            },
+          };
+        }
+      } catch (error) {
+        const debugFile = finalizeTrace(trace, 'error', undefined, error);
+        throw new LLMError(
+          `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
+          'RUNTIME_TRACE_ERROR',
+        );
+      }
+    },
+
+    async finalize(request: FinalizeRequest) {
+      if (typeof memory.patchAssistantMessage !== 'function') {
+        return {};
       }
 
-      if (terminalEvent?.type === 'error') {
-        const debugFile = finalizeTrace(trace, 'error', undefined, terminalEvent.data.message);
-        yield {
-          type: 'error',
-          data: {
-            ...terminalEvent.data,
-            message: `${terminalEvent.data.message}. Trace file: ${debugFile}`,
-          },
-        };
-      }
-    } catch (error) {
-      const debugFile = finalizeTrace(trace, 'error', undefined, error);
-      throw new LLMError(
-        `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
-        'RUNTIME_TRACE_ERROR',
+      const before = await captureMemoryDebugSnapshot(
+        memory,
+        request.conversationId,
+        request.sessionId,
       );
-    }
-  },
-};
+      let outcome: 'patched' | 'skipped_missing_schema_digest' = 'patched';
+
+      if (request.success) {
+        if (!request.schemaDigest) {
+          outcome = 'skipped_missing_schema_digest';
+        } else {
+          await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
+            meta: {
+              schemaDigest: request.schemaDigest,
+            },
+          });
+        }
+      } else {
+        const nextText = buildFailedAssistantText(before.assistantMessage?.text ?? '', request.error);
+
+        await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
+          text: nextText,
+          meta: {
+            failed: true,
+            ...(request.schemaDigest ? { schemaDigest: request.schemaDigest } : {}),
+          },
+          clearOperations: true,
+        });
+      }
+
+      const after = await captureMemoryDebugSnapshot(
+        memory,
+        request.conversationId,
+        request.sessionId,
+      );
+      const debugFile = writeMemoryDump({
+        category: 'finalize',
+        memory: {
+          request,
+          outcome,
+          before,
+          after,
+        },
+      });
+      logger.info('ai.runtime.memory_dump', {
+        conversationId: request.conversationId,
+        sessionId: request.sessionId,
+        success: request.success,
+        debugFile,
+      });
+      const result: FinalizeResult = {
+        memoryDebugFile: debugFile,
+      };
+      return result;
+    },
+  };
+}
+
+export const agentRuntime = createAgentRuntime();

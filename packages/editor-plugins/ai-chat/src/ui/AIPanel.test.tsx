@@ -3,6 +3,23 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PluginContext } from '@shenbi/editor-plugin-api';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
+
+const useAgentRunState = vi.hoisted(() => ({
+  runAgent: vi.fn(),
+  cancelRun: vi.fn(),
+}));
+
+vi.mock('../hooks/useAgentRun', () => ({
+  useAgentRun: () => ({
+    isRunning: false,
+    progressText: '',
+    currentPlan: null,
+    blockStatuses: {},
+    runAgent: useAgentRunState.runAgent,
+    cancelRun: useAgentRunState.cancelRun,
+  }),
+}));
+
 import { AIPanel } from './AIPanel';
 
 const fetchMock = vi.hoisted(() => vi.fn());
@@ -35,6 +52,11 @@ function createPersistenceStateContext(): PluginContext {
         },
       ],
       conversationId: 'conv-1',
+      lastMetadata: {
+        sessionId: 'session-persisted',
+        memoryDebugFile: '.ai-debug/memory/persisted-finalize.json',
+      },
+      lastDebugFile: '.ai-debug/traces/persisted-success.json',
     }],
   ]);
 
@@ -55,6 +77,8 @@ function createPersistenceStateContext(): PluginContext {
 
 describe('AIPanel', () => {
   beforeEach(() => {
+    useAgentRunState.runAgent.mockReset();
+    useAgentRunState.cancelRun.mockReset();
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -118,9 +142,17 @@ describe('AIPanel', () => {
           },
         ],
         conversationId: 'conv-1',
-        lastMetadata: undefined,
+        lastMetadata: {
+          sessionId: 'session-persisted',
+          memoryDebugFile: '.ai-debug/memory/persisted-finalize.json',
+        },
+        lastDebugFile: '.ai-debug/traces/persisted-success.json',
       });
     });
+    expect(screen.getByText('Trace File: .ai-debug/traces/persisted-success.json')).toBeInTheDocument();
+    expect(screen.getByText('Memory Dump: .ai-debug/memory/persisted-finalize.json')).toBeInTheDocument();
+    expect(screen.queryByText(/耗时:/)).toBeNull();
+    expect(screen.queryByText(/Tokens:/)).toBeNull();
   });
 
   it('清空按钮会触发 workspace.resetDocument 并清空会话', async () => {
@@ -148,5 +180,117 @@ describe('AIPanel', () => {
       expect(screen.getByLabelText('Planner')).toHaveValue('openai-compatible::GLM-4.7');
     });
     expect(screen.getByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行')).toHaveValue('');
+  });
+
+  it('在成功运行后显示完整 debugFile 路径', async () => {
+    useAgentRunState.runAgent.mockImplementation(
+      async (
+        _text: string,
+        _plannerModel: string,
+        _blockModel: string,
+        _thinkingEnabled: boolean,
+        _conversationId: string | undefined,
+        _onMessageStart: () => string,
+        _onMessageDelta: (id: string, chunk: string) => void,
+        onDone: (metadata: { sessionId: string; debugFile?: string; memoryDebugFile?: string; durationMs?: number; tokensUsed?: number }) => void,
+      ) => {
+        onDone({
+          sessionId: 'session-success',
+          debugFile: '.ai-debug/traces/2026-03-11-success.json',
+          memoryDebugFile: '.ai-debug/memory/2026-03-11-finalize.json',
+          durationMs: 321,
+          tokensUsed: 128,
+        });
+      },
+    );
+
+    render(<AIPanel bridge={createBridge()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Planner')).toHaveValue('openai-compatible::GLM-4.7');
+    });
+
+    fireEvent.change(
+      screen.getByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行'),
+      { target: { value: '生成一个页面' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Trace File: .ai-debug/traces/2026-03-11-success.json')).toBeInTheDocument();
+      expect(screen.getByText('Memory Dump: .ai-debug/memory/2026-03-11-finalize.json')).toBeInTheDocument();
+      expect(screen.getByText('耗时: 321ms')).toBeInTheDocument();
+      expect(screen.getByText('Tokens: 128')).toBeInTheDocument();
+    });
+  });
+
+  it('在失败运行后从错误文案里提取并显示 debugFile 路径', async () => {
+    useAgentRunState.runAgent.mockImplementation(
+      async (
+        _text: string,
+        _plannerModel: string,
+        _blockModel: string,
+        _thinkingEnabled: boolean,
+        _conversationId: string | undefined,
+        _onMessageStart: () => string,
+        _onMessageDelta: (id: string, chunk: string) => void,
+        _onDone: (metadata: { sessionId: string; debugFile?: string; durationMs?: number; tokensUsed?: number }) => void,
+        onError: (error: string) => void,
+      ) => {
+        onError('Provider unavailable. Trace file: .ai-debug/traces/2026-03-11-error.json');
+      },
+    );
+
+    render(<AIPanel bridge={createBridge()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Planner')).toHaveValue('openai-compatible::GLM-4.7');
+    });
+
+    fireEvent.change(
+      screen.getByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行'),
+      { target: { value: '生成失败' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Trace File: .ai-debug/traces/2026-03-11-error.json')).toBeInTheDocument();
+      expect(screen.getByText('[Error]: Provider unavailable. Trace file: .ai-debug/traces/2026-03-11-error.json')).toBeInTheDocument();
+    });
+  });
+
+  it('在失败运行后对通用错误 dump 使用 Debug File 标签', async () => {
+    useAgentRunState.runAgent.mockImplementation(
+      async (
+        _text: string,
+        _plannerModel: string,
+        _blockModel: string,
+        _thinkingEnabled: boolean,
+        _conversationId: string | undefined,
+        _onMessageStart: () => string,
+        _onMessageDelta: (id: string, chunk: string) => void,
+        _onDone: (metadata: { sessionId: string; debugFile?: string; durationMs?: number; tokensUsed?: number }) => void,
+        onError: (error: string) => void,
+      ) => {
+        onError('prompt is required. Debug file: .ai-debug/errors/2026-03-11-error.json');
+      },
+    );
+
+    render(<AIPanel bridge={createBridge()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Planner')).toHaveValue('openai-compatible::GLM-4.7');
+    });
+
+    fireEvent.change(
+      screen.getByPlaceholderText('输入调试提示词，Enter 发送，Shift+Enter 换行'),
+      { target: { value: '生成失败' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Debug File: .ai-debug/errors/2026-03-11-error.json')).toBeInTheDocument();
+      expect(screen.getByText('[Error]: prompt is required. Debug file: .ai-debug/errors/2026-03-11-error.json')).toBeInTheDocument();
+    });
   });
 });

@@ -1,7 +1,10 @@
 import { buildRuntimeContext } from '../context/build-context';
+import { classifyIntentByRules } from '../intent/rule-classifier';
 import { chatOrchestrator } from '../orchestrators/chat-orchestrator';
+import { modifyOrchestrator } from '../orchestrators/modify-orchestrator';
 import { pageBuilderOrchestrator } from '../orchestrators/page-builder-orchestrator';
-import type { AgentEvent, AgentRuntimeDeps, RunMetadata, RunRequest } from '../types';
+import { createOrchestratorRegistry, type OrchestratorFunction } from '../orchestrators/registry';
+import type { AgentEvent, AgentIntent, AgentOperation, AgentRuntimeContext, AgentRuntimeDeps, RunMetadata, RunRequest } from '../types';
 
 function createSessionId(): string {
   return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -9,6 +12,90 @@ function createSessionId(): string {
 
 function hasPageBuilderTools(deps: AgentRuntimeDeps): boolean {
   return ['planPage', 'buildSkeletonSchema', 'generateBlock', 'assembleSchema'].every((name) => Boolean(deps.tools.get(name)));
+}
+
+function hasModifyTool(deps: AgentRuntimeDeps): boolean {
+  return Boolean(deps.tools.get('modifySchema'));
+}
+
+async function classifyIntent(
+  request: RunRequest,
+  context: AgentRuntimeContext,
+  deps: AgentRuntimeDeps,
+): Promise<{ intent: AgentIntent; confidence: number }> {
+  // Step 1: Rule-based classification — fast, zero-cost
+  const ruleResult = classifyIntentByRules(context);
+
+  // High-confidence rule result: skip LLM to save latency
+  if (ruleResult.confidence >= 0.85) {
+    return ruleResult;
+  }
+
+  // Step 2: LLM classification — handles ambiguous prompts
+  const classifyIntentTool = deps.tools.get('classifyIntent');
+  if (classifyIntentTool) {
+    try {
+      const result = await classifyIntentTool.execute({ request, context });
+      if (
+        result
+        && typeof result === 'object'
+        && 'intent' in result
+        && 'confidence' in result
+      ) {
+        const candidate = result as { intent: AgentIntent; confidence: number };
+        if (
+          (candidate.intent === 'schema.create' || candidate.intent === 'schema.modify' || candidate.intent === 'chat')
+          && Number.isFinite(candidate.confidence)
+        ) {
+          return candidate;
+        }
+      }
+      deps.logger?.info('runAgentStream.classify_intent_invalid_result', {});
+    } catch (error) {
+      deps.logger?.error('runAgentStream.classify_intent_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  // Step 3: Fall back to rule result
+  return ruleResult;
+}
+
+
+function createDefaultRegistry() {
+  const registry = createOrchestratorRegistry();
+  registry.register({
+    id: 'page-builder',
+    intents: ['schema.create'],
+    canHandle: (_context, deps) => hasPageBuilderTools(deps),
+    orchestrate: pageBuilderOrchestrator,
+  });
+  registry.register({
+    id: 'page-modifier',
+    intents: ['schema.modify'],
+    canHandle: (context, deps) => context.document.exists && hasModifyTool(deps),
+    orchestrate: modifyOrchestrator,
+  });
+  registry.register({
+    id: 'chat',
+    intents: ['chat'],
+    orchestrate: chatOrchestrator,
+  });
+  return registry;
+}
+
+function resolveFallbackOrchestrator(
+  intent: AgentIntent,
+  deps: AgentRuntimeDeps,
+): { intent: AgentIntent; orchestrator: OrchestratorFunction } {
+  if (intent === 'schema.create' && hasPageBuilderTools(deps)) {
+    return { intent: 'schema.create', orchestrator: pageBuilderOrchestrator };
+  }
+  if (intent === 'schema.modify' && hasModifyTool(deps)) {
+    return { intent: 'schema.modify', orchestrator: modifyOrchestrator };
+  }
+  return { intent: 'chat', orchestrator: chatOrchestrator };
 }
 
 export async function* runAgentStream(
@@ -46,16 +133,43 @@ export async function* runAgentStream(
 
     yield { type: 'run:start', data: { sessionId, conversationId } };
 
+    const classifiedIntent = await classifyIntent(request, context, deps);
+    const registry = createDefaultRegistry();
+    const resolved = registry.resolve(classifiedIntent.intent, context, deps);
+    const fallback = resolved
+      ? undefined
+      : resolveFallbackOrchestrator(classifiedIntent.intent, deps);
+    const resolvedIntent = fallback
+      ? { intent: fallback.intent, confidence: classifiedIntent.confidence }
+      : classifiedIntent;
+    if (resolvedIntent.intent !== classifiedIntent.intent) {
+      deps.logger?.info('runAgentStream.intent_downgraded', {
+        requestedIntent: request.intent,
+        classifiedIntent: classifiedIntent.intent,
+        effectiveIntent: resolvedIntent.intent,
+        hasSchema: Boolean(request.context.schemaJson),
+        hasModifyTool: hasModifyTool(deps),
+        hasPageBuilderTools: hasPageBuilderTools(deps),
+      });
+    }
+    yield {
+      type: 'intent',
+      data: resolvedIntent,
+    };
+
     const events: AgentEvent[] = [];
     const assistantDeltas: string[] = [];
-    const generator = hasPageBuilderTools(deps)
-      ? pageBuilderOrchestrator(request, context, deps, metadata)
-      : chatOrchestrator(request, context, deps, metadata);
+    const operations: AgentOperation[] = [];
+    const orchestrator = resolved ?? fallback?.orchestrator ?? chatOrchestrator;
+    const generator = orchestrator(request, context, deps, metadata);
 
     for await (const event of generator) {
       events.push(event);
       if (event.type === 'message:delta') {
         assistantDeltas.push(event.data.text);
+      }
+      if (event.type === 'modify:op') {
+        operations.push(event.data.operation);
       }
       yield event;
     }
@@ -65,23 +179,28 @@ export async function* runAgentStream(
       .filter((event): event is Extract<AgentEvent, { type: 'schema:block' }> => event.type === 'schema:block')
       .map((event) => event.data.blockId);
 
-    const doneEvent: AgentEvent = { type: 'done', data: { metadata } };
-    events.push(doneEvent);
-    yield doneEvent;
-
     const assistantText = assistantDeltas.join('');
     await Promise.all([
-      ...(assistantText
+      ...(assistantText || resolvedIntent.intent !== 'chat' || operations.length > 0
         ? [
             deps.memory.appendConversationMessage(conversationId, {
               role: 'assistant',
               text: assistantText,
+              meta: {
+                sessionId,
+                intent: resolvedIntent.intent,
+                ...(operations.length > 0 ? { operations } : {}),
+              },
             }),
           ]
         : []),
       deps.memory.setLastRunMetadata(conversationId, metadata),
       deps.memory.setLastBlockIds(conversationId, finalSchemaBlocks),
     ]);
+
+    const doneEvent: AgentEvent = { type: 'done', data: { metadata } };
+    events.push(doneEvent);
+    yield doneEvent;
   } catch (error) {
     deps.logger?.error('runAgentStream failed', {
       error: error instanceof Error ? error.message : String(error),

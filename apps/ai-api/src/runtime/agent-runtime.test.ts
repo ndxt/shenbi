@@ -1,9 +1,13 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { createInMemoryAgentMemoryStore } from '@shenbi/ai-agents';
 import {
   assessBlockQuality,
+  attachTraceMemory,
+  attachTraceMemoryBestEffort,
   classifyPromptToPageType,
+  createAgentRuntime,
   validateGeneratedBlockNode,
   validateGeneratedBlockNodeWithDiagnostics,
 } from './agent-runtime.ts';
@@ -231,6 +235,37 @@ function loadTrace(name: string): any {
   return JSON.parse(readFileSync(tracePath, 'utf8'));
 }
 
+function listMemoryDumps(): string[] {
+  const dumpDir = resolve(process.cwd(), '.ai-debug', 'memory');
+  try {
+    return readdirSync(dumpDir).filter((name) => name.endsWith('-finalize.json'));
+  } catch {
+    return [];
+  }
+}
+
+function findMemoryDump(
+  names: string[],
+  conversationId: string,
+  sessionId: string,
+): any {
+  const dumpDir = resolve(process.cwd(), '.ai-debug', 'memory');
+  const latest = [...names]
+    .reverse()
+    .map((name) => ({
+      name,
+      path: resolve(dumpDir, name),
+      dump: JSON.parse(readFileSync(resolve(dumpDir, name), 'utf8')),
+    }))
+    .find((entry) =>
+      entry.dump?.memory?.request?.conversationId === conversationId
+      && entry.dump?.memory?.request?.sessionId === sessionId);
+  if (!latest) {
+    throw new Error(`Expected a memory dump for ${conversationId}/${sessionId}`);
+  }
+  return latest.dump;
+}
+
 describe('agent runtime json salvage', () => {
   it('salvages near-valid json with trailing missing braces', () => {
     const raw = '```json\n{"component":"Card","children":[{"component":"Button","children":["确定"]}]\n```';
@@ -275,6 +310,263 @@ describe('agent runtime json salvage', () => {
     expect(parsed).toMatchObject({ component: 'Descriptions.Item' });
     expect(Array.isArray(parsed.children)).toBe(true);
     expect(parsed.children[0]).toBe('北京市朝阳区科技园区A座15层');
+  });
+});
+
+describe('agent runtime finalize', () => {
+  it('patches confirmed schemaDigest onto the matching assistant message on success', async () => {
+    const memory = createInMemoryAgentMemoryStore();
+    const runtime = createAgentRuntime(memory);
+    const conversationId = 'conv-finalize-success';
+    const sessionId = 'run-finalize-success';
+
+    await memory.appendConversationMessage(conversationId, {
+      role: 'assistant',
+      text: 'Planning page structure.',
+      meta: {
+        sessionId,
+        intent: 'schema.create',
+      },
+    });
+
+    await expect(runtime.finalize({
+      conversationId,
+      sessionId,
+      success: true,
+      schemaDigest: 'fnv1a-12345678',
+    })).resolves.toEqual({
+      memoryDebugFile: expect.stringContaining('.ai-debug'),
+    });
+    const dump = findMemoryDump(listMemoryDumps(), conversationId, sessionId);
+
+    await expect(memory.getConversation(conversationId)).resolves.toEqual([
+      {
+        role: 'assistant',
+        text: 'Planning page structure.',
+        meta: {
+          sessionId,
+          intent: 'schema.create',
+          schemaDigest: 'fnv1a-12345678',
+        },
+      },
+    ]);
+    expect(dump.memory).toMatchObject({
+      request: {
+        conversationId,
+        sessionId,
+        success: true,
+        schemaDigest: 'fnv1a-12345678',
+      },
+      outcome: 'patched',
+      before: {
+        assistantMessage: {
+          text: 'Planning page structure.',
+          meta: {
+            intent: 'schema.create',
+          },
+        },
+      },
+      after: {
+        assistantMessage: {
+          text: 'Planning page structure.',
+          meta: {
+            intent: 'schema.create',
+            schemaDigest: 'fnv1a-12345678',
+          },
+        },
+      },
+    });
+  });
+
+  it('marks the matching assistant message as failed and clears operations on failure', async () => {
+    const memory = createInMemoryAgentMemoryStore();
+    const runtime = createAgentRuntime(memory);
+    const conversationId = 'conv-finalize-failure';
+    const sessionId = 'run-finalize-failure';
+
+    await memory.appendConversationMessage(conversationId, {
+      role: 'assistant',
+      text: '会更新当前卡片标题。',
+      meta: {
+        sessionId,
+        intent: 'schema.modify',
+        operations: [{ op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '本月营收' } }],
+      },
+    });
+
+    await expect(runtime.finalize({
+      conversationId,
+      sessionId,
+      success: false,
+      error: 'op 1 failed',
+      schemaDigest: 'fnv1a-deadbeef',
+    })).resolves.toEqual({
+      memoryDebugFile: expect.stringContaining('.ai-debug'),
+    });
+    const dump = findMemoryDump(listMemoryDumps(), conversationId, sessionId);
+
+    await expect(memory.getConversation(conversationId)).resolves.toEqual([
+      {
+        role: 'assistant',
+        text: '[修改失败] op 1 failed\n会更新当前卡片标题。',
+        meta: {
+          sessionId,
+          intent: 'schema.modify',
+          failed: true,
+          schemaDigest: 'fnv1a-deadbeef',
+        },
+      },
+    ]);
+    expect(dump.memory).toMatchObject({
+      request: {
+        conversationId,
+        sessionId,
+        success: false,
+        error: 'op 1 failed',
+        schemaDigest: 'fnv1a-deadbeef',
+      },
+      outcome: 'patched',
+      before: {
+        assistantMessage: {
+          meta: {
+            operations: [{ op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '本月营收' } }],
+          },
+        },
+      },
+      after: {
+        assistantMessage: {
+          text: '[修改失败] op 1 failed\n会更新当前卡片标题。',
+          meta: {
+            failed: true,
+            schemaDigest: 'fnv1a-deadbeef',
+          },
+        },
+      },
+    });
+    expect(dump.memory.after.assistantMessage.meta.operations).toBeUndefined();
+  });
+});
+
+describe('agent runtime trace memory', () => {
+  it('writes assistant memory meta into the success trace after run', async () => {
+    const sessionId = 'trace-session-1';
+    const conversationId = 'trace-memory-conv';
+    const memory = {
+      async getConversation() {
+        return [
+          { role: 'user', text: 'hi' },
+          {
+            role: 'assistant',
+            text: 'hello back',
+            meta: {
+              sessionId,
+              intent: 'chat',
+            },
+          },
+        ];
+      },
+      async appendConversationMessage() {},
+      async getLastRunMetadata() {
+        return {
+          sessionId,
+          conversationId,
+        };
+      },
+      async setLastRunMetadata() {},
+      async getLastBlockIds() {
+        return [];
+      },
+      async setLastBlockIds() {},
+    };
+    const trace: {
+      request: {
+        prompt: string;
+        conversationId: string;
+        context: {
+          schemaSummary: string;
+          componentSummary: string;
+        };
+      };
+      blocks: never[];
+      memory?: unknown;
+    } = {
+      request: {
+        prompt: 'hi',
+        conversationId,
+        context: {
+          schemaSummary: 'Existing dashboard',
+          componentSummary: 'Card',
+        },
+      },
+      blocks: [],
+    };
+
+    await attachTraceMemory(trace as never, memory as never, conversationId, sessionId);
+
+    expect(trace.memory).toMatchObject({
+      finalAssistantMessage: {
+        role: 'assistant',
+        meta: {
+          sessionId,
+          intent: 'chat',
+        },
+      },
+      lastRunMetadata: {
+        sessionId,
+        conversationId,
+      },
+      lastBlockIds: [],
+    });
+    expect(Array.isArray((trace.memory as { conversationTail?: unknown[] }).conversationTail)).toBe(true);
+  });
+
+  it('does not throw when trace memory capture fails', async () => {
+    const trace: {
+      request: {
+        prompt: string;
+        conversationId: string;
+        context: {
+          schemaSummary: string;
+          componentSummary: string;
+        };
+      };
+      blocks: never[];
+      memory?: unknown;
+    } = {
+      request: {
+        prompt: 'hi',
+        conversationId: 'trace-memory-fail-conv',
+        context: {
+          schemaSummary: 'Existing dashboard',
+          componentSummary: 'Card',
+        },
+      },
+      blocks: [],
+    };
+    const memory = {
+      async getConversation() {
+        throw new Error('memory offline');
+      },
+      async appendConversationMessage() {},
+      async getLastRunMetadata() {
+        return undefined;
+      },
+      async setLastRunMetadata() {},
+      async getLastBlockIds() {
+        return [];
+      },
+      async setLastBlockIds() {},
+    };
+
+    await expect(
+      attachTraceMemoryBestEffort(
+        trace as never,
+        memory as never,
+        'trace-memory-fail-conv',
+        'trace-session-fail',
+      ),
+    ).resolves.toBeUndefined();
+    expect(trace.memory).toBeUndefined();
   });
 });
 

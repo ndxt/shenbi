@@ -597,23 +597,30 @@ function normalizeNodeProps(node: SchemaNode): void {
   }
 
   if (node.component === 'Timeline') {
-    // antd v5: Timeline.Item as children is deprecated; convert to items array
+    // antd v5: Timeline.Item as children is deprecated; convert to items array.
+    // IMPORTANT: props.items[].children must be plain text or undefined – the runtime
+    // cannot render schema node objects placed there as React children.
+    // If ANY Timeline.Item contains schema-node children (e.g. Container, Typography),
+    // keep the entire Timeline in children form so the render engine can recurse.
     const timelineChildren = node.children;
     if (Array.isArray(timelineChildren)) {
-      const items = timelineChildren
-        .filter((c): c is SchemaNode => isNodeLike(c) && c.component === 'Timeline.Item')
-        .map((item) => {
+      const timelineItems = timelineChildren.filter(
+        (c): c is SchemaNode => isNodeLike(c) && c.component === 'Timeline.Item',
+      );
+      const hasNodeChildren = timelineItems.some(
+        (item) => Array.isArray(item.children) && item.children.some(isNodeLike),
+      );
+      if (!hasNodeChildren && timelineItems.length > 0) {
+        // All items contain only plain text – safe to convert to props.items
+        const items = timelineItems.map((item) => {
           const itemProps = { ...(item.props ?? {}) };
-          // 'children' key is the content field for antd v5 Timeline items
-          const content = Array.isArray(item.children) && item.children.filter(isNodeLike).length > 0
-            ? item.children
-            : (flattenToText(item.children) || undefined);
+          const content = flattenToText(item.children) || undefined;
           return { ...itemProps, children: content };
         });
-      if (items.length > 0) {
         (props as Record<string, unknown>).items = items;
         node.children = undefined;
       }
+      // If hasNodeChildren, leave node.children intact; the render engine handles recursion.
     }
     // antd v5: mode='left'/'right' are deprecated, use 'start'/'end' instead
     if (props.mode === 'left') props.mode = 'start';
@@ -750,7 +757,7 @@ function normalizeNodeProps(node: SchemaNode): void {
       if (isNodeLike(col.title) || Array.isArray(col.title)) {
         col.title = flattenToText(col.title) || `列${index + 1}`;
       }
-      if (isNodeLike(col.render) || Array.isArray(col.render) || typeof col.render === 'object') {
+      if (isNodeLike(col.render) || Array.isArray(col.render) || (typeof col.render === 'object' && !isJsFunctionValue(col.render))) {
         delete col.render;
       }
       if (isNodeLike(col.editRender) || Array.isArray(col.editRender) || typeof col.editRender === 'object') {
