@@ -384,9 +384,9 @@ export function AIPanel({
         <ChatMessageList messages={messages} />
 
         {isRunning && (
-          <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-2 shadow-sm relative overflow-hidden mt-2">
+          <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col shadow-sm relative overflow-hidden mt-2">
             <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-400 to-blue-500 animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
-            <div className="flex items-center gap-2 text-text-primary" style={{ fontSize: '11px' }}>
+            <div className="flex items-center gap-2 text-text-primary pb-2" style={{ fontSize: '11px' }}>
               <Loader2 size={12} className="animate-spin text-blue-500 shrink-0" />
               <span className="font-semibold text-blue-500 shrink-0">正在生成</span>
               <span className="opacity-70 ml-1 truncate flex-1">{progressText}</span>
@@ -396,15 +396,15 @@ export function AIPanel({
             </div>
             {/* Planner row (create-page) */}
             {plannerMetrics && currentPlan && (
-              <div className="border-t border-border-ide pt-1 flex items-center gap-1.5 px-1" style={{ fontSize: '10px' }}>
-                <span className="text-text-secondary opacity-70 truncate flex-1">Planner</span>
+              <div className="border-t border-border-ide py-2 flex items-center gap-1.5 px-1" style={{ fontSize: '10px' }}>
+                <span className="text-text-secondary opacity-70 truncate flex-1 leading-none translate-y-[1px]">Planner</span>
                 <MetricsBadge durationMs={plannerMetrics.durationMs} inputTokens={plannerMetrics.inputTokens} outputTokens={plannerMetrics.outputTokens} />
                 <CheckCircle2 size={10} className="text-emerald-400 shrink-0" />
               </div>
             )}
             {/* Block list (create-page) */}
             {currentPlan && (
-              <div className="border-t border-border-ide pt-1.5 pb-1.5">
+              <div className="border-t border-border-ide py-2">
                 <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {currentPlan.blocks.map((b) => (
                     <OpRow
@@ -420,7 +420,7 @@ export function AIPanel({
             )}
             {/* Modify op list */}
             {modifyPlan && (
-              <div className="border-t border-border-ide pt-1.5 pb-1.5">
+              <div className="border-t border-border-ide py-2">
                 <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
                     <OpRow
@@ -438,9 +438,9 @@ export function AIPanel({
         )}
 
         {lastRunResult && (
-          <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-2 shadow-sm mt-2" style={{ fontSize: '11px' }}>
+          <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col shadow-sm mt-2" style={{ fontSize: '11px' }}>
             {/* Header */}
-            <div className="flex items-center gap-2 text-text-primary">
+            <div className="flex items-center gap-2 text-text-primary pb-2">
               <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
               <span className="font-semibold text-emerald-400 shrink-0">{lastRunResult.modifyPlan ? '修改完成' : '生成完成'}</span>
               <span className="opacity-70 ml-1 truncate flex-1 leading-none">{lastRunResult.statusLabel}</span>
@@ -454,15 +454,15 @@ export function AIPanel({
             </div>
             {/* Planner row (create-page) */}
             {lastRunResult.plannerMetrics && lastRunResult.plan && (
-              <div className="border-t border-border-ide pt-1 flex items-center gap-1.5 px-1">
-                <span className="text-text-secondary opacity-70 truncate flex-1">Planner</span>
+              <div className="border-t border-border-ide py-2 flex items-center gap-1.5 px-1">
+                <span className="text-text-secondary opacity-70 truncate flex-1 leading-none translate-y-[1px]">Planner</span>
                 <MetricsBadge durationMs={lastRunResult.plannerMetrics.durationMs} inputTokens={lastRunResult.plannerMetrics.inputTokens} outputTokens={lastRunResult.plannerMetrics.outputTokens} />
                 <CheckCircle2 size={10} className="text-emerald-400 shrink-0" />
               </div>
             )}
             {/* Block list (create-page) */}
             {lastRunResult.plan && (
-              <div className="border-t border-border-ide pt-1.5 pb-1.5">
+              <div className="border-t border-border-ide py-2">
                 <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {lastRunResult.plan.blocks.map((b) => (
                     <OpRow
@@ -477,7 +477,7 @@ export function AIPanel({
             )}
             {/* Modify op list */}
             {lastRunResult.modifyPlan && (
-              <div className="border-t border-border-ide pt-1.5 pb-1.5">
+              <div className="border-t border-border-ide py-2">
                 <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {Array.from({ length: lastRunResult.modifyPlan.operationCount }, (_, i) => (
                     <OpRow
@@ -505,9 +505,9 @@ export function AIPanel({
               ].reduce((a, b) => a + b, 0);
               const hasTokenInfo = totalInput > 0 || totalOutput > 0;
               return (
-                <div className="border-t border-border-ide pt-2 flex items-center gap-2 px-1" style={{ fontSize: '10px' }}>
-                  <span className="text-text-secondary opacity-70 flex-1">合计</span>
-                  <span className="text-text-secondary font-mono tabular-nums">{(lastRunResult.elapsedMs / 1000).toFixed(1)}s</span>
+                <div className="border-t border-border-ide pt-3 flex items-center gap-2 px-1" style={{ fontSize: '10px' }}>
+                  <span className="text-text-secondary opacity-70 flex-1 leading-none translate-y-[1px]">合计</span>
+                  <span className="text-text-secondary font-mono tabular-nums leading-none translate-y-[1px]">{(lastRunResult.elapsedMs / 1000).toFixed(1)}s</span>
                   {hasTokenInfo && (
                     <span className="text-text-secondary font-mono tabular-nums">In{totalInput} Out{totalOutput}</span>
                   )}
