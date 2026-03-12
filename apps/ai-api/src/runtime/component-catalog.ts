@@ -13,7 +13,8 @@ type ComponentGroupName =
   | 'advanced-form'
   | 'extended-feedback'
   | 'identity'
-  | 'disclosure';
+  | 'disclosure'
+  | 'charts';
 
 interface FreeLayoutPattern {
   id: string;
@@ -355,13 +356,13 @@ const legacyZoneTemplates: Record<LegacyZoneType, ZoneTemplate> = {
   },
   'chart-area': {
     zoneType: 'chart-area',
-    intent: '趋势、分布或图表替代的统计概览区域',
-    layoutPattern: 'card wrapper with one concise heading, optional one alert, one narrative paragraph, and one main data area',
-    preferredGroups: ['data-display', 'typography', 'feedback-status'],
-    preferredComponents: ['Card', 'Typography.Title', 'Typography.Paragraph', 'Statistic', 'Tag'],
+    intent: '统计图表展示区域，优先使用 Chart.* 系列图表组件展示趋势、对比、占比等数据',
+    layoutPattern: 'card wrapper with one chart component or optionally a Statistic fallback if no chart is appropriate',
+    preferredGroups: ['charts', 'data-display', 'typography', 'feedback-status'],
+    preferredComponents: ['Chart.Line', 'Chart.Column', 'Chart.Pie', 'Chart.Area', 'Chart.Bar', 'Chart.Gauge', 'Card', 'Statistic', 'Typography.Paragraph'],
     maxDepth: 3,
-    maxChildrenPerArray: 5,
-    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"__TITLE__"},"children":[{"component":"Typography.Paragraph","id":"__SUMMARY_ID__","props":{},"children":["本周出勤趋势整体稳定。"]},{"component":"Statistic","id":"__STAT_ID__","props":{"title":"平均出勤率","value":94}}]}',
+    maxChildrenPerArray: 3,
+    skeleton: '{"component":"Card","id":"__ZONE_ID__","props":{"title":"__TITLE__"},"children":[{"component":"Chart.Line","id":"__CHART_ID__","props":{"data":[{"month":"1月","value":350},{"month":"2月","value":420},{"month":"3月","value":390}],"xField":"month","yField":"value","height":280,"autoFit":true}}]}',
     wrapper: {
       component: 'Card',
       props: {
@@ -493,6 +494,11 @@ const runtimeComponentGroupDefinitions: ComponentGroupDefinition[] = [
     description: 'navigation, paging, and progress indication components',
     components: ['Breadcrumb', 'Pagination', 'Steps'],
   },
+  {
+    name: 'charts',
+    description: 'Ant Design Charts statistical chart components for data visualization',
+    components: ['Chart.Line', 'Chart.Column', 'Chart.Bar', 'Chart.Area', 'Chart.Pie', 'Chart.Gauge'],
+  },
 ];
 
 const knowledgeComponentGroupDefinitions: ComponentGroupDefinition[] = [
@@ -552,6 +558,11 @@ const knowledgeComponentGroupDefinitions: ComponentGroupDefinition[] = [
     description: 'expand/collapse structured content sections',
     components: ['Collapse', 'Collapse.Panel'],
   },
+  {
+    name: 'charts',
+    description: 'Ant Design Charts statistical chart components for data visualization',
+    components: ['Chart.Line', 'Chart.Column', 'Chart.Bar', 'Chart.Area', 'Chart.Pie', 'Chart.Gauge'],
+  },
 ];
 
 const legacyZoneGroupMap: Record<LegacyZoneType, ComponentGroupName[]> = {
@@ -562,7 +573,7 @@ const legacyZoneGroupMap: Record<LegacyZoneType, ComponentGroupName[]> = {
   'detail-info': ['data-display', 'typography', 'feedback-status', 'navigation'],
   'form-body': ['data-display', 'filters-form'],
   'form-actions': ['layout-shell', 'actions'],
-  'chart-area': ['data-display', 'typography', 'feedback-status'],
+  'chart-area': ['data-display', 'typography', 'feedback-status', 'charts'],
   'timeline-area': ['data-display', 'typography'],
   'side-info': ['data-display', 'typography', 'feedback-status'],
   'empty-state': ['data-display', 'typography', 'actions', 'feedback-status'],
@@ -577,7 +588,7 @@ const legacyKnowledgeZoneGroupMap: Record<LegacyZoneType, ComponentGroupName[]> 
   'detail-info': ['data-display', 'typography', 'feedback-status', 'identity', 'disclosure'],
   'form-body': ['data-display', 'filters-form', 'advanced-form', 'extended-feedback'],
   'form-actions': ['layout-shell', 'actions'],
-  'chart-area': ['data-display', 'typography', 'feedback-status', 'extended-feedback'],
+  'chart-area': ['data-display', 'typography', 'feedback-status', 'extended-feedback', 'charts'],
   'timeline-area': ['data-display', 'typography', 'extended-feedback'],
   'side-info': ['data-display', 'typography', 'feedback-status', 'identity', 'extended-feedback'],
   'empty-state': ['data-display', 'typography', 'actions', 'extended-feedback'],
@@ -1011,6 +1022,14 @@ const componentMiniSkeletons: Record<string, string> = {
   Tag: '{"component":"Tag","id":"..","props":{"color":"blue"},"children":["标签"]}',
   Progress: '{"component":"Progress","id":"..","props":{"percent":68,"status":"active","showInfo":true}}',
   Result: '{"component":"Result","id":"..","props":{"status":"success","title":"操作成功","subTitle":"任务已完成","extra":{"component":"Button","id":"..","props":{"type":"primary"},"children":["返回列表"]}}}',
+
+  // Charts (Ant Design Charts)
+  'Chart.Line': '{"component":"Chart.Line","id":"..","props":{"data":[{"month":"1月","value":350},{"month":"2月","value":420},{"month":"3月","value":390},{"month":"4月","value":510},{"month":"5月","value":480}],"xField":"month","yField":"value","height":280,"autoFit":true}}',
+  'Chart.Column': '{"component":"Chart.Column","id":"..","props":{"data":[{"category":"产品A","sales":350},{"category":"产品B","sales":420},{"category":"产品C","sales":290}],"xField":"category","yField":"sales","height":280,"autoFit":true}}',
+  'Chart.Bar': '{"component":"Chart.Bar","id":"..","props":{"data":[{"name":"销售部","value":350},{"name":"技术部","value":280},{"name":"运营部","value":420}],"xField":"value","yField":"name","height":280,"autoFit":true}}',
+  'Chart.Area': '{"component":"Chart.Area","id":"..","props":{"data":[{"month":"1月","value":350},{"month":"2月","value":420},{"month":"3月","value":390}],"xField":"month","yField":"value","height":280,"autoFit":true}}',
+  'Chart.Pie': '{"component":"Chart.Pie","id":"..","props":{"data":[{"type":"技术部","value":40},{"type":"销售部","value":30},{"type":"运营部","value":20},{"type":"人事部","value":10}],"angleField":"value","colorField":"type","height":280,"autoFit":true}}',
+  'Chart.Gauge': '{"component":"Chart.Gauge","id":"..","props":{"data":{"target":75,"total":100},"height":240,"autoFit":true}}',
 };
 
 /**

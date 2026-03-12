@@ -16,6 +16,7 @@
     "test:e2e:install": "playwright install"
   },
   "dependencies": {
+    "@ant-design/charts": "^2.6.7",
     "@shenbi/editor-core": "workspace:*",
     "@shenbi/editor-plugin-ai-chat": "workspace:*",
     "@shenbi/editor-plugin-files": "workspace:*",
@@ -28,14 +29,14 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@tailwindcss/vite": "^4.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@playwright/test": "^1.50.0",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@tailwindcss/vite": "^4.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4.0.0",

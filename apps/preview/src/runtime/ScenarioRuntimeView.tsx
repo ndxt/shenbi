@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import * as antd from 'antd';
+import { Line, Column, Bar, Area, Pie, Gauge } from '@ant-design/charts';
 import { type PageSchema } from '@shenbi/schema';
 import {
   antdResolver,
@@ -12,6 +13,13 @@ import { installMockFetch } from '../mock/mock-fetch';
 
 const resolver = antdResolver(antd);
 resolver.register('Container', Container);
+// Ant Design Charts
+resolver.register('Chart.Line', Line);
+resolver.register('Chart.Column', Column);
+resolver.register('Chart.Bar', Bar);
+resolver.register('Chart.Area', Area);
+resolver.register('Chart.Pie', Pie);
+resolver.register('Chart.Gauge', Gauge);
 
 export interface ScenarioRuntimeViewProps {
   schema: PageSchema;

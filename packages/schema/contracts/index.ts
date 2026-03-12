@@ -145,6 +145,16 @@ import {
   backTopContract,
 } from './other';
 
+// ================== Charts ==================
+import {
+  chartLineContract,
+  chartColumnContract,
+  chartBarContract,
+  chartAreaContract,
+  chartPieContract,
+  chartGaugeContract,
+} from './charts';
+
 // ================== Re-exports ==================
 export * from './layout';
 export * from './container';
@@ -174,6 +184,7 @@ export * from './modal';
 export * from './drawer';
 export * from './feedback';
 export * from './other';
+export * from './charts';
 
 // ================== All Built-in Contracts ==================
 export const builtinContracts: ComponentContract[] = [
@@ -289,6 +300,14 @@ export const builtinContracts: ComponentContract[] = [
   appContract,
   configProviderContract,
   backTopContract,
+
+  // Charts
+  chartLineContract,
+  chartColumnContract,
+  chartBarContract,
+  chartAreaContract,
+  chartPieContract,
+  chartGaugeContract,
 ];
 
 // Contract map for quick lookup
