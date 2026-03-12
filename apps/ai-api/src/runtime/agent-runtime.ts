@@ -1359,14 +1359,15 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         '- Favor clean B2B admin layouts: clear page title, concise helper text, grouped filters, summary cards, primary data area, moderate whitespace.',
         '- Prompts describing master-detail, left tree/list + right detail Tabs, or 主从详情 should use a detail-oriented or custom split layout, not a generic list page.',
         '- For master-detail pages, prefer a 7/17 or 8/16 split. The left block should be a compact master navigation/list panel; the right block should hold detail tabs/body.',
-        '- For dashboard pages, prefer this rhythm: header full-width -> filter full-width -> KPI full-width -> main-content + side-info.',
+        '- For dashboard pages, prefer this rhythm: KPI full-width -> main-content + side-info. Only add a header block if the user explicitly mentions page title, header, breadcrumb, or navigation.',
         '- Dashboard filters should not be squeezed into one inline row when they include a RangePicker or more than 3 fields.',
         '- Dashboard KPI rows should contain at most 4 cards and should avoid mixing unrelated card structures in the same row.',
         '- Put primary actions near the title first. Add a side quick-action card only when the prompt clearly requires a separate side region.',
+        '- Do NOT add a header/title block unless the user explicitly asks for page title, header, breadcrumb, or top navigation. If the user only describes content areas, plan only the content blocks.',
         '- Use free-layout patterns when they create a stronger composition, especially for custom or mixed business pages.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Valid example 1:',
-        '{"pageTitle":"经营工作台","pageType":"dashboard","layout":[{"blocks":["header-block"]},{"blocks":["filter-block"]},{"blocks":["kpi-block"]},{"columns":[{"span":18,"blocks":["trend-tabs-block","records-block"]},{"span":6,"blocks":["side-info-block"]}]}],"blocks":[{"id":"header-block","description":"页面标题、说明和顶部主操作","components":["Typography.Title","Typography.Text","Button","Breadcrumb"],"priority":1,"complexity":"simple"},{"id":"filter-block","description":"全宽筛选查询区，包含日期范围、状态和关键词","components":["Form","Form.Item","DatePicker.RangePicker","Select","Input","Button"],"priority":2,"complexity":"medium"},{"id":"kpi-block","description":"核心业务指标卡片，单行 3 到 4 张统一结构的指标卡","components":["Row","Col","Card","Statistic","Typography.Text"],"priority":3,"complexity":"medium"},{"id":"trend-tabs-block","description":"趋势分析 Tabs 区域，每个 tab 保持一个主数据区","components":["Tabs","Alert","Typography.Paragraph","Card"],"priority":4,"complexity":"medium"},{"id":"records-block","description":"主数据表格列表","components":["Table","Tag","Pagination"],"priority":5,"complexity":"medium"},{"id":"side-info-block","description":"紧凑侧边补充说明或快捷入口","components":["Card","Typography.Text","Button"],"priority":6,"complexity":"simple"}]}',
+        '{"pageTitle":"经营工作台","pageType":"dashboard","layout":[{"blocks":["kpi-block"]},{"columns":[{"span":18,"blocks":["trend-tabs-block","records-block"]},{"span":6,"blocks":["side-info-block"]}]}],"blocks":[{"id":"kpi-block","description":"核心业务指标卡片，单行 3 到 4 张统一结构的指标卡","components":["Row","Col","Card","Statistic","Typography.Text"],"priority":1,"complexity":"medium"},{"id":"trend-tabs-block","description":"趋势分析 Tabs 区域，每个 tab 保持一个主数据区","components":["Tabs","Alert","Typography.Paragraph","Card"],"priority":2,"complexity":"medium"},{"id":"records-block","description":"主数据表格列表","components":["Table","Tag","Pagination"],"priority":3,"complexity":"medium"},{"id":"side-info-block","description":"紧凑侧边补充说明或快捷入口","components":["Card","Typography.Text","Button"],"priority":4,"complexity":"simple"}]}',
         'Valid example 2:',
         '{"pageTitle":"员工详情","pageType":"detail","layout":[{"blocks":["detail-header"]},{"columns":[{"span":10,"blocks":["profile-block","contact-block"]},{"span":14,"blocks":["attendance-block","approval-block"]}]}],"blocks":[{"id":"detail-header","description":"页面标题、说明和操作按钮","components":["Typography.Title","Typography.Text","Button","Breadcrumb"],"priority":1,"complexity":"simple"},{"id":"profile-block","description":"员工基本信息","components":["Descriptions","Tag","Avatar"],"priority":2,"complexity":"simple"},{"id":"contact-block","description":"联系方式","components":["Descriptions","Typography.Text"],"priority":3,"complexity":"simple"},{"id":"attendance-block","description":"最近考勤记录","components":["Table","Pagination","Tag"],"priority":4,"complexity":"medium"},{"id":"approval-block","description":"审批动态","components":["Timeline","Badge"],"priority":5,"complexity":"medium"}]}',
         'Valid example 3:',
@@ -1402,6 +1403,7 @@ function createBlockMessages(
   const componentSchemaContracts = getFullComponentContracts(expandedComponents);
   const isDashboardBlock = classifyPromptToPageType(input.request.prompt) === 'dashboard';
   const isMasterListRegion = isMasterListBlock(input) || isMasterDetailPrompt(input.request.prompt);
+  const isHeaderBlock = /header|title|hero|banner|标题|页头/.test(`${input.block.id} ${input.block.description}`.toLowerCase());
   const conversationHistory = formatConversationHistory(input.context.conversation.history, {
     ...(input.context.document.schemaDigest ? { schemaDigest: input.context.document.schemaDigest } : {}),
   });
@@ -1469,6 +1471,14 @@ function createBlockMessages(
             '- Each master item should contain at most one title line, one status/meta line, and one short description line.',
           ]
           : []),
+        ...(isHeaderBlock
+          ? [
+            '- CRITICAL: This block is the PAGE HEADER only. It must contain ONLY the page title, an optional subtitle/description line, and optional breadcrumb navigation.',
+            '- DO NOT generate any data regions, statistics cards, KPI numbers, tables, lists, form fields, tabs, timelines, or any other content in this block.',
+            '- The header block should be extremely concise — typically just Typography.Title + Typography.Text + Breadcrumb.',
+            '- Ignore the detailed content requirements in the user prompt; those belong to other blocks, not the header.',
+          ]
+          : []),
         '- Keep braces and brackets balanced. Your answer must be parseable by JSON.parse without any cleanup.',
         '- Return JSON only. No markdown, no explanation, no code fences.',
         'Return exactly this JSON shape:',
@@ -1478,7 +1488,11 @@ function createBlockMessages(
     {
       role: 'user',
       content: [
-        `Prompt: ${input.request.prompt}`,
+        // IMPORTANT: Use block.description, NOT request.prompt!
+        // Sending the full user prompt causes the LLM to generate content for ALL regions,
+        // leading to one block absorbing the entire page. The planner already decomposed
+        // the user intent into per-block descriptions — use those instead.
+        `Prompt: ${input.block.description}`,
         `Page Title: ${input.pageTitle ?? 'Untitled'}`,
         `Block Index: ${input.blockIndex ?? 0}`,
         `Placement: ${input.placementSummary ?? '默认纵向堆叠区域'}`,
