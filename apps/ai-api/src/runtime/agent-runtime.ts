@@ -1457,6 +1457,11 @@ function createBlockMessages(
         '- For Timeline, return Timeline.Item children with short text content.',
         '- Use realistic Chinese B-end copy such as 今日出勤率, 本周迟到人数, 最近考勤记录, 审批状态.',
         '- Avoid high-risk callback props unless the block explicitly needs them. If a function prop is unnecessary, omit it.',
+        '- CHART v2 RULES: For all Chart.* components use ONLY @ant-design/charts v2 (G2-based) API. Do NOT use G2Plot v1 API.',
+        '- CHART tooltip: DO NOT add formatter, showMarkers, domStyles, or any function string inside tooltip. Only use { items, title } or omit tooltip entirely.',
+        '- CHART label: DO NOT use { type: "outer"|"inner"|"spider", content: "{name} {percentage}" } — these are v1 API and will break rendering. Omit label or use only { style: { ... } }.',
+        '- CHART axis: DO NOT deeply nest label config inside axis. Use only { x: { title: "..." }, y: { title: "..." } } or omit axis.',
+        '- Rule of thumb for charts: if unsure whether a sub-prop exists in v2, OMIT IT. Fewer props = correct rendering; wrong props = empty chart.',
         ...(isDashboardBlock
           ? [
             '- This request is dashboard-like. Favor clean business workbench rhythm over maximal density.',
