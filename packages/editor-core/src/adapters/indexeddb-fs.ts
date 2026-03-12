@@ -2,7 +2,6 @@ import type {
   FileContent,
   FileType,
   FSNodeMetadata,
-  FILE_TYPE_EXTENSIONS,
 } from './file-storage';
 import { FILE_TYPE_EXTENSIONS as EXTENSIONS } from './file-storage';
 import type { VirtualFileSystemAdapter } from './virtual-fs';
@@ -326,13 +325,16 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
     const transaction = db.transaction(['fs_nodes', 'fs_content'], 'readwrite');
     const nodeStore = transaction.objectStore('fs_nodes');
 
-    // Update node metadata
-    const existingNode = await getByKey<FSNodeMetadata>(nodeStore, fileId);
-    if (existingNode) {
-      existingNode.updatedAt = now;
-      existingNode.size = size;
-      nodeStore.put(existingNode);
-    }
+    // Update node metadata -- use IDBRequest callback to stay within the transaction
+    const getRequest = nodeStore.get(fileId);
+    getRequest.onsuccess = () => {
+      const existingNode = getRequest.result as FSNodeMetadata | undefined;
+      if (existingNode) {
+        existingNode.updatedAt = now;
+        existingNode.size = size;
+        nodeStore.put(existingNode);
+      }
+    };
 
     // Update content
     transaction.objectStore('fs_content').put({
@@ -465,7 +467,7 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
 
     // Update descendant paths if directory
     if (node.type === 'directory') {
-      await this.updateDescendantPaths(store, allNodes, nodeId, oldPath, newPath);
+      this.updateDescendantPathsSync(store, allNodes, nodeId, oldPath, newPath);
     }
 
     await new Promise<void>((resolve, reject) => {
@@ -476,7 +478,12 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
     return node;
   }
 
-  async move(projectId: string, nodeId: string, newParentId: string | null): Promise<FSNodeMetadata> {
+  async move(
+    projectId: string,
+    nodeId: string,
+    newParentId: string | null,
+    afterNodeId?: string | null,
+  ): Promise<FSNodeMetadata> {
     const db = await this.getDB(projectId);
     const allNodes = await this.listTree(projectId);
     const node = allNodes.find((n) => n.id === nodeId);
@@ -484,11 +491,77 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
       throw new Error(`Node not found: ${nodeId}`);
     }
 
-    const oldPath = node.path;
-    const newParentPath = newParentId
-      ? (allNodes.find((n) => n.id === newParentId)?.path ?? '')
-      : '';
+    // Validate target parent exists
+    let newParentPath = '';
+    if (newParentId !== null) {
+      const parentNode = allNodes.find((n) => n.id === newParentId);
+      if (!parentNode) {
+        throw new Error(`Target parent not found: ${newParentId}`);
+      }
+      if (parentNode.type !== 'directory') {
+        throw new Error(`Target parent is not a directory: ${newParentId}`);
+      }
+      newParentPath = parentNode.path;
+    }
 
+    // Prevent circular moves (moving a directory into its own descendant)
+    if (node.type === 'directory' && newParentId !== null) {
+      let cursor: string | null = newParentId;
+      while (cursor !== null) {
+        if (cursor === nodeId) {
+          throw new Error('Cannot move a directory into its own descendant');
+        }
+        const cursorNode = allNodes.find((n) => n.id === cursor);
+        cursor = cursorNode?.parentId ?? null;
+      }
+    }
+
+    // Calculate sortOrder when afterNodeId is explicitly provided
+    const siblingNodes: FSNodeMetadata[] = [];
+    if (afterNodeId !== undefined) {
+      for (const n of allNodes) {
+        if (n.parentId === newParentId && n.id !== nodeId) {
+          siblingNodes.push(n);
+        }
+      }
+      siblingNodes.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+      if (afterNodeId === null) {
+        // Place first
+        node.sortOrder = siblingNodes.length === 0 ? 0 : (siblingNodes[0]!.sortOrder ?? 0) - 1000;
+      } else {
+        const afterIdx = siblingNodes.findIndex((n) => n.id === afterNodeId);
+        if (afterIdx === -1) {
+          throw new Error(`afterNodeId not found among siblings: ${afterNodeId}`);
+        }
+        const afterNode = siblingNodes[afterIdx]!;
+        const nextNode = siblingNodes[afterIdx + 1] as FSNodeMetadata | undefined;
+
+        if (!nextNode) {
+          node.sortOrder = (afterNode.sortOrder ?? 0) + 1000;
+        } else {
+          const afterOrder = afterNode.sortOrder ?? 0;
+          const nextOrder = nextNode.sortOrder ?? 0;
+          const mid = (afterOrder + nextOrder) / 2;
+          if (mid === afterOrder || mid === nextOrder) {
+            // Gap exhausted — renormalize all siblings
+            for (let i = 0; i < siblingNodes.length; i++) {
+              siblingNodes[i]!.sortOrder = i * 1000;
+            }
+            const newAfterIdx = siblingNodes.findIndex((n) => n.id === afterNodeId);
+            const renormAfter = siblingNodes[newAfterIdx]!;
+            const renormNext = siblingNodes[newAfterIdx + 1] as FSNodeMetadata | undefined;
+            node.sortOrder = renormNext
+              ? ((renormAfter.sortOrder ?? 0) + (renormNext.sortOrder ?? 0)) / 2
+              : (renormAfter.sortOrder ?? 0) + 1000;
+          } else {
+            node.sortOrder = mid;
+          }
+        }
+      }
+    }
+
+    const oldPath = node.path;
     const fileName = node.type === 'file' && node.fileType
       ? `${node.name}${EXTENSIONS[node.fileType]}`
       : node.name;
@@ -503,9 +576,16 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
     const store = transaction.objectStore('fs_nodes');
     store.put(node);
 
+    // Write renormalized siblings if any
+    if (afterNodeId !== undefined) {
+      for (const sib of siblingNodes) {
+        store.put(sib);
+      }
+    }
+
     // Update descendant paths if directory
     if (node.type === 'directory') {
-      await this.updateDescendantPaths(store, allNodes, nodeId, oldPath, newPath);
+      this.updateDescendantPathsSync(store, allNodes, nodeId, oldPath, newPath);
     }
 
     await new Promise<void>((resolve, reject) => {
@@ -543,18 +623,17 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
     return node?.path ?? '';
   }
 
-  private updateDescendantPaths(
+  private updateDescendantPathsSync(
     store: IDBObjectStore,
     allNodes: FSNodeMetadata[],
     parentId: string,
     oldParentPath: string,
     newParentPath: string,
-  ): Promise<void> {
+  ): void {
     const descendants = allNodes.filter((n) => n.path.startsWith(oldParentPath + '/') && n.id !== parentId);
     for (const desc of descendants) {
       desc.path = newParentPath + desc.path.slice(oldParentPath.length);
       store.put(desc);
     }
-    return Promise.resolve();
   }
 }

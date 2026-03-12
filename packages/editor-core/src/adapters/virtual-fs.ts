@@ -26,7 +26,12 @@ export interface VirtualFileSystemAdapter {
 
   // Rename & Move
   rename(projectId: string, nodeId: string, newName: string): Promise<FSNodeMetadata>;
-  move(projectId: string, nodeId: string, newParentId: string | null): Promise<FSNodeMetadata>;
+  move(
+    projectId: string,
+    nodeId: string,
+    newParentId: string | null,
+    afterNodeId?: string | null,
+  ): Promise<FSNodeMetadata>;
 
   // Query
   getNode(projectId: string, nodeId: string): Promise<FSNodeMetadata | undefined>;

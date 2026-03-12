@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as antd from 'antd';
 import { Rocket, Undo2, Redo2, Trash2 } from 'lucide-react';
 import {
@@ -183,18 +183,24 @@ export function App() {
     onError: (message) => {
       antd.message.error(message);
     },
-    createEditorInstance: appMode === 'shell' ? () => {
+    createEditorInstance: () => {
       return createEditor({
         initialSchema: createEmptyShellSchema(),
         vfs,
         tabManager,
         projectId: PROJECT_ID,
       });
-    } : undefined,
+    },
   });
 
   // Tab manager snapshot
   const tabSnapshot = useTabManager(appMode === 'shell' ? tabManager : undefined);
+
+  // Compute dirty file IDs for FileExplorer
+  const dirtyFileIds = useMemo(
+    () => new Set(tabSnapshot.tabs.filter(t => t.isDirty).map(t => t.fileId)),
+    [tabSnapshot.tabs],
+  );
 
   // Refresh file tree
   const refreshFsTree = useCallback(() => {
@@ -390,7 +396,10 @@ export function App() {
   const enhancedPluginContext = useMemo(() => ({
     ...pluginContext,
     ...(filesystemService ? { filesystem: filesystemService } : {}),
-  }), [filesystemService, pluginContext]);
+    // Include fsTree/tabSnapshot so sidebar re-renders when they change (read via refs in plugin render)
+    _fsTreeVersion: fsTree,
+    _tabSnapshotVersion: tabSnapshot,
+  }), [filesystemService, fsTree, pluginContext, tabSnapshot]);
 
   // Tab actions
   const handleActivateTab = useCallback((fileId: string) => {
@@ -398,14 +407,32 @@ export function App() {
   }, [fileEditor.commands]);
 
   const handleCloseTab = useCallback((fileId: string) => {
-    const tab = tabManager.getTab(fileId);
-    if (tab?.isDirty) {
+    // For the active tab, check live editor dirty state (TabManager copy may be stale)
+    const isActive = tabManager.getActiveTabId() === fileId;
+    const isDirtyCheck = isActive ? shellSnapshot.isDirty : tabManager.getTab(fileId)?.isDirty;
+    if (isDirtyCheck) {
       if (!window.confirm('文件未保存，确定关闭？')) {
         return;
       }
     }
     void fileEditor.commands.execute('tab.close', { fileId });
-  }, [fileEditor.commands, tabManager]);
+  }, [fileEditor.commands, shellSnapshot.isDirty, tabManager]);
+
+  const handleCloseOtherTabs = useCallback((fileId: string) => {
+    tabManager.closeOtherTabs(fileId);
+  }, [tabManager]);
+
+  const handleCloseAllTabs = useCallback(() => {
+    tabManager.closeAllTabs();
+  }, [tabManager]);
+
+  const handleCloseSavedTabs = useCallback(() => {
+    tabManager.closeSavedTabs();
+  }, [tabManager]);
+
+  const handleMoveTab = useCallback((fromIndex: number, toIndex: number) => {
+    tabManager.moveTab(fromIndex, toIndex);
+  }, [tabManager]);
 
   const handleOpenFileFromTree = useCallback((fileId: string) => {
     void fileEditor.commands.execute('tab.open', { fileId });
@@ -430,6 +457,34 @@ export function App() {
   const handleRenameNode = useCallback((nodeId: string, newName: string) => {
     void fileEditor.commands.execute('fs.rename', { nodeId, newName });
   }, [fileEditor.commands]);
+
+  const handleMoveNode = useCallback((nodeId: string, newParentId: string | null, afterNodeId: string | null) => {
+    void fileEditor.commands.execute('fs.move', { nodeId, newParentId, afterNodeId });
+  }, [fileEditor.commands]);
+
+  // Keep stable refs for FileExplorer props to avoid recreating plugins on every tree/tab change
+  const fsTreeRef = useRef(fsTree);
+  fsTreeRef.current = fsTree;
+  const tabSnapshotRef = useRef(tabSnapshot);
+  tabSnapshotRef.current = tabSnapshot;
+  const handleOpenFileFromTreeRef = useRef(handleOpenFileFromTree);
+  handleOpenFileFromTreeRef.current = handleOpenFileFromTree;
+  const handleCreateFileRef = useRef(handleCreateFile);
+  handleCreateFileRef.current = handleCreateFile;
+  const handleCreateDirectoryRef = useRef(handleCreateDirectory);
+  handleCreateDirectoryRef.current = handleCreateDirectory;
+  const handleDeleteNodeRef = useRef(handleDeleteNode);
+  handleDeleteNodeRef.current = handleDeleteNode;
+  const handleRenameNodeRef = useRef(handleRenameNode);
+  handleRenameNodeRef.current = handleRenameNode;
+  const handleMoveNodeRef = useRef(handleMoveNode);
+  handleMoveNodeRef.current = handleMoveNode;
+  const refreshFsTreeRef = useRef(refreshFsTree);
+  refreshFsTreeRef.current = refreshFsTree;
+  const dirtyFileIdsRef = useRef(dirtyFileIds);
+  dirtyFileIdsRef.current = dirtyFileIds;
+  const handleCloseTabRef = useRef(handleCloseTab);
+  handleCloseTabRef.current = handleCloseTab;
 
   const plugins = useMemo(() => {
     const registeredPlugins = [
@@ -502,7 +557,7 @@ export function App() {
       }),
     ];
 
-    // VFS-based file explorer in shell mode
+    // VFS-based file explorer in shell mode (render function uses refs for live data)
     if (appMode === 'shell' && vfsInitialized) {
       registeredPlugins.push(defineEditorPlugin({
         id: 'shenbi.plugin.files',
@@ -515,16 +570,37 @@ export function App() {
               order: 35,
               render: () => (
                 <FileExplorer
-                  tree={fsTree}
-                  activeFileId={tabSnapshot.activeTabId}
-                  onOpenFile={handleOpenFileFromTree}
-                  onCreateFile={handleCreateFile}
-                  onCreateDirectory={handleCreateDirectory}
-                  onDeleteNode={handleDeleteNode}
-                  onRenameNode={handleRenameNode}
-                  onRefresh={refreshFsTree}
+                  tree={fsTreeRef.current}
+                  activeFileId={tabSnapshotRef.current.activeTabId}
+                  dirtyFileIds={dirtyFileIdsRef.current}
+                  onOpenFile={handleOpenFileFromTreeRef.current}
+                  onCreateFile={handleCreateFileRef.current}
+                  onCreateDirectory={handleCreateDirectoryRef.current}
+                  onDeleteNode={handleDeleteNodeRef.current}
+                  onRenameNode={handleRenameNodeRef.current}
+                  onRefresh={refreshFsTreeRef.current}
+                  onMoveNode={handleMoveNodeRef.current}
                 />
               ),
+            },
+          ],
+          commands: [
+            {
+              id: 'files.closeActiveTab',
+              title: '关闭当前标签页',
+              category: 'Files',
+              execute: () => {
+                const activeId = tabSnapshotRef.current.activeTabId;
+                if (activeId) handleCloseTabRef.current(activeId);
+              },
+            },
+          ],
+          shortcuts: [
+            {
+              id: 'files.closeActiveTab.shortcut',
+              commandId: 'files.closeActiveTab',
+              keybinding: 'Ctrl+W',
+              when: 'editorFocused && !inputFocused',
             },
           ],
         },
@@ -537,15 +613,7 @@ export function App() {
   }, [
     appMode,
     filesSidebarTabOptions,
-    fsTree,
-    handleCreateDirectory,
-    handleCreateFile,
-    handleDeleteNode,
-    handleOpenFileFromTree,
-    handleRenameNode,
     handleResetWorkspace,
-    refreshFsTree,
-    tabSnapshot.activeTabId,
     vfsInitialized,
   ]);
 
@@ -617,6 +685,10 @@ export function App() {
       activeTabId={tabSnapshot.activeTabId}
       onActivateTab={handleActivateTab}
       onCloseTab={handleCloseTab}
+      onCloseOtherTabs={handleCloseOtherTabs}
+      onCloseAllTabs={handleCloseAllTabs}
+      onCloseSavedTabs={handleCloseSavedTabs}
+      onMoveTab={handleMoveTab}
       toolbarExtra={(
         <div className="flex items-center gap-2">
           <span className="text-text-secondary" style={{ fontSize: '11px' }}>模式</span>

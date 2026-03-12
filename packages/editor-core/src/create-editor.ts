@@ -495,6 +495,7 @@ function registerVFSCommands(
   eventBus: EventBus<EditorEventMap>,
   vfs: VirtualFileSystemAdapter,
   projectId: string,
+  tabManager?: TabManager,
 ): void {
   commands.register({
     id: 'fs.createFile',
@@ -543,8 +544,31 @@ function registerVFSCommands(
         throw new Error(`Node not found: ${args.nodeId}`);
       }
       if (node.type === 'directory') {
+        // Close tabs for all files in the directory before deleting
+        if (tabManager) {
+          const allNodes = await vfs.listTree(projectId);
+          const collectFileIds = (parentId: string, ids: Set<string>) => {
+            for (const n of allNodes) {
+              if (n.parentId === parentId) {
+                if (n.type === 'file') ids.add(n.id);
+                else collectFileIds(n.id, ids);
+              }
+            }
+          };
+          const fileIds = new Set<string>();
+          collectFileIds(args.nodeId, fileIds);
+          for (const fid of fileIds) {
+            if (tabManager.getTab(fid)) {
+              await commands.execute('tab.close', { fileId: fid });
+            }
+          }
+        }
         await vfs.deleteDirectory(projectId, args.nodeId, true);
       } else {
+        // Close the tab for this file if open
+        if (tabManager?.getTab(args.nodeId)) {
+          await commands.execute('tab.close', { fileId: args.nodeId });
+        }
         await vfs.deleteFile(projectId, args.nodeId);
       }
       eventBus.emit('fs:nodeDeleted', { nodeId: args.nodeId, path: node.path });
@@ -580,7 +604,10 @@ function registerVFSCommands(
       const oldNode = await vfs.getNode(projectId, args.nodeId);
       const oldParentId = oldNode?.parentId ?? null;
       const newParentId = typeof args.newParentId === 'string' ? args.newParentId : null;
-      const node = await vfs.move(projectId, args.nodeId, newParentId);
+      const afterNodeId = 'afterNodeId' in args
+        ? (args.afterNodeId as string | null)
+        : undefined;
+      const node = await vfs.move(projectId, args.nodeId, newParentId, afterNodeId);
       eventBus.emit('fs:nodeMoved', { nodeId: args.nodeId, oldParentId, newParentId });
       eventBus.emit('fs:treeChanged', undefined);
       return node;
@@ -653,12 +680,24 @@ function registerTabCommands(
       const existingTab = tabManager.getTab(fileId);
 
       if (existingTab) {
+        // Save current active tab state before switching
+        const currentTab = tabManager.getActiveTab();
+        if (currentTab && currentTab.fileId !== fileId) {
+          tabManager.updateTab(currentTab.fileId, {
+            schema: currentState.getSchema(),
+            selectedNodeId: currentState.getSnapshot().selectedNodeId,
+            isDirty: currentState.getSnapshot().isDirty,
+          });
+        }
+
         tabManager.activateTab(fileId);
         // Restore tab state to editor
         await commands.execute('schema.restore', {
           schema: existingTab.schema,
           isDirty: existingTab.isDirty,
         });
+        history.clear(state.getSnapshot());
+        currentState.setCurrentFileId(fileId);
         eventBus.emit('tab:activated', { fileId });
         return;
       }
@@ -776,11 +815,44 @@ function registerTabCommands(
     id: 'tab.closeOthers',
     label: 'Close Other Tabs',
     recordHistory: false,
-    execute(_currentState, args) {
+    async execute(currentState, args) {
       if (!isRecord(args) || typeof args.fileId !== 'string') {
         throw new Error('tab.closeOthers expects args: { fileId }');
       }
-      tabManager.closeOtherTabs(args.fileId);
+      const fileId = args.fileId;
+      const closedIds = tabManager.getTabs()
+        .map((t) => t.fileId)
+        .filter((id) => id !== fileId);
+
+      // Save current editor state to the surviving tab if it's active
+      const currentActiveId = tabManager.getActiveTabId();
+      if (currentActiveId === fileId) {
+        tabManager.updateTab(fileId, {
+          schema: currentState.getSchema(),
+          selectedNodeId: currentState.getSnapshot().selectedNodeId,
+          isDirty: currentState.getSnapshot().isDirty,
+        });
+      }
+
+      tabManager.closeOtherTabs(fileId);
+
+      for (const closedId of closedIds) {
+        eventBus.emit('tab:closed', { fileId: closedId });
+      }
+
+      // If the surviving tab wasn't the active one, restore its state
+      if (currentActiveId !== fileId) {
+        const tab = tabManager.getTab(fileId);
+        if (tab) {
+          await commands.execute('schema.restore', {
+            schema: tab.schema,
+            isDirty: tab.isDirty,
+          });
+          history.clear(state.getSnapshot());
+          currentState.setCurrentFileId(fileId);
+          eventBus.emit('tab:activated', { fileId });
+        }
+      }
     },
   });
 
@@ -789,7 +861,11 @@ function registerTabCommands(
     label: 'Close All Tabs',
     recordHistory: false,
     async execute(currentState) {
+      const closedIds = tabManager.getTabs().map((t) => t.fileId);
       tabManager.closeAllTabs();
+      for (const closedId of closedIds) {
+        eventBus.emit('tab:closed', { fileId: closedId });
+      }
       const emptySchema: PageSchema = { id: 'page', name: 'page', body: [] };
       await commands.execute('schema.restore', { schema: emptySchema, isDirty: false });
       history.clear(state.getSnapshot());
@@ -805,10 +881,13 @@ function registerTabCommands(
       const activeTab = tabManager.getActiveTab();
       if (!activeTab) return;
 
-      const schema = currentState.getSchema();
-      if (vfs && projectId) {
-        await vfs.writeFile(projectId, activeTab.fileId, schema);
+      if (!vfs || !projectId) {
+        throw new Error('VFS not configured, cannot save tab');
       }
+
+      const schema = currentState.getSchema();
+      await vfs.writeFile(projectId, activeTab.fileId, schema);
+      tabManager.updateTab(activeTab.fileId, { schema });
       tabManager.markDirty(activeTab.fileId, false);
       currentState.setDirty(false);
       eventBus.emit('tab:dirtyChanged', { fileId: activeTab.fileId, isDirty: false });
@@ -831,7 +910,7 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
   registerBuiltinCommands(state, history, commands, eventBus, fileStorage);
 
   if (options.vfs && options.projectId) {
-    registerVFSCommands(commands, eventBus, options.vfs, options.projectId);
+    registerVFSCommands(commands, eventBus, options.vfs, options.projectId, options.tabManager);
   }
 
   const tabManager = options.tabManager;
