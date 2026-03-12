@@ -102,6 +102,7 @@ export type AgentEvent =
   | { type: 'tool:result'; data: { tool: string; ok: boolean; summary?: string } }
   | { type: 'plan'; data: PagePlan & { _plannerMetrics?: AgentOperationMetrics } }
   | { type: 'modify:start'; data: { operationCount: number; explanation: string; operations: Array<{ op: string; label?: string; nodeId?: string }> } }
+  | { type: 'modify:op:pending'; data: { index: number; label?: string } }
   | { type: 'modify:op'; data: { index: number; operation: AgentOperation; metrics?: AgentOperationMetrics } }
   | { type: 'modify:done'; data: {} }
   | { type: 'schema:skeleton'; data: { schema: PageSchema } }

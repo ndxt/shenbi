@@ -846,3 +846,193 @@ export async function executeModifySchema(
 
   return result;
 }
+
+// ---------------------------------------------------------------------------
+//  Streaming-friendly split API used by the new modify-orchestrator
+// ---------------------------------------------------------------------------
+
+export interface PlanModifyResult {
+  explanation: string;
+  plannerMetrics: import('@shenbi/ai-contracts').AgentOperationMetrics;
+  simpleOps: Array<{ index: number; operation: AgentOperation }>;
+  complexOps: Array<{ index: number; skeleton: PlanInsertNodeSkeleton; label?: string }>;
+  operationCount: number;
+  operationSummaries: Array<{ op: string; label?: string; nodeId?: string }>;
+}
+
+/** Phase 1 only: run the planner LLM call and classify ops into simple vs complex. */
+export async function planModify(
+  input: ModifySchemaInput,
+  trace?: { modify?: ModifySchemaTraceEntry },
+): Promise<PlanModifyResult> {
+  if (!input.request.context.schemaJson) {
+    throw new LLMError('modifySchema requires context.schemaJson', 'MISSING_SCHEMA_CONTEXT');
+  }
+
+  const requestedModel = input.request.blockModel ?? env.AI_BLOCK_MODEL;
+  const modelRef = parseProviderModelRef(requestedModel);
+  const client = createClient(modelRef.provider);
+  const model = requireModel(modelRef.model ?? requestedModel);
+  const thinking = getThinking(input.request);
+  const provider = modelRef.provider ?? env.AI_PROVIDER;
+
+  const planMessages = createPlanMessages(input);
+  const planRequestSummary = {
+    provider,
+    ...client.buildRequestDebugSummary(model, planMessages, thinking, false),
+  };
+  const {
+    content: planText,
+    durationMs: planDurationMs,
+    inputTokens: planInputTokens,
+    outputTokens: planOutputTokens,
+    tokensUsed: planTokensUsed,
+  } = await client.chat(model, planMessages, thinking);
+  const planParsed = extractJson<unknown>(planText, 'modify', input.request, model);
+  if (!isPlanResult(planParsed)) {
+    throw new LLMError('modifySchema planner returned an invalid result shape', 'INVALID_MODIFY_RESULT');
+  }
+
+  if (trace) {
+    trace.modify = { requestSummary: planRequestSummary, model, rawOutput: planText };
+  }
+
+  const plannerMetrics: import('@shenbi/ai-contracts').AgentOperationMetrics = {
+    ...(planDurationMs !== undefined ? { durationMs: planDurationMs } : {}),
+    ...(planInputTokens !== undefined ? { inputTokens: planInputTokens } : {}),
+    ...(planOutputTokens !== undefined ? { outputTokens: planOutputTokens } : {}),
+    ...(planTokensUsed !== undefined ? { tokensUsed: planTokensUsed } : {}),
+  };
+
+  // Distribute planner metrics evenly across simple ops
+  const simpleCount = planParsed.operations.filter((op) => !needsPhase2(op)).length;
+  const perSimpleMs = planDurationMs !== undefined ? Math.round(planDurationMs / Math.max(simpleCount, 1)) : undefined;
+  const perSimpleIn = planInputTokens !== undefined ? Math.round(planInputTokens / Math.max(simpleCount, 1)) : undefined;
+  const perSimpleOut = planOutputTokens !== undefined ? Math.round(planOutputTokens / Math.max(simpleCount, 1)) : undefined;
+  const perSimpleTotal = planTokensUsed !== undefined ? Math.round(planTokensUsed / Math.max(simpleCount, 1)) : undefined;
+  const simpleMetrics: import('@shenbi/ai-contracts').AgentOperationMetrics = {
+    ...(perSimpleMs !== undefined ? { durationMs: perSimpleMs } : {}),
+    ...(perSimpleIn !== undefined ? { inputTokens: perSimpleIn } : {}),
+    ...(perSimpleOut !== undefined ? { outputTokens: perSimpleOut } : {}),
+    ...(perSimpleTotal !== undefined ? { tokensUsed: perSimpleTotal } : {}),
+  };
+
+  const simpleOps: Array<{ index: number; operation: AgentOperation }> = [];
+  const complexOps: Array<{ index: number; skeleton: PlanInsertNodeSkeleton; label?: string }> = [];
+
+  for (const [index, op] of planParsed.operations.entries()) {
+    if (needsPhase2(op)) {
+      complexOps.push({ index, skeleton: op, ...('label' in op && op.label ? { label: op.label as string } : {}) });
+    } else {
+      simpleOps.push({ index, operation: { ...op, _metrics: simpleMetrics } as AgentOperation });
+    }
+  }
+
+  const operationSummaries = planParsed.operations.map((op) => ({
+    op: op.op,
+    ...('label' in op && op.label ? { label: op.label as string } : {}),
+    ...('nodeId' in op && op.nodeId ? { nodeId: op.nodeId as string } : {}),
+  }));
+
+  return { explanation: planParsed.explanation, plannerMetrics, simpleOps, complexOps, operationCount: planParsed.operations.length, operationSummaries };
+}
+
+export interface ComplexOpResult {
+  index: number;
+  operation: AgentOperation;
+  metrics: import('@shenbi/ai-contracts').AgentOperationMetrics;
+}
+
+/** Phase 2: generate the full node for a single insertNode skeleton. */
+export async function executeComplexOp(
+  skeleton: PlanInsertNodeSkeleton,
+  index: number,
+  input: ModifySchemaInput,
+  trace?: { modify?: ModifySchemaTraceEntry },
+): Promise<ComplexOpResult> {
+  const requestedModel = input.request.blockModel ?? env.AI_BLOCK_MODEL;
+  const modelRef = parseProviderModelRef(requestedModel);
+  const client = createClient(modelRef.provider);
+  const model = requireModel(modelRef.model ?? requestedModel);
+  const thinking = getThinking(input.request);
+  const provider = modelRef.provider ?? env.AI_PROVIDER;
+
+  const insertMessages = createInsertNodeMessages(skeleton, input);
+  const insertRequestSummary = {
+    provider,
+    ...client.buildRequestDebugSummary(model, insertMessages, thinking, false),
+  };
+
+  try {
+    const {
+      content: insertText,
+      durationMs: insertDurationMs,
+      inputTokens: insertInputTokens,
+      outputTokens: insertOutputTokens,
+      tokensUsed: insertTokensUsed,
+    } = await client.chat(model, insertMessages, thinking);
+    const insertParsed = extractJson<unknown>(insertText, 'modify-insertNode', input.request, model);
+
+    let node: unknown;
+    if (isRecord(insertParsed) && 'node' in insertParsed) {
+      node = insertParsed.node;
+    } else if (isRecord(insertParsed) && 'component' in insertParsed) {
+      node = insertParsed;
+    } else {
+      throw new LLMError('Phase 2 insertNode returned invalid shape', 'INVALID_INSERT_NODE_RESULT');
+    }
+
+    const insertMetrics: import('@shenbi/ai-contracts').AgentOperationMetrics = {
+      ...(insertDurationMs !== undefined ? { durationMs: insertDurationMs } : {}),
+      ...(insertInputTokens !== undefined ? { inputTokens: insertInputTokens } : {}),
+      ...(insertOutputTokens !== undefined ? { outputTokens: insertOutputTokens } : {}),
+      ...(insertTokensUsed !== undefined ? { tokensUsed: insertTokensUsed } : {}),
+    };
+
+    const finalOp: AgentOperation = {
+      op: 'schema.insertNode',
+      ...(skeleton.parentId ? { parentId: skeleton.parentId } : {}),
+      ...(skeleton.container ? { container: skeleton.container } : {}),
+      ...(skeleton.index !== undefined ? { index: skeleton.index } : {}),
+      ...('label' in skeleton && skeleton.label ? { label: skeleton.label as string } : {}),
+      node: node as AgentOperation extends { op: 'schema.insertNode'; node: infer N } ? N : never,
+      _metrics: insertMetrics,
+    } as AgentOperation;
+
+    if (trace?.modify) {
+      trace.modify.executeTraces = [
+        ...(trace.modify.executeTraces ?? []),
+        {
+          operationIndex: index,
+          requestSummary: insertRequestSummary,
+          rawOutput: insertText,
+          generatedNode: node,
+          ...(insertDurationMs !== undefined ? { durationMs: insertDurationMs } : {}),
+          ...(insertInputTokens !== undefined ? { inputTokens: insertInputTokens } : {}),
+          ...(insertOutputTokens !== undefined ? { outputTokens: insertOutputTokens } : {}),
+          ...(insertTokensUsed !== undefined ? { tokensUsed: insertTokensUsed } : {}),
+        },
+      ];
+    }
+
+    return { index, operation: finalOp, metrics: insertMetrics };
+  } catch (error) {
+    logger.error('modify.phase2_insertNode_failed', {
+      operationIndex: index,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    const fallbackOp: AgentOperation = {
+      op: 'schema.insertNode',
+      ...(skeleton.parentId ? { parentId: skeleton.parentId } : {}),
+      ...(skeleton.container ? { container: skeleton.container } : {}),
+      ...(skeleton.index !== undefined ? { index: skeleton.index } : {}),
+      node: {
+        id: `generated-${index}-${Date.now().toString(36)}`,
+        component: 'Typography.Text',
+        props: { type: 'secondary' },
+        children: skeleton.description ?? '(生成失败，请重试)',
+      },
+    } as AgentOperation;
+    return { index, operation: fallbackOp, metrics: {} };
+  }
+}

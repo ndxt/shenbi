@@ -63,7 +63,7 @@ import {
   expandComponents,
   getFullComponentContracts,
 } from './component-catalog.ts';
-import { executeModifySchema, type ModifySchemaTraceEntry } from './modify-schema.ts';
+import { executeModifySchema, planModify, executeComplexOp as executeComplexOpFn, type ModifySchemaTraceEntry } from './modify-schema.ts';
 import type { AgentRuntime } from './types.ts';
 
 const defaultMemory = createInMemoryAgentMemoryStore();
@@ -1775,6 +1775,19 @@ function createRuntimeDeps(memory: AgentMemoryStore, trace?: RunTraceRecord): Ag
         name: 'modifySchema',
         async execute(input: unknown) {
           return executeModifySchema(input as import('@shenbi/ai-agents').ModifySchemaInput, trace);
+        },
+      },
+      {
+        name: 'planModify',
+        async execute(input: unknown) {
+          return planModify(input as import('@shenbi/ai-agents').ModifySchemaInput, trace);
+        },
+      },
+      {
+        name: 'executeComplexOp',
+        async execute(input: unknown) {
+          const typed = input as { skeleton: unknown; index: number; input: import('@shenbi/ai-agents').ModifySchemaInput };
+          return executeComplexOpFn(typed.skeleton as Parameters<typeof executeComplexOpFn>[0], typed.index, typed.input, trace);
         },
       },
       {

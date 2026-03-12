@@ -557,12 +557,15 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             );
                             setProgressText(`准备执行 ${event.data.operationCount} 个修改`);
                             break;
+                        case 'modify:op:pending':
+                            // Phase 2 LLM call is starting for this insertNode op
+                            localModifyStatuses[event.data.index] = 'generating';
+                            setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'generating' }));
+                            break;
                         case 'modify:op':
                             if (modifyFailed) {
                                 break;
                             }
-                            setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'generating' }));
-                            localModifyStatuses[event.data.index] = 'generating';
                             setProgressText(`执行修改 ${event.data.index + 1}`);
                             if (!bridgeRef.current) {
                                 throw new Error('editor bridge unavailable');
