@@ -124,6 +124,37 @@ export function AIPanel({
     return <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '9px' }}>{parts.join(' ')}</span>;
   };
 
+  // Shared op row used in both running and completed cards
+  const OpRow = ({
+    label,
+    isPending,
+    isDone,
+    metrics,
+    isError,
+  }: {
+    label: string;
+    isPending?: boolean;
+    isDone?: boolean;
+    metrics?: { durationMs: number | undefined; inputTokens: number | undefined; outputTokens: number | undefined };
+    isError?: boolean;
+  }) => (
+    <li
+      className={`flex items-center gap-1.5 min-h-[20px] rounded px-1 ${
+        isPending ? 'animate-pulse bg-blue-500/5' : ''
+      }`}
+      style={{ fontSize: '11px', lineHeight: '1.2' }}
+    >
+      <span className="text-text-primary opacity-80 truncate flex-1 leading-none" title={label}>{label}</span>
+      {isDone && metrics && <MetricsBadge durationMs={metrics.durationMs} inputTokens={metrics.inputTokens} outputTokens={metrics.outputTokens} />}
+      {isDone && (
+        <CheckCircle2
+          size={11}
+          className={`shrink-0 ${isError ? 'text-red-400' : 'text-emerald-400'}`}
+        />
+      )}
+    </li>
+  );
+
   const [selectedNodeLabel, setSelectedNodeLabel] = React.useState<string>('未选中');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const modelsReady = plannerModels.length > 0 && blockModels.length > 0;
@@ -374,23 +405,15 @@ export function AIPanel({
             {/* Block list (create-page) */}
             {currentPlan && (
               <div className="border-t border-border-ide pt-1">
-                <ul className="flex flex-col gap-0.5">
+                <ul className="flex flex-col">
                   {currentPlan.blocks.map((b) => (
-                    <li
+                    <OpRow
                       key={b.id}
-                      className={`flex items-center gap-1.5 py-0.5 rounded px-1 ${
-                        blockStatuses[b.id] === 'generating' ? 'animate-pulse bg-blue-500/5' : ''
-                      }`}
-                      style={{ fontSize: '11px' }}
-                    >
-                      <span className="text-text-primary opacity-80 truncate flex-1" title={b.description}>{b.description}</span>
-                      {blockStatuses[b.id] === 'done' && (
-                        <>
-                          <MetricsBadge durationMs={blockDurationMs[b.id]} inputTokens={blockInputTokens[b.id]} outputTokens={blockOutputTokens[b.id]} />
-                          <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
-                        </>
-                      )}
-                    </li>
+                      label={b.description}
+                      isPending={blockStatuses[b.id] === 'generating'}
+                      isDone={blockStatuses[b.id] === 'done'}
+                      metrics={{ durationMs: blockDurationMs[b.id], inputTokens: blockInputTokens[b.id], outputTokens: blockOutputTokens[b.id] }}
+                    />
                   ))}
                 </ul>
               </div>
@@ -398,25 +421,15 @@ export function AIPanel({
             {/* Modify op list */}
             {modifyPlan && (
               <div className="border-t border-border-ide pt-1">
-                <ul className="flex flex-col gap-0.5">
+                <ul className="flex flex-col">
                   {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
-                    <li
+                    <OpRow
                       key={i}
-                      className={`flex items-center gap-1.5 py-0.5 rounded px-1 ${
-                        modifyStatuses[i] === 'generating' ? 'animate-pulse bg-blue-500/5' : ''
-                      }`}
-                      style={{ fontSize: '11px' }}
-                    >
-                      <span className="text-text-primary opacity-80 truncate flex-1" title={modifyPlan.operationLabels[i] ?? ''}>
-                        {modifyPlan.operationLabels[i] ?? `操作 ${i + 1}`}
-                      </span>
-                      {modifyStatuses[i] === 'done' && (
-                        <>
-                          {modifyOpMetrics[i] && <MetricsBadge durationMs={modifyOpMetrics[i].durationMs} inputTokens={modifyOpMetrics[i].inputTokens} outputTokens={modifyOpMetrics[i].outputTokens} />}
-                          <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
-                        </>
-                      )}
-                    </li>
+                      label={modifyPlan.operationLabels[i] ?? `操作 ${i + 1}`}
+                      isPending={modifyStatuses[i] === 'generating'}
+                      isDone={modifyStatuses[i] === 'done'}
+                      {...(modifyOpMetrics[i] ? { metrics: { durationMs: modifyOpMetrics[i].durationMs, inputTokens: modifyOpMetrics[i].inputTokens, outputTokens: modifyOpMetrics[i].outputTokens } } : {})}
+                    />
                   ))}
                 </ul>
               </div>
@@ -424,15 +437,15 @@ export function AIPanel({
           </div>
         )}
 
-        {!isRunning && lastRunResult && (
+        {lastRunResult && (
           <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-2 shadow-sm mt-2" style={{ fontSize: '11px' }}>
             {/* Header */}
             <div className="flex items-center gap-2 text-text-primary">
               <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
-              <span className="font-semibold text-emerald-400 shrink-0">生成完成</span>
-              <span className="opacity-70 ml-1 truncate flex-1">{progressText}</span>
+              <span className="font-semibold text-emerald-400 shrink-0">{lastRunResult.modifyPlan ? '修改完成' : '生成完成'}</span>
+              <span className="opacity-70 ml-1 truncate flex-1 leading-none">{lastRunResult.statusLabel}</span>
               <button
-                className="text-text-secondary hover:text-text-primary opacity-50 hover:opacity-100 transition-opacity ml-1"
+                className="text-text-secondary hover:text-text-primary opacity-50 hover:opacity-100 transition-opacity ml-1 shrink-0"
                 onClick={() => setLastRunResult(null)}
                 title="关闭"
               >
@@ -450,13 +463,14 @@ export function AIPanel({
             {/* Block list (create-page) */}
             {lastRunResult.plan && (
               <div className="border-t border-border-ide pt-1">
-                <ul className="flex flex-col gap-0.5">
+                <ul className="flex flex-col">
                   {lastRunResult.plan.blocks.map((b) => (
-                    <li key={b.id} className="flex items-center gap-1.5 py-0.5 px-1">
-                      <span className="text-text-primary opacity-80 truncate flex-1" title={b.description}>{b.description}</span>
-                      <MetricsBadge durationMs={lastRunResult.blockDurationMs[b.id]} inputTokens={lastRunResult.blockInputTokens[b.id]} outputTokens={lastRunResult.blockOutputTokens[b.id]} />
-                      <CheckCircle2 size={11} className={lastRunResult.blockStatuses[b.id] === 'done' ? 'text-emerald-400 shrink-0' : 'text-text-secondary shrink-0'} />
-                    </li>
+                    <OpRow
+                      key={b.id}
+                      label={b.description}
+                      isDone={lastRunResult.blockStatuses[b.id] === 'done'}
+                      metrics={{ durationMs: lastRunResult.blockDurationMs[b.id], inputTokens: lastRunResult.blockInputTokens[b.id], outputTokens: lastRunResult.blockOutputTokens[b.id] }}
+                    />
                   ))}
                 </ul>
               </div>
@@ -464,15 +478,15 @@ export function AIPanel({
             {/* Modify op list */}
             {lastRunResult.modifyPlan && (
               <div className="border-t border-border-ide pt-1">
-                <ul className="flex flex-col gap-0.5">
+                <ul className="flex flex-col">
                   {Array.from({ length: lastRunResult.modifyPlan.operationCount }, (_, i) => (
-                    <li key={i} className="flex items-center gap-1.5 py-0.5 px-1">
-                      <span className="text-text-primary opacity-80 truncate flex-1" title={lastRunResult.modifyPlan?.operationLabels[i] ?? ''}>
-                        {lastRunResult.modifyPlan?.operationLabels[i] ?? `操作 ${i + 1}`}
-                      </span>
-                      {lastRunResult.modifyOpMetrics[i] && <MetricsBadge durationMs={lastRunResult.modifyOpMetrics[i].durationMs} inputTokens={lastRunResult.modifyOpMetrics[i].inputTokens} outputTokens={lastRunResult.modifyOpMetrics[i].outputTokens} />}
-                      <CheckCircle2 size={11} className={lastRunResult.modifyStatuses[i] === 'done' ? 'text-emerald-400 shrink-0' : 'text-red-400 shrink-0'} />
-                    </li>
+                    <OpRow
+                      key={i}
+                      label={lastRunResult.modifyPlan?.operationLabels[i] ?? `操作 ${i + 1}`}
+                      isDone={lastRunResult.modifyStatuses[i] === 'done'}
+                      isError={lastRunResult.modifyStatuses[i] !== 'done'}
+                      {...(lastRunResult.modifyOpMetrics[i] ? { metrics: { durationMs: lastRunResult.modifyOpMetrics[i].durationMs, inputTokens: lastRunResult.modifyOpMetrics[i].inputTokens, outputTokens: lastRunResult.modifyOpMetrics[i].outputTokens } } : {})}
+                    />
                   ))}
                 </ul>
               </div>

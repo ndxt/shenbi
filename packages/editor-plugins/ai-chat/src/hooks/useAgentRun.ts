@@ -27,6 +27,7 @@ export interface LastRunResult {
   modifyStatuses: Record<number, BlockRunStatus>;
   modifyOpMetrics: Record<number, AgentOperationMetrics>;
   elapsedMs: number;
+  statusLabel: string;
   tokensUsed?: number;
 }
 
@@ -624,6 +625,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                 modifyStatuses: { ...localModifyStatuses },
                                 modifyOpMetrics: { ...localModifyOpMetrics },
                                 elapsedMs: Date.now() - startTimeRef.current,
+                                statusLabel: localModifyPlan ? '页面修改已应用' : '页面生成完成',
                                 ...(typeof event.data.metadata.tokensUsed === 'number' ? { tokensUsed: event.data.metadata.tokensUsed } : {}),
                             });
                             onDone(await finalizeModifyRun(event.data.metadata));
