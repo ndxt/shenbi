@@ -19,6 +19,9 @@ export interface EditorSessionEditor {
   commands: {
     execute(commandId: string, args?: unknown): Promise<unknown>;
   };
+  eventBus?: {
+    on: (event: any, listener: (...args: any[]) => void) => () => void;
+  } | undefined;
   destroy(): void;
 }
 
@@ -26,9 +29,9 @@ export interface UseEditorSessionOptions {
   mode: EditorSessionMode;
   initialShellSchema: PageSchema;
   updateScenarioSchema: (updater: (schema: PageSchema) => PageSchema) => void;
-  onError?: (message: string) => void;
-  fileStorage?: FileStorageAdapter;
-  createEditorInstance?: () => EditorSessionEditor;
+  onError?: ((message: string) => void) | undefined;
+  fileStorage?: FileStorageAdapter | undefined;
+  createEditorInstance?: (() => EditorSessionEditor) | undefined;
 }
 
 export interface UseEditorSessionResult {

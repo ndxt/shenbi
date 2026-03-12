@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as antd from 'antd';
 import { Rocket, Undo2, Redo2, Trash2 } from 'lucide-react';
 import {
@@ -9,7 +9,12 @@ import {
 import { defineEditorPlugin } from '@shenbi/editor-plugin-api';
 import {
   type EditorStateSnapshot,
+  type FSTreeNode,
+  IndexedDBFileSystemAdapter,
+  TabManager,
   buildEditorTree,
+  buildFSTree,
+  createEditor,
   getAncestorChain,
   getDefaultSelectedNodeId,
   getSchemaNodeByTreeId,
@@ -42,10 +47,11 @@ import {
   useScenarioSession,
   useShellModeUrl,
   useSelectionSync,
+  useTabManager,
   type ShellMode,
 } from '@shenbi/editor-ui';
 import { createAIChatPlugin } from '@shenbi/editor-plugin-ai-chat';
-import { createFilesPlugin, useFileWorkspace } from '@shenbi/editor-plugin-files';
+import { createFilesPlugin, useFileWorkspace, FileExplorer } from '@shenbi/editor-plugin-files';
 import { createSetterPlugin } from '@shenbi/editor-plugin-setter';
 
 type ScenarioKey =
@@ -59,6 +65,7 @@ type ScenarioKey =
 
 type AppMode = ShellMode;
 const WORKSPACE_ID = 'shenbi-preview-debug';
+const PROJECT_ID = 'default';
 const PREVIEW_PERSISTENCE_NAMESPACE = 'preview-debug';
 const ACTIVE_SCENARIO_PERSISTENCE_KEY = 'active-scenario';
 
@@ -139,6 +146,20 @@ export function App() {
   const initialScenarioSchemas = useMemo(() => createInitialScenarioState(), []);
   const [activityMessage, setActivityMessage] = useState<string>('');
   const initialShellSchema = useMemo(() => createEmptyShellSchema(), []);
+
+  // VFS & TabManager instances
+  const vfs = useMemo(() => new IndexedDBFileSystemAdapter(), []);
+  const tabManager = useMemo(() => new TabManager(), []);
+  const [vfsInitialized, setVfsInitialized] = useState(false);
+  const [fsTree, setFsTree] = useState<FSTreeNode[]>([]);
+
+  // Initialize VFS
+  useEffect(() => {
+    void vfs.initialize(PROJECT_ID).then(() => {
+      setVfsInitialized(true);
+    });
+  }, [vfs]);
+
   const {
     activeScenarioSnapshot,
     updateScenarioSnapshot,
@@ -162,7 +183,48 @@ export function App() {
     onError: (message) => {
       antd.message.error(message);
     },
+    createEditorInstance: () => {
+      return createEditor({
+        initialSchema: createEmptyShellSchema(),
+        vfs,
+        tabManager,
+        projectId: PROJECT_ID,
+      });
+    },
   });
+
+  // Tab manager snapshot
+  const tabSnapshot = useTabManager(appMode === 'shell' ? tabManager : undefined);
+
+  // Compute dirty file IDs for FileExplorer
+  const dirtyFileIds = useMemo(
+    () => new Set(tabSnapshot.tabs.filter(t => t.isDirty).map(t => t.fileId)),
+    [tabSnapshot.tabs],
+  );
+
+  // Refresh file tree
+  const refreshFsTree = useCallback(() => {
+    if (!vfsInitialized) return;
+    void vfs.listTree(PROJECT_ID).then((nodes) => {
+      setFsTree(buildFSTree(nodes));
+    });
+  }, [vfs, vfsInitialized]);
+
+  useEffect(() => {
+    if (vfsInitialized && appMode === 'shell') {
+      refreshFsTree();
+    }
+  }, [appMode, refreshFsTree, vfsInitialized]);
+
+  // Listen for fs tree changes
+  useEffect(() => {
+    if (appMode !== 'shell') return;
+    const unsub = fileEditor.eventBus?.on?.('fs:treeChanged', () => {
+      refreshFsTree();
+    });
+    return unsub;
+  }, [appMode, fileEditor.eventBus, refreshFsTree]);
+
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : activeScenarioSnapshot.schema;
   const {
     activeFileName,
@@ -301,6 +363,25 @@ export function App() {
     }
     return executeHostPluginCommand(commandId, payload);
   }, [executeHostPluginCommand, handleResetWorkspace]);
+
+  // File system service for plugin context
+  const filesystemService = useMemo(() => {
+    if (!vfsInitialized) return undefined;
+    return {
+      createFile: async (name: string, fileType: string, content: Record<string, unknown>, parentId?: string) => {
+        const node = await vfs.createFile(PROJECT_ID, parentId ?? null, name, fileType as any, content);
+        refreshFsTree();
+        return node.id;
+      },
+      readFile: async (fileId: string) => {
+        return await vfs.readFile(PROJECT_ID, fileId) as Record<string, unknown>;
+      },
+      writeFile: async (fileId: string, content: Record<string, unknown>) => {
+        await vfs.writeFile(PROJECT_ID, fileId, content);
+      },
+    };
+  }, [refreshFsTree, vfs, vfsInitialized]);
+
   const pluginContext = usePluginContext({
     schema: activeSchema,
     selectedNode,
@@ -310,6 +391,101 @@ export function App() {
     executeCommand: executeAppCommand,
     notifications,
   });
+
+  // Enhance plugin context with filesystem
+  const enhancedPluginContext = useMemo(() => ({
+    ...pluginContext,
+    ...(filesystemService ? { filesystem: filesystemService } : {}),
+    // Include fsTree/tabSnapshot so sidebar re-renders when they change (read via refs in plugin render)
+    _fsTreeVersion: fsTree,
+    _tabSnapshotVersion: tabSnapshot,
+  }), [filesystemService, fsTree, pluginContext, tabSnapshot]);
+
+  // Tab actions
+  const handleActivateTab = useCallback((fileId: string) => {
+    void fileEditor.commands.execute('tab.activate', { fileId });
+  }, [fileEditor.commands]);
+
+  const handleCloseTab = useCallback((fileId: string) => {
+    // For the active tab, check live editor dirty state (TabManager copy may be stale)
+    const isActive = tabManager.getActiveTabId() === fileId;
+    const isDirtyCheck = isActive ? shellSnapshot.isDirty : tabManager.getTab(fileId)?.isDirty;
+    if (isDirtyCheck) {
+      if (!window.confirm('文件未保存，确定关闭？')) {
+        return;
+      }
+    }
+    void fileEditor.commands.execute('tab.close', { fileId });
+  }, [fileEditor.commands, shellSnapshot.isDirty, tabManager]);
+
+  const handleCloseOtherTabs = useCallback((fileId: string) => {
+    tabManager.closeOtherTabs(fileId);
+  }, [tabManager]);
+
+  const handleCloseAllTabs = useCallback(() => {
+    tabManager.closeAllTabs();
+  }, [tabManager]);
+
+  const handleCloseSavedTabs = useCallback(() => {
+    tabManager.closeSavedTabs();
+  }, [tabManager]);
+
+  const handleMoveTab = useCallback((fromIndex: number, toIndex: number) => {
+    tabManager.moveTab(fromIndex, toIndex);
+  }, [tabManager]);
+
+  const handleOpenFileFromTree = useCallback((fileId: string) => {
+    void fileEditor.commands.execute('tab.open', { fileId });
+  }, [fileEditor.commands]);
+
+  const handleCreateFile = useCallback((parentId: string | null, name: string, fileType: string) => {
+    void fileEditor.commands.execute('fs.createFile', { parentId, name, fileType }).then((result: any) => {
+      if (result?.id) {
+        void fileEditor.commands.execute('tab.open', { fileId: result.id });
+      }
+    });
+  }, [fileEditor.commands]);
+
+  const handleCreateDirectory = useCallback((parentId: string | null, name: string) => {
+    void fileEditor.commands.execute('fs.createDirectory', { parentId, name });
+  }, [fileEditor.commands]);
+
+  const handleDeleteNode = useCallback((nodeId: string) => {
+    void fileEditor.commands.execute('fs.deleteNode', { nodeId });
+  }, [fileEditor.commands]);
+
+  const handleRenameNode = useCallback((nodeId: string, newName: string) => {
+    void fileEditor.commands.execute('fs.rename', { nodeId, newName });
+  }, [fileEditor.commands]);
+
+  const handleMoveNode = useCallback((nodeId: string, newParentId: string | null, afterNodeId: string | null) => {
+    void fileEditor.commands.execute('fs.move', { nodeId, newParentId, afterNodeId });
+  }, [fileEditor.commands]);
+
+  // Keep stable refs for FileExplorer props to avoid recreating plugins on every tree/tab change
+  const fsTreeRef = useRef(fsTree);
+  fsTreeRef.current = fsTree;
+  const tabSnapshotRef = useRef(tabSnapshot);
+  tabSnapshotRef.current = tabSnapshot;
+  const handleOpenFileFromTreeRef = useRef(handleOpenFileFromTree);
+  handleOpenFileFromTreeRef.current = handleOpenFileFromTree;
+  const handleCreateFileRef = useRef(handleCreateFile);
+  handleCreateFileRef.current = handleCreateFile;
+  const handleCreateDirectoryRef = useRef(handleCreateDirectory);
+  handleCreateDirectoryRef.current = handleCreateDirectory;
+  const handleDeleteNodeRef = useRef(handleDeleteNode);
+  handleDeleteNodeRef.current = handleDeleteNode;
+  const handleRenameNodeRef = useRef(handleRenameNode);
+  handleRenameNodeRef.current = handleRenameNode;
+  const handleMoveNodeRef = useRef(handleMoveNode);
+  handleMoveNodeRef.current = handleMoveNode;
+  const refreshFsTreeRef = useRef(refreshFsTree);
+  refreshFsTreeRef.current = refreshFsTree;
+  const dirtyFileIdsRef = useRef(dirtyFileIds);
+  dirtyFileIdsRef.current = dirtyFileIds;
+  const handleCloseTabRef = useRef(handleCloseTab);
+  handleCloseTabRef.current = handleCloseTab;
+
   const plugins = useMemo(() => {
     const registeredPlugins = [
       defineEditorPlugin({
@@ -380,11 +556,66 @@ export function App() {
         getAvailableComponents: () => builtinContracts,
       }),
     ];
-    if (appMode === 'shell' && filesSidebarTabOptions) {
+
+    // VFS-based file explorer in shell mode (render function uses refs for live data)
+    if (appMode === 'shell' && vfsInitialized) {
+      registeredPlugins.push(defineEditorPlugin({
+        id: 'shenbi.plugin.files',
+        name: 'Files Plugin',
+        contributes: {
+          sidebarTabs: [
+            {
+              id: 'files',
+              label: 'Files',
+              order: 35,
+              render: () => (
+                <FileExplorer
+                  tree={fsTreeRef.current}
+                  activeFileId={tabSnapshotRef.current.activeTabId}
+                  dirtyFileIds={dirtyFileIdsRef.current}
+                  onOpenFile={handleOpenFileFromTreeRef.current}
+                  onCreateFile={handleCreateFileRef.current}
+                  onCreateDirectory={handleCreateDirectoryRef.current}
+                  onDeleteNode={handleDeleteNodeRef.current}
+                  onRenameNode={handleRenameNodeRef.current}
+                  onRefresh={refreshFsTreeRef.current}
+                  onMoveNode={handleMoveNodeRef.current}
+                />
+              ),
+            },
+          ],
+          commands: [
+            {
+              id: 'files.closeActiveTab',
+              title: '关闭当前标签页',
+              category: 'Files',
+              execute: () => {
+                const activeId = tabSnapshotRef.current.activeTabId;
+                if (activeId) handleCloseTabRef.current(activeId);
+              },
+            },
+          ],
+          shortcuts: [
+            {
+              id: 'files.closeActiveTab.shortcut',
+              commandId: 'files.closeActiveTab',
+              keybinding: 'Ctrl+W',
+              when: 'editorFocused && !inputFocused',
+            },
+          ],
+        },
+      }));
+    } else if (appMode === 'shell' && filesSidebarTabOptions) {
+      // Fallback to legacy file panel if VFS not ready
       registeredPlugins.push(createFilesPlugin(filesSidebarTabOptions));
     }
     return registeredPlugins;
-  }, [appMode, filesSidebarTabOptions, handleResetWorkspace]);
+  }, [
+    appMode,
+    filesSidebarTabOptions,
+    handleResetWorkspace,
+    vfsInitialized,
+  ]);
 
   const handleCanvasSelectNode = (schemaNodeId: string) => {
     selectSchemaNode(schemaNodeId);
@@ -446,10 +677,18 @@ export function App() {
         ...(selectedContract ? { contract: selectedContract } : {}),
       }}
       plugins={plugins}
-      pluginContext={pluginContext}
+      pluginContext={enhancedPluginContext}
       onCanvasSelectNode={handleCanvasSelectNode}
       schemaName={activeSchema.name}
       breadcrumbItems={breadcrumbItems}
+      tabs={appMode === 'shell' && tabSnapshot.tabs.length > 0 ? tabSnapshot.tabs : undefined}
+      activeTabId={tabSnapshot.activeTabId}
+      onActivateTab={handleActivateTab}
+      onCloseTab={handleCloseTab}
+      onCloseOtherTabs={handleCloseOtherTabs}
+      onCloseAllTabs={handleCloseAllTabs}
+      onCloseSavedTabs={handleCloseSavedTabs}
+      onMoveTab={handleMoveTab}
       toolbarExtra={(
         <div className="flex items-center gap-2">
           <span className="text-text-secondary" style={{ fontSize: '11px' }}>模式</span>
@@ -491,7 +730,7 @@ export function App() {
                 className="max-w-[220px] truncate text-text-secondary"
                 style={{ fontSize: '11px' }}
               >
-                {activeFileName ?? '未命名页面'}
+                {activeFileName ?? (tabSnapshot.activeTabId ? tabSnapshot.tabs.find((t) => t.fileId === tabSnapshot.activeTabId)?.fileName : '未命名页面')}
                 {isDirty ? ' *' : ''}
               </span>
               <button

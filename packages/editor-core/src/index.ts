@@ -6,3 +6,7 @@ export * from './history';
 export * from './command';
 export * from './create-editor';
 export * from './adapters/file-storage';
+export * from './adapters/virtual-fs';
+export * from './adapters/indexeddb-fs';
+export * from './adapters/fs-tree-utils';
+export * from './tab-manager';

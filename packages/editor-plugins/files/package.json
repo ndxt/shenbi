@@ -20,7 +20,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@shenbi/editor-plugin-api": "workspace:*"
+    "@shenbi/editor-core": "workspace:*",
+    "@shenbi/editor-plugin-api": "workspace:*",
+    "lucide-react": "^0.575.0"
   },
   "peerDependencies": {
     "react": "^19.0.0",

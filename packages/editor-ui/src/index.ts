@@ -20,6 +20,7 @@ export * from './hooks/useShellModeUrl';
 export * from './hooks/useEditorSession';
 export * from './hooks/useScenarioSession';
 export * from './hooks/useEditorHostBridge';
+export * from './hooks/useTabManager';
 
 export * from './ai/editor-ai-bridge';
 export * from './ai/useEditorAIBridge';

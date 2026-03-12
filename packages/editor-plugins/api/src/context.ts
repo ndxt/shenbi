@@ -42,6 +42,12 @@ export interface PluginDocumentService {
   subscribe?: (listener: (schema: PageSchema) => void) => () => void;
 }
 
+export interface PluginFileSystemService {
+  createFile(name: string, fileType: string, content: Record<string, unknown>, parentId?: string): Promise<string>;
+  readFile(fileId: string): Promise<Record<string, unknown>>;
+  writeFile(fileId: string, content: Record<string, unknown>): Promise<void>;
+}
+
 export interface PluginContext {
   commands?: PluginCommandService;
   document?: PluginDocumentService;
@@ -49,6 +55,7 @@ export interface PluginContext {
   workspace?: PluginWorkspaceService;
   persistence?: PluginPersistenceService;
   notifications?: PluginNotifications;
+  filesystem?: PluginFileSystemService;
 
   // Backward-compatible aliases during migration.
   /** @deprecated Use document.getSchema instead. */
