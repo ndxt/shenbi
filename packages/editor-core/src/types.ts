@@ -25,7 +25,7 @@ export interface EditorEventMap {
   'plugin:activated': { pluginId: string };
   'file:currentChanged': { fileId?: string };
   'file:opened': { fileId: string };
-  'file:saved': { fileId: string };
+  'file:saved': { fileId: string; source?: 'manual' | 'auto' };
 
   // File system events
   'fs:nodeCreated': { node: FSNodeMetadata };

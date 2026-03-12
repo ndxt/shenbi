@@ -6,7 +6,7 @@ import { History } from './history';
 import type { EditorEventMap, EditorStateSnapshot } from './types';
 import { LocalFileStorageAdapter, type FileStorageAdapter, type FileType } from './adapters/file-storage';
 import type { VirtualFileSystemAdapter } from './adapters/virtual-fs';
-import { TabManager } from './tab-manager';
+import { TabManager, type TabState } from './tab-manager';
 import {
   appendSchemaNode,
   insertSchemaNodeAt,
@@ -96,6 +96,44 @@ function extractRestoreArgs(args: unknown): { schema: PageSchema; isDirty?: bool
     return { schema, isDirty: args.isDirty };
   }
   return { schema };
+}
+
+function extractEditorSnapshotArgs(args: unknown): EditorStateSnapshot {
+  if (!isRecord(args) || !isRecord(args.snapshot)) {
+    throw new Error('editor.restoreSnapshot expects args: { snapshot }');
+  }
+  const snapshot = args.snapshot;
+  if (!('schema' in snapshot)) {
+    throw new Error('editor.restoreSnapshot expects args: { snapshot }');
+  }
+
+  const schema = snapshot.schema;
+  validatePageSchema(schema);
+
+  if (snapshot.selectedNodeId !== undefined && typeof snapshot.selectedNodeId !== 'string') {
+    throw new Error('editor.restoreSnapshot expects snapshot.selectedNodeId to be a string');
+  }
+
+  if (snapshot.currentFileId !== undefined && typeof snapshot.currentFileId !== 'string') {
+    throw new Error('editor.restoreSnapshot expects snapshot.currentFileId to be a string');
+  }
+
+  if (typeof snapshot.isDirty !== 'boolean') {
+    throw new Error('editor.restoreSnapshot expects snapshot.isDirty to be a boolean');
+  }
+
+  return {
+    schema,
+    ...(typeof snapshot.selectedNodeId === 'string'
+      ? { selectedNodeId: snapshot.selectedNodeId }
+      : {}),
+    ...(typeof snapshot.currentFileId === 'string'
+      ? { currentFileId: snapshot.currentFileId }
+      : {}),
+    isDirty: snapshot.isDirty,
+    canUndo: false,
+    canRedo: false,
+  };
 }
 
 function extractFileIdFromArgs(args: unknown): string {
@@ -213,6 +251,23 @@ function registerBuiltinCommands(
         }
       }
       eventBus.emit('schema:changed', { schema });
+    },
+  });
+
+  commands.register({
+    id: 'editor.restoreSnapshot',
+    label: 'Restore Editor Snapshot',
+    recordHistory: false,
+    execute(currentState, args) {
+      const snapshot = extractEditorSnapshotArgs(args);
+      const previousFileId = currentState.getCurrentFileId();
+      currentState.restoreSnapshot(snapshot);
+      history.clear(currentState.getSnapshot());
+      currentState.setHistoryFlags(history.canUndo(), history.canRedo());
+      if (previousFileId !== snapshot.currentFileId) {
+        eventBus.emit('file:currentChanged', snapshot.currentFileId ? { fileId: snapshot.currentFileId } : {});
+      }
+      eventBus.emit('schema:changed', { schema: snapshot.schema });
     },
   });
 
@@ -660,14 +715,32 @@ function registerVFSCommands(
 }
 
 function registerTabCommands(
-  state: EditorState,
-  history: History<EditorStateSnapshot>,
   commands: CommandManager,
   eventBus: EventBus<EditorEventMap>,
   tabManager: TabManager,
   vfs?: VirtualFileSystemAdapter,
   projectId?: string,
 ): void {
+  const restoreEditorForTab = async (tab: TabState): Promise<void> => {
+    await commands.execute('editor.restoreSnapshot', {
+      snapshot: {
+        schema: tab.schema,
+        currentFileId: tab.fileId,
+        isDirty: tab.isDirty,
+        ...(tab.selectedNodeId ? { selectedNodeId: tab.selectedNodeId } : {}),
+      },
+    });
+  };
+
+  const restoreEmptyEditor = async (): Promise<void> => {
+    await commands.execute('editor.restoreSnapshot', {
+      snapshot: {
+        schema: createEmptySchema(),
+        isDirty: false,
+      },
+    });
+  };
+
   commands.register({
     id: 'tab.open',
     label: 'Open Tab',
@@ -691,13 +764,7 @@ function registerTabCommands(
         }
 
         tabManager.activateTab(fileId);
-        // Restore tab state to editor
-        await commands.execute('schema.restore', {
-          schema: existingTab.schema,
-          isDirty: existingTab.isDirty,
-        });
-        history.clear(state.getSnapshot());
-        currentState.setCurrentFileId(fileId);
+        await restoreEditorForTab(existingTab);
         eventBus.emit('tab:activated', { fileId });
         return;
       }
@@ -734,10 +801,14 @@ function registerTabCommands(
         isDirty: false,
       });
 
-      // Restore schema to editor
-      await commands.execute('schema.restore', { schema, isDirty: false });
-      history.clear(state.getSnapshot());
-      currentState.setCurrentFileId(fileId);
+      await restoreEditorForTab({
+        fileId,
+        filePath: node.path,
+        fileType: node.fileType ?? 'page',
+        fileName: node.name,
+        schema,
+        isDirty: false,
+      });
       eventBus.emit('tab:opened', { fileId });
       eventBus.emit('tab:activated', { fileId });
     },
@@ -760,19 +831,10 @@ function registerTabCommands(
       if (wasActive) {
         const nextTab = tabManager.getActiveTab();
         if (nextTab) {
-          await commands.execute('schema.restore', {
-            schema: nextTab.schema,
-            isDirty: nextTab.isDirty,
-          });
-          history.clear(state.getSnapshot());
-          currentState.setCurrentFileId(nextTab.fileId);
+          await restoreEditorForTab(nextTab);
           eventBus.emit('tab:activated', { fileId: nextTab.fileId });
         } else {
-          // No tabs left, reset to empty
-          const emptySchema: PageSchema = { id: 'page', name: 'page', body: [] };
-          await commands.execute('schema.restore', { schema: emptySchema, isDirty: false });
-          history.clear(state.getSnapshot());
-          currentState.setCurrentFileId(undefined);
+          await restoreEmptyEditor();
         }
       }
     },
@@ -801,12 +863,7 @@ function registerTabCommands(
       }
 
       tabManager.activateTab(fileId);
-      await commands.execute('schema.restore', {
-        schema: tab.schema,
-        isDirty: tab.isDirty,
-      });
-      history.clear(state.getSnapshot());
-      currentState.setCurrentFileId(fileId);
+      await restoreEditorForTab(tab);
       eventBus.emit('tab:activated', { fileId });
     },
   });
@@ -844,12 +901,7 @@ function registerTabCommands(
       if (currentActiveId !== fileId) {
         const tab = tabManager.getTab(fileId);
         if (tab) {
-          await commands.execute('schema.restore', {
-            schema: tab.schema,
-            isDirty: tab.isDirty,
-          });
-          history.clear(state.getSnapshot());
-          currentState.setCurrentFileId(fileId);
+          await restoreEditorForTab(tab);
           eventBus.emit('tab:activated', { fileId });
         }
       }
@@ -866,10 +918,45 @@ function registerTabCommands(
       for (const closedId of closedIds) {
         eventBus.emit('tab:closed', { fileId: closedId });
       }
-      const emptySchema: PageSchema = { id: 'page', name: 'page', body: [] };
-      await commands.execute('schema.restore', { schema: emptySchema, isDirty: false });
-      history.clear(state.getSnapshot());
-      currentState.setCurrentFileId(undefined);
+      await restoreEmptyEditor();
+    },
+  });
+
+  commands.register({
+    id: 'tab.closeSaved',
+    label: 'Close Saved Tabs',
+    recordHistory: false,
+    async execute(currentState) {
+      const currentActiveTab = tabManager.getActiveTab();
+      if (currentActiveTab) {
+        tabManager.updateTab(currentActiveTab.fileId, {
+          schema: currentState.getSchema(),
+          selectedNodeId: currentState.getSnapshot().selectedNodeId,
+          isDirty: currentState.getSnapshot().isDirty,
+        });
+      }
+
+      const previousActiveId = tabManager.getActiveTabId();
+      const closedIds = tabManager.getTabs()
+        .filter((tab) => !tab.isDirty)
+        .map((tab) => tab.fileId);
+
+      tabManager.closeSavedTabs();
+
+      for (const closedId of closedIds) {
+        eventBus.emit('tab:closed', { fileId: closedId });
+      }
+
+      const nextActiveTab = tabManager.getActiveTab();
+      if (!nextActiveTab) {
+        await restoreEmptyEditor();
+        return;
+      }
+
+      if (nextActiveTab.fileId !== previousActiveId) {
+        await restoreEditorForTab(nextActiveTab);
+        eventBus.emit('tab:activated', { fileId: nextActiveTab.fileId });
+      }
     },
   });
 
@@ -877,21 +964,24 @@ function registerTabCommands(
     id: 'tab.save',
     label: 'Save Current Tab',
     recordHistory: false,
-    async execute(currentState) {
+    async execute(currentState, args) {
       const activeTab = tabManager.getActiveTab();
-      if (!activeTab) return;
+      if (!activeTab) {
+        throw new Error('No active tab to save');
+      }
 
       if (!vfs || !projectId) {
         throw new Error('VFS not configured, cannot save tab');
       }
 
+      const source = isRecord(args) && args.source === 'auto' ? 'auto' : 'manual';
       const schema = currentState.getSchema();
       await vfs.writeFile(projectId, activeTab.fileId, schema);
       tabManager.updateTab(activeTab.fileId, { schema });
       tabManager.markDirty(activeTab.fileId, false);
       currentState.setDirty(false);
       eventBus.emit('tab:dirtyChanged', { fileId: activeTab.fileId, isDirty: false });
-      eventBus.emit('file:saved', { fileId: activeTab.fileId });
+      eventBus.emit('file:saved', { fileId: activeTab.fileId, source });
     },
   });
 }
@@ -915,8 +1005,33 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
 
   const tabManager = options.tabManager;
   if (tabManager) {
-    registerTabCommands(state, history, commands, eventBus, tabManager, options.vfs, options.projectId);
+    registerTabCommands(commands, eventBus, tabManager, options.vfs, options.projectId);
   }
+
+  const unsubscribeState = tabManager
+    ? state.subscribe((snapshot) => {
+      const activeTabId = tabManager.getActiveTabId();
+      if (!activeTabId) {
+        return;
+      }
+      const activeTab = tabManager.getTab(activeTabId);
+      if (!activeTab) {
+        return;
+      }
+      if (
+        activeTab.schema === snapshot.schema
+        && activeTab.selectedNodeId === snapshot.selectedNodeId
+        && activeTab.isDirty === snapshot.isDirty
+      ) {
+        return;
+      }
+      tabManager.updateTab(activeTabId, {
+        schema: snapshot.schema,
+        selectedNodeId: snapshot.selectedNodeId,
+        isDirty: snapshot.isDirty,
+      });
+    })
+    : undefined;
 
   return {
     state,
@@ -925,6 +1040,7 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
     eventBus,
     tabManager,
     destroy() {
+      unsubscribeState?.();
       eventBus.clear();
     },
   };

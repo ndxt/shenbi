@@ -12,6 +12,7 @@ import {
   ChevronsDownUp,
   Trash2,
   Pencil,
+  Save,
   Database,
   Workflow,
   BookOpen,
@@ -22,6 +23,13 @@ export interface FileExplorerProps {
   tree: FSTreeNode[];
   activeFileId: string | undefined;
   dirtyFileIds?: Set<string> | undefined;
+  statusText?: string | undefined;
+  canSaveActiveFile?: boolean | undefined;
+  onSaveActiveFile?: (() => void) | undefined;
+  initialExpandedIds?: string[] | undefined;
+  initialFocusedId?: string | undefined;
+  onExpandedIdsChange?: ((expandedIds: string[]) => void) | undefined;
+  onFocusedIdChange?: ((focusedId: string | undefined) => void) | undefined;
   onOpenFile: (fileId: string) => void;
   onCreateFile: (parentId: string | null, name: string, fileType: FileType) => void;
   onCreateDirectory: (parentId: string | null, name: string) => void;
@@ -382,6 +390,13 @@ export function FileExplorer({
   tree,
   activeFileId,
   dirtyFileIds,
+  statusText,
+  canSaveActiveFile,
+  onSaveActiveFile,
+  initialExpandedIds,
+  initialFocusedId,
+  onExpandedIdsChange,
+  onFocusedIdChange,
   onOpenFile,
   onCreateFile,
   onCreateDirectory,
@@ -390,10 +405,10 @@ export function FileExplorer({
   onRefresh,
   onMoveNode,
 }: FileExplorerProps) {
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(initialExpandedIds ?? []));
   const [renamingId, setRenamingId] = useState<string | undefined>();
   const [creating, setCreating] = useState<CreatingState | null>(null);
-  const [focusedId, setFocusedId] = useState<string | undefined>();
+  const [focusedId, setFocusedId] = useState<string | undefined>(initialFocusedId);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     open: false, x: 0, y: 0, node: null, targetParentId: null,
   });
@@ -429,6 +444,48 @@ export function FileExplorer({
     walk(tree, null);
     return map;
   }, [tree]);
+
+  useEffect(() => {
+    setExpandedIds(new Set(initialExpandedIds ?? []));
+  }, [initialExpandedIds]);
+
+  useEffect(() => {
+    setFocusedId(initialFocusedId);
+  }, [initialFocusedId]);
+
+  useEffect(() => {
+    onExpandedIdsChange?.([...expandedIds]);
+  }, [expandedIds, onExpandedIdsChange]);
+
+  useEffect(() => {
+    onFocusedIdChange?.(focusedId);
+  }, [focusedId, onFocusedIdChange]);
+
+  useEffect(() => {
+    if (!activeFileId) {
+      return;
+    }
+    const ancestorIds: string[] = [];
+    let cursor = parentLookup.get(activeFileId) ?? null;
+    while (cursor) {
+      ancestorIds.push(cursor);
+      cursor = parentLookup.get(cursor) ?? null;
+    }
+    if (ancestorIds.length === 0) {
+      return;
+    }
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const id of ancestorIds) {
+        if (!next.has(id)) {
+          next.add(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [activeFileId, parentLookup]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -800,6 +857,15 @@ export function FileExplorer({
         <span className="text-[11px] text-text-secondary font-medium uppercase tracking-wide flex-1">文件</span>
         <button
           type="button"
+          className="p-1 rounded hover:bg-bg-activity-bar text-text-secondary hover:text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          title="保存当前文件"
+          onClick={onSaveActiveFile}
+          disabled={!canSaveActiveFile || !onSaveActiveFile}
+        >
+          <Save size={14} />
+        </button>
+        <button
+          type="button"
           className="p-1 rounded hover:bg-bg-activity-bar text-text-secondary hover:text-text-primary transition-colors"
           title="新建文件"
           onClick={() => startCreating(null, 'file')}
@@ -830,6 +896,9 @@ export function FileExplorer({
         >
           <ChevronsDownUp size={14} />
         </button>
+      </div>
+      <div className="px-2 py-1 border-b border-border-ide text-[11px] text-text-secondary">
+        {statusText ?? '无活动文件'}
       </div>
 
       {/* Tree */}

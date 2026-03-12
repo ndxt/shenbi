@@ -106,6 +106,24 @@ export class TabManager {
     };
   }
 
+  restoreSnapshot(snapshot: TabManagerSnapshot): void {
+    this.tabs.clear();
+    this.tabOrder = [];
+
+    for (const tab of snapshot.tabs) {
+      this.tabs.set(tab.fileId, { ...tab });
+      this.tabOrder.push(tab.fileId);
+    }
+
+    if (snapshot.activeTabId && this.tabs.has(snapshot.activeTabId)) {
+      this.activeTabId = snapshot.activeTabId;
+    } else {
+      this.activeTabId = this.tabOrder[0];
+    }
+
+    this.notify();
+  }
+
   closeOtherTabs(fileId: string): void {
     const idsToClose = this.tabOrder.filter((id) => id !== fileId);
     for (const id of idsToClose) {

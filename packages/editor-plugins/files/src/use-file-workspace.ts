@@ -151,6 +151,24 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
   }, [refreshFiles, reportError]);
 
   const handleSave = useCallback(() => {
+    if (mode === 'shell') {
+      if (!activeFileIdRef.current) {
+        const message = '请先从文件树创建或打开文件';
+        setFileStatus(message);
+        onErrorRef.current?.(message);
+        return;
+      }
+      void commandsRef.current.execute('tab.save')
+        .then(() => {
+          setFileStatus(`已保存: ${activeFileIdRef.current}`);
+          refreshFiles();
+        })
+        .catch((error) => {
+          reportError('保存失败', error);
+        });
+      return;
+    }
+
     if (!activeFileIdRef.current) {
       requestSaveAs();
       return;
@@ -163,7 +181,7 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       .catch((error) => {
         reportError('保存失败', error);
       });
-  }, [refreshFiles, reportError, requestSaveAs]);
+  }, [mode, refreshFiles, reportError, requestSaveAs]);
 
   const handleSaveAs = useCallback(() => {
     requestSaveAs();
