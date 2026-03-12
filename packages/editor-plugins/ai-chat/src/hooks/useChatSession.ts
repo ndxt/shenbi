@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { PluginPersistenceService } from '@shenbi/editor-plugin-api';
 import type { RunMetadata } from '../ai/api-types';
+import type { LastRunResult } from './useAgentRun';
 
 const PERSISTENCE_NAMESPACE = 'ai-chat';
 const PERSISTENCE_KEY = 'session';
@@ -10,6 +11,8 @@ export interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
     content: string;
     timestamp: number;
+    /** When present, this message represents a completed run result card. */
+    runResult?: LastRunResult | undefined;
 }
 
 export function useChatSession(persistence?: PluginPersistenceService) {
@@ -84,6 +87,17 @@ export function useChatSession(persistence?: PluginPersistenceService) {
         );
     }, []);
 
+    /** Remove the runResult data from a specific message (dismiss the card). */
+    const dismissRunResult = useCallback((messageId: string) => {
+        setMessages((prev) =>
+            prev.map((m) => {
+                if (m.id !== messageId) return m;
+                const { runResult: _, ...rest } = m;
+                return rest;
+            })
+        );
+    }, []);
+
     const resetSession = useCallback(() => {
         setMessages([]);
         setConversationId(undefined);
@@ -96,6 +110,7 @@ export function useChatSession(persistence?: PluginPersistenceService) {
         messages,
         addMessage,
         updateMessage,
+        dismissRunResult,
         conversationId,
         setConversationId,
         activeRunId,

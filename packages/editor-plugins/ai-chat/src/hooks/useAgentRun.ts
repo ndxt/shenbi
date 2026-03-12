@@ -29,6 +29,9 @@ export interface LastRunResult {
   elapsedMs: number;
   statusLabel: string;
   tokensUsed?: number;
+  durationMs?: number;
+  debugFile?: string;
+  memoryDebugFile?: string;
 }
 
 
@@ -291,6 +294,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             onDone: (metadata: RunMetadata) => void,
             onError: (err: string) => void,
             blockConcurrency?: number,
+            onRunComplete?: (result: LastRunResult) => void,
         ) => {
             if (!bridgeRef.current) return;
             if (isRunningRef.current) return;
@@ -613,22 +617,30 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             setProgressText(modifyFailed ? '页面修改失败，已回滚' : '页面修改已应用');
                             break;
                         case 'done':
-                            setLastRunResult({
-                                plan: localPlan,
-                                plannerMetrics: localPlannerMetrics,
-                                blockStatuses: { ...localBlockStatuses },
-                                blockTokens: { ...localBlockTokens },
-                                blockInputTokens: { ...localBlockInputTokens },
-                                blockOutputTokens: { ...localBlockOutputTokens },
-                                blockDurationMs: { ...localBlockDurationMs },
-                                modifyPlan: localModifyPlan,
-                                modifyStatuses: { ...localModifyStatuses },
-                                modifyOpMetrics: { ...localModifyOpMetrics },
-                                elapsedMs: Date.now() - startTimeRef.current,
-                                statusLabel: localModifyPlan ? '页面修改已应用' : '页面生成完成',
-                                ...(typeof event.data.metadata.tokensUsed === 'number' ? { tokensUsed: event.data.metadata.tokensUsed } : {}),
-                            });
-                            onDone(await finalizeModifyRun(event.data.metadata));
+                            {
+                                const finalizedMetadata = await finalizeModifyRun(event.data.metadata);
+                                const runResult: LastRunResult = {
+                                    plan: localPlan,
+                                    plannerMetrics: localPlannerMetrics,
+                                    blockStatuses: { ...localBlockStatuses },
+                                    blockTokens: { ...localBlockTokens },
+                                    blockInputTokens: { ...localBlockInputTokens },
+                                    blockOutputTokens: { ...localBlockOutputTokens },
+                                    blockDurationMs: { ...localBlockDurationMs },
+                                    modifyPlan: localModifyPlan,
+                                    modifyStatuses: { ...localModifyStatuses },
+                                    modifyOpMetrics: { ...localModifyOpMetrics },
+                                    elapsedMs: Date.now() - startTimeRef.current,
+                                    statusLabel: localModifyPlan ? '页面修改已应用' : '页面生成完成',
+                                    ...(typeof finalizedMetadata.tokensUsed === 'number' ? { tokensUsed: finalizedMetadata.tokensUsed } : {}),
+                                    ...(typeof finalizedMetadata.durationMs === 'number' ? { durationMs: finalizedMetadata.durationMs } : {}),
+                                    ...(finalizedMetadata.debugFile ? { debugFile: finalizedMetadata.debugFile } : {}),
+                                    ...(finalizedMetadata.memoryDebugFile ? { memoryDebugFile: finalizedMetadata.memoryDebugFile } : {}),
+                                };
+                                setLastRunResult(runResult);
+                                onRunComplete?.(runResult);
+                                onDone(finalizedMetadata);
+                            }
                             break;
                         case 'error':
                             throw new Error(event.data.message);

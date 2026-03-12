@@ -99,10 +99,32 @@ export function createEditorAIBridge(options: EditorAIBridgeOptions): EditorAIBr
 export function createEditorAIBridgeFromPluginContext(
   options: EditorAIBridgeFromPluginContextOptions,
 ): EditorAIBridge {
+  // Local cache: the editor host may not reflect replaced schema immediately.
+  // When the host still reports an empty body, return the cached version instead.
+  let lastReplacedSchema: PageSchema | undefined;
+
+  function hasBody(schema: PageSchema | undefined): boolean {
+    if (!schema) return false;
+    const body = schema.body;
+    return Array.isArray(body) ? body.length > 0 : Boolean(body);
+  }
+
   const getSnapshot = (): EditorBridgeSnapshot => {
+    const hostSchema = getPluginSchema(options.context);
     const selectedNodeId = getPluginSelectedNodeId(options.context);
+
+    // Prefer host schema when it has content; fall back to cache when host is empty.
+    let schema: PageSchema;
+    if (hostSchema && hasBody(hostSchema)) {
+      schema = hostSchema;
+    } else if (lastReplacedSchema && hasBody(lastReplacedSchema)) {
+      schema = lastReplacedSchema;
+    } else {
+      schema = hostSchema ?? { id: 'plugin-empty-page', body: [] };
+    }
+
     return {
-      schema: getPluginSchema(options.context) ?? { id: 'plugin-empty-page', body: [] },
+      schema,
       ...(selectedNodeId ? { selectedNodeId } : {}),
     };
   };
@@ -136,12 +158,22 @@ export function createEditorAIBridgeFromPluginContext(
   return createEditorAIBridge({
     getSnapshot,
     replaceSchema: (schema) => {
+      lastReplacedSchema = schema;
       if (replacePluginSchema(options.context, schema)) {
         return;
       }
     },
     execute: async (commandId, args) => {
       try {
+        // Track schema replacements through the command path as well.
+        if (commandId === 'schema.replace' && args && typeof args === 'object' && 'schema' in args) {
+          lastReplacedSchema = (args as { schema: PageSchema }).schema;
+        }
+        // Clear cache on document reset.
+        if (commandId === 'workspace.resetDocument') {
+          lastReplacedSchema = undefined;
+        }
+
         const hasCommandHandler = Boolean(options.context.commands?.execute || options.context.executeCommand);
         if (hasCommandHandler) {
           await executePluginCommand(options.context, commandId, args);
