@@ -404,7 +404,7 @@ export function AIPanel({
             )}
             {/* Block list (create-page) */}
             {currentPlan && (
-              <div className="border-t border-border-ide pt-1">
+              <div className="border-t border-border-ide pt-1.5 pb-1.5">
                 <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {currentPlan.blocks.map((b) => (
                     <OpRow
@@ -420,7 +420,7 @@ export function AIPanel({
             )}
             {/* Modify op list */}
             {modifyPlan && (
-              <div className="border-t border-border-ide pt-1">
+              <div className="border-t border-border-ide pt-1.5 pb-1.5">
                 <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
                     <OpRow
@@ -462,7 +462,7 @@ export function AIPanel({
             )}
             {/* Block list (create-page) */}
             {lastRunResult.plan && (
-              <div className="border-t border-border-ide pt-1.5">
+              <div className="border-t border-border-ide pt-1.5 pb-1.5">
                 <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {lastRunResult.plan.blocks.map((b) => (
                     <OpRow
@@ -477,7 +477,7 @@ export function AIPanel({
             )}
             {/* Modify op list */}
             {lastRunResult.modifyPlan && (
-              <div className="border-t border-border-ide pt-1.5">
+              <div className="border-t border-border-ide pt-1.5 pb-1.5">
                 <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {Array.from({ length: lastRunResult.modifyPlan.operationCount }, (_, i) => (
                     <OpRow
@@ -505,7 +505,7 @@ export function AIPanel({
               ].reduce((a, b) => a + b, 0);
               const hasTokenInfo = totalInput > 0 || totalOutput > 0;
               return (
-                <div className="border-t border-border-ide pt-1 flex items-center gap-2 px-1" style={{ fontSize: '10px' }}>
+                <div className="border-t border-border-ide pt-2 flex items-center gap-2 px-1" style={{ fontSize: '10px' }}>
                   <span className="text-text-secondary opacity-70 flex-1">合计</span>
                   <span className="text-text-secondary font-mono tabular-nums">{(lastRunResult.elapsedMs / 1000).toFixed(1)}s</span>
                   {hasTokenInfo && (
