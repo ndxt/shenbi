@@ -17,8 +17,12 @@ export interface ModifyPlan {
 
 export interface LastRunResult {
   plan: PlanConfig | null;
+  plannerMetrics: AgentOperationMetrics | null;
   blockStatuses: Record<string, BlockRunStatus>;
   blockTokens: Record<string, number>;
+  blockInputTokens: Record<string, number>;
+  blockOutputTokens: Record<string, number>;
+  blockDurationMs: Record<string, number>;
   modifyPlan: ModifyPlan | null;
   modifyStatuses: Record<number, BlockRunStatus>;
   modifyOpMetrics: Record<number, AgentOperationMetrics>;
@@ -167,6 +171,10 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
     const [modifyOpMetrics, setModifyOpMetrics] = useState<Record<number, AgentOperationMetrics>>({});
     const [elapsedMs, setElapsedMs] = useState(0);
     const [blockTokens, setBlockTokens] = useState<Record<string, number>>({});
+    const [blockInputTokens, setBlockInputTokens] = useState<Record<string, number>>({});
+    const [blockOutputTokens, setBlockOutputTokens] = useState<Record<string, number>>({});
+    const [blockDurationMs, setBlockDurationMs] = useState<Record<string, number>>({});
+    const [plannerMetrics, setPlannerMetrics] = useState<AgentOperationMetrics | null>(null);
     const [lastRunResult, setLastRunResult] = useState<LastRunResult | null>(null);
     const startTimeRef = useRef<number>(0);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -295,6 +303,10 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             setModifyOpMetrics({});
             setElapsedMs(0);
             setBlockTokens({});
+            setBlockInputTokens({});
+            setBlockOutputTokens({});
+            setBlockDurationMs({});
+            setPlannerMetrics(null);
             startTimeRef.current = Date.now();
             currentIntentRef.current = null;
 
@@ -384,8 +396,12 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                 const stream = aiClient.runStream(request, { signal: ac.signal });
                 // Local tracking for lastRunResult snapshot
                 let localPlan: PlanConfig | null = null;
+                let localPlannerMetrics: AgentOperationMetrics | null = null;
                 const localBlockStatuses: Record<string, BlockRunStatus> = {};
                 const localBlockTokens: Record<string, number> = {};
+                const localBlockInputTokens: Record<string, number> = {};
+                const localBlockOutputTokens: Record<string, number> = {};
+                const localBlockDurationMs: Record<string, number> = {};
                 let localModifyPlan: ModifyPlan | null = null;
                 const localModifyStatuses: Record<number, BlockRunStatus> = {};
                 const localModifyOpMetrics: Record<number, AgentOperationMetrics> = {};
@@ -425,6 +441,11 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             break;
                         case 'plan':
                             localPlan = event.data as PlanConfig;
+                            if ('_plannerMetrics' in event.data && event.data._plannerMetrics) {
+                                const m = event.data._plannerMetrics as AgentOperationMetrics;
+                                localPlannerMetrics = m;
+                                setPlannerMetrics(m);
+                            }
                             setCurrentPlan(event.data);
                             setBlockStatuses(
                                 Object.fromEntries(event.data.blocks.map((block) => [block.id, 'waiting' as const]))
@@ -476,6 +497,18 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     ...prev,
                                     [event.data.blockId]: event.data.tokensUsed as number,
                                 }));
+                            }
+                            if (typeof event.data.inputTokens === 'number') {
+                                localBlockInputTokens[event.data.blockId] = event.data.inputTokens;
+                                setBlockInputTokens((prev) => ({ ...prev, [event.data.blockId]: event.data.inputTokens as number }));
+                            }
+                            if (typeof event.data.outputTokens === 'number') {
+                                localBlockOutputTokens[event.data.blockId] = event.data.outputTokens;
+                                setBlockOutputTokens((prev) => ({ ...prev, [event.data.blockId]: event.data.outputTokens as number }));
+                            }
+                            if (typeof event.data.durationMs === 'number') {
+                                localBlockDurationMs[event.data.blockId] = event.data.durationMs;
+                                setBlockDurationMs((prev) => ({ ...prev, [event.data.blockId]: event.data.durationMs as number }));
                             }
                             break;
                         case 'schema:done':
@@ -578,8 +611,12 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                         case 'done':
                             setLastRunResult({
                                 plan: localPlan,
+                                plannerMetrics: localPlannerMetrics,
                                 blockStatuses: { ...localBlockStatuses },
                                 blockTokens: { ...localBlockTokens },
+                                blockInputTokens: { ...localBlockInputTokens },
+                                blockOutputTokens: { ...localBlockOutputTokens },
+                                blockDurationMs: { ...localBlockDurationMs },
                                 modifyPlan: localModifyPlan,
                                 modifyStatuses: { ...localModifyStatuses },
                                 modifyOpMetrics: { ...localModifyOpMetrics },
@@ -624,6 +661,10 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         modifyOpMetrics,
         elapsedMs,
         blockTokens,
+        blockInputTokens,
+        blockOutputTokens,
+        blockDurationMs,
+        plannerMetrics,
         lastRunResult,
         setLastRunResult,
         runAgent,

@@ -1506,7 +1506,7 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
     provider: blockModelRef.provider ?? env.AI_PROVIDER,
     ...client.buildRequestDebugSummary(model, messages, thinking, false),
   };
-  const { content: text, tokensUsed } = await client.chat(model, messages, thinking);
+  const { content: text, tokensUsed, inputTokens: blockInput, outputTokens: blockOutput, durationMs: blockDuration } = await client.chat(model, messages, thinking);
   const rawNode = extractJson<GenerateBlockResult['node']>(text, 'block', input.request, model);
   const { node, diagnostics } = validateGeneratedBlockNodeWithDiagnostics(rawNode, input.block.id);
   const qualityDiagnostics = assessBlockQuality(node, input);
@@ -1569,6 +1569,9 @@ async function generateBlock(input: GenerateBlockInput, trace?: RunTraceRecord):
     node: finalNode,
     summary: `Generated ${input.block.description} via ${model}`,
     ...(totalTokens !== undefined ? { tokensUsed: totalTokens } : {}),
+    ...(blockInput !== undefined ? { inputTokens: blockInput } : {}),
+    ...(blockOutput !== undefined ? { outputTokens: blockOutput } : {}),
+    ...(blockDuration !== undefined ? { durationMs: blockDuration } : {}),
   };
 }
 
@@ -1699,7 +1702,7 @@ async function planWithModel(input: PlanPageInput, trace?: RunTraceRecord): Prom
   const model = requireModel(plannerModelRef.model ?? requestedPlannerModel, 'planner');
   const messages = createPlannerMessages(input);
   const thinking = getThinking(input.request);
-  const { content: text, tokensUsed } = await client.chat(model, messages, thinking);
+  const { content: text, tokensUsed, inputTokens: planInput, outputTokens: planOutput, durationMs: planDuration } = await client.chat(model, messages, thinking);
   const plan = extractJson<PagePlan>(text, 'planner', input.request, model);
   const normalizedPlan = normalizePlan(plan);
   if (trace) {
@@ -1714,7 +1717,15 @@ async function planWithModel(input: PlanPageInput, trace?: RunTraceRecord): Prom
       ...(tokensUsed !== undefined ? { tokensUsed } : {}),
     };
   }
-  return normalizedPlan;
+  const plannerMetrics: { durationMs?: number; inputTokens?: number; outputTokens?: number; tokensUsed?: number } = {
+    ...(planDuration !== undefined ? { durationMs: planDuration } : {}),
+    ...(planInput !== undefined ? { inputTokens: planInput } : {}),
+    ...(planOutput !== undefined ? { outputTokens: planOutput } : {}),
+    ...(tokensUsed !== undefined ? { tokensUsed } : {}),
+  };
+  return Object.keys(plannerMetrics).length > 0
+    ? { ...normalizedPlan, _plannerMetrics: plannerMetrics } as typeof normalizedPlan & { _plannerMetrics: typeof plannerMetrics }
+    : normalizedPlan;
 }
 
 function createRuntimeDeps(memory: AgentMemoryStore, trace?: RunTraceRecord): AgentRuntimeDeps {

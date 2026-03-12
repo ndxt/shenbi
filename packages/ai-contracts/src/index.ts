@@ -100,13 +100,13 @@ export type AgentEvent =
   | { type: 'message:delta'; data: { text: string } }
   | { type: 'tool:start'; data: { tool: string; label?: string } }
   | { type: 'tool:result'; data: { tool: string; ok: boolean; summary?: string } }
-  | { type: 'plan'; data: PagePlan }
+  | { type: 'plan'; data: PagePlan & { _plannerMetrics?: AgentOperationMetrics } }
   | { type: 'modify:start'; data: { operationCount: number; explanation: string; operations: Array<{ op: string; label?: string; nodeId?: string }> } }
   | { type: 'modify:op'; data: { index: number; operation: AgentOperation; metrics?: AgentOperationMetrics } }
   | { type: 'modify:done'; data: {} }
   | { type: 'schema:skeleton'; data: { schema: PageSchema } }
   | { type: 'schema:block:start'; data: { blockId: string; description: string } }
-  | { type: 'schema:block'; data: { blockId: string; node: SchemaNode; tokensUsed?: number } }
+  | { type: 'schema:block'; data: { blockId: string; node: SchemaNode; tokensUsed?: number; inputTokens?: number; outputTokens?: number; durationMs?: number } }
   | { type: 'schema:done'; data: { schema: PageSchema } }
   | { type: 'done'; data: { metadata: RunMetadata } }
   | { type: 'error'; data: { message: string; code?: string } };

@@ -183,6 +183,9 @@ export async function* pageBuilderOrchestrator(
         blockId: completed.result.blockId,
         node: completed.result.generated.node,
         ...(completed.result.generated.tokensUsed !== undefined ? { tokensUsed: completed.result.generated.tokensUsed } : {}),
+        ...(completed.result.generated.inputTokens !== undefined ? { inputTokens: completed.result.generated.inputTokens } : {}),
+        ...(completed.result.generated.outputTokens !== undefined ? { outputTokens: completed.result.generated.outputTokens } : {}),
+        ...(completed.result.generated.durationMs !== undefined ? { durationMs: completed.result.generated.durationMs } : {}),
       },
     };
   }

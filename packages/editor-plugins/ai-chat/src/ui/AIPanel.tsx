@@ -104,11 +104,25 @@ export function AIPanel({
     modifyOpMetrics,
     elapsedMs,
     blockTokens,
+    blockInputTokens,
+    blockOutputTokens,
+    blockDurationMs,
+    plannerMetrics,
     lastRunResult,
     setLastRunResult,
     runAgent,
     cancelRun,
   } = useAgentRun(bridge);
+
+  // Unified compact metrics badge: 'Xs In300 Out2000'
+  const MetricsBadge = ({ durationMs, inputTokens, outputTokens }: { durationMs: number | undefined; inputTokens: number | undefined; outputTokens: number | undefined }) => {
+    const parts: string[] = [];
+    if (durationMs !== undefined) parts.push(`${(durationMs / 1000).toFixed(1)}s`);
+    if (inputTokens !== undefined) parts.push(`In${inputTokens}`);
+    if (outputTokens !== undefined) parts.push(`Out${outputTokens}`);
+    if (parts.length === 0) return null;
+    return <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '9px' }}>{parts.join(' ')}</span>;
+  };
 
   const [selectedNodeLabel, setSelectedNodeLabel] = React.useState<string>('未选中');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -349,13 +363,22 @@ export function AIPanel({
                 {Math.floor(elapsedMs / 1000)}s
               </span>
             </div>
+            {/* Planner row (create-page) */}
+            {plannerMetrics && currentPlan && (
+              <div className="border-t border-border-ide pt-1 flex items-center gap-1.5 px-1" style={{ fontSize: '10px' }}>
+                <span className="text-text-secondary opacity-70 truncate flex-1">Planner</span>
+                <MetricsBadge durationMs={plannerMetrics.durationMs} inputTokens={plannerMetrics.inputTokens} outputTokens={plannerMetrics.outputTokens} />
+                <CheckCircle2 size={10} className="text-emerald-400 shrink-0" />
+              </div>
+            )}
+            {/* Block list (create-page) */}
             {currentPlan && (
-              <div className="mt-1 border-t border-border-ide pt-2">
+              <div className="border-t border-border-ide pt-1">
                 <ul className="flex flex-col gap-0.5">
                   {currentPlan.blocks.map((b) => (
                     <li
                       key={b.id}
-                      className={`flex items-center gap-2 py-0.5 rounded px-1 ${
+                      className={`flex items-center gap-1.5 py-0.5 rounded px-1 ${
                         blockStatuses[b.id] === 'generating' ? 'animate-pulse bg-blue-500/5' : ''
                       }`}
                       style={{ fontSize: '11px' }}
@@ -363,9 +386,7 @@ export function AIPanel({
                       <span className="text-text-primary opacity-80 truncate flex-1" title={b.description}>{b.description}</span>
                       {blockStatuses[b.id] === 'done' && (
                         <>
-                          {typeof blockTokens[b.id] === 'number' && (
-                            <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '9px' }}>{blockTokens[b.id]}t</span>
-                          )}
+                          <MetricsBadge durationMs={blockDurationMs[b.id]} inputTokens={blockInputTokens[b.id]} outputTokens={blockOutputTokens[b.id]} />
                           <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
                         </>
                       )}
@@ -374,8 +395,9 @@ export function AIPanel({
                 </ul>
               </div>
             )}
+            {/* Modify op list */}
             {modifyPlan && (
-              <div className="mt-1 border-t border-border-ide pt-2">
+              <div className="border-t border-border-ide pt-1">
                 <ul className="flex flex-col gap-0.5">
                   {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
                     <li
@@ -388,19 +410,11 @@ export function AIPanel({
                       <span className="text-text-primary opacity-80 truncate flex-1" title={modifyPlan.operationLabels[i] ?? ''}>
                         {modifyPlan.operationLabels[i] ?? `操作 ${i + 1}`}
                       </span>
-                      {modifyStatuses[i] === 'done' && modifyOpMetrics[i] && (
-                        <span className="text-text-secondary font-mono tabular-nums shrink-0 flex items-center gap-1" style={{ fontSize: '9px' }}>
-                          {modifyOpMetrics[i].durationMs !== undefined && `${Math.round(modifyOpMetrics[i].durationMs! / 100) / 10}s`}
-                          {modifyOpMetrics[i].inputTokens !== undefined && (
-                            <span>输入{modifyOpMetrics[i].inputTokens}t</span>
-                          )}
-                          {modifyOpMetrics[i].outputTokens !== undefined && (
-                            <span>输出{modifyOpMetrics[i].outputTokens}t</span>
-                          )}
-                        </span>
-                      )}
                       {modifyStatuses[i] === 'done' && (
-                        <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
+                        <>
+                          {modifyOpMetrics[i] && <MetricsBadge durationMs={modifyOpMetrics[i].durationMs} inputTokens={modifyOpMetrics[i].inputTokens} outputTokens={modifyOpMetrics[i].outputTokens} />}
+                          <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
+                        </>
                       )}
                     </li>
                   ))}
@@ -412,14 +426,11 @@ export function AIPanel({
 
         {!isRunning && lastRunResult && (
           <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-2 shadow-sm mt-2" style={{ fontSize: '11px' }}>
+            {/* Header */}
             <div className="flex items-center gap-2 text-text-primary">
               <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
               <span className="font-semibold text-emerald-400 shrink-0">生成完成</span>
               <span className="opacity-70 ml-1 truncate flex-1">{progressText}</span>
-              <span className="text-text-secondary font-mono shrink-0 tabular-nums" style={{ fontSize: '10px' }}>
-                {Math.round(lastRunResult.elapsedMs / 1000)}s
-                {typeof lastRunResult.tokensUsed === 'number' && ` · ${lastRunResult.tokensUsed}t`}
-              </span>
               <button
                 className="text-text-secondary hover:text-text-primary opacity-50 hover:opacity-100 transition-opacity ml-1"
                 onClick={() => setLastRunResult(null)}
@@ -428,42 +439,70 @@ export function AIPanel({
                 ×
               </button>
             </div>
+            {/* Planner row (create-page) */}
+            {lastRunResult.plannerMetrics && lastRunResult.plan && (
+              <div className="border-t border-border-ide pt-1 flex items-center gap-1.5 px-1">
+                <span className="text-text-secondary opacity-70 truncate flex-1">Planner</span>
+                <MetricsBadge durationMs={lastRunResult.plannerMetrics.durationMs} inputTokens={lastRunResult.plannerMetrics.inputTokens} outputTokens={lastRunResult.plannerMetrics.outputTokens} />
+                <CheckCircle2 size={10} className="text-emerald-400 shrink-0" />
+              </div>
+            )}
+            {/* Block list (create-page) */}
             {lastRunResult.plan && (
-              <div className="mt-1 border-t border-border-ide pt-2">
+              <div className="border-t border-border-ide pt-1">
                 <ul className="flex flex-col gap-0.5">
                   {lastRunResult.plan.blocks.map((b) => (
-                    <li key={b.id} className="flex items-center gap-2 py-0.5 px-1" style={{ fontSize: '11px' }}>
+                    <li key={b.id} className="flex items-center gap-1.5 py-0.5 px-1">
                       <span className="text-text-primary opacity-80 truncate flex-1" title={b.description}>{b.description}</span>
-                      {typeof lastRunResult.blockTokens[b.id] === 'number' && (
-                        <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '9px' }}>{lastRunResult.blockTokens[b.id]}t</span>
-                      )}
+                      <MetricsBadge durationMs={lastRunResult.blockDurationMs[b.id]} inputTokens={lastRunResult.blockInputTokens[b.id]} outputTokens={lastRunResult.blockOutputTokens[b.id]} />
                       <CheckCircle2 size={11} className={lastRunResult.blockStatuses[b.id] === 'done' ? 'text-emerald-400 shrink-0' : 'text-text-secondary shrink-0'} />
                     </li>
                   ))}
                 </ul>
               </div>
             )}
+            {/* Modify op list */}
             {lastRunResult.modifyPlan && (
-              <div className="mt-1 border-t border-border-ide pt-2">
+              <div className="border-t border-border-ide pt-1">
                 <ul className="flex flex-col gap-0.5">
                   {Array.from({ length: lastRunResult.modifyPlan.operationCount }, (_, i) => (
-                    <li key={i} className="flex items-center gap-1.5 py-0.5 px-1" style={{ fontSize: '11px' }}>
+                    <li key={i} className="flex items-center gap-1.5 py-0.5 px-1">
                       <span className="text-text-primary opacity-80 truncate flex-1" title={lastRunResult.modifyPlan?.operationLabels[i] ?? ''}>
                         {lastRunResult.modifyPlan?.operationLabels[i] ?? `操作 ${i + 1}`}
                       </span>
-                      {lastRunResult.modifyOpMetrics[i] && (
-                        <span className="text-text-secondary font-mono tabular-nums shrink-0 flex items-center gap-1" style={{ fontSize: '9px' }}>
-                          {lastRunResult.modifyOpMetrics[i].durationMs !== undefined && `${Math.round(lastRunResult.modifyOpMetrics[i].durationMs! / 100) / 10}s`}
-                          {lastRunResult.modifyOpMetrics[i].inputTokens !== undefined && <span>输入{lastRunResult.modifyOpMetrics[i].inputTokens}t</span>}
-                          {lastRunResult.modifyOpMetrics[i].outputTokens !== undefined && <span>输出{lastRunResult.modifyOpMetrics[i].outputTokens}t</span>}
-                        </span>
-                      )}
+                      {lastRunResult.modifyOpMetrics[i] && <MetricsBadge durationMs={lastRunResult.modifyOpMetrics[i].durationMs} inputTokens={lastRunResult.modifyOpMetrics[i].inputTokens} outputTokens={lastRunResult.modifyOpMetrics[i].outputTokens} />}
                       <CheckCircle2 size={11} className={lastRunResult.modifyStatuses[i] === 'done' ? 'text-emerald-400 shrink-0' : 'text-red-400 shrink-0'} />
                     </li>
                   ))}
                 </ul>
               </div>
             )}
+            {/* Summary totals */}
+            {(() => {
+              const totalInput = [
+                lastRunResult.plannerMetrics?.inputTokens ?? 0,
+                ...Object.values(lastRunResult.blockInputTokens),
+                ...Object.values(lastRunResult.modifyOpMetrics).map((m) => m.inputTokens ?? 0),
+              ].reduce((a, b) => a + b, 0);
+              const totalOutput = [
+                lastRunResult.plannerMetrics?.outputTokens ?? 0,
+                ...Object.values(lastRunResult.blockOutputTokens),
+                ...Object.values(lastRunResult.modifyOpMetrics).map((m) => m.outputTokens ?? 0),
+              ].reduce((a, b) => a + b, 0);
+              const hasTokenInfo = totalInput > 0 || totalOutput > 0;
+              return (
+                <div className="border-t border-border-ide pt-1 flex items-center gap-2 px-1" style={{ fontSize: '10px' }}>
+                  <span className="text-text-secondary opacity-70 flex-1">合计</span>
+                  <span className="text-text-secondary font-mono tabular-nums">{(lastRunResult.elapsedMs / 1000).toFixed(1)}s</span>
+                  {hasTokenInfo && (
+                    <span className="text-text-secondary font-mono tabular-nums">In{totalInput} Out{totalOutput}</span>
+                  )}
+                  {typeof lastRunResult.tokensUsed === 'number' && !hasTokenInfo && (
+                    <span className="text-text-secondary font-mono tabular-nums">{lastRunResult.tokensUsed}t</span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
