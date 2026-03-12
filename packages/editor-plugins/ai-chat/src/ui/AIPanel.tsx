@@ -139,12 +139,12 @@ export function AIPanel({
     isError?: boolean;
   }) => (
     <li
-      className={`flex items-center gap-1.5 py-1 rounded px-1 ${
+      className={`flex items-center gap-1.5 py-1.5 rounded px-1.5 ${
         isPending ? 'animate-pulse bg-blue-500/5' : ''
       }`}
       style={{ fontSize: '11px' }}
     >
-      <span className="text-text-primary opacity-80 truncate flex-1" title={label}>{label}</span>
+      <span className="text-text-primary opacity-80 truncate flex-1 leading-none translate-y-[1px]" title={label}>{label}</span>
       {isDone && metrics && <MetricsBadge durationMs={metrics.durationMs} inputTokens={metrics.inputTokens} outputTokens={metrics.outputTokens} />}
       {isDone && (
         <CheckCircle2
@@ -405,7 +405,7 @@ export function AIPanel({
             {/* Block list (create-page) */}
             {currentPlan && (
               <div className="border-t border-border-ide pt-1">
-                <ul className="flex flex-col gap-1.5">
+                <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {currentPlan.blocks.map((b) => (
                     <OpRow
                       key={b.id}
@@ -421,7 +421,7 @@ export function AIPanel({
             {/* Modify op list */}
             {modifyPlan && (
               <div className="border-t border-border-ide pt-1">
-                <ul className="flex flex-col gap-1.5">
+                <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
                     <OpRow
                       key={i}
@@ -463,7 +463,7 @@ export function AIPanel({
             {/* Block list (create-page) */}
             {lastRunResult.plan && (
               <div className="border-t border-border-ide pt-1.5">
-                <ul className="flex flex-col gap-1.5">
+                <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {lastRunResult.plan.blocks.map((b) => (
                     <OpRow
                       key={b.id}
@@ -478,7 +478,7 @@ export function AIPanel({
             {/* Modify op list */}
             {lastRunResult.modifyPlan && (
               <div className="border-t border-border-ide pt-1.5">
-                <ul className="flex flex-col gap-1.5">
+                <ul className="flex flex-col gap-1.5 m-0 p-0">
                   {Array.from({ length: lastRunResult.modifyPlan.operationCount }, (_, i) => (
                     <OpRow
                       key={i}
