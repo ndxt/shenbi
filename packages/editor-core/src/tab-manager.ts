@@ -123,6 +123,32 @@ export class TabManager {
     this.notify();
   }
 
+  closeSavedTabs(): void {
+    const dirtyIds = new Set(
+      [...this.tabs.values()].filter((t) => t.isDirty).map((t) => t.fileId),
+    );
+    for (const id of this.tabOrder) {
+      if (!dirtyIds.has(id)) this.tabs.delete(id);
+    }
+    this.tabOrder = this.tabOrder.filter((id) => dirtyIds.has(id));
+    if (this.activeTabId && !this.tabs.has(this.activeTabId)) {
+      this.activeTabId = this.tabOrder[0];
+    }
+    this.notify();
+  }
+
+  moveTab(fromIndex: number, toIndex: number): void {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 || fromIndex >= this.tabOrder.length ||
+      toIndex < 0 || toIndex >= this.tabOrder.length
+    ) return;
+    const id = this.tabOrder.splice(fromIndex, 1)[0];
+    if (!id) return;
+    this.tabOrder.splice(toIndex, 0, id);
+    this.notify();
+  }
+
   subscribe(listener: TabManagerListener): () => void {
     this.listeners.add(listener);
     return () => {

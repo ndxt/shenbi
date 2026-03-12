@@ -63,6 +63,10 @@ interface AppShellProps {
   activeTabId?: string | undefined;
   onActivateTab?: ((fileId: string) => void) | undefined;
   onCloseTab?: ((fileId: string) => void) | undefined;
+  onCloseOtherTabs?: ((fileId: string) => void) | undefined;
+  onCloseAllTabs?: (() => void) | undefined;
+  onCloseSavedTabs?: (() => void) | undefined;
+  onMoveTab?: ((fromIndex: number, toIndex: number) => void) | undefined;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -115,6 +119,10 @@ export function AppShell({
   activeTabId,
   onActivateTab,
   onCloseTab,
+  onCloseOtherTabs,
+  onCloseAllTabs,
+  onCloseSavedTabs,
+  onMoveTab,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const resolvedPersistenceAdapter = React.useMemo(
@@ -824,6 +832,10 @@ export function AppShell({
             activeTabId={activeTabId}
             onActivateTab={onActivateTab}
             onCloseTab={onCloseTab}
+            onCloseOtherTabs={onCloseOtherTabs}
+            onCloseAllTabs={onCloseAllTabs}
+            onCloseSavedTabs={onCloseSavedTabs}
+            onMoveTab={onMoveTab}
           />
           <WorkbenchToolbar
             extra={toolbarExtra}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TabManager, type TabManagerSnapshot } from '@shenbi/editor-core';
 
 export function useTabManager(tabManager: TabManager | undefined): TabManagerSnapshot {

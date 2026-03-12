@@ -9,8 +9,8 @@ export interface PromptOption {
 interface DropdownItem {
     label: string;
     value: string;
-    title?: string;
-    onRemove?: (value: string) => void;
+    title?: string | undefined;
+    onRemove?: ((value: string) => void) | undefined;
 }
 
 interface ChatInputProps {
