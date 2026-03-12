@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PageSchema } from '@shenbi/schema';
 import { createEditor } from './create-editor';
 import type { FileMetadata, FileStorageAdapter } from './adapters/file-storage';
+import type { VirtualFileSystemAdapter } from './adapters/virtual-fs';
+import { TabManager } from './tab-manager';
 
 function createSchema(name: string): PageSchema {
   return {
@@ -65,6 +67,102 @@ function createMemoryStorage(initial: PageSchema = createSchema('loaded')): File
   };
 }
 
+function createMemoryVFS(initialSchema: PageSchema = createSchema('loaded')): VirtualFileSystemAdapter {
+  const nodes = new Map([
+    ['demo', {
+      id: 'demo',
+      name: initialSchema.name ?? 'demo',
+      type: 'file' as const,
+      fileType: 'page' as const,
+      parentId: null,
+      path: '/demo.page.json',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }],
+  ]);
+  const contents = new Map<string, PageSchema>([['demo', initialSchema]]);
+
+  return {
+    async initialize() {
+      return undefined;
+    },
+    async listTree() {
+      return [...nodes.values()];
+    },
+    async createFile(_projectId, parentId, name, fileType, content) {
+      const node = {
+        id: `file-${name}`,
+        name,
+        type: 'file' as const,
+        fileType,
+        parentId,
+        path: `/${name}.page.json`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      nodes.set(node.id, node);
+      contents.set(node.id, content as PageSchema);
+      return node;
+    },
+    async readFile(_projectId, fileId) {
+      const content = contents.get(fileId);
+      if (!content) {
+        throw new Error(`missing file: ${fileId}`);
+      }
+      return content;
+    },
+    async writeFile(_projectId, fileId, content) {
+      contents.set(fileId, content as PageSchema);
+      const node = nodes.get(fileId);
+      if (node) {
+        node.updatedAt = Date.now();
+      }
+    },
+    async deleteFile(_projectId, fileId) {
+      nodes.delete(fileId);
+      contents.delete(fileId);
+    },
+    async createDirectory(_projectId, parentId, name) {
+      const node = {
+        id: `dir-${name}`,
+        name,
+        type: 'directory' as const,
+        parentId,
+        path: `/${name}`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      nodes.set(node.id, node);
+      return node;
+    },
+    async deleteDirectory() {
+      return undefined;
+    },
+    async rename(_projectId, nodeId, newName) {
+      const node = nodes.get(nodeId);
+      if (!node) {
+        throw new Error(`missing node: ${nodeId}`);
+      }
+      node.name = newName;
+      return node;
+    },
+    async move(_projectId, nodeId, newParentId) {
+      const node = nodes.get(nodeId);
+      if (!node) {
+        throw new Error(`missing node: ${nodeId}`);
+      }
+      node.parentId = newParentId;
+      return node;
+    },
+    async getNode(_projectId, nodeId) {
+      return nodes.get(nodeId);
+    },
+    async getNodeByPath(_projectId, path) {
+      return [...nodes.values()].find((node) => node.path === path);
+    },
+  };
+}
+
 describe('createEditor', () => {
   it('registers builtin commands', () => {
     const editor = createEditor();
@@ -81,6 +179,7 @@ describe('createEditor', () => {
     expect(editor.commands.has('history.beginBatch')).toBe(true);
     expect(editor.commands.has('history.commitBatch')).toBe(true);
     expect(editor.commands.has('history.discardBatch')).toBe(true);
+    expect(editor.commands.has('editor.restoreSnapshot')).toBe(true);
     expect(editor.commands.has('file.listSchemas')).toBe(true);
     expect(editor.commands.has('file.openSchema')).toBe(true);
     expect(editor.commands.has('file.saveSchema')).toBe(true);
@@ -209,6 +308,139 @@ describe('createEditor', () => {
     expect(changed).toHaveBeenCalledWith({ fileId: 'id-new-page' });
   });
 
+  it('registers tab commands when tab manager is configured', () => {
+    const editor = createEditor({
+      tabManager: new TabManager(),
+      vfs: createMemoryVFS(),
+      projectId: 'project-1',
+    });
+
+    expect(editor.commands.has('tab.open')).toBe(true);
+    expect(editor.commands.has('tab.close')).toBe(true);
+    expect(editor.commands.has('tab.closeOthers')).toBe(true);
+    expect(editor.commands.has('tab.closeAll')).toBe(true);
+    expect(editor.commands.has('tab.closeSaved')).toBe(true);
+    expect(editor.commands.has('tab.save')).toBe(true);
+  });
+
+  it('tab.save writes VFS content and clears dirty state', async () => {
+    const initial = createSchema('vfs-loaded');
+    const vfs = createMemoryVFS(initial);
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: initial,
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    await editor.commands.execute('schema.replace', { schema: createSchema('changed-page') });
+    await editor.commands.execute('tab.save', { source: 'auto' });
+
+    expect(await vfs.readFile('project-1', 'demo')).toMatchObject({ name: 'changed-page' });
+    expect(editor.state.getIsDirty()).toBe(false);
+    expect(tabManager.getTab('demo')?.isDirty).toBe(false);
+  });
+
+  it('keeps active tab snapshot in sync with editor state and closes saved tabs through command flow', async () => {
+    const vfs = createMemoryVFS(createSchema('page-a'));
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    tabManager.openTab('dirty-tab', {
+      filePath: '/dirty-tab.page.json',
+      fileType: 'page',
+      fileName: 'dirty-tab',
+      schema: createSchema('dirty-tab'),
+      selectedNodeId: 'dirty-node',
+      isDirty: true,
+    });
+    tabManager.activateTab('demo');
+    editor.state.setSelectedNodeId('node-1');
+    await editor.commands.execute('schema.replace', { schema: createSchema('updated-page-a') });
+
+    expect(tabManager.getTab('demo')).toMatchObject({
+      selectedNodeId: 'node-1',
+      isDirty: true,
+    });
+
+    await editor.commands.execute('tab.closeSaved');
+
+    expect(tabManager.getTabs().map((tab) => tab.fileId)).toEqual(['demo', 'dirty-tab']);
+
+    await editor.commands.execute('tab.save');
+    await editor.commands.execute('tab.closeSaved');
+
+    expect(tabManager.getTabs().map((tab) => tab.fileId)).toEqual(['dirty-tab']);
+    expect(editor.state.getCurrentFileId()).toBe('dirty-tab');
+    expect(editor.state.getSelectedNodeId()).toBe('dirty-node');
+    expect(editor.state.getSchema()).toMatchObject({ name: 'dirty-tab' });
+  });
+
+  it('tab.activate restores selected node for the target tab', async () => {
+    const vfs = createMemoryVFS(createSchema('page-a'));
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+
+    const secondNode = await vfs.createFile(
+      'project-1',
+      null,
+      'page-b',
+      'page',
+      createSchema('page-b'),
+    );
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    editor.state.setSelectedNodeId('node-a');
+    await editor.commands.execute('tab.open', { fileId: secondNode.id });
+    editor.state.setSelectedNodeId('node-b');
+
+    await editor.commands.execute('tab.activate', { fileId: 'demo' });
+
+    expect(editor.state.getCurrentFileId()).toBe('demo');
+    expect(editor.state.getSelectedNodeId()).toBe('node-a');
+  });
+
+  it('restores tab manager snapshots in order', () => {
+    const manager = new TabManager();
+    manager.restoreSnapshot({
+      tabs: [
+        {
+          fileId: 'b',
+          filePath: '/b.page.json',
+          fileType: 'page',
+          fileName: 'B',
+          schema: createSchema('B'),
+          isDirty: false,
+        },
+        {
+          fileId: 'a',
+          filePath: '/a.page.json',
+          fileType: 'page',
+          fileName: 'A',
+          schema: createSchema('A'),
+          isDirty: true,
+        },
+      ],
+      activeTabId: 'a',
+    });
+
+    expect(manager.getTabs().map((tab) => tab.fileId)).toEqual(['b', 'a']);
+    expect(manager.getActiveTabId()).toBe('a');
+  });
+
   it('node.patchProps updates schema and records history', async () => {
     const editor = createEditor({
       initialSchema: createSchemaWithCard('patch-target'),
@@ -323,6 +555,33 @@ describe('createEditor', () => {
       { id: 'a', component: 'Text', props: { text: 'A' } },
       { id: 'b', component: 'Text', props: { text: 'B' } },
     ]);
+  });
+
+  it('editor.restoreSnapshot clears history before restoring the next state', async () => {
+    const editor = createEditor({
+      initialSchema: createSchemaWithCard('restore-history'),
+      fileStorage: createMemoryStorage(),
+    });
+
+    await editor.commands.execute('node.patchProps', {
+      treeId: 'body.0',
+      patch: { title: 'changed-title' },
+    });
+    expect(editor.history.getSize()).toBe(1);
+
+    await editor.commands.execute('editor.restoreSnapshot', {
+      snapshot: {
+        schema: createSchema('cleared-page'),
+        isDirty: false,
+      },
+    });
+
+    expect(editor.history.getSize()).toBe(0);
+    expect(editor.state.getSnapshot().canUndo).toBe(false);
+
+    await editor.commands.execute('editor.undo');
+
+    expect(editor.state.getSchema()).toMatchObject({ name: 'cleared-page' });
   });
 
   it('history.discardBatch restores the pre-batch snapshot', async () => {

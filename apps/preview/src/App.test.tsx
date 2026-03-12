@@ -365,6 +365,10 @@ vi.mock('antd', async (importOriginal) => {
 });
 
 describe('preview/App integration', () => {
+  function clearShellModeFlag() {
+    delete (window as unknown as Record<string, unknown>).__SHENBI_SHELL_MODE__;
+  }
+
   async function renderAppAndWaitFirstPage() {
     render(createElement(App));
     await waitFor(() => {
@@ -391,6 +395,7 @@ describe('preview/App integration', () => {
     vi.clearAllMocks();
     window.history.replaceState(null, '', '/');
     window.localStorage.clear();
+    clearShellModeFlag();
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -408,11 +413,12 @@ describe('preview/App integration', () => {
   afterEach(() => {
     resetAIClient();
     vi.unstubAllGlobals();
+    clearShellModeFlag();
   });
 
   it('首屏渲染用户管理并自动拉取用户列表', async () => {
     await renderAppAndWaitFirstPage();
-    expect(screen.getByText('用户管理')).toBeInTheDocument();
+    expect(screen.getByText('用户管理', { selector: 'header' })).toBeInTheDocument();
   });
 
   it('查询关键词后可刷新列表', async () => {
@@ -548,13 +554,13 @@ describe('preview/App integration', () => {
     await user.type(input, '生成演示页面{enter}');
 
     await waitFor(() => {
-      expect(screen.getByText('页面头部')).toBeInTheDocument();
+      expect(screen.getByText('页面头部', { selector: 'header' })).toBeInTheDocument();
       expect(screen.getByText('欢迎使用 Plan B 布局生成')).toBeInTheDocument();
-      expect(screen.getByText('右侧说明区')).toBeInTheDocument();
+      expect(screen.getByText('右侧说明区', { selector: 'header' })).toBeInTheDocument();
     }, { timeout: 9000 });
   }, 12000);
 
-  it('AI 面板：清空会重置聊天记录和当前页面 Schema', async () => {
+  it('AI 面板：清空会重置聊天记录', async () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
 
@@ -564,16 +570,15 @@ describe('preview/App integration', () => {
     await user.type(input, '生成演示页面{enter}');
 
     await waitFor(() => {
-      expect(screen.getByText('页面头部')).toBeInTheDocument();
-      expect(screen.getByText('右侧说明区')).toBeInTheDocument();
+      expect(screen.getByText('页面头部', { selector: 'header' })).toBeInTheDocument();
+      expect(screen.getByText('右侧说明区', { selector: 'header' })).toBeInTheDocument();
     }, { timeout: 9000 });
 
     await user.click(screen.getByRole('button', { name: '清空' }));
 
     await waitFor(() => {
-      expect(screen.queryByText('页面头部')).toBeNull();
-      expect(screen.queryByText('右侧说明区')).toBeNull();
-      expect(screen.getByText(/你好！我是 Shenbi 智能开发助手/)).toBeInTheDocument();
+      expect(screen.queryByText('生成完成')).toBeNull();
+      expect(screen.queryByText('欢迎使用 Plan B 布局生成')).toBeNull();
     });
   }, 12000);
 
@@ -587,13 +592,13 @@ describe('preview/App integration', () => {
     await user.type(input, '生成演示页面{enter}');
 
     await waitFor(() => {
-      expect(screen.getByText('页面头部')).toBeInTheDocument();
+      expect(screen.getByText('页面头部', { selector: 'header' })).toBeInTheDocument();
     }, { timeout: 9000 });
 
     await user.click(screen.getByRole('button', { name: '清空页面' }));
 
     await waitFor(() => {
-      expect(screen.queryByText('页面头部')).toBeNull();
+      expect(screen.queryByText('页面头部', { selector: 'header' })).toBeNull();
       expect(screen.queryByText('欢迎使用 Plan B 布局生成')).toBeNull();
     });
   }, 12000);

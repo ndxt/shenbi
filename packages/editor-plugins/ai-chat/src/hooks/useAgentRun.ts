@@ -28,6 +28,9 @@ export interface LastRunResult {
   modifyOpMetrics: Record<number, AgentOperationMetrics>;
   elapsedMs: number;
   statusLabel: string;
+  didApplySchema: boolean;
+  autoSaved?: boolean;
+  autoSaveError?: string;
   tokensUsed?: number;
   durationMs?: number;
   debugFile?: string;
@@ -346,6 +349,9 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             let modifyFailed = false;
             let failedOpIndex: number | undefined;
             let failedError: string | undefined;
+            let didApplySchemaChange = false;
+            let autoSaved = false;
+            let autoSaveError: string | undefined;
 
             const finalizeModifyRun = async (metadata: RunMetadata): Promise<RunMetadata> => {
                 const finalizeConversationId = metadata.conversationId ?? conversationId ?? metadata.sessionId;
@@ -466,6 +472,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             }
                             setProgressText('渲染页面骨架');
                             bridgeRef.current?.replaceSchema(event.data.schema);
+                            didApplySchemaChange = true;
                             break;
                         case 'schema:block:start':
                             localBlockStatuses[event.data.blockId] = 'generating';
@@ -491,6 +498,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                 );
                                 bridgeRef.current.replaceSchema(nextSchema);
                             }
+                            didApplySchemaChange = true;
                             localBlockStatuses[event.data.blockId] = 'done';
                             setBlockStatuses((prev) => ({
                                 ...prev,
@@ -525,6 +533,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                             }
                             setProgressText('更新页面 Schema');
                             bridgeRef.current?.replaceSchema(event.data.schema);
+                            didApplySchemaChange = true;
                             setBlockStatuses((prev) => Object.fromEntries(
                                 Object.keys(prev).map((blockId) => [blockId, 'done' as const])
                             ));
@@ -595,6 +604,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     }
                                     onError(`修改失败：第 ${event.data.index + 1} 条 ${event.data.operation.op} 执行出错${failedError ? ` - ${failedError}` : ''}`);
                                 } else {
+                                    didApplySchemaChange = true;
                                     setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'done' }));
                                     localModifyStatuses[event.data.index] = 'done';
                                 }
@@ -619,6 +629,15 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                         case 'done':
                             {
                                 const finalizedMetadata = await finalizeModifyRun(event.data.metadata);
+                                const shouldAutoSave = didApplySchemaChange && !modifyFailed;
+                                if (shouldAutoSave && bridgeRef.current) {
+                                    const saveResult = await bridgeRef.current.execute('tab.save', { source: 'auto' });
+                                    if (saveResult.success) {
+                                        autoSaved = true;
+                                    } else {
+                                        autoSaveError = saveResult.error || '自动保存失败';
+                                    }
+                                }
                                 const runResult: LastRunResult = {
                                     plan: localPlan,
                                     plannerMetrics: localPlannerMetrics,
@@ -632,6 +651,9 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     modifyOpMetrics: { ...localModifyOpMetrics },
                                     elapsedMs: Date.now() - startTimeRef.current,
                                     statusLabel: localModifyPlan ? '页面修改已应用' : '页面生成完成',
+                                    didApplySchema: didApplySchemaChange && !modifyFailed,
+                                    ...(autoSaved ? { autoSaved: true } : {}),
+                                    ...(autoSaveError ? { autoSaveError } : {}),
                                     ...(typeof finalizedMetadata.tokensUsed === 'number' ? { tokensUsed: finalizedMetadata.tokensUsed } : {}),
                                     ...(typeof finalizedMetadata.durationMs === 'number' ? { durationMs: finalizedMetadata.durationMs } : {}),
                                     ...(finalizedMetadata.debugFile ? { debugFile: finalizedMetadata.debugFile } : {}),

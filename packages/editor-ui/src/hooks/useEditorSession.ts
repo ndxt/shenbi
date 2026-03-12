@@ -14,6 +14,7 @@ export interface EditorSessionEditor {
     getSnapshot(): EditorStateSnapshot;
     getSchema(): PageSchema;
     setSelectedNodeId(nextNodeId: string | undefined): void;
+    restoreSnapshot(snapshot: EditorStateSnapshot): void;
     subscribe(listener: (snapshot: EditorStateSnapshot) => void): () => void;
   };
   commands: {

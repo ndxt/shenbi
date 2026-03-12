@@ -182,7 +182,6 @@ describe('useAgentRun', () => {
     expect(client.requests).toHaveLength(1);
     expect(client.requests[0]).toMatchObject({
       prompt: '把当前卡片标题改成新标题，并追加一段说明',
-      intent: 'schema.modify',
       conversationId: 'conv-success',
       selectedNodeId: 'card-1',
       context: {
@@ -208,7 +207,12 @@ describe('useAgentRun', () => {
       'node.patchProps',
       'node.append',
       'history.commitBatch',
+      'tab.save',
     ]);
+    expect(result.current.lastRunResult).toMatchObject({
+      didApplySchema: true,
+      autoSaveError: expect.any(String),
+    });
 
     await act(async () => {
       await editor.commands.execute('editor.undo');
@@ -300,7 +304,6 @@ describe('useAgentRun', () => {
     expect(client.requests).toHaveLength(1);
     expect(client.requests[0]).toMatchObject({
       prompt: '删除一个不存在的节点',
-      intent: 'schema.modify',
       conversationId: 'conv-failure',
       selectedNodeId: 'card-1',
       context: {
@@ -323,6 +326,9 @@ describe('useAgentRun', () => {
       'node.patchProps',
       'history.discardBatch',
     ]);
+    expect(result.current.lastRunResult).toMatchObject({
+      didApplySchema: false,
+    });
 
     const currentSchema = editor.state.getSchema();
     const cardTreeId = getTreeIdBySchemaNodeId(currentSchema, 'card-1');
@@ -456,5 +462,135 @@ describe('useAgentRun', () => {
     expect(commandLog.filter((entry) => entry.commandId === 'history.discardBatch')).toHaveLength(2);
     expect(editor.history.getSize()).toBe(0);
     expect(getSchemaNodeByTreeId(editor.state.getSchema(), 'body.0.children.0')?.props?.title).toBe('旧标题');
+  });
+
+  it('marks runs as auto-saved when tab.save succeeds', async () => {
+    let schema = createInitialSchema();
+    const commandLog: string[] = [];
+    const bridge: EditorAIBridge = {
+      getSchema: () => schema,
+      getSelectedNodeId: () => 'card-1',
+      getAvailableComponents: () => [],
+      execute: async (commandId) => {
+        commandLog.push(commandId);
+        return { success: true };
+      },
+      replaceSchema: (nextSchema) => {
+        schema = nextSchema;
+      },
+      appendBlock: async () => ({ success: true }),
+      removeNode: async () => ({ success: true }),
+      subscribe: () => () => undefined,
+    };
+    const client = new ScenarioAIClient([
+      {
+        type: 'run:start',
+        data: { sessionId: 'session-auto-save', conversationId: 'conv-auto-save' },
+      },
+      {
+        type: 'intent',
+        data: { intent: 'schema.create', confidence: 1 },
+      },
+      {
+        type: 'plan',
+        data: {
+          intent: 'schema.create',
+          blocks: [],
+        } as any,
+      },
+      {
+        type: 'schema:skeleton',
+        data: { schema: createInitialSchema() },
+      },
+      {
+        type: 'schema:done',
+        data: { schema: createInitialSchema() },
+      },
+      {
+        type: 'done',
+        data: {
+          metadata: {
+            sessionId: 'session-auto-save',
+            conversationId: 'conv-auto-save',
+          },
+        },
+      },
+    ]);
+    setAIClient(client);
+    const { result } = renderHook(() => useAgentRun(bridge));
+
+    await act(async () => {
+      await result.current.runAgent(
+        '生成一个页面',
+        '',
+        '',
+        false,
+        'conv-auto-save',
+        () => 'message-4',
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+      );
+    });
+
+    expect(commandLog).toContain('tab.save');
+    expect(result.current.lastRunResult).toMatchObject({
+      didApplySchema: true,
+      autoSaved: true,
+    });
+  });
+
+  it('does not auto-save chat-only runs', async () => {
+    const execute = vi.fn(async () => ({ success: true }));
+    const bridge: EditorAIBridge = {
+      getSchema: () => createInitialSchema(),
+      getSelectedNodeId: () => 'card-1',
+      getAvailableComponents: () => [],
+      execute,
+      replaceSchema: vi.fn(),
+      appendBlock: async () => ({ success: true }),
+      removeNode: async () => ({ success: true }),
+      subscribe: () => () => undefined,
+    };
+    const client = new ScenarioAIClient([
+      {
+        type: 'run:start',
+        data: { sessionId: 'session-chat', conversationId: 'conv-chat' },
+      },
+      {
+        type: 'intent',
+        data: { intent: 'chat.reply', confidence: 1 },
+      },
+      {
+        type: 'done',
+        data: {
+          metadata: {
+            sessionId: 'session-chat',
+            conversationId: 'conv-chat',
+          },
+        },
+      },
+    ]);
+    setAIClient(client);
+    const { result } = renderHook(() => useAgentRun(bridge));
+
+    await act(async () => {
+      await result.current.runAgent(
+        '解释一下这个页面',
+        '',
+        '',
+        false,
+        'conv-chat',
+        () => 'message-5',
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+      );
+    });
+
+    expect(execute).not.toHaveBeenCalledWith('tab.save', expect.anything());
+    expect(result.current.lastRunResult).toMatchObject({
+      didApplySchema: false,
+    });
   });
 });

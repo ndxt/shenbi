@@ -18,6 +18,9 @@ function createCommands(context: MockCommandsContext = {}): FileCommandExecutor 
     if (commandId === 'file.saveSchema') {
       return undefined;
     }
+    if (commandId === 'tab.save') {
+      return undefined;
+    }
     if (commandId === 'editor.undo' || commandId === 'editor.redo' || commandId === 'file.openSchema') {
       return undefined;
     }
@@ -57,10 +60,10 @@ describe('useFileWorkspace', () => {
     expect(commands.execute).toHaveBeenCalledWith('file.listSchemas');
   });
 
-  it('无 activeFileId 时保存会走另存为', async () => {
+  it('legacy 模式下无 activeFileId 时保存会走另存为', async () => {
     const commands = createCommands({ saveAsResult: 'new-file-id' });
     const { result } = renderHook(() => useFileWorkspace({
-      mode: 'shell',
+      mode: 'scenarios',
       snapshot: {
         currentFileId: undefined,
         schemaName: 'Draft',
@@ -101,8 +104,36 @@ describe('useFileWorkspace', () => {
     fireEvent.keyDown(window, { key: 's', ctrlKey: true });
 
     await waitFor(() => {
-      expect(commands.execute).toHaveBeenCalledWith('file.saveSchema');
+      expect(commands.execute).toHaveBeenCalledWith('tab.save');
     });
+  });
+
+  it('shell 模式无活动文件时保存会给出提示且不触发 saveAs', async () => {
+    const onError = vi.fn();
+    const commands = createCommands();
+    const { result } = renderHook(() => useFileWorkspace({
+      mode: 'shell',
+      snapshot: {
+        currentFileId: undefined,
+        schemaName: 'Draft',
+        isDirty: true,
+        canUndo: false,
+        canRedo: false,
+      },
+      commands,
+      onError,
+      promptFileName: () => 'ignored',
+    }));
+
+    act(() => {
+      result.current.handleSave();
+    });
+
+    await waitFor(() => {
+      expect(result.current.fileStatus).toBe('请先从文件树创建或打开文件');
+      expect(onError).toHaveBeenCalledWith('请先从文件树创建或打开文件');
+    });
+    expect(commands.execute).not.toHaveBeenCalledWith('file.saveAs', expect.anything());
   });
 
   it('Ctrl+Z / Ctrl+Shift+Z 会触发撤销与重做', async () => {

@@ -120,6 +120,11 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
           <span className="text-text-secondary font-mono tabular-nums">{result.tokensUsed}t</span>
         )}
       </div>
+      {result.didApplySchema && (
+        <div className="border-t border-border-ide pt-2 px-1 text-[10px] text-text-secondary">
+          {result.autoSaved ? '文件已自动保存' : result.autoSaveError ? `自动保存失败: ${result.autoSaveError}` : '页面变更已应用'}
+        </div>
+      )}
       {/* Debug metadata */}
       {(typeof result.durationMs === 'number' || typeof result.tokensUsed === 'number' || result.debugFile || result.memoryDebugFile) && (
         <div className="text-text-secondary flex flex-col items-center gap-1 opacity-50 pt-2" style={{ fontSize: '10px' }}>

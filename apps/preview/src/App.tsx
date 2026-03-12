@@ -12,6 +12,7 @@ import {
   type FSTreeNode,
   IndexedDBFileSystemAdapter,
   TabManager,
+  type TabManagerSnapshot,
   buildEditorTree,
   buildFSTree,
   createEditor,
@@ -68,6 +69,7 @@ const WORKSPACE_ID = 'shenbi-preview-debug';
 const PROJECT_ID = 'default';
 const PREVIEW_PERSISTENCE_NAMESPACE = 'preview-debug';
 const ACTIVE_SCENARIO_PERSISTENCE_KEY = 'active-scenario';
+const SHELL_SESSION_PERSISTENCE_KEY = 'shell-session';
 
 const scenarioOptions: { label: string; value: ScenarioKey }[] = [
   { label: '用户管理场景', value: 'user-management' },
@@ -133,6 +135,19 @@ function createEmptyShellSchema(): PageSchema {
   };
 }
 
+interface PersistedShellSession {
+  tabs: TabManagerSnapshot;
+  expandedIds: string[];
+  focusedId?: string | undefined;
+}
+
+function areStringArraysEqual(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((value, index) => value === right[index]);
+}
+
 export function App() {
   const [appMode, setAppMode] = useShellModeUrl();
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
@@ -142,6 +157,7 @@ export function App() {
     [persistenceAdapter],
   );
   const [scenarioPersistenceHydrated, setScenarioPersistenceHydrated] = useState(false);
+  const [shellSessionHydrated, setShellSessionHydrated] = useState(false);
   const initialScenarioSnapshots = useMemo(() => createInitialScenarioSnapshots(), []);
   const initialScenarioSchemas = useMemo(() => createInitialScenarioState(), []);
   const [activityMessage, setActivityMessage] = useState<string>('');
@@ -152,12 +168,23 @@ export function App() {
   const tabManager = useMemo(() => new TabManager(), []);
   const [vfsInitialized, setVfsInitialized] = useState(false);
   const [fsTree, setFsTree] = useState<FSTreeNode[]>([]);
+  const [fileExplorerExpandedIds, setFileExplorerExpandedIds] = useState<string[]>([]);
+  const [fileExplorerFocusedId, setFileExplorerFocusedId] = useState<string | undefined>();
+  const [shellSaveSources, setShellSaveSources] = useState<Record<string, 'manual' | 'auto'>>({});
 
   // Initialize VFS
   useEffect(() => {
-    void vfs.initialize(PROJECT_ID).then(() => {
-      setVfsInitialized(true);
-    });
+    if (typeof indexedDB === 'undefined') {
+      setShellSessionHydrated(true);
+      return;
+    }
+    void vfs.initialize(PROJECT_ID)
+      .then(() => {
+        setVfsInitialized(true);
+      })
+      .catch(() => {
+        setShellSessionHydrated(true);
+      });
   }, [vfs]);
 
   const {
@@ -194,7 +221,7 @@ export function App() {
   });
 
   // Tab manager snapshot
-  const tabSnapshot = useTabManager(appMode === 'shell' ? tabManager : undefined);
+  const tabSnapshot = useTabManager(tabManager);
 
   // Compute dirty file IDs for FileExplorer
   const dirtyFileIds = useMemo(
@@ -225,6 +252,24 @@ export function App() {
     return unsub;
   }, [appMode, fileEditor.eventBus, refreshFsTree]);
 
+  useEffect(() => {
+    const unsub = fileEditor.eventBus?.on?.('file:saved', ({
+      fileId,
+      source,
+    }: {
+      fileId: string;
+      source?: 'manual' | 'auto';
+    }) => {
+      const nextSource = source ?? 'manual';
+      setShellSaveSources((previous) => (
+        previous[fileId] === nextSource
+          ? previous
+          : { ...previous, [fileId]: nextSource }
+      ));
+    });
+    return unsub;
+  }, [fileEditor.eventBus]);
+
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : activeScenarioSnapshot.schema;
   const {
     activeFileName,
@@ -232,6 +277,7 @@ export function App() {
     isDirty,
     canUndo,
     canRedo,
+    handleSave,
     handleUndo,
     handleRedo,
   } = useFileWorkspace({
@@ -254,6 +300,154 @@ export function App() {
       return window.prompt('请输入文件名', defaultName);
     },
   });
+
+  const activeShellSaveSource = useMemo(
+    () => (tabSnapshot.activeTabId ? shellSaveSources[tabSnapshot.activeTabId] : undefined),
+    [shellSaveSources, tabSnapshot.activeTabId],
+  );
+
+  const fileExplorerStatusText = useMemo(() => {
+    if (!tabSnapshot.activeTabId) {
+      return '无活动文件';
+    }
+    if (isDirty) {
+      return '未保存';
+    }
+    return activeShellSaveSource === 'auto' ? '已自动保存' : '已保存';
+  }, [activeShellSaveSource, isDirty, tabSnapshot.activeTabId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (appMode !== 'shell' || !vfsInitialized || shellSessionHydrated) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void workspacePersistence
+      .getJSON<PersistedShellSession>(PREVIEW_PERSISTENCE_NAMESPACE, SHELL_SESSION_PERSISTENCE_KEY)
+      .then(async (storedSession) => {
+        if (cancelled || !storedSession) {
+          return;
+        }
+
+        const nodes = await vfs.listTree(PROJECT_ID);
+        if (cancelled) {
+          return;
+        }
+
+        const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+        const restoredTabs: TabManagerSnapshot['tabs'] = [];
+
+        for (const persistedTab of storedSession.tabs.tabs) {
+          const liveNode = nodeMap.get(persistedTab.fileId);
+          if (!liveNode || liveNode.type !== 'file') {
+            continue;
+          }
+
+          let schema = persistedTab.schema;
+          if (!persistedTab.isDirty) {
+            try {
+              schema = await vfs.readFile(PROJECT_ID, persistedTab.fileId) as PageSchema;
+            } catch {
+              continue;
+            }
+          }
+
+          restoredTabs.push({
+            ...persistedTab,
+            schema,
+            fileName: liveNode.name,
+            filePath: liveNode.path,
+            fileType: liveNode.fileType ?? persistedTab.fileType,
+          });
+        }
+
+        const activeTabId = storedSession.tabs.activeTabId
+          && restoredTabs.some((tab) => tab.fileId === storedSession.tabs.activeTabId)
+          ? storedSession.tabs.activeTabId
+          : restoredTabs[0]?.fileId;
+
+        tabManager.restoreSnapshot({
+          tabs: restoredTabs,
+          activeTabId,
+        });
+
+        const directoryIds = new Set(
+          nodes.filter((node) => node.type === 'directory').map((node) => node.id),
+        );
+        setFileExplorerExpandedIds(
+          (storedSession.expandedIds ?? []).filter((id) => directoryIds.has(id)),
+        );
+        setFileExplorerFocusedId(
+          storedSession.focusedId && nodeMap.has(storedSession.focusedId)
+            ? storedSession.focusedId
+            : undefined,
+        );
+
+        const activeTab = activeTabId
+          ? restoredTabs.find((tab) => tab.fileId === activeTabId)
+          : undefined;
+        await fileEditor.commands.execute('editor.restoreSnapshot', {
+          snapshot: activeTab
+            ? {
+              schema: activeTab.schema,
+              currentFileId: activeTab.fileId,
+              isDirty: activeTab.isDirty,
+              ...(activeTab.selectedNodeId ? { selectedNodeId: activeTab.selectedNodeId } : {}),
+            }
+            : {
+              schema: createEmptyShellSchema(),
+              isDirty: false,
+            },
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) {
+          setShellSessionHydrated(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    appMode,
+    fileEditor.commands,
+    shellSessionHydrated,
+    tabManager,
+    vfs,
+    vfsInitialized,
+    workspacePersistence,
+  ]);
+
+  useEffect(() => {
+    if (appMode !== 'shell' || !shellSessionHydrated || !vfsInitialized) {
+      return;
+    }
+
+    void workspacePersistence
+      .setJSON<PersistedShellSession>(
+        PREVIEW_PERSISTENCE_NAMESPACE,
+        SHELL_SESSION_PERSISTENCE_KEY,
+        {
+          tabs: tabSnapshot,
+          expandedIds: fileExplorerExpandedIds,
+          ...(fileExplorerFocusedId ? { focusedId: fileExplorerFocusedId } : {}),
+        },
+      )
+      .catch(() => undefined);
+  }, [
+    appMode,
+    fileExplorerExpandedIds,
+    fileExplorerFocusedId,
+    shellSessionHydrated,
+    tabSnapshot,
+    vfsInitialized,
+    workspacePersistence,
+  ]);
 
   const treeNodes = useMemo(() => buildEditorTree(activeSchema), [activeSchema]);
   const { selectedNodeId, selectTreeNode, selectSchemaNode } = useSelectionSync({
@@ -334,10 +528,16 @@ export function App() {
     schemaName: activeSchema.name,
     promptFileName,
   });
-  const handleResetWorkspace = useCallback(() => {
+  const handleResetWorkspace = useCallback(async () => {
     if (appMode === 'shell') {
-      updateActiveSchema(() => createEmptyShellSchema());
-      setShellSelectedNodeId(undefined);
+      const emptySchema = createEmptyShellSchema();
+      await fileEditor.commands.execute('editor.restoreSnapshot', {
+        snapshot: {
+          schema: emptySchema,
+          isDirty: Boolean(shellSnapshot.currentFileId),
+          ...(shellSnapshot.currentFileId ? { currentFileId: shellSnapshot.currentFileId } : {}),
+        },
+      });
       return;
     }
 
@@ -350,16 +550,15 @@ export function App() {
   }, [
     activeScenario,
     appMode,
+    fileEditor.commands,
     initialScenarioSchemas,
     setScenarioSelectedNodeId,
-    setShellSelectedNodeId,
-    updateActiveSchema,
     updateScenarioSnapshot,
+    shellSnapshot.currentFileId,
   ]);
   const executeAppCommand = useCallback((commandId: string, payload?: unknown) => {
     if (commandId === 'workspace.resetDocument') {
-      handleResetWorkspace();
-      return undefined;
+      return handleResetWorkspace();
     }
     return executeHostPluginCommand(commandId, payload);
   }, [executeHostPluginCommand, handleResetWorkspace]);
@@ -419,16 +618,16 @@ export function App() {
   }, [fileEditor.commands, shellSnapshot.isDirty, tabManager]);
 
   const handleCloseOtherTabs = useCallback((fileId: string) => {
-    tabManager.closeOtherTabs(fileId);
-  }, [tabManager]);
+    void fileEditor.commands.execute('tab.closeOthers', { fileId });
+  }, [fileEditor.commands]);
 
   const handleCloseAllTabs = useCallback(() => {
-    tabManager.closeAllTabs();
-  }, [tabManager]);
+    void fileEditor.commands.execute('tab.closeAll');
+  }, [fileEditor.commands]);
 
   const handleCloseSavedTabs = useCallback(() => {
-    tabManager.closeSavedTabs();
-  }, [tabManager]);
+    void fileEditor.commands.execute('tab.closeSaved');
+  }, [fileEditor.commands]);
 
   const handleMoveTab = useCallback((fromIndex: number, toIndex: number) => {
     tabManager.moveTab(fromIndex, toIndex);
@@ -462,6 +661,18 @@ export function App() {
     void fileEditor.commands.execute('fs.move', { nodeId, newParentId, afterNodeId });
   }, [fileEditor.commands]);
 
+  const handleExpandedIdsChange = useCallback((nextExpandedIds: string[]) => {
+    setFileExplorerExpandedIds((previous) => (
+      areStringArraysEqual(previous, nextExpandedIds) ? previous : nextExpandedIds
+    ));
+  }, []);
+
+  const handleFocusedIdChange = useCallback((nextFocusedId: string | undefined) => {
+    setFileExplorerFocusedId((previous) => (
+      previous === nextFocusedId ? previous : nextFocusedId
+    ));
+  }, []);
+
   // Keep stable refs for FileExplorer props to avoid recreating plugins on every tree/tab change
   const fsTreeRef = useRef(fsTree);
   fsTreeRef.current = fsTree;
@@ -483,8 +694,20 @@ export function App() {
   refreshFsTreeRef.current = refreshFsTree;
   const dirtyFileIdsRef = useRef(dirtyFileIds);
   dirtyFileIdsRef.current = dirtyFileIds;
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
   const handleCloseTabRef = useRef(handleCloseTab);
   handleCloseTabRef.current = handleCloseTab;
+  const fileExplorerStatusTextRef = useRef(fileExplorerStatusText);
+  fileExplorerStatusTextRef.current = fileExplorerStatusText;
+  const fileExplorerExpandedIdsRef = useRef(fileExplorerExpandedIds);
+  fileExplorerExpandedIdsRef.current = fileExplorerExpandedIds;
+  const fileExplorerFocusedIdRef = useRef(fileExplorerFocusedId);
+  fileExplorerFocusedIdRef.current = fileExplorerFocusedId;
+  const handleExpandedIdsChangeRef = useRef(handleExpandedIdsChange);
+  handleExpandedIdsChangeRef.current = handleExpandedIdsChange;
+  const handleFocusedIdChangeRef = useRef(handleFocusedIdChange);
+  handleFocusedIdChangeRef.current = handleFocusedIdChange;
 
   const plugins = useMemo(() => {
     const registeredPlugins = [
@@ -498,9 +721,7 @@ export function App() {
               title: 'Reset Document',
               category: 'Workspace',
               description: 'Reset the current shell page or restore the active scenario baseline.',
-              execute: () => {
-                handleResetWorkspace();
-              },
+              execute: () => handleResetWorkspace(),
             },
           ],
         },
@@ -573,6 +794,13 @@ export function App() {
                   tree={fsTreeRef.current}
                   activeFileId={tabSnapshotRef.current.activeTabId}
                   dirtyFileIds={dirtyFileIdsRef.current}
+                  statusText={fileExplorerStatusTextRef.current}
+                  canSaveActiveFile={Boolean(tabSnapshotRef.current.activeTabId) && dirtyFileIdsRef.current.has(tabSnapshotRef.current.activeTabId ?? '')}
+                  onSaveActiveFile={handleSaveRef.current}
+                  initialExpandedIds={fileExplorerExpandedIdsRef.current}
+                  initialFocusedId={fileExplorerFocusedIdRef.current}
+                  onExpandedIdsChange={handleExpandedIdsChangeRef.current}
+                  onFocusedIdChange={handleFocusedIdChangeRef.current}
                   onOpenFile={handleOpenFileFromTreeRef.current}
                   onCreateFile={handleCreateFileRef.current}
                   onCreateDirectory={handleCreateDirectoryRef.current}
