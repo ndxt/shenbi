@@ -4,6 +4,7 @@ import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import { aiClient } from '../ai/sse-client';
 import { executeAgentOperation } from '../ai/operation-executor';
 import { createSchemaDigest, type AgentIntent, type PagePlan, type RunMetadata, type RunRequest } from '../ai/api-types';
+import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
 
 export type PlanConfig = PagePlan;
 export type BlockRunStatus = 'waiting' | 'generating' | 'done';
@@ -20,6 +21,7 @@ export interface LastRunResult {
   blockTokens: Record<string, number>;
   modifyPlan: ModifyPlan | null;
   modifyStatuses: Record<number, BlockRunStatus>;
+  modifyOpMetrics: Record<number, AgentOperationMetrics>;
   elapsedMs: number;
   tokensUsed?: number;
 }
@@ -162,6 +164,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
     const [blockStatuses, setBlockStatuses] = useState<Record<string, BlockRunStatus>>({});
     const [modifyPlan, setModifyPlan] = useState<ModifyPlan | null>(null);
     const [modifyStatuses, setModifyStatuses] = useState<Record<number, BlockRunStatus>>({});
+    const [modifyOpMetrics, setModifyOpMetrics] = useState<Record<number, AgentOperationMetrics>>({});
     const [elapsedMs, setElapsedMs] = useState(0);
     const [blockTokens, setBlockTokens] = useState<Record<string, number>>({});
     const [lastRunResult, setLastRunResult] = useState<LastRunResult | null>(null);
@@ -289,6 +292,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             setBlockStatuses({});
             setModifyPlan(null);
             setModifyStatuses({});
+            setModifyOpMetrics({});
             setElapsedMs(0);
             setBlockTokens({});
             startTimeRef.current = Date.now();
@@ -384,6 +388,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                 const localBlockTokens: Record<string, number> = {};
                 let localModifyPlan: ModifyPlan | null = null;
                 const localModifyStatuses: Record<number, BlockRunStatus> = {};
+                const localModifyOpMetrics: Record<number, AgentOperationMetrics> = {};
 
                 for await (const event of stream) {
                     if (ac.signal.aborted) {
@@ -530,7 +535,11 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                 throw new Error('editor bridge unavailable');
                             }
                             {
-                                const result = await executeAgentOperation(bridgeRef.current, event.data.operation);
+                                if (event.data.metrics && Object.keys(event.data.metrics).length > 0) {
+                                setModifyOpMetrics((prev) => ({ ...prev, [event.data.index]: event.data.metrics as AgentOperationMetrics }));
+                                localModifyOpMetrics[event.data.index] = event.data.metrics as AgentOperationMetrics;
+                            }
+                            const result = await executeAgentOperation(bridgeRef.current, event.data.operation);
                                 if (!result.success) {
                                     modifyFailed = true;
                                     failedOpIndex = event.data.index;
@@ -573,6 +582,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                 blockTokens: { ...localBlockTokens },
                                 modifyPlan: localModifyPlan,
                                 modifyStatuses: { ...localModifyStatuses },
+                                modifyOpMetrics: { ...localModifyOpMetrics },
                                 elapsedMs: Date.now() - startTimeRef.current,
                                 ...(typeof event.data.metadata.tokensUsed === 'number' ? { tokensUsed: event.data.metadata.tokensUsed } : {}),
                             });
@@ -611,6 +621,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         blockStatuses,
         modifyPlan,
         modifyStatuses,
+        modifyOpMetrics,
         elapsedMs,
         blockTokens,
         lastRunResult,

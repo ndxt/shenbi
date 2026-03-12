@@ -9,15 +9,22 @@ export type AgentIntent =
   | 'schema.modify'
   | 'chat';
 
+export interface AgentOperationMetrics {
+  durationMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  tokensUsed?: number;
+}
+
 export type AgentOperation =
-  | { op: 'schema.patchProps'; label?: string; nodeId: string; patch: Record<string, unknown> }
-  | { op: 'schema.patchStyle'; label?: string; nodeId: string; patch: Record<string, unknown> }
-  | { op: 'schema.patchEvents'; label?: string; nodeId: string; patch: Record<string, unknown> }
-  | { op: 'schema.patchLogic'; label?: string; nodeId: string; patch: Record<string, unknown> }
-  | { op: 'schema.patchColumns'; label?: string; nodeId: string; columns: unknown }
-  | { op: 'schema.insertNode'; label?: string; parentId?: string; container?: 'body' | 'dialogs'; index?: number; node: SchemaNode }
-  | { op: 'schema.removeNode'; label?: string; nodeId: string }
-  | { op: 'schema.replace'; label?: string; schema: PageSchema };
+  | { op: 'schema.patchProps'; label?: string; nodeId: string; patch: Record<string, unknown>; _metrics?: AgentOperationMetrics }
+  | { op: 'schema.patchStyle'; label?: string; nodeId: string; patch: Record<string, unknown>; _metrics?: AgentOperationMetrics }
+  | { op: 'schema.patchEvents'; label?: string; nodeId: string; patch: Record<string, unknown>; _metrics?: AgentOperationMetrics }
+  | { op: 'schema.patchLogic'; label?: string; nodeId: string; patch: Record<string, unknown>; _metrics?: AgentOperationMetrics }
+  | { op: 'schema.patchColumns'; label?: string; nodeId: string; columns: unknown; _metrics?: AgentOperationMetrics }
+  | { op: 'schema.insertNode'; label?: string; parentId?: string; container?: 'body' | 'dialogs'; index?: number; node: SchemaNode; _metrics?: AgentOperationMetrics }
+  | { op: 'schema.removeNode'; label?: string; nodeId: string; _metrics?: AgentOperationMetrics }
+  | { op: 'schema.replace'; label?: string; schema: PageSchema; _metrics?: AgentOperationMetrics };
 
 export type PageType = 'dashboard' | 'list' | 'form' | 'detail' | 'statistics' | 'custom';
 
@@ -95,7 +102,7 @@ export type AgentEvent =
   | { type: 'tool:result'; data: { tool: string; ok: boolean; summary?: string } }
   | { type: 'plan'; data: PagePlan }
   | { type: 'modify:start'; data: { operationCount: number; explanation: string; operations: Array<{ op: string; label?: string; nodeId?: string }> } }
-  | { type: 'modify:op'; data: { index: number; operation: AgentOperation } }
+  | { type: 'modify:op'; data: { index: number; operation: AgentOperation; metrics?: AgentOperationMetrics } }
   | { type: 'modify:done'; data: {} }
   | { type: 'schema:skeleton'; data: { schema: PageSchema } }
   | { type: 'schema:block:start'; data: { blockId: string; description: string } }

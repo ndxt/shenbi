@@ -101,6 +101,7 @@ export function AIPanel({
     blockStatuses,
     modifyPlan,
     modifyStatuses,
+    modifyOpMetrics,
     elapsedMs,
     blockTokens,
     lastRunResult,
@@ -379,7 +380,7 @@ export function AIPanel({
                   {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
                     <li
                       key={i}
-                      className={`flex items-center gap-2 py-0.5 rounded px-1 ${
+                      className={`flex items-center gap-1.5 py-0.5 rounded px-1 ${
                         modifyStatuses[i] === 'generating' ? 'animate-pulse bg-blue-500/5' : ''
                       }`}
                       style={{ fontSize: '11px' }}
@@ -387,6 +388,17 @@ export function AIPanel({
                       <span className="text-text-primary opacity-80 truncate flex-1" title={modifyPlan.operationLabels[i] ?? ''}>
                         {modifyPlan.operationLabels[i] ?? `操作 ${i + 1}`}
                       </span>
+                      {modifyStatuses[i] === 'done' && modifyOpMetrics[i] && (
+                        <span className="text-text-secondary font-mono tabular-nums shrink-0 flex items-center gap-1" style={{ fontSize: '9px' }}>
+                          {modifyOpMetrics[i].durationMs !== undefined && `${Math.round(modifyOpMetrics[i].durationMs! / 100) / 10}s`}
+                          {modifyOpMetrics[i].inputTokens !== undefined && (
+                            <span>输入{modifyOpMetrics[i].inputTokens}t</span>
+                          )}
+                          {modifyOpMetrics[i].outputTokens !== undefined && (
+                            <span>输出{modifyOpMetrics[i].outputTokens}t</span>
+                          )}
+                        </span>
+                      )}
                       {modifyStatuses[i] === 'done' && (
                         <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
                       )}
@@ -435,10 +447,17 @@ export function AIPanel({
               <div className="mt-1 border-t border-border-ide pt-2">
                 <ul className="flex flex-col gap-0.5">
                   {Array.from({ length: lastRunResult.modifyPlan.operationCount }, (_, i) => (
-                    <li key={i} className="flex items-center gap-2 py-0.5 px-1" style={{ fontSize: '11px' }}>
+                    <li key={i} className="flex items-center gap-1.5 py-0.5 px-1" style={{ fontSize: '11px' }}>
                       <span className="text-text-primary opacity-80 truncate flex-1" title={lastRunResult.modifyPlan?.operationLabels[i] ?? ''}>
                         {lastRunResult.modifyPlan?.operationLabels[i] ?? `操作 ${i + 1}`}
                       </span>
+                      {lastRunResult.modifyOpMetrics[i] && (
+                        <span className="text-text-secondary font-mono tabular-nums shrink-0 flex items-center gap-1" style={{ fontSize: '9px' }}>
+                          {lastRunResult.modifyOpMetrics[i].durationMs !== undefined && `${Math.round(lastRunResult.modifyOpMetrics[i].durationMs! / 100) / 10}s`}
+                          {lastRunResult.modifyOpMetrics[i].inputTokens !== undefined && <span>输入{lastRunResult.modifyOpMetrics[i].inputTokens}t</span>}
+                          {lastRunResult.modifyOpMetrics[i].outputTokens !== undefined && <span>输出{lastRunResult.modifyOpMetrics[i].outputTokens}t</span>}
+                        </span>
+                      )}
                       <CheckCircle2 size={11} className={lastRunResult.modifyStatuses[i] === 'done' ? 'text-emerald-400 shrink-0' : 'text-red-400 shrink-0'} />
                     </li>
                   ))}

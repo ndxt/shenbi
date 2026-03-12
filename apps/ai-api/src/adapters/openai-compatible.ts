@@ -44,6 +44,8 @@ interface ChatCompletionChoice {
 
 interface ChatCompletionUsage {
   total_tokens?: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
 }
 
 interface ChatCompletionResponse {
@@ -225,9 +227,10 @@ export class OpenAICompatibleClient {
     model: string,
     messages: OpenAICompatibleMessage[],
     thinking?: OpenAICompatibleThinking,
-  ): Promise<{ content: string; tokensUsed?: number }> {
+  ): Promise<{ content: string; tokensUsed?: number; inputTokens?: number; outputTokens?: number; durationMs?: number }> {
     const fmt = this.resolveFormat(model, thinking);
     const body = this.buildRequestBody(model, messages, fmt, false);
+    const startMs = Date.now();
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -242,12 +245,21 @@ export class OpenAICompatibleClient {
     }
 
     const payload = await response.json() as ChatCompletionResponse;
+    const durationMs = Date.now() - startMs;
     const content = payload.choices?.[0]?.message?.content?.trim();
     if (!content) {
       throw new LLMError('Provider returned empty content', 'OPENAI_COMPAT_EMPTY');
     }
     const tokensUsed = typeof payload.usage?.total_tokens === 'number' ? payload.usage.total_tokens : undefined;
-    return { content, ...(tokensUsed !== undefined ? { tokensUsed } : {}) };
+    const inputTokens = typeof payload.usage?.prompt_tokens === 'number' ? payload.usage.prompt_tokens : undefined;
+    const outputTokens = typeof payload.usage?.completion_tokens === 'number' ? payload.usage.completion_tokens : undefined;
+    return {
+      content,
+      durationMs,
+      ...(tokensUsed !== undefined ? { tokensUsed } : {}),
+      ...(inputTokens !== undefined ? { inputTokens } : {}),
+      ...(outputTokens !== undefined ? { outputTokens } : {}),
+    };
   }
 
   async *streamChat(

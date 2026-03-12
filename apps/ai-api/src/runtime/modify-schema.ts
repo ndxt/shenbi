@@ -39,6 +39,10 @@ export interface ModifySchemaTraceEntry {
     requestSummary?: OpenAICompatibleRequestDebugSummary & { provider: string };
     rawOutput: string;
     generatedNode?: unknown;
+    durationMs?: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    tokensUsed?: number;
   }>;
 }
 
@@ -657,7 +661,7 @@ export async function executeModifySchema(
     provider,
     ...client.buildRequestDebugSummary(model, planMessages, thinking, false),
   };
-  const { content: planText } = await client.chat(model, planMessages, thinking);
+  const { content: planText, durationMs: planDurationMs, inputTokens: planInputTokens, outputTokens: planOutputTokens, tokensUsed: planTokensUsed } = await client.chat(model, planMessages, thinking);
   const planParsed = extractJson<unknown>(planText, 'modify', input.request, model);
   if (!isPlanResult(planParsed)) {
     throw new LLMError('modifySchema planner returned an invalid result shape', 'INVALID_MODIFY_RESULT');
@@ -679,9 +683,26 @@ export async function executeModifySchema(
   // Fast path: no complex ops
   // ========================
   if (complexEntries.length === 0) {
+    // Distribute Phase 1 metrics evenly across all simple ops
+    const simpleCount = simpleOps.length || 1;
+    const perOpDuration = planDurationMs !== undefined ? Math.round(planDurationMs / simpleCount) : undefined;
+    const perOpInput = planInputTokens !== undefined ? Math.round(planInputTokens / simpleCount) : undefined;
+    const perOpOutput = planOutputTokens !== undefined ? Math.round(planOutputTokens / simpleCount) : undefined;
+    const perOpTotal = planTokensUsed !== undefined ? Math.round(planTokensUsed / simpleCount) : undefined;
+
+    const opsWithMetrics: AgentOperation[] = simpleOps.map((op) => ({
+      ...op,
+      _metrics: {
+        ...(perOpDuration !== undefined ? { durationMs: perOpDuration } : {}),
+        ...(perOpInput !== undefined ? { inputTokens: perOpInput } : {}),
+        ...(perOpOutput !== undefined ? { outputTokens: perOpOutput } : {}),
+        ...(perOpTotal !== undefined ? { tokensUsed: perOpTotal } : {}),
+      },
+    } as AgentOperation));
+
     const result: ModifyResult = {
       explanation: planParsed.explanation,
-      operations: simpleOps,
+      operations: opsWithMetrics,
     };
     if (trace) {
       trace.modify = {
@@ -709,7 +730,7 @@ export async function executeModifySchema(
     };
 
     try {
-      const { content: insertText } = await client.chat(model, insertMessages, thinking);
+      const { content: insertText, durationMs: insertDurationMs, inputTokens: insertInputTokens, outputTokens: insertOutputTokens, tokensUsed: insertTokensUsed } = await client.chat(model, insertMessages, thinking);
       const insertParsed = extractJson<unknown>(insertText, 'modify-insertNode', input.request, model);
 
       let node: unknown;
@@ -727,14 +748,27 @@ export async function executeModifySchema(
         requestSummary: insertRequestSummary,
         rawOutput: insertText,
         generatedNode: node,
+        ...(insertDurationMs !== undefined ? { durationMs: insertDurationMs } : {}),
+        ...(insertInputTokens !== undefined ? { inputTokens: insertInputTokens } : {}),
+        ...(insertOutputTokens !== undefined ? { outputTokens: insertOutputTokens } : {}),
+        ...(insertTokensUsed !== undefined ? { tokensUsed: insertTokensUsed } : {}),
       });
+
+      const insertMetrics: import('@shenbi/ai-contracts').AgentOperationMetrics = {
+        ...(insertDurationMs !== undefined ? { durationMs: insertDurationMs } : {}),
+        ...(insertInputTokens !== undefined ? { inputTokens: insertInputTokens } : {}),
+        ...(insertOutputTokens !== undefined ? { outputTokens: insertOutputTokens } : {}),
+        ...(insertTokensUsed !== undefined ? { tokensUsed: insertTokensUsed } : {}),
+      };
 
       const finalOp: AgentOperation = {
         op: 'schema.insertNode',
         ...(skeleton.parentId ? { parentId: skeleton.parentId } : {}),
         ...(skeleton.container ? { container: skeleton.container } : {}),
         ...(skeleton.index !== undefined ? { index: skeleton.index } : {}),
+        ...('label' in skeleton && skeleton.label ? { label: skeleton.label as string } : {}),
         node: node as AgentOperation extends { op: 'schema.insertNode'; node: infer N } ? N : never,
+        _metrics: insertMetrics,
       } as AgentOperation;
 
       executedOps.push({ index, operation: finalOp });
@@ -769,7 +803,19 @@ export async function executeModifySchema(
 
   await Promise.all(phase2Tasks);
 
-  // Merge: rebuild operations array in original order
+  // Merge: rebuild operations array in original order, adding Phase 1 metrics to simple ops
+  const simpleCount = simpleOps.length || 1;
+  const perOpDuration = planDurationMs !== undefined ? Math.round(planDurationMs / simpleCount) : undefined;
+  const perOpInput = planInputTokens !== undefined ? Math.round(planInputTokens / simpleCount) : undefined;
+  const perOpOutput = planOutputTokens !== undefined ? Math.round(planOutputTokens / simpleCount) : undefined;
+  const perOpTotal = planTokensUsed !== undefined ? Math.round(planTokensUsed / simpleCount) : undefined;
+  const phase1Metrics: import('@shenbi/ai-contracts').AgentOperationMetrics = {
+    ...(perOpDuration !== undefined ? { durationMs: perOpDuration } : {}),
+    ...(perOpInput !== undefined ? { inputTokens: perOpInput } : {}),
+    ...(perOpOutput !== undefined ? { outputTokens: perOpOutput } : {}),
+    ...(perOpTotal !== undefined ? { tokensUsed: perOpTotal } : {}),
+  };
+
   const mergedOps: AgentOperation[] = [];
   let simpleIdx = 0;
   for (const [planIdx, planOp] of planParsed.operations.entries()) {
@@ -777,7 +823,8 @@ export async function executeModifySchema(
     if (executed) {
       mergedOps.push(executed.operation);
     } else {
-      mergedOps.push(simpleOps[simpleIdx]!);
+      const simpleOp = simpleOps[simpleIdx]!;
+      mergedOps.push({ ...simpleOp, _metrics: phase1Metrics } as AgentOperation);
       simpleIdx += 1;
     }
   }

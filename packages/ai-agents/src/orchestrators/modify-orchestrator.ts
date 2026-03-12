@@ -61,6 +61,7 @@ export async function* modifyOrchestrator(
       data: {
         index,
         operation,
+        ...('_metrics' in operation && operation._metrics ? { metrics: operation._metrics } : {}),
       },
     };
   }
