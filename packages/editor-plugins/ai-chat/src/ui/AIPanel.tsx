@@ -135,7 +135,7 @@ export function AIPanel({
   }) => (
     <li
       className="flex items-center gap-1.5 py-0.5 rounded px-1.5"
-      style={{ fontSize: '11px', ...(isPending ? { animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' } : {}) }}
+      style={{ fontSize: '11px', ...(isPending ? { animation: 'pulse 3s ease-in-out infinite' } : {}) }}
     >
       <span className="text-text-primary opacity-80 truncate flex-1 leading-none translate-y-[1px]" title={label}>{label}</span>
       {isDone && metrics && <MetricsBadge durationMs={metrics.durationMs} inputTokens={metrics.inputTokens} outputTokens={metrics.outputTokens} />}
@@ -294,7 +294,7 @@ export function AIPanel({
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes shimmer { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 20% { opacity: 1; } 50% { opacity: 0.25; } 80% { opacity: 1; } }
       `}</style>
       <div className="w-full h-full bg-bg-panel border-l border-border-ide flex flex-col shrink-0 overflow-hidden">
         <div className="h-9 px-4 border-b border-border-ide flex items-center justify-between shrink-0">
