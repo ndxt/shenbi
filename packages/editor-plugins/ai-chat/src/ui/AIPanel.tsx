@@ -45,6 +45,18 @@ const PROMPT_PRESETS = [
     label: '多区块门户',
     value: '生成一个多区块门户页面，包含顶部欢迎区、左右分栏卡片、中部九宫格快捷入口、下方图文混排信息区和浮动操作按钮，覆盖 Grid、Card、Typography、List、Flex、FloatButton 组合。',
   },
+  {
+    label: '数据分析看板',
+    value: '生成一个数据分析看板页面，顶部四个 KPI 指标卡（Statistic），下方左侧折线图展示月度趋势（Chart.Line），右侧饼图展示类别占比分布（Chart.Pie），底部柱状图对比各部门数据（Chart.Column），覆盖 Card、Chart.Line、Chart.Pie、Chart.Column、Statistic 组合。',
+  },
+  {
+    label: '销售趋势图表',
+    value: '生成一个销售趋势图表页面，包含顶部筛选条件区（日期选择、类型下拉），中部面积图展示近6个月销售额趋势（Chart.Area），侧边条形图对比各产品销量排行（Chart.Bar），底部数据汇总表格，覆盖 Form、DatePicker、Select、Chart.Area、Chart.Bar、Table 组合。',
+  },
+  {
+    label: 'KPI 与进度监控',
+    value: '生成一个 KPI 进度监控页面，包含左侧三个仪表盘分别展示目标达成率、服务可用率和用户满意度（Chart.Gauge），右侧 Descriptions 展示详细指标，底部 Timeline 展示近期关键事件，覆盖 Chart.Gauge、Descriptions、Timeline、Card 组合。',
+  },
 ] as const;
 
 function extractDebugFilePath(message: string): string | undefined {
