@@ -664,7 +664,14 @@ export async function executeModifySchema(
   const { content: planText, durationMs: planDurationMs, inputTokens: planInputTokens, outputTokens: planOutputTokens, tokensUsed: planTokensUsed } = await client.chat(model, planMessages, thinking);
   const planParsed = extractJson<unknown>(planText, 'modify', input.request, model);
   if (!isPlanResult(planParsed)) {
-    throw new LLMError('modifySchema planner returned an invalid result shape', 'INVALID_MODIFY_RESULT');
+    const debugFile = writeInvalidJsonDump({
+      source: 'modify',
+      rawOutput: planText,
+      summarizedOutput: planText.slice(0, 400),
+      request: input.request,
+      model,
+    });
+    throw new LLMError(`modifySchema planner returned an invalid result shape. Debug file: ${debugFile}`, 'INVALID_MODIFY_RESULT');
   }
 
   // Separate simple ops (ready to execute) from complex ops (need Phase 2)
@@ -890,7 +897,14 @@ export async function planModify(
   } = await client.chat(model, planMessages, thinking);
   const planParsed = extractJson<unknown>(planText, 'modify', input.request, model);
   if (!isPlanResult(planParsed)) {
-    throw new LLMError('modifySchema planner returned an invalid result shape', 'INVALID_MODIFY_RESULT');
+    const debugFile = writeInvalidJsonDump({
+      source: 'modify',
+      rawOutput: planText,
+      summarizedOutput: planText.slice(0, 400),
+      request: input.request,
+      model,
+    });
+    throw new LLMError(`modifySchema planner returned an invalid result shape. Debug file: ${debugFile}`, 'INVALID_MODIFY_RESULT');
   }
 
   if (trace) {
