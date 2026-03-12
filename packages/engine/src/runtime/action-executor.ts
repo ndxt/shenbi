@@ -52,6 +52,8 @@ export interface ExecutorOptions {
   notification?: NotificationAdapter;
   confirm?: ConfirmAdapter;
   fetcher?: typeof fetch;
+  /** 将 Modal.confirm 挂载到页面容器而非 body */
+  getPopupContainer?: () => HTMLElement;
 }
 
 const expressionCache = new Map<string, ReturnType<typeof compileExpression>>();
@@ -386,6 +388,9 @@ export async function executeActions(
           antdConfirmConfig.onCancel = onCancel;
         }
         const modalFn = mod?.Modal?.[confirmType] ?? mod?.Modal?.confirm;
+        if (options.getPopupContainer) {
+          antdConfirmConfig.getContainer = options.getPopupContainer;
+        }
         modalFn?.(antdConfirmConfig);
         break;
       }

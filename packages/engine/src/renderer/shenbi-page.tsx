@@ -1,4 +1,4 @@
-import { createElement, useMemo, type ReactElement } from 'react';
+import { createElement, useMemo, useRef, useCallback, type ReactElement } from 'react';
 import type { PageSchema } from '@shenbi/schema';
 import type { ComponentResolver, PageRuntime, CompiledNode } from '../types/contracts';
 import { compileSchema } from '../compiler/schema';
@@ -19,9 +19,15 @@ export function ShenbiPage({
   compiledBody,
   compiledDialogs,
 }: ShenbiPageProps): ReactElement | null {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const getPopupContainer = useCallback((): HTMLElement => {
+    return containerRef.current ?? document.body;
+  }, []);
+
   const contextValue = useMemo(
-    () => ({ runtime, resolver }),
-    [runtime, resolver],
+    () => ({ runtime, resolver, getPopupContainer }),
+    [runtime, resolver, getPopupContainer],
   );
 
   const bodyElements = Array.isArray(compiledBody)
@@ -47,14 +53,22 @@ export function ShenbiPage({
     const isOpen = runtime.state[visibleKey] === true;
     const payload = runtime.dialogPayloads[dialogId];
 
-    if (!isOpen) return null;
+    debugger;
 
+    // 始终渲染，通过 open 状态控制显隐，让 Ant Design 处理开关动画和遮罩交互
     return createElement(NodeRenderer, {
       key: dialogId,
       node: dialog,
       extraContext: { dialogPayload: payload, dialogId },
+      open: isOpen,
+      ...(isDrawer
+        ? { onClose: () => { debugger; runtime.dispatch({ type: 'SET', key: visibleKey, value: false }) } }
+        : { onCancel: () => { debugger; runtime.dispatch({ type: 'SET', key: visibleKey, value: false }) } }),
     });
   });
+
+  // 页面根容器：position: relative 使浮层能够正确相对于页面定位
+  const containerStyle = { position: 'relative' as const, height: '100%' };
 
   // React 19: 直接用 <ShenbiContext> 作为 Provider
   return createElement(
@@ -63,8 +77,12 @@ export function ShenbiPage({
     createElement(
       ShenbiContext,
       { value: contextValue },
-      bodyElements,
-      dialogElements,
+      createElement(
+        'div',
+        { ref: containerRef, style: containerStyle, 'data-shenbi-page-root': true },
+        bodyElements,
+        dialogElements,
+      ),
     ),
   );
 }

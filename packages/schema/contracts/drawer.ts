@@ -91,8 +91,7 @@ export const drawerContract: ComponentContract = {
     },
     getContainer: {
       type: 'any',
-      default: 'body',
-      description: '指定 Drawer 挂载的节点',
+      description: '指定 Drawer 挂载的节点，默认挂载到页面容器',
     },
     keyboard: {
       type: 'boolean',

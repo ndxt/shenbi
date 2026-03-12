@@ -29,6 +29,13 @@ const ITEMS_BASED_COMPONENTS = new Set([
   'Tabs',
 ]);
 
+/**
+ * 需要将挂载容器设置为页面根节点的覆盖层组件。
+ * 自动注入 getContainer prop 指向 ShenbiPage 的容器 div，
+ * 避免这些组件默认挂载到 <body>。
+ */
+const OVERLAY_COMPONENTS = new Set(['Modal', 'Drawer']);
+
 // ===== Context =====
 
 export const ShenbiContext = createContext<ShenbiContextValue | null>(null);
@@ -39,6 +46,11 @@ export function useShenbi(): ShenbiContextValue {
     throw new Error('useShenbi must be used within <ShenbiContext>');
   }
   return ctx;
+}
+
+export function useGetPopupContainer(): (() => HTMLElement) | undefined {
+  const ctx = useContext(ShenbiContext);
+  return ctx?.getPopupContainer;
 }
 
 // ===== ErrorBoundary =====
@@ -185,7 +197,7 @@ function renderChild(
 }
 
 export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRendererProps): ReactElement | null {
-  const { runtime, resolver } = useShenbi();
+  const { runtime, resolver, getPopupContainer } = useShenbi();
   const ctx: ExpressionContext = runtime.getContext(extraContext);
 
   // Step 2: 权限检查
@@ -278,6 +290,30 @@ export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRende
   // 为编辑器画布提供可点击选中能力
   if (node.id && Comp !== Fragment) {
     resolvedProps['data-shenbi-node-id'] = node.id;
+  }
+
+  // 强制 Modal/Drawer 不使用 Portal，直接在当前 DOM 位置渲染（即页面容器内），
+  // 而非默认挂载到 <body>。getContainer={false} 是 Ant Design 的标准用法。
+  if (OVERLAY_COMPONENTS.has(node.componentType)) {
+    resolvedProps.getContainer = false;
+
+    // 自动注入关闭回调：如果 open 绑定了 state 表达式且没有 onClose/onCancel，
+    // 则自动生成一个将对应 state 设为 false 的处理器。
+    const isDrawer = node.componentType === 'Drawer';
+    const closeEvent = isDrawer ? 'onClose' : 'onCancel';
+    if (typeof resolvedProps[closeEvent] !== 'function') {
+      const openExpr = node.dynamicProps.open;
+      if (openExpr && openExpr.deps.length > 0) {
+        // deps 形如 ['state.drawerVisible']，取第一个并去掉 'state.' 前缀
+        const dep = openExpr.deps[0];
+        if (dep) {
+          const stateKey = dep.startsWith('state.') ? dep.slice(6) : dep;
+          resolvedProps[closeEvent] = () => {
+            runtime.dispatch({ type: 'SET', key: stateKey, value: false });
+          };
+        }
+      }
+    }
   }
 
   // Step 8: show 条件

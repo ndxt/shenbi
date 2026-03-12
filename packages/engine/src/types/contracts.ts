@@ -80,4 +80,6 @@ export interface ComponentResolver {
 export interface ShenbiContextValue {
   runtime: PageRuntime;
   resolver: ComponentResolver;
+  /** 返回页面根容器 DOM 节点，用于将浮层（Modal/Drawer/confirm）挂载到页面容器而非 body */
+  getPopupContainer?: () => HTMLElement;
 }
