@@ -10,14 +10,14 @@ export type AgentIntent =
   | 'chat';
 
 export type AgentOperation =
-  | { op: 'schema.patchProps'; nodeId: string; patch: Record<string, unknown> }
-  | { op: 'schema.patchStyle'; nodeId: string; patch: Record<string, unknown> }
-  | { op: 'schema.patchEvents'; nodeId: string; patch: Record<string, unknown> }
-  | { op: 'schema.patchLogic'; nodeId: string; patch: Record<string, unknown> }
-  | { op: 'schema.patchColumns'; nodeId: string; columns: unknown }
-  | { op: 'schema.insertNode'; parentId?: string; container?: 'body' | 'dialogs'; index?: number; node: SchemaNode }
-  | { op: 'schema.removeNode'; nodeId: string }
-  | { op: 'schema.replace'; schema: PageSchema };
+  | { op: 'schema.patchProps'; label?: string; nodeId: string; patch: Record<string, unknown> }
+  | { op: 'schema.patchStyle'; label?: string; nodeId: string; patch: Record<string, unknown> }
+  | { op: 'schema.patchEvents'; label?: string; nodeId: string; patch: Record<string, unknown> }
+  | { op: 'schema.patchLogic'; label?: string; nodeId: string; patch: Record<string, unknown> }
+  | { op: 'schema.patchColumns'; label?: string; nodeId: string; columns: unknown }
+  | { op: 'schema.insertNode'; label?: string; parentId?: string; container?: 'body' | 'dialogs'; index?: number; node: SchemaNode }
+  | { op: 'schema.removeNode'; label?: string; nodeId: string }
+  | { op: 'schema.replace'; label?: string; schema: PageSchema };
 
 export type PageType = 'dashboard' | 'list' | 'form' | 'detail' | 'statistics' | 'custom';
 
@@ -94,7 +94,7 @@ export type AgentEvent =
   | { type: 'tool:start'; data: { tool: string; label?: string } }
   | { type: 'tool:result'; data: { tool: string; ok: boolean; summary?: string } }
   | { type: 'plan'; data: PagePlan }
-  | { type: 'modify:start'; data: { operationCount: number; explanation: string; operations: Array<{ op: string; nodeId?: string }> } }
+  | { type: 'modify:start'; data: { operationCount: number; explanation: string; operations: Array<{ op: string; label?: string; nodeId?: string }> } }
   | { type: 'modify:op'; data: { index: number; operation: AgentOperation } }
   | { type: 'modify:done'; data: {} }
   | { type: 'schema:skeleton'; data: { schema: PageSchema } }

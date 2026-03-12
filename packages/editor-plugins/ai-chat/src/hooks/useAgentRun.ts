@@ -291,7 +291,6 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             setModifyStatuses({});
             setElapsedMs(0);
             setBlockTokens({});
-            setLastRunResult(null);
             startTimeRef.current = Date.now();
             currentIntentRef.current = null;
 
@@ -498,7 +497,8 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                 }
                             }
                             {
-                                const labels = (event.data.operations ?? []).map((o: { op: string; nodeId?: string }) => {
+                                const labels = (event.data.operations ?? []).map((o: { op: string; label?: string; nodeId?: string }) => {
+                                    if (o.label) return o.label;
                                     const shortOp = o.op.replace('schema.', '');
                                     return o.nodeId ? `${shortOp} → ${o.nodeId}` : shortOp;
                                 });

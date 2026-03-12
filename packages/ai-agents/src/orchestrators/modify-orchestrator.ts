@@ -49,6 +49,7 @@ export async function* modifyOrchestrator(
       explanation: result.explanation,
       operations: result.operations.map((o) => ({
         op: o.op,
+        ...('label' in o && o.label ? { label: o.label } : {}),
         ...('nodeId' in o && o.nodeId ? { nodeId: o.nodeId } : {}),
       })),
     },
