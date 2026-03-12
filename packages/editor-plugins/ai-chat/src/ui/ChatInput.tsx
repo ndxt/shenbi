@@ -10,7 +10,7 @@ interface DropdownItem {
     label: string;
     value: string;
     title?: string;
-    onRemove?: (value: string) => void;
+    onRemove?: ((value: string) => void) | undefined;
 }
 
 interface ChatInputProps {

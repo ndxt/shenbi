@@ -99,7 +99,7 @@ export class MockAIClient implements AIClient {
             await wait(240, options.signal);
             yield { type: 'tool:result', data: { tool: 'modifySchema', ok: true, summary: '准备更新当前节点标题。' } };
             yield { type: 'message:delta', data: { text: '识别为局部修改，准备直接应用到当前页面。\n' } };
-            yield { type: 'modify:start', data: { operationCount: 1, explanation: '准备更新当前节点标题。' } };
+            yield { type: 'modify:start', data: { operationCount: 1, operations: [{ op: 'schema.patchProps', label: '更新标题' }], explanation: '准备更新当前节点标题。' } };
             yield {
                 type: 'modify:op',
                 data: {
