@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '@shenbi/i18n';
 
 export interface CommandPaletteItem {
   id: string;
@@ -73,6 +74,7 @@ export function CommandPalette({
   onClose,
   onRunCommand,
 }: CommandPaletteProps) {
+  const { t } = useTranslation('editorUi');
   const [query, setQuery] = React.useState('');
   const [selectedCommandId, setSelectedCommandId] = React.useState<string | undefined>(undefined);
   const listRef = React.useRef<HTMLDivElement | null>(null);
@@ -120,7 +122,7 @@ export function CommandPalette({
       const groups: Array<[string, CommandPaletteItem[]]> = [];
 
       if (recentCommands.length > 0) {
-        groups.push(['Recent', recentCommands]);
+        groups.push([t('commandPalette.recent'), recentCommands]);
       }
 
       const remainingGroups = new Map<string, CommandPaletteItem[]>();
@@ -128,7 +130,7 @@ export function CommandPalette({
         if (recentCommandIdsSet.has(command.id)) {
           continue;
         }
-        const key = command.category ?? 'Other';
+        const key = command.category ?? t('commandPalette.other');
         const items = remainingGroups.get(key) ?? [];
         items.push(command);
         remainingGroups.set(key, items);
@@ -139,13 +141,13 @@ export function CommandPalette({
 
     const groups = new Map<string, CommandPaletteItem[]>();
     for (const command of filteredCommands) {
-      const key = command.category ?? 'Other';
+      const key = command.category ?? t('commandPalette.other');
       const items = groups.get(key) ?? [];
       items.push(command);
       groups.set(key, items);
     }
     return [...groups.entries()];
-  }, [filteredCommands, query, recentCommandIds]);
+  }, [filteredCommands, query, recentCommandIds, t]);
   const orderedCommands = React.useMemo(
     () => groupedCommands.flatMap(([, items]) => items),
     [groupedCommands],
@@ -204,7 +206,7 @@ export function CommandPalette({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Command Palette"
+        aria-label={t('commandPalette.title')}
         className="w-[560px] overflow-hidden rounded border border-border-ide bg-bg-panel shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
@@ -212,11 +214,11 @@ export function CommandPalette({
           <input
             autoFocus
             data-shenbi-command-palette-input="true"
-            aria-label="Command Palette Search"
+            aria-label={t('commandPalette.searchLabel')}
             aria-controls="command-palette-listbox"
             aria-activedescendant={selectedCommandId ? `command-palette-option-${selectedCommandId}` : undefined}
             className="w-full bg-transparent text-sm text-text-primary outline-none"
-            placeholder="Type a command"
+            placeholder={t('commandPalette.placeholder')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -246,11 +248,11 @@ export function CommandPalette({
           id="command-palette-listbox"
           ref={listRef}
           role="listbox"
-          aria-label="Command Palette Results"
+          aria-label={t('commandPalette.resultsLabel')}
           className="max-h-[360px] overflow-auto py-1"
         >
           {orderedCommands.length === 0 ? (
-            <div className="px-3 py-4 text-sm text-text-secondary">No commands found.</div>
+            <div className="px-3 py-4 text-sm text-text-secondary">{t('commandPalette.noResults')}</div>
           ) : (
             groupedCommands.map(([category, items]) => (
               <div key={category} className="py-1">

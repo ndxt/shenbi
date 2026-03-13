@@ -29,11 +29,16 @@ export interface HostCommandRegistryOptions {
   setShowAssistantPanel: (value: boolean) => void;
   setShowCommandPalette: (value: boolean) => void;
   toggleMaximize: () => void;
+  t: (key: string) => string;
 }
 
 function createDelegatedCommand(
   id: string,
   title: string,
+  category: string,
+  description: string,
+  aliases: string[],
+  keywords: string[],
   shortcut: string | undefined,
   pluginContext: PluginContext | undefined,
   when = 'editorFocused && !inputFocused',
@@ -45,28 +50,10 @@ function createDelegatedCommand(
   return {
     id,
     title,
-    category: id.startsWith('file.') ? 'File' : 'Edit',
-    aliases: id === 'file.saveSchema'
-      ? ['save']
-      : id === 'file.saveAs'
-        ? ['save as']
-        : id === 'editor.undo'
-          ? ['undo change']
-          : ['redo change'],
-    keywords: id === 'file.saveSchema'
-      ? ['schema', 'persist']
-      : id === 'file.saveAs'
-        ? ['schema', 'export']
-        : id === 'editor.undo'
-          ? ['history', 'back']
-          : ['history', 'forward'],
-    description: id === 'file.saveSchema'
-      ? 'Save the current schema.'
-      : id === 'file.saveAs'
-        ? 'Save the current schema as a new file.'
-        : id === 'editor.undo'
-          ? 'Undo the most recent change.'
-          : 'Redo the most recent undone change.',
+    category,
+    aliases,
+    keywords,
+    description,
     when,
     priority: 50,
     execute: (payload) => execute(id, payload),
@@ -75,11 +62,12 @@ function createDelegatedCommand(
 }
 
 export function createHostCommandRegistry(options: HostCommandRegistryOptions): HostCommandDefinition[] {
+  const { t } = options;
   const commands: Array<HostCommandDefinition | undefined> = [
     {
       id: 'commandPalette.open',
-      title: 'Open Command Palette',
-      category: 'Workbench',
+      title: t('hostCommands.openCommandPalette'),
+      category: t('hostCommands.category.workbench'),
       aliases: ['show commands', 'open palette'],
       keywords: ['commands', 'search', 'palette'],
       description: 'Open the command palette to search and run commands.',
@@ -90,14 +78,50 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
         options.setShowCommandPalette(true);
       },
     },
-    createDelegatedCommand('editor.undo', 'Undo', 'Mod+Z', options.pluginContext),
-    createDelegatedCommand('editor.redo', 'Redo', 'Mod+Shift+Z', options.pluginContext),
-    createDelegatedCommand('file.saveSchema', 'Save File', 'Mod+S', options.pluginContext),
-    createDelegatedCommand('file.saveAs', 'Save As', 'Mod+Shift+S', options.pluginContext),
+    createDelegatedCommand(
+      'editor.undo',
+      t('hostCommands.undo'),
+      t('hostCommands.category.edit'),
+      'Undo the most recent change.',
+      ['undo change'],
+      ['history', 'back'],
+      'Mod+Z',
+      options.pluginContext,
+    ),
+    createDelegatedCommand(
+      'editor.redo',
+      t('hostCommands.redo'),
+      t('hostCommands.category.edit'),
+      'Redo the most recent undone change.',
+      ['redo change'],
+      ['history', 'forward'],
+      'Mod+Shift+Z',
+      options.pluginContext,
+    ),
+    createDelegatedCommand(
+      'file.saveSchema',
+      t('hostCommands.saveFile'),
+      t('hostCommands.category.file'),
+      'Save the current schema.',
+      ['save'],
+      ['schema', 'persist'],
+      'Mod+S',
+      options.pluginContext,
+    ),
+    createDelegatedCommand(
+      'file.saveAs',
+      t('hostCommands.saveAs'),
+      t('hostCommands.category.file'),
+      'Save the current schema as a new file.',
+      ['save as'],
+      ['schema', 'export'],
+      'Mod+Shift+S',
+      options.pluginContext,
+    ),
     {
       id: 'layout.toggleSidebar',
-      title: options.showSidebar ? 'Hide Sidebar' : 'Show Sidebar',
-      category: 'Layout',
+      title: options.showSidebar ? t('hostCommands.hideSidebar') : t('hostCommands.showSidebar'),
+      category: t('hostCommands.category.layout'),
       aliases: ['toggle sidebar', 'left panel'],
       keywords: ['sidebar', 'layout', 'navigation'],
       description: 'Toggle the visibility of the left sidebar.',
@@ -110,8 +134,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
     },
     {
       id: 'layout.toggleConsole',
-      title: options.showConsole ? 'Hide Console' : 'Show Console',
-      category: 'Layout',
+      title: options.showConsole ? t('hostCommands.hideConsole') : t('hostCommands.showConsole'),
+      category: t('hostCommands.category.layout'),
       aliases: ['toggle console', 'bottom panel'],
       keywords: ['console', 'layout', 'logs'],
       description: 'Toggle the visibility of the bottom console panel.',
@@ -124,8 +148,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
     },
     {
       id: 'layout.toggleInspector',
-      title: options.showInspector ? 'Hide Inspector' : 'Show Inspector',
-      category: 'Layout',
+      title: options.showInspector ? t('hostCommands.hideInspector') : t('hostCommands.showInspector'),
+      category: t('hostCommands.category.layout'),
       aliases: ['toggle inspector', 'right panel'],
       keywords: ['inspector', 'layout', 'properties'],
       description: 'Toggle the visibility of the right inspector panel.',
@@ -139,8 +163,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
     options.hasAssistantPanel
       ? {
           id: 'layout.toggleAssistantPanel',
-          title: options.showAssistantPanel ? 'Hide Assistant Panel' : 'Show Assistant Panel',
-          category: 'Layout',
+          title: options.showAssistantPanel ? t('hostCommands.hideAssistantPanel') : t('hostCommands.showAssistantPanel'),
+          category: t('hostCommands.category.layout'),
           aliases: ['toggle assistant', 'toggle ai panel'],
           keywords: ['assistant', 'ai', 'layout'],
           description: 'Toggle the visibility of the assistant panel.',
@@ -153,8 +177,8 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
       : undefined,
     {
       id: 'layout.toggleMaximize',
-      title: options.isMaximized ? 'Restore Layout' : 'Maximize Center Area',
-      category: 'Layout',
+      title: options.isMaximized ? t('hostCommands.restoreLayout') : t('hostCommands.maximizeCenter'),
+      category: t('hostCommands.category.layout'),
       aliases: ['maximize editor', 'restore panels'],
       keywords: ['maximize', 'layout', 'focus'],
       description: 'Maximize or restore the center editing area.',

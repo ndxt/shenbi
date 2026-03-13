@@ -1,0 +1,84 @@
+{
+  "panel": {
+    "title": "AI Assistant",
+    "clear": "Clear",
+    "clearAriaLabel": "Clear",
+    "clearTooltip": "Clear current session and page"
+  },
+  "model": {
+    "loadingModels": "Loading model list...",
+    "loadModelsFailed": "Failed to load model list: {{error}}",
+    "modelsNotLoaded": "Model list not yet loaded"
+  },
+  "status": {
+    "notSelected": "Not selected",
+    "selected": "Selected: {{label}}",
+    "bridgeDisconnected": "Bridge not connected",
+    "generating": "Generating",
+    "operationWithIndex": "Operation {{index}}"
+  },
+  "presets": {
+    "label": "Common Scenarios",
+    "workspaceOverview": {
+      "label": "Workspace Overview",
+      "value": "Generate a complex workspace homepage with filter area, KPI cards, trend charts, table list, right detail drawer, and top quick actions. Focus on covering Card, Table, Tabs, Drawer, Form, Button, and responsive layout combinations."
+    },
+    "masterDetail": {
+      "label": "Master-Detail",
+      "value": "Generate a master-detail page: left side tree or list, right side Tabs detail area, with search, status tags, action buttons, form edit modal, and bottom timeline. Cover Tree, Tabs, Descriptions, Modal, Form, Tag combinations."
+    },
+    "formOrchestration": {
+      "label": "Form Orchestration",
+      "value": "Generate a complex form orchestration page with basic info, grouped sections, Form.List dynamic add/remove, linked validation, submit button area, and result preview card. Cover Form, Input, Select, DatePicker, Form.List, Card, Alert combinations."
+    },
+    "listWithDrawer": {
+      "label": "List with Drawer",
+      "value": "Generate a list page with query form, batch action bar, data table, row actions, detail drawer, and pagination. Cover Query Form, Table, Drawer, Space, Button, Tag common scenarios."
+    },
+    "multiBlockPortal": {
+      "label": "Multi-Block Portal",
+      "value": "Generate a multi-block portal page with top welcome area, left-right split cards, center grid quick links, bottom mixed content area, and floating action button. Cover Grid, Card, Typography, List, Flex, FloatButton combinations."
+    },
+    "dataAnalysisDashboard": {
+      "label": "Data Analysis Dashboard",
+      "value": "Generate a data analysis dashboard page with four KPI statistic cards at the top, a line chart showing monthly trends on the left (Chart.Line), a pie chart showing category distribution on the right (Chart.Pie), and a column chart comparing department data at the bottom (Chart.Column). Cover Card, Chart.Line, Chart.Pie, Chart.Column, Statistic combinations."
+    },
+    "salesTrendCharts": {
+      "label": "Sales Trend Charts",
+      "value": "Generate a sales trend chart page with top filter area (date picker, type dropdown), center area chart showing 6-month sales trend (Chart.Area), side bar chart comparing product sales ranking (Chart.Bar), and bottom data summary table. Cover Form, DatePicker, Select, Chart.Area, Chart.Bar, Table combinations."
+    },
+    "kpiProgressMonitor": {
+      "label": "KPI & Progress Monitor",
+      "value": "Generate a KPI progress monitoring page with three gauges on the left showing goal achievement rate, service availability, and user satisfaction (Chart.Gauge), detailed metrics in Descriptions on the right, and recent key events in Timeline at the bottom. Cover Chart.Gauge, Descriptions, Timeline, Card combinations."
+    }
+  },
+  "input": {
+    "historyLabel": "History",
+    "empty": "Empty",
+    "remove": "Remove",
+    "placeholder": "Enter debug prompt, Enter to send, Shift+Enter for new line"
+  },
+  "message": {
+    "you": "You",
+    "assistant": "Shenbi AI",
+    "welcome": "Hello! I'm Shenbi Intelligent Development Assistant.\nI can help you generate layouts, bind data, and adjust styles.\nHow can I help you today?"
+  },
+  "result": {
+    "generateComplete": "Generation Complete",
+    "modifyComplete": "Modification Complete",
+    "dismiss": "Dismiss",
+    "total": "Total",
+    "duration": "Duration",
+    "tokens": "Tokens",
+    "fileAutoSaved": "File auto-saved",
+    "autoSaveFailed": "Auto-save failed: {{error}}",
+    "pageChangesApplied": "Page changes applied",
+    "traceFile": "Trace File",
+    "debugFile": "Debug File",
+    "memoryDump": "Memory Dump"
+  },
+  "settings": {
+    "thinking": "Thinking",
+    "concurrency": "Concurrency"
+  }
+}

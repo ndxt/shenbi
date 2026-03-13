@@ -23,6 +23,7 @@
     "@shenbi/ai-contracts": "workspace:*",
     "@shenbi/editor-core": "workspace:*",
     "@shenbi/editor-plugin-api": "workspace:*",
+    "@shenbi/i18n": "workspace:*",
     "@shenbi/schema": "workspace:*",
     "lucide-react": "^0.575.0"
   },

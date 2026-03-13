@@ -194,5 +194,57 @@
       "cursor": "Cursor Dark",
       "webstormDark": "WebStorm Dark"
     }
+  },
+  "editorTabs": {
+    "unsaved": "Unsaved",
+    "unsavedTooltip": "Unsaved (Ctrl+S to save)",
+    "close": "Close",
+    "closeOthers": "Close Others",
+    "closeSaved": "Close Saved",
+    "closeAll": "Close All",
+    "untitled": "Untitled"
+  },
+  "commandPalette": {
+    "title": "Command Palette",
+    "searchLabel": "Command Palette Search",
+    "placeholder": "Type a command",
+    "resultsLabel": "Command Palette Results",
+    "noResults": "No commands found.",
+    "recent": "Recent",
+    "other": "Other"
+  },
+  "hostCommands": {
+    "openCommandPalette": "Open Command Palette",
+    "undo": "Undo",
+    "redo": "Redo",
+    "saveFile": "Save File",
+    "saveAs": "Save As",
+    "showSidebar": "Show Sidebar",
+    "hideSidebar": "Hide Sidebar",
+    "showConsole": "Show Console",
+    "hideConsole": "Hide Console",
+    "showInspector": "Show Inspector",
+    "hideInspector": "Hide Inspector",
+    "showAssistantPanel": "Show Assistant Panel",
+    "hideAssistantPanel": "Hide Assistant Panel",
+    "maximizeCenter": "Maximize Center Area",
+    "restoreLayout": "Restore Layout",
+    "category": {
+      "workbench": "Workbench",
+      "file": "File",
+      "edit": "Edit",
+      "layout": "Layout"
+    }
+  },
+  "pagePanel": {
+    "title": "Page State (Page Data)",
+    "params": "Page Params",
+    "stateData": "State Data (State / Computed)",
+    "methods": "Methods",
+    "contextData": "Context Data",
+    "addState": "Add State Parameter"
+  },
+  "schemaTree": {
+    "hidden": "Hidden"
   }
 }

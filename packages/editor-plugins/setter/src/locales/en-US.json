@@ -1,0 +1,86 @@
+{
+  "panel": {
+    "actions": "Actions",
+    "currentNode": "Current Node",
+    "contractProps": "Contract Props",
+    "basicProps": "Basic Props",
+    "structuralProps": "Structural Props",
+    "advancedProps": "Advanced Props",
+    "noContractTitle": "The current component `{{component}}` has no contract. Please add contracts first.",
+    "selectNodeFirst": "Please select a node from the component tree first.",
+    "selectNodeFirstCanvas": "Please select a node from the component tree or canvas first."
+  },
+  "actions": {
+    "newFlow": "New Flow",
+    "searchPlaceholder": "Search Action...",
+    "prepareRequestParams": "Prepare Request Params",
+    "assignResultTo": "Assign result to {{target}}",
+    "fetchApi": "Fetch API"
+  },
+  "errors": {
+    "mustBeArrayJson": "Property value must be a valid JSON array",
+    "mustBeObjectJson": "Property value must be a valid JSON object",
+    "mustBeArrayJsonForType": "Property value must be a valid JSON {{type}}",
+    "propsMustBeObject": "props must be a valid JSON object",
+    "columnsMustBeArray": "columns must be a valid JSON array",
+    "propsColumnsMustBeArray": "props.columns must be a valid JSON array",
+    "propsJsonParseFailed": "Failed to parse props JSON",
+    "propParseFailed": "Failed to parse property",
+    "styleMustBeObject": "style must be a valid JSON object or expression string",
+    "styleJsonParseFailed": "Failed to parse style JSON",
+    "eventActionsMustBeArray": "Event actions must be an array",
+    "eventJsonParseFailed": "Failed to parse event JSON",
+    "logicMustBeObject": "logic must be a valid JSON object",
+    "logicJsonParseFailed": "Failed to parse logic JSON"
+  },
+  "empty": {
+    "noProps": "This component has no declared props.",
+    "noColumns": "No columns yet. Click \"Add Column\" to create one.",
+    "noEvents": "No events on the current node. Click \"Add\" to add onClick first."
+  },
+  "props": {
+    "component": "Component",
+    "showJsonView": "Open JSON View",
+    "hideJsonView": "Close JSON View",
+    "batchEditHint": "Batch edit props. Changes are patched on blur.",
+    "expression": "Expression"
+  },
+  "columns": {
+    "newColumn": "Add Column",
+    "column": "Column",
+    "columnWithIndex": "Column {{index}}",
+    "title": "Title",
+    "field": "Field",
+    "key": "Key",
+    "width": "Width",
+    "align": "Align",
+    "defaultAlign": "Default",
+    "delete": "Delete",
+    "titleAriaLabel": "Column {{index}} Title",
+    "fieldAriaLabel": "Column {{index}} Field",
+    "keyAriaLabel": "Column {{index}} Key",
+    "widthAriaLabel": "Column {{index}} Width",
+    "alignAriaLabel": "Column {{index}} Align"
+  },
+  "validation": {
+    "required": "Required Validation",
+    "requiredPlaceholder": "Enter required field message",
+    "requiredDefaultMessage": "This field is required"
+  },
+  "style": {
+    "supportHint": "Supports JSON object (e.g., <code>{ \"display\": \"none\" }</code>) or expression string (e.g., <code>{{state.dynamicStyle}}</code>)."
+  },
+  "events": {
+    "boundEvents": "Bound Events",
+    "addNew": "Add",
+    "actionsCount": "{{count}} actions",
+    "oneAction": "1 action",
+    "editHint": "Edit ActionChain JSON directly. Changes are saved on blur."
+  },
+  "logic": {
+    "editHint": "Editable fields: if / show / loop. Set to null to remove logic."
+  },
+  "common": {
+    "reset": "Reset"
+  }
+}

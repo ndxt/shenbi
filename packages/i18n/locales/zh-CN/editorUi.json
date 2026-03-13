@@ -194,5 +194,57 @@
       "cursor": "Cursor 深色",
       "webstormDark": "WebStorm 深色"
     }
+  },
+  "editorTabs": {
+    "unsaved": "未保存",
+    "unsavedTooltip": "未保存 (Ctrl+S 保存)",
+    "close": "关闭",
+    "closeOthers": "关闭其他",
+    "closeSaved": "关闭已保存的",
+    "closeAll": "关闭所有",
+    "untitled": "未命名"
+  },
+  "commandPalette": {
+    "title": "命令面板",
+    "searchLabel": "命令面板搜索",
+    "placeholder": "输入命令",
+    "resultsLabel": "命令面板结果",
+    "noResults": "未找到命令。",
+    "recent": "最近",
+    "other": "其他"
+  },
+  "hostCommands": {
+    "openCommandPalette": "打开命令面板",
+    "undo": "撤销",
+    "redo": "重做",
+    "saveFile": "保存文件",
+    "saveAs": "另存为",
+    "showSidebar": "显示侧边栏",
+    "hideSidebar": "隐藏侧边栏",
+    "showConsole": "显示控制台",
+    "hideConsole": "隐藏控制台",
+    "showInspector": "显示检查器",
+    "hideInspector": "隐藏检查器",
+    "showAssistantPanel": "显示助手面板",
+    "hideAssistantPanel": "隐藏助手面板",
+    "maximizeCenter": "最大化中心区域",
+    "restoreLayout": "恢复布局",
+    "category": {
+      "workbench": "工作台",
+      "file": "文件",
+      "edit": "编辑",
+      "layout": "布局"
+    }
+  },
+  "pagePanel": {
+    "title": "页面状态 (Page Data)",
+    "params": "页面参数 (Params)",
+    "stateData": "状态数据 (State / Computed)",
+    "methods": "方法 (Methods)",
+    "contextData": "上下文数据 (Context)",
+    "addState": "新增 State 参数"
+  },
+  "schemaTree": {
+    "hidden": "已隐藏"
   }
 }

@@ -1,0 +1,86 @@
+{
+  "panel": {
+    "actions": "交互编排 (Actions)",
+    "currentNode": "当前节点",
+    "contractProps": "契约属性",
+    "basicProps": "基础属性",
+    "structuralProps": "结构属性",
+    "advancedProps": "高级属性",
+    "noContractTitle": "当前组件 `{{component}}` 暂无契约，请先补充 contracts。",
+    "selectNodeFirst": "请先在组件树中选择一个节点。",
+    "selectNodeFirstCanvas": "请先在组件树或画布中选择一个节点。"
+  },
+  "actions": {
+    "newFlow": "新建流",
+    "searchPlaceholder": "搜索 Action...",
+    "prepareRequestParams": "准备请求参数",
+    "assignResultTo": "将结果赋值给 {{target}}",
+    "fetchApi": "Fetch API"
+  },
+  "errors": {
+    "mustBeArrayJson": "属性值必须是数组 JSON",
+    "mustBeObjectJson": "属性值必须是对象 JSON",
+    "mustBeArrayJsonForType": "属性值必须是{{type}} JSON",
+    "propsMustBeObject": "props 必须是对象 JSON",
+    "columnsMustBeArray": "columns 必须是数组 JSON",
+    "propsColumnsMustBeArray": "props.columns 必须是数组 JSON",
+    "propsJsonParseFailed": "props JSON 解析失败",
+    "propParseFailed": "属性解析失败",
+    "styleMustBeObject": "style 必须是对象 JSON 或表达式字符串",
+    "styleJsonParseFailed": "style JSON 解析失败",
+    "eventActionsMustBeArray": "事件动作必须是数组",
+    "eventJsonParseFailed": "事件 JSON 解析失败",
+    "logicMustBeObject": "logic 必须是对象 JSON",
+    "logicJsonParseFailed": "logic JSON 解析失败"
+  },
+  "empty": {
+    "noProps": "该组件未声明 props。",
+    "noColumns": "暂无列，点击「新增列」创建。",
+    "noEvents": "当前节点暂无事件。点击「新增」可先添加 onClick。"
+  },
+  "props": {
+    "component": "组件",
+    "showJsonView": "打开 JSON 视图",
+    "hideJsonView": "收起 JSON 视图",
+    "batchEditHint": "用于批量编辑 props。失焦后按对象 patch 回写。",
+    "expression": "表达式"
+  },
+  "columns": {
+    "newColumn": "新增列",
+    "column": "列",
+    "columnWithIndex": "列 {{index}}",
+    "title": "标题",
+    "field": "字段",
+    "key": "key",
+    "width": "宽度",
+    "align": "对齐",
+    "defaultAlign": "默认对齐",
+    "delete": "删除",
+    "titleAriaLabel": "列{{index}} 标题",
+    "fieldAriaLabel": "列{{index}} 字段",
+    "keyAriaLabel": "列{{index}} key",
+    "widthAriaLabel": "列{{index}} 宽度",
+    "alignAriaLabel": "列{{index}} 对齐"
+  },
+  "validation": {
+    "required": "必填校验",
+    "requiredPlaceholder": "请输入必填提示文案",
+    "requiredDefaultMessage": "该字段为必填项"
+  },
+  "style": {
+    "supportHint": "支持对象 JSON（如 <code>{ \"display\": \"none\" }</code>）或表达式字符串（如 <code>{{state.dynamicStyle}}</code>）。"
+  },
+  "events": {
+    "boundEvents": "已绑定事件",
+    "addNew": "新增",
+    "actionsCount": "{{count}}个动作",
+    "oneAction": "1个动作",
+    "editHint": "支持直接编辑 ActionChain JSON，失焦后自动回写。"
+  },
+  "logic": {
+    "editHint": "可编辑字段：if / show / loop。删除逻辑可把字段设置为 null。"
+  },
+  "common": {
+    "reset": "重置"
+  }
+}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
+import { useTranslation } from '@shenbi/i18n';
 import type { LastRunResult } from '../hooks/useAgentRun';
 import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
 
@@ -41,6 +42,8 @@ export interface RunResultCardProps {
 }
 
 export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
+  const { t } = useTranslation('pluginAiChat');
+
   const totalInput = [
     result.plannerMetrics?.inputTokens ?? 0,
     ...Object.values(result.blockInputTokens),
@@ -53,18 +56,25 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
   ].reduce((a, b) => a + b, 0);
   const hasTokenInfo = totalInput > 0 || totalOutput > 0;
 
+  // Helper function to get debug file label from translation
+  const getDebugFileLabel = (path: string) => {
+    return /(?:^|[\\/])(?:\.ai-debug[\\/])?traces(?:[\\/]|$)/i.test(path)
+      ? t('result.traceFile')
+      : t('result.debugFile');
+  };
+
   return (
     <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col shadow-sm mt-2" style={{ fontSize: '11px' }}>
       {/* Header */}
       <div className="flex items-center gap-2 text-text-primary pb-2 mb-2">
         <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
-        <span className="font-semibold text-emerald-400 shrink-0">{result.modifyPlan ? '修改完成' : '生成完成'}</span>
+        <span className="font-semibold text-emerald-400 shrink-0">{result.modifyPlan ? t('result.modifyComplete') : t('result.generateComplete')}</span>
         <span className="opacity-70 ml-1 truncate flex-1 leading-none">{result.statusLabel}</span>
         {onDismiss && (
           <button
             className="text-text-secondary hover:text-text-primary opacity-50 hover:opacity-100 transition-opacity ml-1 shrink-0"
             onClick={onDismiss}
-            title="关闭"
+            title={t('result.dismiss')}
           >
             ×
           </button>
@@ -100,7 +110,7 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
             {Array.from({ length: result.modifyPlan.operationCount }, (_, i) => (
               <OpRow
                 key={i}
-                label={result.modifyPlan?.operationLabels[i] ?? `操作 ${i + 1}`}
+                label={result.modifyPlan?.operationLabels[i] ?? t('status.operationWithIndex', { index: i + 1 })}
                 isDone={result.modifyStatuses[i] === 'done'}
                 isError={result.modifyStatuses[i] !== 'done'}
                 {...(result.modifyOpMetrics[i] ? { metrics: { durationMs: result.modifyOpMetrics[i].durationMs, inputTokens: result.modifyOpMetrics[i].inputTokens, outputTokens: result.modifyOpMetrics[i].outputTokens } } : {})}
@@ -111,7 +121,7 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
       )}
       {/* Summary totals */}
       <div className="border-t border-border-ide pt-2 flex items-center gap-2 px-1" style={{ fontSize: '10px', marginTop: '-6px', paddingTop: '8px' }}>
-        <span className="text-text-secondary opacity-70 flex-1 leading-none translate-y-[1px]">合计</span>
+        <span className="text-text-secondary opacity-70 flex-1 leading-none translate-y-[1px]">{t('result.total')}</span>
         <span className="text-text-secondary font-mono tabular-nums leading-none translate-y-[1px]">{(result.elapsedMs / 1000).toFixed(1)}s</span>
         {hasTokenInfo && (
           <span className="text-text-secondary font-mono tabular-nums">In{totalInput} Out{totalOutput}</span>
@@ -122,7 +132,7 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
       </div>
       {result.didApplySchema && (
         <div className="border-t border-border-ide pt-2 px-1 text-[10px] text-text-secondary">
-          {result.autoSaved ? '文件已自动保存' : result.autoSaveError ? `自动保存失败: ${result.autoSaveError}` : '页面变更已应用'}
+          {result.autoSaved ? t('result.fileAutoSaved') : result.autoSaveError ? t('result.autoSaveFailed', { error: result.autoSaveError }) : t('result.pageChangesApplied')}
         </div>
       )}
       {/* Debug metadata */}
@@ -131,20 +141,20 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
           {(typeof result.durationMs === 'number' || typeof result.tokensUsed === 'number') && (
             <div className="flex justify-center gap-4">
               {typeof result.durationMs === 'number' && (
-                <span>耗时: {result.durationMs}ms</span>
+                <span>{t('result.duration')}: {result.durationMs}ms</span>
               )}
               {typeof result.tokensUsed === 'number' && (
-                <span>Tokens: {result.tokensUsed}</span>
+                <span>{t('result.tokens')}: {result.tokensUsed}</span>
               )}
             </div>
           )}
           {result.debugFile && (
             <span className="font-mono break-all text-center">
-              {/(?:^|[\\/])(?:\.ai-debug[\\/])?traces(?:[\\/]|$)/i.test(result.debugFile) ? 'Trace File' : 'Debug File'}: {result.debugFile}
+              {getDebugFileLabel(result.debugFile)}: {result.debugFile}
             </span>
           )}
           {result.memoryDebugFile && (
-            <span className="font-mono break-all text-center">Memory Dump: {result.memoryDebugFile}</span>
+            <span className="font-mono break-all text-center">{t('result.memoryDump')}: {result.memoryDebugFile}</span>
           )}
         </div>
       )}

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Square, Lightbulb, History, X } from 'lucide-react';
+import { useTranslation } from '@shenbi/i18n';
 
 export interface PromptOption {
     label: string;
@@ -33,13 +34,17 @@ function DropdownMenu({
     label,
     items,
     onSelect,
-    disabled
+    disabled,
+    emptyText,
+    removeText,
 }: {
     icon: React.ElementType;
     label: string;
     items: DropdownItem[];
     onSelect: (val: string) => void;
     disabled?: boolean;
+    emptyText: string;
+    removeText: string;
 }) {
     const [open, setOpen] = useState(false);
     const btnRef = useRef<HTMLButtonElement>(null);
@@ -99,7 +104,7 @@ function DropdownMenu({
                     style={menuStyle}
                 >
                     {items.length === 0 ? (
-                        <div className="px-3 py-2 text-text-secondary text-center" style={{ fontSize: '12px' }}>空</div>
+                        <div className="px-3 py-2 text-text-secondary text-center" style={{ fontSize: '12px' }}>{emptyText}</div>
                     ) : (
                         items.map((item, idx) => (
                             <div
@@ -127,7 +132,7 @@ function DropdownMenu({
                                             event.stopPropagation();
                                             item.onRemove?.(item.value);
                                         }}
-                                        title="删除"
+                                        title={removeText}
                                     >
                                         <X size={12} />
                                     </button>
@@ -154,6 +159,7 @@ export function ChatInput({
     onSelectHistory,
     onRemoveHistory,
 }: ChatInputProps) {
+    const { t } = useTranslation('pluginAiChat');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Auto-resize logic
@@ -163,7 +169,7 @@ export function ChatInput({
 
         // Reset height to recalculate
         textarea.style.height = 'auto';
-        
+
         // Calculate new height, bounded by CSS min/max-height, using scrollHeight
         const paddingOffset = 10; // extra padding allowance for pb-8 vs py-2
         textarea.style.height = `${Math.min(textarea.scrollHeight + paddingOffset, 250)}px`;
@@ -199,16 +205,18 @@ export function ChatInput({
                 {(promptPresets.length > 0) && (
                     <DropdownMenu
                         icon={Lightbulb}
-                        label="常用覆盖场景"
+                        label={t('presets.label')}
                         items={promptPresets}
                         onSelect={handleSelectPreset}
                         disabled={disabled || isRunning}
+                        emptyText={t('input.empty')}
+                        removeText={t('input.remove')}
                     />
                 )}
                 {(promptHistory.length > 0) && (
                     <DropdownMenu
                         icon={History}
-                        label="历史输入"
+                        label={t('input.historyLabel')}
                         items={promptHistory.map((h) => ({
                             label: h,
                             value: h,
@@ -216,6 +224,8 @@ export function ChatInput({
                         }))}
                         onSelect={handleSelectHistory}
                         disabled={disabled || isRunning}
+                        emptyText={t('input.empty')}
+                        removeText={t('input.remove')}
                     />
                 )}
             </div>
@@ -225,7 +235,7 @@ export function ChatInput({
                     ref={textareaRef}
                     className="shenbi-custom-scrollbar w-full bg-bg-activity-bar border border-border-ide text-text-primary rounded pl-3 pr-3 pt-2 pb-8 min-h-[60px] max-h-[250px] focus:outline-none focus:border-blue-500 transition-colors shadow-sm resize-none leading-relaxed"
                     style={{ fontSize: '12px' }}
-                    placeholder="输入调试提示词，Enter 发送，Shift+Enter 换行"
+                    placeholder={t('input.placeholder')}
                     value={text}
                     onChange={(e) => onTextChange(e.target.value)}
                     onKeyDown={handleKeyDown}

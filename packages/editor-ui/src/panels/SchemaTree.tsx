@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronRight, ChevronDown, Layout, Type, Box, Image as ImageIcon, EyeOff } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { ComponentContract } from '@shenbi/schema';
+import { useTranslation } from '@shenbi/i18n';
 
 export interface SchemaNode {
   id: string;
@@ -64,6 +65,7 @@ export interface SchemaTreeProps {
 }
 
 export function SchemaTree({ nodes = mockSchemaTree, selectedNodeId, onSelect, contracts = [] }: SchemaTreeProps) {
+  const { t } = useTranslation('editorUi');
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const internalSelectedId = selectedNodeId ?? nodes[0]?.id;
 
@@ -151,7 +153,7 @@ export function SchemaTree({ nodes = mockSchemaTree, selectedNodeId, onSelect, c
           
           {/* Right Actions (Hidden state, etc.) */}
           {node.isHidden && (
-            <div className="mr-2 text-text-secondary/60" title="已隐藏">
+            <div className="mr-2 text-text-secondary/60" title={t('schemaTree.hidden')}>
               <EyeOff size={12} strokeWidth={1.5} />
             </div>
           )}

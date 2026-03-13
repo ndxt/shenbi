@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ActionChain, ColumnSchema, ComponentContract, ContractProp, SchemaNode } from '@shenbi/schema';
+import { i18n, useTranslation } from '@shenbi/i18n';
 import { Code, GripVertical, Link2, Plus } from 'lucide-react';
 
 export interface SetterPanelProps {
@@ -127,13 +128,13 @@ function parseValueByContractType(raw: unknown, contractProp: ContractProp): unk
     try {
       parsed = JSON.parse(trimmed) as unknown;
     } catch {
-      throw new Error(contractProp.type === 'array' ? '属性值必须是数组 JSON' : '属性值必须是对象 JSON');
+      throw new Error(i18n.t('pluginSetter:errors.mustBeArrayJsonForType', { type: contractProp.type }));
     }
     if (contractProp.type === 'array' && !Array.isArray(parsed)) {
-      throw new Error('属性值必须是数组 JSON');
+      throw new Error(i18n.t('pluginSetter:errors.mustBeArrayJson'));
     }
     if (contractProp.type === 'object' && (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))) {
-      throw new Error('属性值必须是对象 JSON');
+      throw new Error(i18n.t('pluginSetter:errors.mustBeObjectJson'));
     }
     return parsed;
   }
@@ -228,7 +229,7 @@ function parsePropsPatch(raw: string): Record<string, unknown> {
   }
   const parsed = JSON.parse(trimmed) as unknown;
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('props 必须是对象 JSON');
+    throw new Error(i18n.t('pluginSetter:errors.propsMustBeObject'));
   }
   return parsed as Record<string, unknown>;
 }
@@ -255,7 +256,7 @@ function updateRulesRequired(rulesValue: unknown, required: boolean, requiredMes
     if (rules.some((rule) => rule.required === true)) {
       return rules;
     }
-    const message = requiredMessage?.trim() || '该字段为必填项';
+    const message = requiredMessage?.trim() || i18n.t('pluginSetter:validation.requiredDefaultMessage');
     return [{ required: true, message }, ...rules];
   }
 
@@ -300,6 +301,7 @@ interface PropsSetterProps {
 }
 
 function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: PropsSetterProps) {
+  const { t } = useTranslation('pluginSetter');
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [showPropsJson, setShowPropsJson] = useState(false);
@@ -369,7 +371,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
       const parsed = parseValueByContractType(next, propMeta);
       if (selectedNode.component === 'Table' && propName === 'columns') {
         if (!Array.isArray(parsed)) {
-          throw new Error('columns 必须是数组 JSON');
+          throw new Error(t('errors.columnsMustBeArray'));
         }
         if (onPatchColumns) {
           onPatchColumns(parsed as unknown[]);
@@ -383,7 +385,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
       }
       setErrors((prev) => ({ ...prev, [propName]: undefined }));
     } catch (err) {
-      const message = err instanceof Error ? err.message : '属性解析失败';
+      const message = err instanceof Error ? err.message : t('errors.propParseFailed');
       setErrors((prev) => ({ ...prev, [propName]: message }));
     }
   };
@@ -391,7 +393,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
   if (!selectedNode) {
     return (
       <div className="p-4 text-[12px] text-text-secondary">
-        请先在组件树中选择一个节点。
+        {t('panel.selectNodeFirst')}
       </div>
     );
   }
@@ -399,28 +401,28 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
   if (!contract) {
     return (
       <div className="p-4 text-[12px] text-text-secondary">
-        当前组件 `{selectedNode.component}` 暂无契约，请先补充 contracts。
+        {t('panel.noContractTitle', { component: selectedNode.component })}
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4 p-3 text-text-primary">
-      <SetterGroup title="当前节点">
+      <SetterGroup title={t('panel.currentNode')}>
         <div className="text-[12px] text-text-secondary break-all">
-          <div>组件：{selectedNode.component}</div>
+          <div>{t('props.component')}：{selectedNode.component}</div>
           {selectedNode.id ? <div>ID：{selectedNode.id}</div> : null}
         </div>
       </SetterGroup>
 
-      <SetterGroup title="契约属性">
+      <SetterGroup title={t('panel.contractProps')}>
         {sortedPropEntries.length === 0 ? (
-          <div className="text-[12px] text-text-secondary">该组件未声明 props。</div>
+          <div className="text-[12px] text-text-secondary">{t('empty.noProps')}</div>
         ) : (
           <div className="flex flex-col gap-3">
             {groupedPropEntries.basic.length > 0 ? (
               <PropsGroup
-                title="基础属性"
+                title={t('panel.basicProps')}
                 entries={groupedPropEntries.basic}
                 selectedNode={selectedNode}
                 drafts={drafts}
@@ -434,7 +436,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
 
             {groupedPropEntries.structured.length > 0 ? (
               <PropsGroup
-                title="结构属性"
+                title={t('panel.structuralProps')}
                 entries={groupedPropEntries.structured}
                 selectedNode={selectedNode}
                 drafts={drafts}
@@ -449,14 +451,14 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
         )}
       </SetterGroup>
 
-      <SetterGroup title="高级属性">
+      <SetterGroup title={t('panel.advancedProps')}>
         <button
           type="button"
           onClick={() => setShowPropsJson((prev) => !prev)}
           className="w-full text-[12px] text-text-secondary border border-dashed border-border-ide p-3 rounded text-center flex items-center justify-center gap-2 cursor-pointer hover:bg-bg-activity-bar transition-colors"
         >
           <Code size={14} />
-          <span>{showPropsJson ? '收起 JSON 视图' : '打开 JSON 视图'}</span>
+          <span>{showPropsJson ? t('props.hideJsonView') : t('props.showJsonView')}</span>
         </button>
         {showPropsJson ? (
           <div className="flex flex-col gap-2">
@@ -470,7 +472,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
                   if (selectedNode.component === 'Table' && Object.prototype.hasOwnProperty.call(patch, 'columns')) {
                     const columnsValue = patch.columns;
                     if (!Array.isArray(columnsValue)) {
-                      throw new Error('props.columns 必须是数组 JSON');
+                      throw new Error(t('errors.propsColumnsMustBeArray'));
                     }
                     if (onPatchColumns) {
                       onPatchColumns(columnsValue as unknown[]);
@@ -482,7 +484,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
                   }
                   setPropsJsonError(undefined);
                 } catch (err) {
-                  const message = err instanceof Error ? err.message : 'props JSON 解析失败';
+                  const message = err instanceof Error ? err.message : t('errors.propsJsonParseFailed');
                   setPropsJsonError(message);
                 }
               }}
@@ -490,7 +492,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
             />
             {propsJsonError ? <div className="text-[11px] text-red-400">{propsJsonError}</div> : null}
             <div className="text-[11px] text-text-secondary">
-              用于批量编辑 props。失焦后按对象 patch 回写。
+              {t('props.batchEditHint')}
             </div>
           </div>
         ) : null}
@@ -632,6 +634,7 @@ function FormItemRulesField({
   rulesValue: unknown;
   onChange: (nextRules: RuleObject[]) => void;
 }) {
+  const { t } = useTranslation('pluginSetter');
   const required = hasRequiredRule(rulesValue);
   const [messageDraft, setMessageDraft] = useState('');
 
@@ -653,12 +656,12 @@ function FormItemRulesField({
           }}
           className="size-4 accent-blue-500"
         />
-        必填校验
+        {t('validation.required')}
       </label>
       <input
         aria-label="rules.required.message"
         className="bg-bg-sidebar border border-border-ide rounded px-2 py-1 text-[11px] text-text-primary disabled:opacity-50"
-        placeholder="请输入必填提示文案"
+        placeholder={t('validation.requiredPlaceholder')}
         value={messageDraft}
         disabled={!required}
         onChange={(event) => setMessageDraft(event.target.value)}
@@ -711,6 +714,16 @@ function TableColumnsField({
   columns: ColumnSchema[];
   onChange: (columns: ColumnSchema[]) => void;
 }) {
+  const { t } = useTranslation('pluginSetter');
+
+  const handleAddColumn = () => {
+    const nextIndex = columns.length + 1;
+    onChange([
+      ...columns,
+      { title: t('columns.columnWithIndex', { index: nextIndex }), dataIndex: `field${nextIndex}` },
+    ]);
+  };
+
   return (
     <div className="flex flex-col gap-2 rounded border border-border-ide p-2 bg-bg-canvas">
       <div className="flex items-center justify-between">
@@ -718,20 +731,14 @@ function TableColumnsField({
         <button
           type="button"
           className="text-[11px] text-blue-400 hover:text-blue-300"
-          onClick={() => {
-            const nextIndex = columns.length + 1;
-            onChange([
-              ...columns,
-              { title: `列${nextIndex}`, dataIndex: `field${nextIndex}` },
-            ]);
-          }}
+          onClick={handleAddColumn}
         >
-          新增列
+          {t('columns.newColumn')}
         </button>
       </div>
 
       {columns.length === 0 ? (
-        <div className="text-[11px] text-text-secondary">暂无列，点击“新增列”创建。</div>
+        <div className="text-[11px] text-text-secondary">{t('empty.noColumns')}</div>
       ) : null}
 
       <div className="flex flex-col gap-2">
@@ -748,7 +755,7 @@ function TableColumnsField({
           return (
             <div key={`col-${index}`} className="rounded border border-border-ide p-2 bg-bg-sidebar">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] text-text-secondary">列 {index + 1}</span>
+                <span className="text-[11px] text-text-secondary">{t('columns.column')} {index + 1}</span>
                 <button
                   type="button"
                   className="text-[11px] text-red-400 hover:text-red-300"
@@ -756,14 +763,14 @@ function TableColumnsField({
                     onChange(columns.filter((_, i) => i !== index));
                   }}
                 >
-                  删除
+                  {t('columns.delete')}
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input
-                  aria-label={`列${index + 1} 标题`}
+                  aria-label={t('columns.titleAriaLabel', { index: index + 1 })}
                   className="bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px]"
-                  placeholder="标题"
+                  placeholder={t('columns.title')}
                   value={title}
                   onChange={(event) => {
                     onChange(updateColumnAt(columns, index, (prev) => ({
@@ -773,7 +780,7 @@ function TableColumnsField({
                   }}
                 />
                 <input
-                  aria-label={`列${index + 1} 字段`}
+                  aria-label={t('columns.fieldAriaLabel', { index: index + 1 })}
                   className="bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px]"
                   placeholder="dataIndex"
                   value={dataIndex}
@@ -785,7 +792,7 @@ function TableColumnsField({
                   }}
                 />
                 <input
-                  aria-label={`列${index + 1} key`}
+                  aria-label={t('columns.keyAriaLabel', { index: index + 1 })}
                   className="bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px]"
                   placeholder="key"
                   value={key}
@@ -803,7 +810,7 @@ function TableColumnsField({
                   }}
                 />
                 <input
-                  aria-label={`列${index + 1} 宽度`}
+                  aria-label={t('columns.widthAriaLabel', { index: index + 1 })}
                   className="bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px]"
                   placeholder="width"
                   value={width}
@@ -821,7 +828,7 @@ function TableColumnsField({
                   }}
                 />
                 <select
-                  aria-label={`列${index + 1} 对齐`}
+                  aria-label={t('columns.alignAriaLabel', { index: index + 1 })}
                   className="bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] col-span-2"
                   value={align}
                   onChange={(event) => {
@@ -837,7 +844,7 @@ function TableColumnsField({
                     }));
                   }}
                 >
-                  <option value="">默认对齐</option>
+                  <option value="">{t('columns.defaultAlign')}</option>
                   <option value="left">left</option>
                   <option value="center">center</option>
                   <option value="right">right</option>
@@ -880,12 +887,13 @@ function parseStyleValue(raw: string): unknown {
   }
   const parsed = JSON.parse(trimmed) as unknown;
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('style 必须是对象 JSON 或表达式字符串');
+    throw new Error(i18n.t('pluginSetter:errors.styleMustBeObject'));
   }
   return parsed;
 }
 
 function StyleSetter({ selectedNode, onPatchStyle }: StyleSetterProps) {
+  const { t } = useTranslation('pluginSetter');
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -897,7 +905,7 @@ function StyleSetter({ selectedNode, onPatchStyle }: StyleSetterProps) {
   if (!selectedNode) {
     return (
       <div className="p-4 text-[12px] text-text-secondary">
-        请先在组件树或画布中选择一个节点。
+        {t('panel.selectNodeFirstCanvas')}
       </div>
     );
   }
@@ -915,16 +923,16 @@ function StyleSetter({ selectedNode, onPatchStyle }: StyleSetterProps) {
               onPatchStyle?.({ style: nextStyle });
               setError(undefined);
             } catch (err) {
-              const message = err instanceof Error ? err.message : 'style JSON 解析失败';
+              const message = err instanceof Error ? err.message : t('errors.styleJsonParseFailed');
               setError(message);
             }
           }}
           className="w-full min-h-[140px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500"
         />
         {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
-        <div className="text-[11px] text-text-secondary">
-          支持对象 JSON（如 <code>{'{ "display": "none" }'}</code>）或表达式字符串（如 <code>{'{{state.dynamicStyle}}'}</code>）。
-        </div>
+        <div className="text-[11px] text-text-secondary"
+          dangerouslySetInnerHTML={{ __html: t('style.supportHint') }}
+        />
       </SetterGroup>
     </div>
   );
@@ -949,12 +957,13 @@ function formatActions(actions: unknown): string {
 function parseActionChain(raw: string): ActionChain {
   const parsed = JSON.parse(raw) as unknown;
   if (!Array.isArray(parsed)) {
-    throw new Error('事件动作必须是数组');
+    throw new Error(i18n.t('pluginSetter:errors.eventActionsMustBeArray'));
   }
   return parsed as ActionChain;
 }
 
 function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
+  const { t } = useTranslation('pluginSetter');
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errorByEvent, setErrorByEvent] = useState<Record<string, string | undefined>>({});
 
@@ -966,7 +975,7 @@ function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
   if (!selectedNode) {
     return (
       <div className="p-4 text-[12px] text-text-secondary">
-        请先在组件树或画布中选择一个节点。
+        {t('panel.selectNodeFirstCanvas')}
       </div>
     );
   }
@@ -977,7 +986,7 @@ function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
   return (
     <div className="flex flex-col gap-3 p-3 text-text-primary">
       <div className="flex justify-between items-center mb-2">
-        <span className="text-[11px] font-bold text-text-secondary uppercase">已绑定事件</span>
+        <span className="text-[11px] font-bold text-text-secondary uppercase">{t('events.boundEvents')}</span>
         <button
           className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-600 transition-colors"
           onClick={() => {
@@ -987,25 +996,28 @@ function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
             onPatchEvents?.({ onClick: [] });
           }}
         >
-          <Plus size={10} /> 新增
+          <Plus size={10} /> {t('events.addNew')}
         </button>
       </div>
 
       {eventEntries.length === 0 ? (
         <div className="text-[12px] text-text-secondary border border-dashed border-border-ide rounded p-3">
-          当前节点暂无事件。点击“新增”可先添加 `onClick`。
+          {t('empty.noEvents')}
         </div>
       ) : null}
 
       {eventEntries.map(([eventName, actions]) => {
         const rawValue = drafts[eventName] ?? formatActions(actions);
         const error = errorByEvent[eventName];
+        const actionsCount = Array.isArray(actions)
+          ? t('events.actionsCount', { count: actions.length })
+          : t('events.oneAction');
         return (
           <div key={eventName} className="border border-border-ide rounded bg-bg-canvas overflow-hidden">
             <div className="flex justify-between items-center bg-bg-activity-bar px-2 py-1.5 border-b border-border-ide">
               <span className="text-[12px] font-semibold text-blue-400">{eventName}</span>
               <span className="text-[10px] text-text-secondary">
-                {Array.isArray(actions) ? `${actions.length}个动作` : '1个动作'}
+                {actionsCount}
               </span>
             </div>
             <div className="p-2 flex flex-col gap-2">
@@ -1022,7 +1034,7 @@ function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
                     onPatchEvents?.({ [eventName]: nextChain });
                     setErrorByEvent((prev) => ({ ...prev, [eventName]: undefined }));
                   } catch (error) {
-                    const message = error instanceof Error ? error.message : '事件 JSON 解析失败';
+                    const message = error instanceof Error ? error.message : t('errors.eventJsonParseFailed');
                     setErrorByEvent((prev) => ({ ...prev, [eventName]: message }));
                   }
                 }}
@@ -1031,7 +1043,7 @@ function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
               {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
               <div className="flex items-center gap-2 text-[11px] text-text-secondary bg-bg-sidebar p-1.5 rounded border border-border-ide border-dashed">
                 <GripVertical size={12} className="text-text-secondary" />
-                <div className="flex-1 truncate">支持直接编辑 ActionChain JSON，失焦后自动回写。</div>
+                <div className="flex-1 truncate">{t('events.editHint')}</div>
               </div>
             </div>
           </div>
@@ -1053,7 +1065,7 @@ function parseLogicPatch(raw: string): Record<string, unknown> {
   }
   const parsed = JSON.parse(trimmed) as unknown;
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('logic 必须是对象 JSON');
+    throw new Error(i18n.t('pluginSetter:errors.logicMustBeObject'));
   }
   const source = parsed as Record<string, unknown>;
   const result: Record<string, unknown> = {};
@@ -1083,6 +1095,7 @@ function formatLogicValue(node: SchemaNode | undefined): string {
 }
 
 function LogicSetter({ selectedNode, onPatchLogic }: LogicSetterProps) {
+  const { t } = useTranslation('pluginSetter');
   const [draft, setDraft] = useState('{}');
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -1094,7 +1107,7 @@ function LogicSetter({ selectedNode, onPatchLogic }: LogicSetterProps) {
   if (!selectedNode) {
     return (
       <div className="p-4 text-[12px] text-text-secondary">
-        请先在组件树或画布中选择一个节点。
+        {t('panel.selectNodeFirstCanvas')}
       </div>
     );
   }
@@ -1112,7 +1125,7 @@ function LogicSetter({ selectedNode, onPatchLogic }: LogicSetterProps) {
               onPatchLogic?.(patch);
               setError(undefined);
             } catch (err) {
-              const message = err instanceof Error ? err.message : 'logic JSON 解析失败';
+              const message = err instanceof Error ? err.message : t('errors.logicJsonParseFailed');
               setError(message);
             }
           }}
@@ -1120,7 +1133,7 @@ function LogicSetter({ selectedNode, onPatchLogic }: LogicSetterProps) {
         />
         {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
         <div className="text-[11px] text-text-secondary">
-          可编辑字段：`if` / `show` / `loop`。删除逻辑可把字段设置为 `null`。
+          {t('logic.editHint')}
         </div>
       </SetterGroup>
     </div>
@@ -1165,6 +1178,7 @@ function PropertyField({
   onChange,
   onCommit,
 }: PropertyFieldProps) {
+  const { t } = useTranslation('pluginSetter');
   const inputId = `setter-${label}`;
   const displayValue = typeof value === 'boolean' ? String(value) : value;
   const selectOptions = options.includes(displayValue) || !displayValue
@@ -1183,7 +1197,7 @@ function PropertyField({
         {isExpression ? (
           <span className="bg-yellow-500/20 text-yellow-500 rounded px-1 flex items-center gap-0.5 ml-2 shrink-0">
             <Link2 size={10} />
-            <span className="text-[9px]">表达式</span>
+            <span className="text-[9px]">{t('props.expression')}</span>
           </span>
         ) : null}
         {canReset ? (
@@ -1193,7 +1207,7 @@ function PropertyField({
             onClick={onReset}
             className="ml-2 rounded border border-border-ide px-1.5 py-0.5 text-[9px] text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar"
           >
-            重置
+            {t('common.reset')}
           </button>
         ) : null}
       </label>

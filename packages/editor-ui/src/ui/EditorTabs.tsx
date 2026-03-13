@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X, FileCode, FileJson, Workflow, Database, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { FileType, TabState } from '@shenbi/editor-core';
+import { useTranslation } from '@shenbi/i18n';
 
 function getTabIcon(fileType?: FileType) {
   switch (fileType) {
@@ -52,6 +53,7 @@ function TabItem({
   onDragOver,
   onDrop,
   onDragEnd,
+  t,
 }: {
   label: string;
   icon: React.ComponentType<{ size: number; className?: string }>;
@@ -68,6 +70,7 @@ function TabItem({
   onDragOver?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
   onDragEnd?: (e: React.DragEvent) => void;
+  t: (key: string) => string;
 }) {
   return (
     <div
@@ -76,7 +79,7 @@ function TabItem({
         ${active ? 'bg-bg-sidebar text-text-primary' : 'bg-bg-editor text-text-secondary hover:bg-bg-sidebar/50 hover:text-text-primary'}
         ${dragging ? 'opacity-50' : ''}
       `}
-      title={isDirty ? `${label} - 未保存` : label}
+      title={isDirty ? `${label} - ${t('editorTabs.unsaved')}` : label}
       onClick={onClick}
       onAuxClick={onAuxClick}
       onContextMenu={onContextMenu}
@@ -96,7 +99,7 @@ function TabItem({
           {isDirty && (
             <span
               className="w-2 h-2 rounded-full bg-text-secondary group-hover:hidden"
-              title="未保存 (Ctrl+S 保存)"
+              title={t('editorTabs.unsavedTooltip')}
             />
           )}
           <div
@@ -112,7 +115,7 @@ function TabItem({
       ) : isDirty ? (
         <span
           className="w-2 h-2 rounded-full bg-text-secondary shrink-0"
-          title="未保存 (Ctrl+S 保存)"
+          title={t('editorTabs.unsavedTooltip')}
         />
       ) : null}
       {active && <div className="absolute top-0 left-0 right-0 h-[2px] bg-blue-500" />}
@@ -132,6 +135,7 @@ export function EditorTabs({
   onCloseSavedTabs,
   onMoveTab,
 }: EditorTabsProps) {
+  const { t } = useTranslation('editorUi');
   /* ── Context menu ── */
   const [ctxMenu, setCtxMenu] = useState<TabContextMenu | null>(null);
 
@@ -262,6 +266,7 @@ export function EditorTabs({
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDrop={(e) => handleDrop(e, index)}
                 onDragEnd={handleDragEnd}
+                t={t}
               />
             );
           })}
@@ -290,21 +295,21 @@ export function EditorTabs({
               className="w-full px-3 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg-activity-bar"
               onClick={() => { onCloseTab?.(ctxMenu.fileId); setCtxMenu(null); }}
             >
-              关闭
+              {t('editorTabs.close')}
             </button>
             <button
               type="button"
               className="w-full px-3 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg-activity-bar"
               onClick={() => { onCloseOtherTabs?.(ctxMenu.fileId); setCtxMenu(null); }}
             >
-              关闭其他
+              {t('editorTabs.closeOthers')}
             </button>
             <button
               type="button"
               className="w-full px-3 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg-activity-bar"
               onClick={() => { onCloseSavedTabs?.(); setCtxMenu(null); }}
             >
-              关闭已保存的
+              {t('editorTabs.closeSaved')}
             </button>
             <div className="border-t border-border-ide my-1" />
             <button
@@ -312,7 +317,7 @@ export function EditorTabs({
               className="w-full px-3 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg-activity-bar"
               onClick={() => { onCloseAllTabs?.(); setCtxMenu(null); }}
             >
-              关闭所有
+              {t('editorTabs.closeAll')}
             </button>
           </div>
         )}
@@ -321,10 +326,10 @@ export function EditorTabs({
   }
 
   // Legacy single-tab mode
-  const displayLabel = label || 'Untitled';
+  const displayLabel = label || t('editorTabs.untitled');
   return (
     <div className="h-9 bg-bg-editor border-b border-border-ide flex items-center shrink-0 overflow-x-auto scrollbar-hide">
-      <TabItem label={displayLabel} icon={FileCode} active />
+      <TabItem label={displayLabel} icon={FileCode} active t={t} />
     </div>
   );
 }

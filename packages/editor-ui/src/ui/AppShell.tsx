@@ -44,6 +44,7 @@ import {
   changeLanguage,
   detectBrowserLocale,
   useCurrentLocale,
+  useTranslation,
   type SupportedLocale,
 } from '@shenbi/i18n';
 
@@ -154,6 +155,7 @@ export function AppShell({
   const currentLocale = useCurrentLocale();
   const currentLocaleRef = React.useRef(currentLocale);
   currentLocaleRef.current = currentLocale;
+  const { t } = useTranslation('editorUi');
   
   // Panel Visibility State
   const [showSidebar, setShowSidebar] = React.useState(true);
@@ -283,6 +285,7 @@ export function AppShell({
     setShowAssistantPanel,
     setShowCommandPalette,
     toggleMaximize,
+    t,
   }), [
     auxiliaryPanels.length,
     isMaximized,
@@ -291,6 +294,7 @@ export function AppShell({
     showConsole,
     showInspector,
     showSidebar,
+    t,
   ]);
   const hostCommandMap = React.useMemo(
     () => new Map(hostCommands.map((command) => [command.id, command])),

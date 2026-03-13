@@ -1,0 +1,84 @@
+{
+  "panel": {
+    "title": "AI 助手",
+    "clear": "清空",
+    "clearAriaLabel": "清空",
+    "clearTooltip": "清空当前会话和页面"
+  },
+  "model": {
+    "loadingModels": "正在加载模型列表...",
+    "loadModelsFailed": "模型列表加载失败: {{error}}",
+    "modelsNotLoaded": "模型列表尚未加载完成"
+  },
+  "status": {
+    "notSelected": "未选中",
+    "selected": "选中: {{label}}",
+    "bridgeDisconnected": "Bridge 未连接",
+    "generating": "正在生成",
+    "operationWithIndex": "操作 {{index}}"
+  },
+  "presets": {
+    "label": "常用覆盖场景",
+    "workspaceOverview": {
+      "label": "工作台总览",
+      "value": "生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作，重点覆盖卡片、表格、Tabs、Drawer、Form、按钮和响应式布局组合。"
+    },
+    "masterDetail": {
+      "label": "主从详情",
+      "value": "生成一个主从详情页面：左侧树或列表，右侧 Tabs 详情区，支持查询、状态标签、操作按钮、表单编辑弹窗和底部时间线，覆盖 Tree、Tabs、Descriptions、Modal、Form、Tag 组合。"
+    },
+    "formOrchestration": {
+      "label": "表单编排",
+      "value": "生成一个复杂表单编排页面，包含基础信息、分组区域、Form.List 动态增删、联动校验、提交按钮区和结果预览卡片，覆盖 Form、Input、Select、DatePicker、Form.List、Card、Alert 组合。"
+    },
+    "listWithDrawer": {
+      "label": "列表加抽屉",
+      "value": "生成一个列表页，包含查询表单、批量操作栏、数据表格、行内操作、详情抽屉和分页，覆盖 Query Form、Table、Drawer、Space、Button、Tag 常见覆盖场景。"
+    },
+    "multiBlockPortal": {
+      "label": "多区块门户",
+      "value": "生成一个多区块门户页面，包含顶部欢迎区、左右分栏卡片、中部九宫格快捷入口、下方图文混排信息区和浮动操作按钮，覆盖 Grid、Card、Typography、List、Flex、FloatButton 组合。"
+    },
+    "dataAnalysisDashboard": {
+      "label": "数据分析看板",
+      "value": "生成一个数据分析看板页面，顶部四个 KPI 指标卡（Statistic），下方左侧折线图展示月度趋势（Chart.Line），右侧饼图展示类别占比分布（Chart.Pie），底部柱状图对比各部门数据（Chart.Column），覆盖 Card、Chart.Line、Chart.Pie、Chart.Column、Statistic 组合。"
+    },
+    "salesTrendCharts": {
+      "label": "销售趋势图表",
+      "value": "生成一个销售趋势图表页面，包含顶部筛选条件区（日期选择、类型下拉），中部面积图展示近6个月销售额趋势（Chart.Area），侧边条形图对比各产品销量排行（Chart.Bar），底部数据汇总表格，覆盖 Form、DatePicker、Select、Chart.Area、Chart.Bar、Table 组合。"
+    },
+    "kpiProgressMonitor": {
+      "label": "KPI 与进度监控",
+      "value": "生成一个 KPI 进度监控页面，包含左侧三个仪表盘分别展示目标达成率、服务可用率和用户满意度（Chart.Gauge），右侧 Descriptions 展示详细指标，底部 Timeline 展示近期关键事件，覆盖 Chart.Gauge、Descriptions、Timeline、Card 组合。"
+    }
+  },
+  "input": {
+    "historyLabel": "历史输入",
+    "empty": "空",
+    "remove": "删除",
+    "placeholder": "输入调试提示词，Enter 发送，Shift+Enter 换行"
+  },
+  "message": {
+    "you": "你",
+    "assistant": "Shenbi AI",
+    "welcome": "你好！我是 Shenbi 智能开发助手。\n可以帮您生成布局、绑定数据、调整样式。\n有什么我可以帮您的吗？"
+  },
+  "result": {
+    "generateComplete": "生成完成",
+    "modifyComplete": "修改完成",
+    "dismiss": "关闭",
+    "total": "合计",
+    "duration": "耗时",
+    "tokens": "Tokens",
+    "fileAutoSaved": "文件已自动保存",
+    "autoSaveFailed": "自动保存失败: {{error}}",
+    "pageChangesApplied": "页面变更已应用",
+    "traceFile": "Trace File",
+    "debugFile": "Debug File",
+    "memoryDump": "Memory Dump"
+  },
+  "settings": {
+    "thinking": "思考",
+    "concurrency": "并发"
+  }
+}

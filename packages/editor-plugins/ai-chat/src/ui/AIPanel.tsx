@@ -1,15 +1,16 @@
-import React, { useEffect, useRef } from 'react';
-import { Sparkles, LoaderCircle, BrainCircuit, Trash2, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useRef, useMemo } from 'react';
+import { Sparkles, LoaderCircle, Trash2, CheckCircle2 } from 'lucide-react';
 import {
   executePluginCommand,
   type PluginContext,
 } from '@shenbi/editor-plugin-api';
+import { useTranslation } from '@shenbi/i18n';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import { useModels } from '../hooks/useModels';
 import { useChatSession } from '../hooks/useChatSession';
 import { useAgentRun } from '../hooks/useAgentRun';
 import { ChatMessageList } from './ChatMessageList';
-import { ChatInput } from './ChatInput';
+import { ChatInput, type PromptOption } from './ChatInput';
 import { ModelSelector } from './ModelSelector';
 
 export interface AIPanelProps {
@@ -24,50 +25,18 @@ const UI_PERSISTENCE_KEY = 'ui';
 const PROMPT_HISTORY_PERSISTENCE_KEY = 'prompt-history';
 const MAX_PROMPT_HISTORY = 12;
 
-const PROMPT_PRESETS = [
-  {
-    label: '工作台总览',
-    value: '生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作，重点覆盖卡片、表格、Tabs、Drawer、Form、按钮和响应式布局组合。',
-  },
-  {
-    label: '主从详情',
-    value: '生成一个主从详情页面：左侧树或列表，右侧 Tabs 详情区，支持查询、状态标签、操作按钮、表单编辑弹窗和底部时间线，覆盖 Tree、Tabs、Descriptions、Modal、Form、Tag 组合。',
-  },
-  {
-    label: '表单编排',
-    value: '生成一个复杂表单编排页面，包含基础信息、分组区域、Form.List 动态增删、联动校验、提交按钮区和结果预览卡片，覆盖 Form、Input、Select、DatePicker、Form.List、Card、Alert 组合。',
-  },
-  {
-    label: '列表加抽屉',
-    value: '生成一个列表页，包含查询表单、批量操作栏、数据表格、行内操作、详情抽屉和分页，覆盖 Query Form、Table、Drawer、Space、Button、Tag 常见覆盖场景。',
-  },
-  {
-    label: '多区块门户',
-    value: '生成一个多区块门户页面，包含顶部欢迎区、左右分栏卡片、中部九宫格快捷入口、下方图文混排信息区和浮动操作按钮，覆盖 Grid、Card、Typography、List、Flex、FloatButton 组合。',
-  },
-  {
-    label: '数据分析看板',
-    value: '生成一个数据分析看板页面，顶部四个 KPI 指标卡（Statistic），下方左侧折线图展示月度趋势（Chart.Line），右侧饼图展示类别占比分布（Chart.Pie），底部柱状图对比各部门数据（Chart.Column），覆盖 Card、Chart.Line、Chart.Pie、Chart.Column、Statistic 组合。',
-  },
-  {
-    label: '销售趋势图表',
-    value: '生成一个销售趋势图表页面，包含顶部筛选条件区（日期选择、类型下拉），中部面积图展示近6个月销售额趋势（Chart.Area），侧边条形图对比各产品销量排行（Chart.Bar），底部数据汇总表格，覆盖 Form、DatePicker、Select、Chart.Area、Chart.Bar、Table 组合。',
-  },
-  {
-    label: 'KPI 与进度监控',
-    value: '生成一个 KPI 进度监控页面，包含左侧三个仪表盘分别展示目标达成率、服务可用率和用户满意度（Chart.Gauge），右侧 Descriptions 展示详细指标，底部 Timeline 展示近期关键事件，覆盖 Chart.Gauge、Descriptions、Timeline、Card 组合。',
-  },
-] as const;
-
-function extractDebugFilePath(message: string): string | undefined {
-  const matched = message.match(/(?:Trace|Debug) file:\s*([^\r\n]+)/i);
-  return matched?.[1]?.trim();
-}
-
-function getDebugFileLabel(path: string): 'Trace File' | 'Debug File' {
-  return /(?:^|[\\/])(?:\.ai-debug[\\/])?traces(?:[\\/]|$)/i.test(path)
-    ? 'Trace File'
-    : 'Debug File';
+// Helper to get prompt presets from i18n
+function getPromptPresets(t: (key: string) => string): PromptOption[] {
+  return [
+    { label: t('presets.workspaceOverview.label'), value: t('presets.workspaceOverview.value') },
+    { label: t('presets.masterDetail.label'), value: t('presets.masterDetail.value') },
+    { label: t('presets.formOrchestration.label'), value: t('presets.formOrchestration.value') },
+    { label: t('presets.listWithDrawer.label'), value: t('presets.listWithDrawer.value') },
+    { label: t('presets.multiBlockPortal.label'), value: t('presets.multiBlockPortal.value') },
+    { label: t('presets.dataAnalysisDashboard.label'), value: t('presets.dataAnalysisDashboard.value') },
+    { label: t('presets.salesTrendCharts.label'), value: t('presets.salesTrendCharts.value') },
+    { label: t('presets.kpiProgressMonitor.label'), value: t('presets.kpiProgressMonitor.value') },
+  ];
 }
 
 export function AIPanel({
@@ -76,6 +45,7 @@ export function AIPanel({
   defaultPlannerModel,
   defaultBlockModel,
 }: AIPanelProps) {
+  const { t } = useTranslation('pluginAiChat');
   const persistence = pluginContext?.persistence;
   const [thinkingEnabled, setThinkingEnabled] = React.useState(false);
   const [blockConcurrency, setBlockConcurrency] = React.useState(3);
@@ -121,6 +91,9 @@ export function AIPanel({
     cancelRun,
   } = useAgentRun(bridge);
 
+  // Memoized prompt presets from i18n
+  const promptPresets = useMemo(() => getPromptPresets(t), [t]);
+
   // Unified compact metrics badge: 'Xs In300 Out2000'
   const MetricsBadge = ({ durationMs, inputTokens, outputTokens }: { durationMs: number | undefined; inputTokens: number | undefined; outputTokens: number | undefined }) => {
     const parts: string[] = [];
@@ -160,7 +133,7 @@ export function AIPanel({
     </li>
   );
 
-  const [selectedNodeLabel, setSelectedNodeLabel] = React.useState<string>('未选中');
+  const [selectedNodeLabel, setSelectedNodeLabel] = React.useState<string>(t('status.notSelected'));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const modelsReady = plannerModels.length > 0 && blockModels.length > 0;
   const modelSelectionBlocked = isLoadingModels || Boolean(modelsError) || !modelsReady;
@@ -208,9 +181,9 @@ export function AIPanel({
   useEffect(() => {
     if (!bridge) return;
     return bridge.subscribe((snapshot) => {
-      setSelectedNodeLabel(snapshot.selectedNodeId ?? '未选中');
+      setSelectedNodeLabel(snapshot.selectedNodeId ?? t('status.notSelected'));
     });
-  }, [bridge]);
+  }, [bridge, t]);
 
   useEffect(() => {
     const target = messagesEndRef.current;
@@ -270,7 +243,7 @@ export function AIPanel({
 
   const handleSend = (text: string) => {
     if (modelSelectionBlocked) {
-      addMessage({ role: 'assistant', content: `[Error]: ${modelsError ?? '模型列表尚未加载完成'}` });
+      addMessage({ role: 'assistant', content: `[Error]: ${modelsError ?? t('model.modelsNotLoaded')}` });
       return;
     }
 
@@ -312,19 +285,19 @@ export function AIPanel({
         <div className="h-9 px-4 border-b border-border-ide flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-text-primary">
             <Sparkles size={14} className="text-blue-500" />
-            <span className="font-bold uppercase tracking-wider" style={{ fontSize: '11px' }}>AI Assistant</span>
+            <span className="font-bold uppercase tracking-wider" style={{ fontSize: '11px' }}>{t('panel.title')}</span>
           </div>
           <button
             type="button"
             className="rounded p-1.5 text-text-secondary transition-colors hover:bg-bg-canvas hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
             onClick={handleClear}
             disabled={isRunning}
-            aria-label="清空"
-            title="清空当前会话和页面"
+            aria-label={t('panel.clearAriaLabel')}
+            title={t('panel.clearTooltip')}
           >
             <span className="flex items-center gap-1">
               <Trash2 size={13} />
-              <span>清空</span>
+              <span>{t('panel.clear')}</span>
             </span>
           </button>
         </div>
@@ -337,8 +310,8 @@ export function AIPanel({
             }} disabled={isRunning || modelSelectionBlocked} />
             <ModelSelector label="Block" models={blockModels} value={blockModel} onChange={setBlockModel} disabled={isRunning || modelSelectionBlocked} />
           </div>
-          <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0" title="思考模式">
-            <span className="text-text-secondary uppercase tracking-wider" style={{ fontSize: '10px' }}>思考</span>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0" title={t('settings.thinking')}>
+            <span className="text-text-secondary uppercase tracking-wider" style={{ fontSize: '10px' }}>{t('settings.thinking')}</span>
             <div className={`relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${thinkingEnabled ? 'bg-blue-500' : 'bg-bg-canvas border border-border-ide'}`}>
               <span className={`pointer-events-none inline-block h-[12px] w-[12px] transform rounded-full shadow transition duration-200 ease-in-out ${thinkingEnabled ? 'bg-white translate-x-1.5' : 'bg-text-secondary -translate-x-1.5'}`} />
             </div>
@@ -353,7 +326,7 @@ export function AIPanel({
         </div>
 
         <div className="flex-none px-3 py-1.5 border-b border-border-ide bg-bg-panel flex items-center gap-2">
-          <span className="text-text-secondary uppercase tracking-wider shrink-0" style={{ fontSize: '10px' }}>并发</span>
+          <span className="text-text-secondary uppercase tracking-wider shrink-0" style={{ fontSize: '10px' }}>{t('settings.concurrency')}</span>
           <input
             type="range"
             min={1}
@@ -364,27 +337,27 @@ export function AIPanel({
             disabled={isRunning}
             className="flex-1 accent-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ height: '4px' }}
-            title={`并发 block 数: ${blockConcurrency}`}
+            title={`${t('settings.concurrency')}: ${blockConcurrency}`}
           />
           <span className="text-text-primary font-mono shrink-0 w-4 text-center" style={{ fontSize: '11px' }}>{blockConcurrency}</span>
         </div>
 
         {isLoadingModels && (
           <div className="px-4 py-2 text-text-secondary border-b border-border-ide bg-bg-panel" style={{ fontSize: '11px' }}>
-            正在加载模型列表...
+            {t('model.loadingModels')}
           </div>
         )}
 
         {modelsError && (
           <div className="px-4 py-2 text-red-400 border-b border-border-ide bg-bg-panel" style={{ fontSize: '11px' }}>
-            模型列表加载失败: {modelsError}
+            {t('model.loadModelsFailed', { error: modelsError })}
           </div>
         )}
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
           {messages.length === 0 && (
-            <div className="text-text-secondary text-center py-10 opacity-60" style={{ fontSize: '12px' }}>
-              你好！我是 Shenbi 智能开发助手。<br />可以帮您生成布局、绑定数据、调整样式。<br />有什么我可以帮您的吗？
+            <div className="text-text-secondary text-center py-10 opacity-60 whitespace-pre-line" style={{ fontSize: '12px' }}>
+              {t('message.welcome')}
             </div>
           )}
 
@@ -395,7 +368,7 @@ export function AIPanel({
               <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-400 to-blue-500 animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
               <div className="flex items-center gap-2 text-text-primary pb-2 mb-2" style={{ fontSize: '11px' }}>
                 <LoaderCircle size={12} className="text-blue-500 shrink-0" style={{ animation: 'spin 1s linear infinite' }} />
-                <span className="font-semibold text-blue-500 shrink-0">正在生成</span>
+                <span className="font-semibold text-blue-500 shrink-0">{t('status.generating')}</span>
                 <span className="opacity-70 ml-1 truncate flex-1">{progressText}</span>
                 <span className="text-text-secondary font-mono shrink-0 tabular-nums" style={{ fontSize: '10px' }}>
                   {Math.floor(elapsedMs / 1000)}s
@@ -432,7 +405,7 @@ export function AIPanel({
                     {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
                       <OpRow
                         key={i}
-                        label={modifyPlan.operationLabels[i] ?? `操作 ${i + 1}`}
+                        label={modifyPlan.operationLabels[i] ?? t('status.operationWithIndex', { index: i + 1 })}
                         isPending={modifyStatuses[i] === 'generating'}
                         isDone={modifyStatuses[i] === 'done'}
                         {...(modifyOpMetrics[i] ? { metrics: { durationMs: modifyOpMetrics[i].durationMs, inputTokens: modifyOpMetrics[i].inputTokens, outputTokens: modifyOpMetrics[i].outputTokens } } : {})}
@@ -451,8 +424,8 @@ export function AIPanel({
 
         <div className="border-t border-border-ide shrink-0 bg-bg-panel flex flex-col gap-2" style={{ padding: '8px' }}>
           <div className="text-text-secondary flex justify-between px-1" style={{ fontSize: '11px' }}>
-            <span>选中: <span className="text-text-primary">{selectedNodeLabel}</span></span>
-            {!bridge && <span className="text-red-400">Bridge 未连接</span>}
+            <span>{t('status.selected', { label: selectedNodeLabel })}</span>
+            {!bridge && <span className="text-red-400">{t('status.bridgeDisconnected')}</span>}
           </div>
           <ChatInput
             onSend={handleSend}
@@ -461,7 +434,7 @@ export function AIPanel({
             disabled={!bridge || modelSelectionBlocked}
             text={draftText}
             onTextChange={setDraftText}
-            promptPresets={[...PROMPT_PRESETS]}
+            promptPresets={promptPresets}
             promptHistory={promptHistory}
             onSelectPreset={applyPromptText}
             onSelectHistory={applyPromptText}
