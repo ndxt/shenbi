@@ -1,0 +1,58 @@
+{
+  "mode": "模式",
+  "scenario": "场景",
+  "scenarios": {
+    "userManagement": "用户管理场景",
+    "formList": "Form.List",
+    "tabsDetail": "Tabs 详情",
+    "treeManagement": "Tree 管理",
+    "descriptions": "Descriptions",
+    "drawerDetail": "Drawer 详情",
+    "nineGrid": "九宫格布局"
+  },
+  "modeOptions": {
+    "scenarios": "多场景",
+    "shell": "Shell"
+  },
+  "commands": {
+    "resetDocument": {
+      "title": "重置文档",
+      "description": "重置当前 Shell 页面，或恢复当前场景的初始基线。"
+    }
+  },
+  "plugins": {
+    "debug": {
+      "label": "调试",
+      "loaded": "插件面板已加载",
+      "selected": "当前选中: {{nodeId}}"
+    },
+    "assets": {
+      "name": "资源面板插件",
+      "activityLabel": "资源",
+      "sidebarLabel": "资源",
+      "loaded": "侧边栏插件已加载"
+    },
+    "files": {
+      "name": "文件插件",
+      "closeActiveTab": "关闭当前标签页"
+    }
+  },
+  "messages": {
+    "activityTriggered": "活动插件已触发"
+  },
+  "toolbar": {
+    "undo": "撤销 (Ctrl+Z)",
+    "redo": "重做 (Ctrl+Shift+Z)",
+    "clearPage": "清空页面",
+    "currentFile": "当前文件",
+    "untitled": "未命名页面"
+  },
+  "prompt": {
+    "enterFileName": "请输入文件名",
+    "confirmClose": "文件未保存，确定关闭？"
+  },
+  "aria": {
+    "modeSwitch": "模式切换",
+    "scenarioSwitch": "场景切换"
+  }
+}

@@ -22,6 +22,7 @@
   "dependencies": {
     "@shenbi/editor-core": "workspace:*",
     "@shenbi/editor-plugin-api": "workspace:*",
+    "@shenbi/i18n": "workspace:*",
     "lucide-react": "^0.575.0"
   },
   "peerDependencies": {

@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from '@shenbi/i18n';
+import './i18n';
 
 export interface FilePanelFileItem {
   id: string;
@@ -26,6 +28,8 @@ export function FilePanel({
   onSaveAsFile,
   onRefresh,
 }: FilePanelProps) {
+  const { t } = useTranslation('pluginFiles');
+
   return (
     <div className="h-full flex flex-col text-xs text-text-primary">
       <div className="flex items-center gap-2 p-3 border-b border-border-ide">
@@ -34,21 +38,21 @@ export function FilePanel({
           className="h-7 rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary transition-colors hover:bg-bg-activity-bar"
           onClick={onSaveFile}
         >
-          保存
+          {t('filePanel.save')}
         </button>
         <button
           type="button"
           className="h-7 rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary transition-colors hover:bg-bg-activity-bar"
           onClick={onSaveAsFile}
         >
-          另存为
+          {t('filePanel.saveAs')}
         </button>
         <button
           type="button"
           className="h-7 rounded border border-border-ide bg-bg-panel px-2 text-[12px] text-text-primary transition-colors hover:bg-bg-activity-bar"
           onClick={onRefresh}
         >
-          刷新
+          {t('filePanel.refresh')}
         </button>
       </div>
       <div className="px-3 py-2 text-[11px] text-text-secondary border-b border-border-ide">
@@ -57,7 +61,7 @@ export function FilePanel({
       <div className="flex-1 overflow-auto p-2 space-y-2">
         {files.length === 0 ? (
           <div className="rounded border border-dashed border-border-ide p-3 text-[11px] text-text-secondary">
-            暂无文件，点击“另存为”创建
+            {t('filePanel.empty')}
           </div>
         ) : (
           files.map((file) => (
@@ -78,7 +82,7 @@ export function FilePanel({
                 className="mt-2 h-6 rounded border border-border-ide px-2 text-[11px] transition-colors hover:bg-bg-sidebar"
                 onClick={() => onOpenFile(file.id)}
               >
-                打开
+                {t('filePanel.open')}
               </button>
             </div>
           ))

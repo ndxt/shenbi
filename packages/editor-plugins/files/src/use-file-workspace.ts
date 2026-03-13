@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SidebarTabContribution } from '@shenbi/editor-plugin-api';
+import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
 import type { FilePanelFileItem } from './FilePanel';
 import {
   createFilesSidebarTab,
   type CreateFilesSidebarTabOptions,
 } from './sidebar-tab';
+import './i18n';
 
 export type EditorMode = 'shell' | 'scenarios';
 
@@ -43,6 +45,12 @@ export interface UseFileWorkspaceResult {
   refreshFiles: () => void;
 }
 
+type FileStatusState =
+  | { kind: 'idle' }
+  | { kind: 'saved'; fileId: string }
+  | { kind: 'opened'; fileId: string }
+  | { kind: 'error'; translationKey: string; message?: string };
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -80,14 +88,15 @@ function isEditableHotkeyTarget(target: EventTarget | null): boolean {
 export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorkspaceResult {
   const { mode, snapshot, commands, onError, promptFileName } = options;
   const [storedFiles, setStoredFiles] = useState<FilePanelFileItem[]>([]);
-  const [fileStatus, setFileStatus] = useState<string>('当前未绑定文件');
+  const [statusState, setStatusState] = useState<FileStatusState>({ kind: 'idle' });
+  const { t } = useTranslation('pluginFiles');
+  const currentLocale = useCurrentLocale();
 
   const activeFileId = mode === 'shell' ? snapshot.currentFileId : undefined;
   const isDirty = mode === 'shell' ? snapshot.isDirty : false;
   const canUndo = mode === 'shell' ? snapshot.canUndo : false;
   const canRedo = mode === 'shell' ? snapshot.canRedo : false;
 
-  // Stable refs for frequently-changing callbacks/values to break dependency cascades
   const commandsRef = useRef(commands);
   commandsRef.current = commands;
   const onErrorRef = useRef(onError);
@@ -103,11 +112,28 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
   const canRedoRef = useRef(canRedo);
   canRedoRef.current = canRedo;
 
-  const reportError = useCallback((prefix: string, error: unknown) => {
-    const message = `${prefix}: ${getErrorMessage(error)}`;
-    setFileStatus(message);
-    onErrorRef.current?.(message);
-  }, []);
+  const fileStatus = useMemo(() => {
+    if (statusState.kind === 'idle') {
+      return t('status.noBoundFile');
+    }
+    if (statusState.kind === 'saved') {
+      return t('status.saved', { fileId: statusState.fileId });
+    }
+    if (statusState.kind === 'opened') {
+      return t('status.opened', { fileId: statusState.fileId });
+    }
+    return t(statusState.translationKey, { message: statusState.message ?? '' });
+  }, [currentLocale, statusState, t]);
+
+  const reportError = useCallback((translationKey: string, error: unknown) => {
+    const nextStatus: FileStatusState = {
+      kind: 'error',
+      translationKey,
+      message: getErrorMessage(error),
+    };
+    setStatusState(nextStatus);
+    onErrorRef.current?.(t(nextStatus.translationKey, { message: nextStatus.message }));
+  }, [t]);
 
   const refreshFiles = useCallback(() => {
     void commandsRef.current.execute('file.listSchemas')
@@ -117,7 +143,7 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
         setStoredFiles(sorted);
       })
       .catch((error) => {
-        reportError('文件列表加载失败', error);
+        reportError('status.listLoadFailed', error);
       });
   }, [reportError]);
 
@@ -131,40 +157,40 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
     void commandsRef.current.execute('file.saveAs', { name: nextName.trim() })
       .then((saveAsResult) => {
         const nextFileId = typeof saveAsResult === 'string' ? saveAsResult : nextName.trim();
-        setFileStatus(`已保存: ${nextFileId}`);
+        setStatusState({ kind: 'saved', fileId: nextFileId });
         refreshFiles();
       })
       .catch((error) => {
-        reportError('另存失败', error);
+        reportError('status.saveAsFailed', error);
       });
   }, [refreshFiles, reportError]);
 
   const handleOpenFile = useCallback((fileId: string) => {
     void commandsRef.current.execute('file.openSchema', { fileId })
       .then(() => {
-        setFileStatus(`已打开: ${fileId}`);
+        setStatusState({ kind: 'opened', fileId });
         refreshFiles();
       })
       .catch((error) => {
-        reportError('打开失败', error);
+        reportError('status.openFailed', error);
       });
   }, [refreshFiles, reportError]);
 
   const handleSave = useCallback(() => {
     if (mode === 'shell') {
       if (!activeFileIdRef.current) {
-        const message = '请先从文件树创建或打开文件';
-        setFileStatus(message);
-        onErrorRef.current?.(message);
+        const translationKey = 'status.createOrOpenFirst';
+        setStatusState({ kind: 'error', translationKey });
+        onErrorRef.current?.(t(translationKey));
         return;
       }
       void commandsRef.current.execute('tab.save')
         .then(() => {
-          setFileStatus(`已保存: ${activeFileIdRef.current}`);
+          setStatusState({ kind: 'saved', fileId: activeFileIdRef.current! });
           refreshFiles();
         })
         .catch((error) => {
-          reportError('保存失败', error);
+          reportError('status.saveFailed', error);
         });
       return;
     }
@@ -175,13 +201,13 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
     }
     void commandsRef.current.execute('file.saveSchema')
       .then(() => {
-        setFileStatus(`已保存: ${activeFileIdRef.current}`);
+        setStatusState({ kind: 'saved', fileId: activeFileIdRef.current! });
         refreshFiles();
       })
       .catch((error) => {
-        reportError('保存失败', error);
+        reportError('status.saveFailed', error);
       });
-  }, [mode, refreshFiles, reportError, requestSaveAs]);
+  }, [mode, refreshFiles, reportError, requestSaveAs, t]);
 
   const handleSaveAs = useCallback(() => {
     requestSaveAs();
@@ -192,7 +218,7 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       return;
     }
     void commandsRef.current.execute('editor.undo').catch((error) => {
-      reportError('撤销失败', error);
+      reportError('status.undoFailed', error);
     });
   }, [reportError]);
 
@@ -201,7 +227,7 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       return;
     }
     void commandsRef.current.execute('editor.redo').catch((error) => {
-      reportError('重做失败', error);
+      reportError('status.redoFailed', error);
     });
   }, [reportError]);
 
@@ -284,6 +310,7 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       return undefined;
     }
     return createFilesSidebarTab({
+      label: t('title'),
       files: storedFiles,
       activeFileId,
       status: fileStatus,
@@ -292,12 +319,24 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       onSaveAsFile: handleSaveAs,
       onRefresh: refreshFiles,
     });
-  }, [activeFileId, fileStatus, handleOpenFile, handleSave, handleSaveAs, mode, refreshFiles, storedFiles]);
+  }, [
+    activeFileId,
+    currentLocale,
+    fileStatus,
+    handleOpenFile,
+    handleSave,
+    handleSaveAs,
+    mode,
+    refreshFiles,
+    storedFiles,
+    t,
+  ]);
   const filesSidebarTabOptions = useMemo<CreateFilesSidebarTabOptions | undefined>(() => {
     if (mode !== 'shell') {
       return undefined;
     }
     return {
+      label: t('title'),
       files: storedFiles,
       activeFileId,
       status: fileStatus,
@@ -306,7 +345,18 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       onSaveAsFile: handleSaveAs,
       onRefresh: refreshFiles,
     };
-  }, [activeFileId, fileStatus, handleOpenFile, handleSave, handleSaveAs, mode, refreshFiles, storedFiles]);
+  }, [
+    activeFileId,
+    currentLocale,
+    fileStatus,
+    handleOpenFile,
+    handleSave,
+    handleSaveAs,
+    mode,
+    refreshFiles,
+    storedFiles,
+    t,
+  ]);
 
   return {
     activeFileId,
@@ -323,4 +373,3 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
     refreshFiles,
   };
 }
-

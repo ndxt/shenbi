@@ -1,0 +1,58 @@
+{
+  "mode": "Mode",
+  "scenario": "Scenario",
+  "scenarios": {
+    "userManagement": "User Management",
+    "formList": "Form.List",
+    "tabsDetail": "Tabs Detail",
+    "treeManagement": "Tree Management",
+    "descriptions": "Descriptions",
+    "drawerDetail": "Drawer Detail",
+    "nineGrid": "Nine-Grid Layout"
+  },
+  "modeOptions": {
+    "scenarios": "Scenarios",
+    "shell": "Shell"
+  },
+  "commands": {
+    "resetDocument": {
+      "title": "Reset Document",
+      "description": "Reset the current shell page or restore the active scenario baseline."
+    }
+  },
+  "plugins": {
+    "debug": {
+      "label": "Debug",
+      "loaded": "Plugin tab loaded",
+      "selected": "Selected: {{nodeId}}"
+    },
+    "assets": {
+      "name": "Assets Plugin",
+      "activityLabel": "Assets",
+      "sidebarLabel": "Assets",
+      "loaded": "Sidebar plugin loaded"
+    },
+    "files": {
+      "name": "Files Plugin",
+      "closeActiveTab": "Close Active Tab"
+    }
+  },
+  "messages": {
+    "activityTriggered": "Activity plugin triggered"
+  },
+  "toolbar": {
+    "undo": "Undo (Ctrl+Z)",
+    "redo": "Redo (Ctrl+Shift+Z)",
+    "clearPage": "Clear Page",
+    "currentFile": "Current File",
+    "untitled": "Untitled Page"
+  },
+  "prompt": {
+    "enterFileName": "Enter file name",
+    "confirmClose": "File has unsaved changes. Close anyway?"
+  },
+  "aria": {
+    "modeSwitch": "Mode switch",
+    "scenarioSwitch": "Scenario switch"
+  }
+}
