@@ -274,7 +274,7 @@ export function App() {
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : activeScenarioSnapshot.schema;
   const {
     activeFileName,
-    filesSidebarTabOptions,
+    filesPrimaryPanelOptions,
     isDirty,
     canUndo,
     canRedo,
@@ -285,6 +285,9 @@ export function App() {
     mode: appMode === 'shell' ? 'shell' : 'scenarios',
     snapshot: {
       currentFileId: appMode === 'shell' ? shellSnapshot.currentFileId : activeScenarioSnapshot.currentFileId,
+      activeFileType: appMode === 'shell'
+        ? tabSnapshot.tabs.find((tab) => tab.fileId === tabSnapshot.activeTabId)?.fileType
+        : undefined,
       schemaName: activeSchema.name,
       isDirty: appMode === 'shell' ? shellSnapshot.isDirty : activeScenarioSnapshot.isDirty,
       canUndo: appMode === 'shell' ? shellSnapshot.canUndo : activeScenarioSnapshot.canUndo,
@@ -785,38 +788,42 @@ export function App() {
 
     // VFS-based file explorer in shell mode (render function uses refs for live data)
     if (appMode === 'shell' && vfsInitialized) {
+      registeredPlugins.push(createFilesPlugin({
+        ...(filesPrimaryPanelOptions ?? {
+          files: [],
+          activeFileId: undefined,
+          status: fileExplorerStatusText,
+          onOpenFile: () => undefined,
+          onSaveFile: () => undefined,
+          onSaveAsFile: () => undefined,
+          onRefresh: () => undefined,
+        }),
+        renderPrimaryPanel: () => (
+          <FileExplorer
+            tree={fsTreeRef.current}
+            activeFileId={tabSnapshotRef.current.activeTabId}
+            dirtyFileIds={dirtyFileIdsRef.current}
+            statusText={fileExplorerStatusTextRef.current}
+            canSaveActiveFile={Boolean(tabSnapshotRef.current.activeTabId) && dirtyFileIdsRef.current.has(tabSnapshotRef.current.activeTabId ?? '')}
+            onSaveActiveFile={handleSaveRef.current}
+            initialExpandedIds={fileExplorerExpandedIdsRef.current}
+            initialFocusedId={fileExplorerFocusedIdRef.current}
+            onExpandedIdsChange={handleExpandedIdsChangeRef.current}
+            onFocusedIdChange={handleFocusedIdChangeRef.current}
+            onOpenFile={handleOpenFileFromTreeRef.current}
+            onCreateFile={handleCreateFileRef.current}
+            onCreateDirectory={handleCreateDirectoryRef.current}
+            onDeleteNode={handleDeleteNodeRef.current}
+            onRenameNode={handleRenameNodeRef.current}
+            onRefresh={refreshFsTreeRef.current}
+            onMoveNode={handleMoveNodeRef.current}
+          />
+        ),
+      }));
       registeredPlugins.push(defineEditorPlugin({
-        id: 'shenbi.plugin.files',
-        name: filesT('pluginName'),
+        id: 'shenbi.plugin.files.commands',
+        name: `${filesT('pluginName')} Commands`,
         contributes: {
-          sidebarTabs: [
-            {
-              id: 'files',
-              label: filesT('title'),
-              order: 35,
-              render: () => (
-                <FileExplorer
-                  tree={fsTreeRef.current}
-                  activeFileId={tabSnapshotRef.current.activeTabId}
-                  dirtyFileIds={dirtyFileIdsRef.current}
-                  statusText={fileExplorerStatusTextRef.current}
-                  canSaveActiveFile={Boolean(tabSnapshotRef.current.activeTabId) && dirtyFileIdsRef.current.has(tabSnapshotRef.current.activeTabId ?? '')}
-                  onSaveActiveFile={handleSaveRef.current}
-                  initialExpandedIds={fileExplorerExpandedIdsRef.current}
-                  initialFocusedId={fileExplorerFocusedIdRef.current}
-                  onExpandedIdsChange={handleExpandedIdsChangeRef.current}
-                  onFocusedIdChange={handleFocusedIdChangeRef.current}
-                  onOpenFile={handleOpenFileFromTreeRef.current}
-                  onCreateFile={handleCreateFileRef.current}
-                  onCreateDirectory={handleCreateDirectoryRef.current}
-                  onDeleteNode={handleDeleteNodeRef.current}
-                  onRenameNode={handleRenameNodeRef.current}
-                  onRefresh={refreshFsTreeRef.current}
-                  onMoveNode={handleMoveNodeRef.current}
-                />
-              ),
-            },
-          ],
           commands: [
             {
               id: 'files.closeActiveTab',
@@ -838,15 +845,16 @@ export function App() {
           ],
         },
       }));
-    } else if (appMode === 'shell' && filesSidebarTabOptions) {
+    } else if (appMode === 'shell' && filesPrimaryPanelOptions) {
       // Fallback to legacy file panel if VFS not ready
-      registeredPlugins.push(createFilesPlugin(filesSidebarTabOptions));
+      registeredPlugins.push(createFilesPlugin(filesPrimaryPanelOptions));
     }
     return registeredPlugins;
   }, [
     appMode,
     currentLocale,
-    filesSidebarTabOptions,
+    fileExplorerStatusText,
+    filesPrimaryPanelOptions,
     filesT,
     handleResetWorkspace,
     previewT,

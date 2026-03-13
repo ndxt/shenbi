@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SidebarTabContribution } from '@shenbi/editor-plugin-api';
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PrimaryPanelContribution, SidebarTabContribution } from '@shenbi/editor-plugin-api';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
 import type { FilePanelFileItem } from './FilePanel';
+import { FilePanel } from './FilePanel';
 import {
   createFilesSidebarTab,
   type CreateFilesSidebarTabOptions,
@@ -12,6 +13,7 @@ export type EditorMode = 'shell' | 'scenarios';
 
 export interface FileWorkspaceSnapshot {
   currentFileId: string | undefined;
+  activeFileType?: string | undefined;
   schemaName: string | undefined;
   isDirty: boolean;
   canUndo: boolean;
@@ -37,6 +39,10 @@ export interface UseFileWorkspaceResult {
   canUndo: boolean;
   canRedo: boolean;
   fileStatus: string;
+  activeFileType: string | undefined;
+  showPageContextPanel: boolean;
+  filesPrimaryPanel: PrimaryPanelContribution | undefined;
+  filesPrimaryPanelOptions: CreateFilesSidebarTabOptions | undefined;
   filesSidebarTab: SidebarTabContribution | undefined;
   filesSidebarTabOptions: CreateFilesSidebarTabOptions | undefined;
   handleSave: () => void;
@@ -93,6 +99,7 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
   const currentLocale = useCurrentLocale();
 
   const activeFileId = mode === 'shell' ? snapshot.currentFileId : undefined;
+  const activeFileType = mode === 'shell' ? snapshot.activeFileType : undefined;
   const isDirty = mode === 'shell' ? snapshot.isDirty : false;
   const canUndo = mode === 'shell' ? snapshot.canUndo : false;
   const canRedo = mode === 'shell' ? snapshot.canRedo : false;
@@ -357,14 +364,37 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
     storedFiles,
     t,
   ]);
+  const filesPrimaryPanel = useMemo<PrimaryPanelContribution | undefined>(() => {
+    if (mode !== 'shell' || !filesSidebarTabOptions) {
+      return undefined;
+    }
+    return {
+      id: 'files',
+      label: t('title'),
+      order: 35,
+      render: () => createElement(FilePanel, {
+        files: filesSidebarTabOptions.files,
+        activeFileId: filesSidebarTabOptions.activeFileId,
+        status: filesSidebarTabOptions.status,
+        onOpenFile: filesSidebarTabOptions.onOpenFile,
+        onSaveFile: filesSidebarTabOptions.onSaveFile,
+        onSaveAsFile: filesSidebarTabOptions.onSaveAsFile,
+        onRefresh: filesSidebarTabOptions.onRefresh,
+      }),
+    };
+  }, [filesSidebarTabOptions, mode, t]);
 
   return {
     activeFileId,
     activeFileName,
+    activeFileType,
     isDirty,
     canUndo,
     canRedo,
     fileStatus,
+    showPageContextPanel: activeFileType === 'page',
+    filesPrimaryPanel,
+    filesPrimaryPanelOptions: filesSidebarTabOptions,
     filesSidebarTab,
     filesSidebarTabOptions,
     handleSave,

@@ -9,11 +9,11 @@ describe('ActivityBar', () => {
   it('默认渲染内置图标项（fallback）', () => {
     render(<ActivityBar />);
 
-    const explorer = screen.getByLabelText('Explorer');
+    const explorer = screen.getByLabelText('Components');
     expect(explorer).toBeInTheDocument();
     expect(explorer).toHaveAttribute('aria-pressed', 'true');
     expect(explorer).not.toHaveAttribute('title');
-    expect(screen.getByLabelText('Search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Outline')).toBeInTheDocument();
     expect(screen.getByLabelText('Data')).toBeInTheDocument();
     expect(screen.getByLabelText('Debug')).toBeInTheDocument();
     expect(screen.getByLabelText('Extensions')).toBeInTheDocument();
@@ -59,8 +59,8 @@ describe('ActivityBar', () => {
   it('点击图标后切换激活态', () => {
     render(<ActivityBar />);
 
-    const explorer = screen.getByLabelText('Explorer');
-    const search = screen.getByLabelText('Search');
+    const explorer = screen.getByLabelText('Components');
+    const search = screen.getByLabelText('Outline');
     expect(explorer).toHaveAttribute('aria-pressed', 'true');
     expect(search).toHaveAttribute('aria-pressed', 'false');
 
@@ -73,7 +73,7 @@ describe('ActivityBar', () => {
     const onSelectItem = vi.fn();
     render(<ActivityBar onSelectItem={onSelectItem} />);
 
-    fireEvent.click(screen.getByLabelText('Search'));
+    fireEvent.click(screen.getByLabelText('Outline'));
     expect(onSelectItem).toHaveBeenCalledTimes(1);
     expect(onSelectItem.mock.calls[0]?.[0]?.id).toBe('search');
   });

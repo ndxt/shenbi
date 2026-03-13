@@ -57,6 +57,7 @@ describe('useFileWorkspace', () => {
       expect(result.current.activeFileName).toBe('B Page');
     });
     expect(result.current.filesSidebarTab?.id).toBe('files');
+    expect(result.current.filesPrimaryPanel?.id).toBe('files');
     expect(commands.execute).toHaveBeenCalledWith('file.listSchemas');
   });
 
@@ -83,7 +84,7 @@ describe('useFileWorkspace', () => {
       expect(commands.execute).toHaveBeenCalledWith('file.saveAs', { name: 'My Draft' });
     });
     await waitFor(() => {
-      expect(result.current.fileStatus).toContain('已保存');
+      expect(result.current.fileStatus).toContain('Saved');
     });
   });
 
@@ -130,8 +131,8 @@ describe('useFileWorkspace', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.fileStatus).toBe('请先从文件树创建或打开文件');
-      expect(onError).toHaveBeenCalledWith('请先从文件树创建或打开文件');
+      expect(result.current.fileStatus).toBe('Create or open a file from the file tree first');
+      expect(onError).toHaveBeenCalledWith('Create or open a file from the file tree first');
     });
     expect(commands.execute).not.toHaveBeenCalledWith('file.saveAs', expect.anything());
   });

@@ -23,6 +23,11 @@ export function mergeContributions<T extends OrderedContribution>(
 
 export type ActivityBarSection = 'main' | 'bottom';
 
+export type ActivityBarTarget =
+  | { type: 'panel'; panelId: string }
+  | { type: 'action' }
+  | { type: 'tab'; tabId: string };
+
 export interface ActivityBarItemIconProps {
   size?: number;
   strokeWidth?: number;
@@ -34,6 +39,8 @@ export interface ActivityBarItemContribution extends OrderedContribution {
   icon: React.ComponentType<ActivityBarItemIconProps>;
   active?: boolean;
   section?: ActivityBarSection;
+  target?: ActivityBarTarget;
+  /** @deprecated Use target instead. */
   targetSidebarTabId?: string;
   onClick?: () => void;
 }
@@ -58,6 +65,24 @@ export interface SidebarTabRenderContext {
 export interface SidebarTabContribution extends OrderedContribution {
   label: string;
   render: (context: SidebarTabRenderContext) => React.ReactNode;
+}
+
+export interface PrimaryPanelContribution extends OrderedContribution {
+  label: string;
+  render: (context: SidebarTabRenderContext) => React.ReactNode;
+}
+
+export interface FileContextPanelRenderContext extends SidebarTabRenderContext {
+  activeFileId?: string;
+  activeFileName?: string;
+  activeFileType?: string;
+}
+
+export interface FileContextPanelContribution extends OrderedContribution {
+  label: string;
+  fileTypes?: string[];
+  defaultActive?: boolean;
+  render: (context: FileContextPanelRenderContext) => React.ReactNode;
 }
 
 export interface InspectorTabRenderContext {
