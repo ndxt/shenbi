@@ -9,6 +9,7 @@ import {
 } from '@shenbi/editor-plugin-api';
 import type { TabState } from '@shenbi/editor-core';
 import { ActivityBar } from './ActivityBar';
+import { SelectionOverlay } from './SelectionOverlay';
 import { Sidebar } from './Sidebar';
 import { WorkbenchToolbar } from './WorkbenchToolbar';
 import { EditorTabs } from './EditorTabs';
@@ -65,8 +66,18 @@ interface AppShellProps {
   pluginContext?: PluginContext;
   persistenceAdapter?: WorkspacePersistenceAdapter;
   onCanvasSelectNode?: (nodeId: string) => void;
+  /** 点击画布空白区域时取消选中 */
+  onCanvasDeselectNode?: () => void;
+  /** 当前选中节点的 schema node id（用于画布选中高亮框） */
+  selectedNodeSchemaId?: string;
   schemaName?: string | undefined;
   breadcrumbItems?: { id: string; label: string }[];
+  /** 面包屑项被点击时回调 */
+  onBreadcrumbSelect?: (nodeId: string) => void;
+  /** 面包屡项 hover 时回调（传入 tree node ID 或 null） */
+  onBreadcrumbHover?: (nodeId: string | null) => void;
+  /** 面包屑 hover 对应的 schema node id（用于画布 hover 高亮） */
+  hoveredNodeSchemaId?: string | null | undefined;
   /** Multi-tab mode */
   tabs?: TabState[] | undefined;
   activeTabId?: string | undefined;
@@ -127,8 +138,13 @@ export function AppShell({
   pluginContext,
   persistenceAdapter,
   onCanvasSelectNode,
+  onCanvasDeselectNode,
+  selectedNodeSchemaId,
   schemaName,
   breadcrumbItems,
+  onBreadcrumbSelect,
+  onBreadcrumbHover,
+  hoveredNodeSchemaId,
   tabs,
   activeTabId,
   onActivateTab,
@@ -139,6 +155,7 @@ export function AppShell({
   onMoveTab,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const canvasContentRef = React.useRef<HTMLDivElement | null>(null);
   const resolvedPersistenceAdapter = React.useMemo(
     () => persistenceAdapter ?? new LocalWorkspacePersistenceAdapter(),
     [persistenceAdapter],
@@ -760,22 +777,25 @@ export function AppShell({
     if (contextMenuState.open) {
       setContextMenuState((current) => ({ ...current, open: false }));
     }
-    if (!onCanvasSelectNode) {
-      return;
-    }
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
       return;
     }
+    // 忽略点击 selection overlay（标签、下拉菜单等）
+    if (target.closest('.selection-overlay') || target.closest('.selection-overlay__dropdown')) {
+      return;
+    }
     const hit = target.closest('[data-shenbi-node-id]');
     if (!hit) {
+      onCanvasDeselectNode?.();
       return;
     }
     const nodeId = hit.getAttribute('data-shenbi-node-id');
     if (!nodeId) {
+      onCanvasDeselectNode?.();
       return;
     }
-    onCanvasSelectNode(nodeId);
+    onCanvasSelectNode?.(nodeId);
     if (!showInspector) {
       setShowInspector(true);
       setIsMaximized(false);
@@ -890,6 +910,8 @@ export function AppShell({
             extra={toolbarExtra}
             menus={allMenus}
             breadcrumbItems={breadcrumbItems ?? []}
+            onBreadcrumbSelect={onBreadcrumbSelect}
+            onBreadcrumbHover={onBreadcrumbHover}
             onRunMenuCommand={(commandId) => {
               void runCommand(commandId);
             }}
@@ -905,8 +927,16 @@ export function AppShell({
               >
                 {/* The Stage / Viewport */}
                 <div className="relative z-10 stage-viewport min-h-[600px] w-full max-w-[1200px] rounded-sm overflow-hidden border border-border-ide">
-                  <div className="bg-white min-h-full" onClickCapture={handleCanvasClickCapture}>
+                  <div className="bg-white min-h-full relative" ref={canvasContentRef} onClickCapture={handleCanvasClickCapture}>
                     {children}
+                    <SelectionOverlay
+                      containerRef={canvasContentRef}
+                      selectedNodeSchemaId={selectedNodeSchemaId}
+                      externalHoverNodeSchemaId={hoveredNodeSchemaId}
+                      ancestorItems={breadcrumbItems}
+                      onSelectAncestor={onBreadcrumbSelect}
+                      onHoverAncestor={onBreadcrumbHover}
+                    />
                   </div>
                   
                   {/* Viewport Meta Info (Figma Style) */}

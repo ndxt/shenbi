@@ -290,6 +290,7 @@ export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRende
   // 为编辑器画布提供可点击选中能力
   if (node.id && Comp !== Fragment) {
     resolvedProps['data-shenbi-node-id'] = node.id;
+    resolvedProps['data-shenbi-component-type'] = node.componentType;
   }
 
   // 强制 Modal/Drawer 不使用 Portal，直接在当前 DOM 位置渲染（即页面容器内），

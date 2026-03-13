@@ -18,9 +18,11 @@ interface WorkbenchToolbarProps {
   menus?: ToolbarMenuItem[];
   onRunMenuCommand?: (commandId: string) => void;
   breadcrumbItems?: { id: string; label: string }[];
+  onBreadcrumbSelect?: ((nodeId: string) => void) | undefined;
+  onBreadcrumbHover?: ((nodeId: string | null) => void) | undefined;
 }
 
-export function WorkbenchToolbar({ extra, menus, onRunMenuCommand, breadcrumbItems = [] }: WorkbenchToolbarProps) {
+export function WorkbenchToolbar({ extra, menus, onRunMenuCommand, breadcrumbItems = [], onBreadcrumbSelect, onBreadcrumbHover }: WorkbenchToolbarProps) {
   const startMenus = React.useMemo(
     () => menus?.filter((menu) => menu.target === 'toolbar-start') ?? [],
     [menus],
@@ -51,9 +53,17 @@ export function WorkbenchToolbar({ extra, menus, onRunMenuCommand, breadcrumbIte
           {breadcrumbItems.map((item, index) => (
             <React.Fragment key={item.id}>
               {index > 0 && <ChevronRight size={12} />}
-              <span className={index === breadcrumbItems.length - 1 ? 'text-text-primary truncate' : 'truncate'}>
+              <button
+                type="button"
+                className={`truncate hover:text-text-primary transition-colors cursor-pointer bg-transparent border-0 p-0 ${
+                  index === breadcrumbItems.length - 1 ? 'text-text-primary' : ''
+                }`}
+                onClick={() => onBreadcrumbSelect?.(item.id)}
+                onMouseEnter={() => onBreadcrumbHover?.(item.id)}
+                onMouseLeave={() => onBreadcrumbHover?.(null)}
+              >
                 {item.label}
-              </span>
+              </button>
             </React.Fragment>
           ))}
         </div>
