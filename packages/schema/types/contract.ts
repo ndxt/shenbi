@@ -50,6 +50,7 @@ export interface ContractChildren {
 
 export interface ComponentContractV1 {
   componentType: string;
+  displayNameKey?: string;
   runtimeType?: string;
   category?: string;
   icon?: string;

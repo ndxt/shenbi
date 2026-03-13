@@ -87,9 +87,12 @@ function buildComponentTree(
 
   contracts.forEach((contract) => {
     const descriptionKey = COMPONENT_DESCRIPTION_KEYS[contract.componentType];
+    const componentNameKey = contract.displayNameKey;
     treeMap.set(contract.componentType, {
       id: contract.componentType,
-      name: contract.componentType.split('.').pop() || contract.componentType,
+      name: componentNameKey
+        ? t(componentNameKey, { defaultValue: contract.componentType.split('.').pop() || contract.componentType })
+        : contract.componentType.split('.').pop() || contract.componentType,
       icon: getIconFromContract(contract.icon),
       description: descriptionKey
         ? t(descriptionKey, { defaultValue: (contract as { description?: string }).description })
@@ -127,6 +130,7 @@ function getCategoryName(category: string, t: TranslateFn): string {
     'general': t('category.general'),
     'layout': t('category.layout'),
     'navigation': t('category.navigation'),
+    'chart': t('category.chart'),
     'data-entry': t('category.dataEntry'),
     'data-display': t('category.dataDisplay'),
     'feedback': t('category.feedback'),
@@ -290,8 +294,12 @@ export function ComponentPanel({ contracts = [], onInsert }: ComponentPanelProps
       const matchedItems = group.items.filter((item) => {
         const lowerSearch = searchTerm.toLowerCase();
         const selfMatch = item.id.toLowerCase().includes(lowerSearch);
-        const childMatch = item.children.some((child) => child.id.toLowerCase().includes(lowerSearch));
-        return selfMatch || childMatch;
+        const selfNameMatch = item.name.toLowerCase().includes(lowerSearch);
+        const childMatch = item.children.some((child) => (
+          child.id.toLowerCase().includes(lowerSearch)
+          || child.name.toLowerCase().includes(lowerSearch)
+        ));
+        return selfMatch || selfNameMatch || childMatch;
       });
       return { ...group, items: matchedItems };
     })

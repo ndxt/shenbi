@@ -1,5 +1,32 @@
 import type { ComponentContract } from '../types/contract';
 
+function pascalToCamelCase(value: string): string {
+  return value
+    .replace(/^[A-Z]+(?=[A-Z][a-z]|[0-9]|$)/, (match) => match.toLowerCase())
+    .replace(/^[A-Z]/, (match) => match.toLowerCase());
+}
+
+function upperCaseFirst(value: string): string {
+  return value.length > 0 ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
+}
+
+function toComponentDisplayNameKey(componentType: string): string {
+  const [firstSegment = '', ...restSegments] = componentType.split('.');
+  const normalized = [
+    pascalToCamelCase(firstSegment),
+    ...restSegments.map((segment) => upperCaseFirst(pascalToCamelCase(segment))),
+  ].join('');
+
+  return `componentName.${normalized}`;
+}
+
+function withDisplayNameKey(contract: ComponentContract): ComponentContract {
+  return {
+    ...contract,
+    displayNameKey: contract.displayNameKey ?? toComponentDisplayNameKey(contract.componentType),
+  };
+}
+
 // ================== Layout ==================
 import {
   layoutContract,
@@ -308,7 +335,7 @@ export const builtinContracts: ComponentContract[] = [
   chartAreaContract,
   chartPieContract,
   chartGaugeContract,
-];
+].map(withDisplayNameKey);
 
 // Contract map for quick lookup
 export const builtinContractMap: Record<string, ComponentContract> = Object.fromEntries(
