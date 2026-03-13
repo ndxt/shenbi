@@ -1,3 +1,5 @@
+import './i18n';
+
 export * from './FilePanel';
 export * from './FileExplorer';
 export * from './plugin';

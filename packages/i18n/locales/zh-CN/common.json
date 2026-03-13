@@ -1,0 +1,19 @@
+{
+  "confirm": "确定",
+  "cancel": "取消",
+  "save": "保存",
+  "delete": "删除",
+  "rename": "重命名",
+  "close": "关闭",
+  "closeOthers": "关闭其他",
+  "closeAll": "关闭所有",
+  "closeSaved": "关闭已保存",
+  "newFile": "新建文件",
+  "newFolder": "新建文件夹",
+  "refresh": "刷新",
+  "collapseAll": "全部折叠",
+  "unsaved": "未保存",
+  "noDescription": "暂无详细说明。",
+  "search": "搜索",
+  "notFound": "未找到匹配项"
+}

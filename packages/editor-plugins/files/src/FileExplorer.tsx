@@ -18,6 +18,8 @@ import {
   BookOpen,
 } from 'lucide-react';
 import type { FSTreeNode, FileType } from '@shenbi/editor-core';
+import { useTranslation } from '@shenbi/i18n';
+import './i18n';
 
 export interface FileExplorerProps {
   tree: FSTreeNode[];
@@ -180,6 +182,7 @@ function TreeNodeItem({
   onDrop,
   onDragEnd,
 }: TreeNodeItemProps) {
+  const { t } = useTranslation('pluginFiles');
   const isDir = node.type === 'directory';
   const isExpanded = expandedIds.has(node.id);
   const isActive = node.id === activeFileId;
@@ -325,7 +328,10 @@ function TreeNodeItem({
             onBlur={handleRenameBlur}
           />
         ) : (
-          <span className="truncate flex-1" title={isDirty ? `${node.name} - 未保存` : node.name}>
+          <span
+            className="truncate flex-1"
+            title={isDirty ? `${node.name} - ${t('unsaved', { ns: 'common' })}` : node.name}
+          >
             {node.name}
             {isDirty && (
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-text-secondary ml-1.5 align-middle" />
@@ -405,6 +411,7 @@ export function FileExplorer({
   onRefresh,
   onMoveNode,
 }: FileExplorerProps) {
+  const { t } = useTranslation('pluginFiles');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(initialExpandedIds ?? []));
   const [renamingId, setRenamingId] = useState<string | undefined>();
   const [creating, setCreating] = useState<CreatingState | null>(null);
@@ -555,10 +562,10 @@ export function FileExplorer({
   }, []);
 
   const handleDelete = useCallback((nodeId: string) => {
-    if (window.confirm('确定删除？')) {
+    if (window.confirm(t('confirmDelete'))) {
       onDeleteNode(nodeId);
     }
-  }, [onDeleteNode]);
+  }, [onDeleteNode, t]);
 
   const startRename = useCallback((id: string) => {
     setRenamingId(id);
@@ -854,11 +861,11 @@ export function FileExplorer({
     <div className="h-full flex flex-col text-xs text-text-primary" ref={containerRef}>
       {/* Toolbar */}
       <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border-ide">
-        <span className="text-[11px] text-text-secondary font-medium uppercase tracking-wide flex-1">文件</span>
+        <span className="text-[11px] text-text-secondary font-medium uppercase tracking-wide flex-1">{t('title')}</span>
         <button
           type="button"
           className="p-1 rounded hover:bg-bg-activity-bar text-text-secondary hover:text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-          title="保存当前文件"
+          title={t('toolbar.saveCurrentFile')}
           onClick={onSaveActiveFile}
           disabled={!canSaveActiveFile || !onSaveActiveFile}
         >
@@ -867,7 +874,7 @@ export function FileExplorer({
         <button
           type="button"
           className="p-1 rounded hover:bg-bg-activity-bar text-text-secondary hover:text-text-primary transition-colors"
-          title="新建文件"
+          title={t('toolbar.newFile')}
           onClick={() => startCreating(null, 'file')}
         >
           <Plus size={14} />
@@ -875,7 +882,7 @@ export function FileExplorer({
         <button
           type="button"
           className="p-1 rounded hover:bg-bg-activity-bar text-text-secondary hover:text-text-primary transition-colors"
-          title="新建文件夹"
+          title={t('toolbar.newFolder')}
           onClick={() => startCreating(null, 'directory')}
         >
           <FolderPlus size={14} />
@@ -883,7 +890,7 @@ export function FileExplorer({
         <button
           type="button"
           className="p-1 rounded hover:bg-bg-activity-bar text-text-secondary hover:text-text-primary transition-colors"
-          title="刷新"
+          title={t('toolbar.refresh')}
           onClick={onRefresh}
         >
           <RefreshCw size={14} />
@@ -891,14 +898,14 @@ export function FileExplorer({
         <button
           type="button"
           className="p-1 rounded hover:bg-bg-activity-bar text-text-secondary hover:text-text-primary transition-colors"
-          title="全部折叠"
+          title={t('toolbar.collapseAll')}
           onClick={collapseAll}
         >
           <ChevronsDownUp size={14} />
         </button>
       </div>
       <div className="px-2 py-1 border-b border-border-ide text-[11px] text-text-secondary">
-        {statusText ?? '无活动文件'}
+        {statusText ?? t('status.noActiveFile')}
       </div>
 
       {/* Tree */}
@@ -913,7 +920,7 @@ export function FileExplorer({
       >
         {tree.length === 0 && !showRootCreateInput ? (
           <div className="px-3 py-4 text-center text-[11px] text-text-secondary">
-            暂无文件，点击上方按钮创建
+            {t('empty')}
           </div>
         ) : (
           <>
@@ -972,7 +979,7 @@ export function FileExplorer({
               startCreating(parentId, 'file');
             }}
           >
-            <Plus size={13} /> 新建文件
+            <Plus size={13} /> {t('menu.newFile')}
           </button>
           <button
             type="button"
@@ -983,7 +990,7 @@ export function FileExplorer({
               startCreating(parentId, 'directory');
             }}
           >
-            <FolderPlus size={13} /> 新建文件夹
+            <FolderPlus size={13} /> {t('menu.newFolder')}
           </button>
           {contextMenu.node && (
             <>
@@ -996,7 +1003,7 @@ export function FileExplorer({
                   startRename(contextMenu.node!.id);
                 }}
               >
-                <Pencil size={13} /> 重命名
+                <Pencil size={13} /> {t('menu.rename')}
               </button>
               <button
                 type="button"
@@ -1006,7 +1013,7 @@ export function FileExplorer({
                   handleDelete(contextMenu.node!.id);
                 }}
               >
-                <Trash2 size={13} /> 删除
+                <Trash2 size={13} /> {t('menu.delete')}
               </button>
             </>
           )}

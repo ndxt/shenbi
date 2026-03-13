@@ -1,6 +1,8 @@
 import React from 'react';
 import type { SidebarTabContribution } from '@shenbi/editor-plugin-api';
+import { i18n } from '@shenbi/i18n';
 import { FilePanel, type FilePanelFileItem } from './FilePanel';
+import './i18n';
 
 export interface CreateFilesSidebarTabOptions {
   id?: string;
@@ -20,7 +22,7 @@ export function createFilesSidebarTab(
 ): SidebarTabContribution {
   return {
     id: options.id ?? 'files',
-    label: options.label ?? 'Files',
+    label: options.label ?? i18n.t('title', { ns: 'pluginFiles' }),
     order: options.order ?? 35,
     render: () => (
       <FilePanel

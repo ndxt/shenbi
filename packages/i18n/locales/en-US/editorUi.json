@@ -1,0 +1,78 @@
+{
+  "panel": {
+    "title": "Components"
+  },
+  "search": {
+    "placeholder": "Search components..."
+  },
+  "popover": {
+    "subComponents": "Sub Components",
+    "documentation": "Documentation",
+    "componentDocs": "Component Docs"
+  },
+  "category": {
+    "general": "General",
+    "layout": "Layout",
+    "navigation": "Navigation",
+    "dataEntry": "Data Entry",
+    "dataDisplay": "Data Display",
+    "feedback": "Feedback",
+    "other": "Other",
+    "uncategorized": "Uncategorized"
+  },
+  "component": {
+    "layout": "Page layout container with support for header, footer, and sidebar areas.",
+    "layoutHeader": "Page header navigation bar, commonly used for logo, menu, and user info.",
+    "layoutContent": "Main content area that fills remaining space automatically.",
+    "layoutFooter": "Page footer for copyright or auxiliary information.",
+    "layoutSider": "Sidebar container with collapse support.",
+    "floatButton": "Floating action button fixed to the viewport, often used for feedback or back-to-top actions.",
+    "floatButtonGroup": "Grouped floating action buttons for bundling multiple quick actions together.",
+    "floatButtonBackTop": "Back-to-top button.",
+    "typography": "Typography primitives for titles, text, links, and paragraph content.",
+    "typographyTitle": "Title text component.",
+    "typographyText": "Plain text component.",
+    "typographyLink": "Link text component.",
+    "typographyParagraph": "Paragraph text component.",
+    "tabs": "Tabbed navigation component.",
+    "tabsTabPane": "Content pane rendered inside a tab.",
+    "space": "Spacing helper for applying consistent gaps between components.",
+    "spaceCompact": "Compact grouping for tightly arranged components.",
+    "tree": "Tree view component.",
+    "treeDirectoryTree": "Directory-style tree component.",
+    "skeleton": "Skeleton placeholder shown while content is loading.",
+    "skeletonButton": "Button-shaped skeleton placeholder.",
+    "skeletonAvatar": "Avatar-shaped skeleton placeholder.",
+    "skeletonInput": "Input-shaped skeleton placeholder.",
+    "skeletonImage": "Image-shaped skeleton placeholder.",
+    "row": "Grid row used together with Col for layout composition.",
+    "col": "Grid column that must be nested inside Row to divide horizontal space.",
+    "flex": "Flex layout container for alignment, spacing, and wrapping.",
+    "divider": "Divider line for separating content blocks.",
+    "anchor": "Anchor component for jumping to a specific section on the page.",
+    "breadcrumb": "Breadcrumb navigation showing the current page hierarchy.",
+    "dropdown": "Dropdown menu that expands into a list of actions.",
+    "menu": "Navigation menu for pages and features.",
+    "pagination": "Pagination control for splitting long lists into pages.",
+    "steps": "Step indicator that guides users through a multi-step flow.",
+    "button": "Button component for triggering business logic or user interactions.",
+    "input": "Input field component.",
+    "select": "Select dropdown component.",
+    "table": "Table component for displaying row and column data.",
+    "form": "Form container.",
+    "formItem": "Form item containing label and input control."
+  },
+  "tab": {
+    "pageState": "Page State",
+    "pageParams": "Page Params",
+    "stateData": "State Data",
+    "methods": "Methods",
+    "contextData": "Context Data"
+  },
+  "statusBar": {
+    "ready": "Ready",
+    "errors": "Errors",
+    "warnings": "Warnings",
+    "language": "Language"
+  }
+}

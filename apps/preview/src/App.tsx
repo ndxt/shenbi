@@ -54,6 +54,7 @@ import {
 import { createAIChatPlugin } from '@shenbi/editor-plugin-ai-chat';
 import { createFilesPlugin, useFileWorkspace, FileExplorer } from '@shenbi/editor-plugin-files';
 import { createSetterPlugin } from '@shenbi/editor-plugin-setter';
+import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
 
 type ScenarioKey =
   | 'user-management'
@@ -70,21 +71,6 @@ const PROJECT_ID = 'default';
 const PREVIEW_PERSISTENCE_NAMESPACE = 'preview-debug';
 const ACTIVE_SCENARIO_PERSISTENCE_KEY = 'active-scenario';
 const SHELL_SESSION_PERSISTENCE_KEY = 'shell-session';
-
-const scenarioOptions: { label: string; value: ScenarioKey }[] = [
-  { label: '用户管理场景', value: 'user-management' },
-  { label: 'Form.List', value: 'form-list' },
-  { label: 'Tabs 详情', value: 'tabs-detail' },
-  { label: 'Tree 管理', value: 'tree-management' },
-  { label: 'Descriptions', value: 'descriptions' },
-  { label: 'Drawer 详情', value: 'drawer-detail' },
-  { label: '九宫格布局', value: 'nine-grid' },
-];
-
-const modeOptions: { label: string; value: AppMode }[] = [
-  { label: '多场景', value: 'scenarios' },
-  { label: 'Shell', value: 'shell' },
-];
 
 function cloneSchema(schema: PageSchema): PageSchema {
   if (typeof structuredClone === 'function') {
@@ -149,6 +135,9 @@ function areStringArraysEqual(left: string[], right: string[]): boolean {
 }
 
 export function App() {
+  const { t: previewT } = useTranslation('preview');
+  const { t: filesT } = useTranslation('pluginFiles');
+  const currentLocale = useCurrentLocale();
   const [appMode, setAppMode] = useShellModeUrl();
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const persistenceAdapter = useMemo(() => new LocalWorkspacePersistenceAdapter(), []);
@@ -162,6 +151,19 @@ export function App() {
   const initialScenarioSchemas = useMemo(() => createInitialScenarioState(), []);
   const [activityMessage, setActivityMessage] = useState<string>('');
   const initialShellSchema = useMemo(() => createEmptyShellSchema(), []);
+  const scenarioOptions = useMemo<{ label: string; value: ScenarioKey }[]>(() => ([
+    { label: previewT('scenarios.userManagement'), value: 'user-management' },
+    { label: previewT('scenarios.formList'), value: 'form-list' },
+    { label: previewT('scenarios.tabsDetail'), value: 'tabs-detail' },
+    { label: previewT('scenarios.treeManagement'), value: 'tree-management' },
+    { label: previewT('scenarios.descriptions'), value: 'descriptions' },
+    { label: previewT('scenarios.drawerDetail'), value: 'drawer-detail' },
+    { label: previewT('scenarios.nineGrid'), value: 'nine-grid' },
+  ]), [currentLocale, previewT]);
+  const modeOptions = useMemo<{ label: string; value: AppMode }[]>(() => ([
+    { label: previewT('modeOptions.scenarios'), value: 'scenarios' },
+    { label: previewT('modeOptions.shell'), value: 'shell' },
+  ]), [currentLocale, previewT]);
 
   // VFS & TabManager instances
   const vfs = useMemo(() => new IndexedDBFileSystemAdapter(), []);
@@ -297,7 +299,7 @@ export function App() {
       if (typeof window === 'undefined') {
         return null;
       }
-      return window.prompt('请输入文件名', defaultName);
+      return window.prompt(previewT('prompt.enterFileName'), defaultName);
     },
   });
 
@@ -308,13 +310,15 @@ export function App() {
 
   const fileExplorerStatusText = useMemo(() => {
     if (!tabSnapshot.activeTabId) {
-      return '无活动文件';
+      return filesT('status.noActiveFile');
     }
     if (isDirty) {
-      return '未保存';
+      return filesT('status.unsavedShort');
     }
-    return activeShellSaveSource === 'auto' ? '已自动保存' : '已保存';
-  }, [activeShellSaveSource, isDirty, tabSnapshot.activeTabId]);
+    return activeShellSaveSource === 'auto'
+      ? filesT('status.autoSaved')
+      : filesT('status.savedShort');
+  }, [activeShellSaveSource, currentLocale, filesT, isDirty, tabSnapshot.activeTabId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -516,8 +520,8 @@ export function App() {
     if (typeof window === 'undefined') {
       return null;
     }
-    return window.prompt('请输入文件名', defaultName);
-  }, []);
+    return window.prompt(previewT('prompt.enterFileName'), defaultName);
+  }, [previewT]);
   const { executePluginCommand: executeHostPluginCommand } = useEditorHostBridge({
     mode: appMode === 'shell' ? 'shell' : 'scenarios',
     shellCommands: fileEditor.commands,
@@ -610,12 +614,12 @@ export function App() {
     const isActive = tabManager.getActiveTabId() === fileId;
     const isDirtyCheck = isActive ? shellSnapshot.isDirty : tabManager.getTab(fileId)?.isDirty;
     if (isDirtyCheck) {
-      if (!window.confirm('文件未保存，确定关闭？')) {
+      if (!window.confirm(previewT('prompt.confirmClose'))) {
         return;
       }
     }
     void fileEditor.commands.execute('tab.close', { fileId });
-  }, [fileEditor.commands, shellSnapshot.isDirty, tabManager]);
+  }, [fileEditor.commands, previewT, shellSnapshot.isDirty, tabManager]);
 
   const handleCloseOtherTabs = useCallback((fileId: string) => {
     void fileEditor.commands.execute('tab.closeOthers', { fileId });
@@ -718,9 +722,9 @@ export function App() {
           commands: [
             {
               id: 'workspace.resetDocument',
-              title: 'Reset Document',
+              title: previewT('commands.resetDocument.title'),
               category: 'Workspace',
-              description: 'Reset the current shell page or restore the active scenario baseline.',
+              description: previewT('commands.resetDocument.description'),
               execute: () => handleResetWorkspace(),
             },
           ],
@@ -730,13 +734,15 @@ export function App() {
         inspectorTabs: [
           {
             id: 'debug',
-            label: 'Debug',
+            label: previewT('plugins.debug.label'),
             order: 99,
             render: (context) => (
               <div className="p-3 text-xs text-text-secondary">
-                Plugin Tab Loaded
+                {previewT('plugins.debug.loaded')}
                 {context.selectedNode?.id ? (
-                  <div className="mt-2 text-[11px]">Selected: {context.selectedNode.id}</div>
+                  <div className="mt-2 text-[11px]">
+                    {previewT('plugins.debug.selected', { nodeId: context.selectedNode.id })}
+                  </div>
                 ) : null}
               </div>
             ),
@@ -745,27 +751,27 @@ export function App() {
       }),
       defineEditorPlugin({
         id: 'preview.assets',
-        name: 'Preview Assets Plugin',
+        name: previewT('plugins.assets.name'),
         contributes: {
           activityBarItems: [
             {
               id: 'rocket',
-              label: 'Rocket',
+              label: previewT('plugins.assets.activityLabel'),
               icon: Rocket,
               order: 99,
               section: 'main',
               targetSidebarTabId: 'assets',
-              onClick: () => setActivityMessage('Activity Plugin Triggered'),
+              onClick: () => setActivityMessage(previewT('messages.activityTriggered')),
             },
           ],
           sidebarTabs: [
             {
               id: 'assets',
-              label: 'Assets',
+              label: previewT('plugins.assets.sidebarLabel'),
               order: 99,
               render: () => (
                 <div className="p-3 text-xs text-text-secondary">
-                  Sidebar Plugin Loaded
+                  {previewT('plugins.assets.loaded')}
                 </div>
               ),
             },
@@ -782,12 +788,12 @@ export function App() {
     if (appMode === 'shell' && vfsInitialized) {
       registeredPlugins.push(defineEditorPlugin({
         id: 'shenbi.plugin.files',
-        name: 'Files Plugin',
+        name: filesT('pluginName'),
         contributes: {
           sidebarTabs: [
             {
               id: 'files',
-              label: 'Files',
+              label: filesT('title'),
               order: 35,
               render: () => (
                 <FileExplorer
@@ -815,8 +821,8 @@ export function App() {
           commands: [
             {
               id: 'files.closeActiveTab',
-              title: '关闭当前标签页',
-              category: 'Files',
+              title: previewT('plugins.files.closeActiveTab'),
+              category: filesT('title'),
               execute: () => {
                 const activeId = tabSnapshotRef.current.activeTabId;
                 if (activeId) handleCloseTabRef.current(activeId);
@@ -840,8 +846,11 @@ export function App() {
     return registeredPlugins;
   }, [
     appMode,
+    currentLocale,
     filesSidebarTabOptions,
+    filesT,
     handleResetWorkspace,
+    previewT,
     vfsInitialized,
   ]);
 
@@ -874,7 +883,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [workspacePersistence]);
+  }, [scenarioOptions, workspacePersistence]);
 
   useEffect(() => {
     if (!scenarioPersistenceHydrated) {
@@ -919,11 +928,13 @@ export function App() {
       onMoveTab={handleMoveTab}
       toolbarExtra={(
         <div className="flex items-center gap-2">
-          <span className="text-text-secondary" style={{ fontSize: '11px' }}>模式</span>
+          <span className="text-text-secondary" style={{ fontSize: '11px' }}>
+            {previewT('mode')}
+          </span>
           <select
             className="h-7 w-[110px] rounded border border-border-ide bg-bg-panel px-2 text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
             style={{ fontSize: '12px' }}
-            aria-label="模式切换"
+            aria-label={previewT('aria.modeSwitch')}
             value={appMode}
             onChange={(event) => setAppMode(event.target.value as AppMode)}
           >
@@ -935,11 +946,13 @@ export function App() {
           </select>
           {appMode === 'scenarios' ? (
             <>
-              <span className="text-text-secondary" style={{ fontSize: '11px' }}>场景</span>
+              <span className="text-text-secondary" style={{ fontSize: '11px' }}>
+                {previewT('scenario')}
+              </span>
               <select
                 className="h-7 w-[180px] rounded border border-border-ide bg-bg-panel px-2 text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
                 style={{ fontSize: '12px' }}
-                aria-label="场景切换"
+                aria-label={previewT('aria.scenarioSwitch')}
                 value={activeScenario}
                 onChange={(event) => setActiveScenario(event.target.value as ScenarioKey)}
               >
@@ -954,30 +967,32 @@ export function App() {
           {appMode === 'shell' ? (
             <>
               <span
-                aria-label="当前文件"
+                aria-label={previewT('toolbar.currentFile')}
                 className="max-w-[220px] truncate text-text-secondary"
                 style={{ fontSize: '11px' }}
               >
-                {activeFileName ?? (tabSnapshot.activeTabId ? tabSnapshot.tabs.find((t) => t.fileId === tabSnapshot.activeTabId)?.fileName : '未命名页面')}
+                {activeFileName ?? (tabSnapshot.activeTabId
+                  ? tabSnapshot.tabs.find((t) => t.fileId === tabSnapshot.activeTabId)?.fileName
+                  : previewT('toolbar.untitled'))}
                 {isDirty ? ' *' : ''}
               </span>
               <button
                 type="button"
-                aria-label="撤销"
+                aria-label={previewT('toolbar.undo')}
                 className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!canUndo}
                 onClick={handleUndo}
-                title="撤销 (Ctrl+Z)"
+                title={previewT('toolbar.undo')}
               >
                 <Undo2 size={15} />
               </button>
               <button
                 type="button"
-                aria-label="重做"
+                aria-label={previewT('toolbar.redo')}
                 className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!canRedo}
                 onClick={handleRedo}
-                title="重做 (Ctrl+Shift+Z)"
+                title={previewT('toolbar.redo')}
               >
                 <Redo2 size={15} />
               </button>
@@ -985,12 +1000,12 @@ export function App() {
           ) : null}
           <button
             type="button"
-            aria-label="清空页面"
+            aria-label={previewT('toolbar.clearPage')}
             className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary"
             onClick={() => {
               void executeAppCommand('workspace.resetDocument');
             }}
-            title="清空页面"
+            title={previewT('toolbar.clearPage')}
           >
             <Trash2 size={15} />
           </button>

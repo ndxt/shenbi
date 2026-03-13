@@ -1,0 +1,19 @@
+{
+  "confirm": "Confirm",
+  "cancel": "Cancel",
+  "save": "Save",
+  "delete": "Delete",
+  "rename": "Rename",
+  "close": "Close",
+  "closeOthers": "Close Others",
+  "closeAll": "Close All",
+  "closeSaved": "Close Saved",
+  "newFile": "New File",
+  "newFolder": "New Folder",
+  "refresh": "Refresh",
+  "collapseAll": "Collapse All",
+  "unsaved": "Unsaved",
+  "noDescription": "No description available.",
+  "search": "Search",
+  "notFound": "No matches found"
+}

@@ -1,0 +1,78 @@
+{
+  "panel": {
+    "title": "组件"
+  },
+  "search": {
+    "placeholder": "搜索组件..."
+  },
+  "popover": {
+    "subComponents": "子组件",
+    "documentation": "文档说明",
+    "componentDocs": "组件文档"
+  },
+  "category": {
+    "general": "通用",
+    "layout": "布局",
+    "navigation": "导航",
+    "dataEntry": "录入",
+    "dataDisplay": "展示",
+    "feedback": "反馈",
+    "other": "其他",
+    "uncategorized": "未分类"
+  },
+  "component": {
+    "layout": "页面整体布局容器，支持顶部、底部、侧边栏等区域。",
+    "layoutHeader": "页面顶部导航栏，常用于 Logo、菜单、用户信息。",
+    "layoutContent": "页面主要内容区域，自动填充剩余空间。",
+    "layoutFooter": "页面底部版权栏或辅助信息栏。",
+    "layoutSider": "侧边栏容器，支持展开收起。",
+    "floatButton": "悬浮按钮，固定在页面右下角，常用于反馈、回到顶部。",
+    "floatButtonGroup": "悬浮按钮组，可以将多个悬浮按钮组合在一起。",
+    "floatButtonBackTop": "回到顶部按钮。",
+    "typography": "排版组件，提供标题、文本、链接等基础排版。",
+    "typographyTitle": "标题组件。",
+    "typographyText": "普通文本组件。",
+    "typographyLink": "链接文本。",
+    "typographyParagraph": "段落文本。",
+    "tabs": "选项卡切换组件。",
+    "tabsTabPane": "选项卡面板内容。",
+    "space": "间距组件，用于统一设置组件间的间距。",
+    "spaceCompact": "紧凑排列的组件组。",
+    "tree": "树形展示组件。",
+    "treeDirectoryTree": "目录结构的树。",
+    "skeleton": "骨架屏，在页面加载时提供视觉占位。",
+    "skeletonButton": "按钮样式的骨架。",
+    "skeletonAvatar": "头像样式的骨架。",
+    "skeletonInput": "输入框样式的骨架。",
+    "skeletonImage": "图片样式的骨架。",
+    "row": "栅格行，结合 Col 使用，用于页面布局。",
+    "col": "栅格列，必须嵌套在 Row 内使用，比例分配容器宽度。",
+    "flex": "弹性布局，用于控制子元素的对齐方式、间距、换行。",
+    "divider": "分割线，用于分隔段落或内容。",
+    "anchor": "锚点组件，用于跳转到页面指定位置。",
+    "breadcrumb": "面包屑组件，显示当前页面在系统层级结构中的位置。",
+    "dropdown": "下拉菜单，向下弹出的列表。",
+    "menu": "导航菜单，为页面和功能提供导航的菜单列表。",
+    "pagination": "分页器，采用分页的形式分隔长列表。",
+    "steps": "步骤条，引导用户按照流程完成任务的导航条。",
+    "button": "按钮组件，用于触发业务逻辑或响应用户点击。",
+    "input": "输入框组件。",
+    "select": "选择器组件。",
+    "table": "表格组件，展示行列数据。",
+    "form": "表单容器。",
+    "formItem": "表单项，包含标签和输入控件。"
+  },
+  "tab": {
+    "pageState": "页面状态",
+    "pageParams": "页面参数",
+    "stateData": "状态数据",
+    "methods": "方法",
+    "contextData": "上下文数据"
+  },
+  "statusBar": {
+    "ready": "就绪",
+    "errors": "错误",
+    "warnings": "警告",
+    "language": "语言"
+  }
+}
