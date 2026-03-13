@@ -24,6 +24,8 @@ export default defineConfig({
       '@shenbi/editor-plugin-files': path.resolve(__dirname, '../../packages/editor-plugins/files/src/index.ts'),
       '@shenbi/editor-plugin-setter': path.resolve(__dirname, '../../packages/editor-plugins/setter/src/index.ts'),
       '@shenbi/editor-plugin-ai-chat': path.resolve(__dirname, '../../packages/editor-plugins/ai-chat/src/index.ts'),
+      '@shenbi/engine': path.resolve(__dirname, '../../packages/engine/src/index.ts'),
+      '@shenbi/i18n': path.resolve(__dirname, '../../packages/i18n/src/index.ts'),
       '@shenbi/schema': path.resolve(__dirname, '../../packages/schema/types/index.ts'),
       '@shenbi/editor-ui': path.resolve(__dirname, '../../packages/editor-ui/src/index.ts'),
     },

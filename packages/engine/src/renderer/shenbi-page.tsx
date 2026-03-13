@@ -53,8 +53,6 @@ export function ShenbiPage({
     const isOpen = runtime.state[visibleKey] === true;
     const payload = runtime.dialogPayloads[dialogId];
 
-    debugger;
-
     // 始终渲染，通过 open 状态控制显隐，让 Ant Design 处理开关动画和遮罩交互
     return createElement(NodeRenderer, {
       key: dialogId,
@@ -62,8 +60,8 @@ export function ShenbiPage({
       extraContext: { dialogPayload: payload, dialogId },
       open: isOpen,
       ...(isDrawer
-        ? { onClose: () => { debugger; runtime.dispatch({ type: 'SET', key: visibleKey, value: false }) } }
-        : { onCancel: () => { debugger; runtime.dispatch({ type: 'SET', key: visibleKey, value: false }) } }),
+        ? { onClose: () => { runtime.dispatch({ type: 'SET', key: visibleKey, value: false }) } }
+        : { onCancel: () => { runtime.dispatch({ type: 'SET', key: visibleKey, value: false }) } }),
     });
   });
 

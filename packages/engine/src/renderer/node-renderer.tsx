@@ -312,6 +312,17 @@ export function NodeRenderer({ node, extraContext, ...injectedProps }: NodeRende
             runtime.dispatch({ type: 'SET', key: stateKey, value: false });
           };
         }
+      } else if (node.id) {
+        // open 是静态值（如 true）且没有 onClose/onCancel：
+        // 使用节点 ID 自动生成 state key，让 Drawer/Modal 可以关闭。
+        const autoKey = `__overlay_${node.id}`;
+        // 用 state 覆写 open：state 为 undefined 时保留原始静态值，state 为 false 时关闭
+        if (runtime.state[autoKey] === false) {
+          resolvedProps.open = false;
+        }
+        resolvedProps[closeEvent] = () => {
+          runtime.dispatch({ type: 'SET', key: autoKey, value: false });
+        };
       }
     }
   }
