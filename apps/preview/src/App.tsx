@@ -865,6 +865,25 @@ export function App() {
     selectSchemaNode(schemaNodeId);
   };
 
+  const handleCanvasDeselectNode = () => {
+    selectTreeNode(getDefaultSelectedNodeId(treeNodes) ?? '');
+  };
+
+  const handleBreadcrumbSelect = (treeNodeId: string) => {
+    selectTreeNode(treeNodeId);
+  };
+
+  const [breadcrumbHoveredSchemaId, setBreadcrumbHoveredSchemaId] = useState<string | null>(null);
+
+  const handleBreadcrumbHover = useCallback((treeNodeId: string | null) => {
+    if (!treeNodeId) {
+      setBreadcrumbHoveredSchemaId(null);
+      return;
+    }
+    const node = getSchemaNodeByTreeId(activeSchema, treeNodeId);
+    setBreadcrumbHoveredSchemaId(node?.id ?? null);
+  }, [activeSchema]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -923,8 +942,13 @@ export function App() {
       plugins={plugins}
       pluginContext={enhancedPluginContext}
       onCanvasSelectNode={handleCanvasSelectNode}
+      onCanvasDeselectNode={handleCanvasDeselectNode}
+      selectedNodeSchemaId={selectedNode?.id}
+      hoveredNodeSchemaId={breadcrumbHoveredSchemaId}
       schemaName={activeSchema.name}
       breadcrumbItems={breadcrumbItems}
+      onBreadcrumbSelect={handleBreadcrumbSelect}
+      onBreadcrumbHover={handleBreadcrumbHover}
       tabs={appMode === 'shell' && tabSnapshot.tabs.length > 0 ? tabSnapshot.tabs : undefined}
       activeTabId={tabSnapshot.activeTabId}
       onActivateTab={handleActivateTab}
