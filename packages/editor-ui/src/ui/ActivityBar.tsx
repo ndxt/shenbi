@@ -40,10 +40,11 @@ const ActivityItem = ({ icon: Icon, active = false, label, onClick }: ActivityIt
 
 export interface ActivityBarProps {
   items?: ActivityBarItemContribution[];
+  activeItemId?: string;
   onSelectItem?: (item: ActivityBarItemContribution) => void;
 }
 
-export function ActivityBar({ items, onSelectItem }: ActivityBarProps) {
+export function ActivityBar({ items, activeItemId, onSelectItem }: ActivityBarProps) {
   const resolvedItems = React.useMemo(() => resolveActivityBarItems(items), [items]);
   const mainItems = resolvedItems.filter((item) => (item.section ?? 'main') === 'main');
   const bottomItems = resolvedItems.filter((item) => (item.section ?? 'main') === 'bottom');
@@ -53,16 +54,23 @@ export function ActivityBar({ items, onSelectItem }: ActivityBarProps) {
     return preferred ?? resolvedItems[0]?.id ?? '';
   }, [resolvedItems]);
 
-  const [activeId, setActiveId] = React.useState(defaultActiveId);
+  const [innerActiveId, setInnerActiveId] = React.useState(defaultActiveId);
+  const activeId = activeItemId ?? innerActiveId;
+
+  const setActiveId = React.useCallback((nextId: string) => {
+    if (activeItemId === undefined) {
+      setInnerActiveId(nextId);
+    }
+  }, [activeItemId]);
 
   React.useEffect(() => {
     if (!activeId) {
-      setActiveId(defaultActiveId);
+      setInnerActiveId(defaultActiveId);
       return;
     }
     const exists = resolvedItems.some((item) => item.id === activeId);
     if (!exists) {
-      setActiveId(defaultActiveId);
+      setInnerActiveId(defaultActiveId);
     }
   }, [activeId, defaultActiveId, resolvedItems]);
 

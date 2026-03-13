@@ -1,7 +1,7 @@
 import {
   BugPlay,
   Database,
-  FileText,
+  LayoutGrid,
   Package,
   Search,
   Settings,
@@ -19,12 +19,12 @@ export type {
 
 function createBuiltinActivityItems(): ActivityBarItemContribution[] {
   return [
-    { id: 'explorer', label: 'Explorer', icon: FileText, order: 10, active: true, section: 'main', targetSidebarTabId: 'components' },
-    { id: 'search', label: 'Search', icon: Search, order: 20, section: 'main', targetSidebarTabId: 'outline' },
-    { id: 'data', label: 'Data', icon: Database, order: 30, section: 'main', targetSidebarTabId: 'data' },
-    { id: 'debug', label: 'Debug', icon: BugPlay, order: 40, section: 'main' },
-    { id: 'extensions', label: 'Extensions', icon: Package, order: 50, section: 'main' },
-    { id: 'settings', label: 'Settings', icon: Settings, order: 10, section: 'bottom' },
+    { id: 'explorer', label: 'Components', icon: LayoutGrid, order: 10, active: true, section: 'main', target: { type: 'panel', panelId: 'explorer' } },
+    { id: 'search', label: 'Outline', icon: Search, order: 20, section: 'main', target: { type: 'panel', panelId: 'search' } },
+    { id: 'data', label: 'Data', icon: Database, order: 30, section: 'main', target: { type: 'panel', panelId: 'data' } },
+    { id: 'debug', label: 'Debug', icon: BugPlay, order: 40, section: 'main', target: { type: 'action' } },
+    { id: 'extensions', label: 'Extensions', icon: Package, order: 50, section: 'main', target: { type: 'action' } },
+    { id: 'settings', label: 'Settings', icon: Settings, order: 10, section: 'bottom', target: { type: 'action' } },
   ];
 }
 

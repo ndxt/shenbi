@@ -137,7 +137,7 @@ export function TitleBar({
           <button
             onClick={onOpenCommandPalette}
             className="p-1 rounded transition-colors text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar"
-            title="Open Command Palette (Ctrl+Shift+P)"
+            title="Open Command Palette"
           >
             <Search size={14} />
           </button>

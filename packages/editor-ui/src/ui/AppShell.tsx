@@ -18,6 +18,7 @@ import { CommandPalette, type CommandPaletteItem } from './CommandPalette';
 import { ContextMenuOverlay, type ContextMenuItem } from './ContextMenuOverlay';
 import { Console } from './Console';
 import { StatusBar } from './StatusBar';
+import { resolvePrimaryPanels, type PrimaryPanelContribution } from './primary-panels';
 import '../styles/editor-ui.css';
 import { useResize } from '../hooks/useResize';
 import {
@@ -52,6 +53,7 @@ import type { ActivityBarItemContribution, ActivityBarProps } from './ActivityBa
 import type { SidebarProps } from './Sidebar';
 import type { InspectorProps } from './Inspector';
 import type { ToolbarMenuItem } from './ToolbarMenus';
+import { resolveActivityBarItems } from './activitybar-items';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -98,13 +100,30 @@ function isCleanup(value: unknown): value is EditorPluginCleanup {
   return typeof value === 'function';
 }
 
+function resolveActivityItemPanelId(
+  item: ActivityBarItemContribution,
+  panels: PrimaryPanelContribution[],
+): string | undefined {
+  const targetPanelId = item.target?.type === 'panel'
+    ? item.target.panelId
+    : item.targetSidebarTabId;
+  if (!targetPanelId) {
+    return undefined;
+  }
+  return panels.some((panel) => panel.id === targetPanelId) ? targetPanelId : undefined;
+}
+
 interface StoredLayoutState {
   showSidebar?: boolean;
   showInspector?: boolean;
   showConsole?: boolean;
   showAssistantPanel?: boolean;
   activeAuxiliaryPanelId?: string;
+  activePrimaryPanelId?: string;
+  showFileContextPanel?: boolean;
+  activeFileContextTabId?: string;
   sidebarSize?: number;
+  fileContextPanelSize?: number;
   inspectorSize?: number;
   assistantPanelSize?: number;
   consoleSize?: number;
@@ -170,7 +189,10 @@ export function AppShell({
     area: 'canvas',
     position: { x: 0, y: 0 },
   });
-  const [activeSidebarTabId, setActiveSidebarTabId] = React.useState('components');
+  const [activePrimaryPanelId, setActivePrimaryPanelId] = React.useState('');
+  const [showFileContextPanel, setShowFileContextPanel] = React.useState(true);
+  const [activeFileContextTabId, setActiveFileContextTabId] = React.useState('components');
+  const [activeActivityItemId, setActiveActivityItemId] = React.useState('');
   const [activeAuxiliaryPanelId, setActiveAuxiliaryPanelId] = React.useState<string | undefined>();
   const [focusVersion, setFocusVersion] = React.useState(0);
 
@@ -217,6 +239,11 @@ export function AppShell({
     setSize: setInspectorSize,
   } = useResize(256, 160, 600);
   const {
+    size: fileContextPanelSize,
+    startResize: startFileContextPanelResize,
+    setSize: setFileContextPanelSize,
+  } = useResize(256, 180, 600);
+  const {
     size: aiPanelSize,
     startResize: startAIPanelResize,
     setSize: setAIPanelSize,
@@ -237,12 +264,36 @@ export function AppShell({
     ],
     [activityBarProps?.items, pluginContributes.activityBarItems],
   );
-  const sidebarTabs = React.useMemo(
+  const primaryPanels = React.useMemo(
+    () => resolvePrimaryPanels(pluginContributes.primaryPanels),
+    [pluginContributes.primaryPanels],
+  );
+  const resolvedActivityItems = React.useMemo(
+    () => resolveActivityBarItems(activityItems),
+    [activityItems],
+  );
+  const defaultActivityItemId = React.useMemo(() => {
+    const preferred = resolvedActivityItems.find((item) => item.active)?.id;
+    return preferred ?? resolvedActivityItems[0]?.id ?? '';
+  }, [resolvedActivityItems]);
+  const defaultPrimaryPanelId = React.useMemo(() => {
+    const preferredItem = resolvedActivityItems.find((item) => item.id === defaultActivityItemId);
+    return (
+      (preferredItem ? resolveActivityItemPanelId(preferredItem, primaryPanels) : undefined)
+      ?? primaryPanels[0]?.id
+      ?? 'explorer'
+    );
+  }, [defaultActivityItemId, primaryPanels, resolvedActivityItems]);
+  const legacySidebarTabs = React.useMemo(
     () => [
       ...pluginContributes.sidebarTabs,
       ...(sidebarProps?.tabs ?? []),
     ],
     [pluginContributes.sidebarTabs, sidebarProps?.tabs],
+  );
+  const fileContextLegacyTabs = React.useMemo(
+    () => legacySidebarTabs.filter((tab) => !primaryPanels.some((panel) => panel.id === tab.id)),
+    [legacySidebarTabs, primaryPanels],
   );
   const inspectorTabs = React.useMemo(
     () => [
@@ -251,6 +302,63 @@ export function AppShell({
     ],
     [inspectorProps?.tabs, pluginContributes.inspectorTabs],
   );
+  const activeEditorTab = React.useMemo(
+    () => tabs?.find((tab) => tab.fileId === activeTabId) ?? tabs?.[0],
+    [activeTabId, tabs],
+  );
+  const fileContextTabs = React.useMemo(() => {
+    if (activeEditorTab?.fileType !== 'page') {
+      return [];
+    }
+    const contextualTabs = pluginContributes.fileContextPanels
+      .filter((panel) => {
+        if (!panel.fileTypes || panel.fileTypes.length === 0) {
+          return true;
+        }
+        return panel.fileTypes.includes(activeEditorTab.fileType);
+      })
+      .map((panel) => ({
+        id: panel.id,
+        label: panel.label,
+        ...(panel.order !== undefined ? { order: panel.order } : {}),
+        render: (context: Parameters<typeof panel.render>[0]) => panel.render({
+          ...context,
+          activeFileId: activeEditorTab.fileId,
+          activeFileName: activeEditorTab.fileName,
+          activeFileType: activeEditorTab.fileType,
+        }),
+      }));
+    return [...contextualTabs, ...fileContextLegacyTabs];
+  }, [activeEditorTab, fileContextLegacyTabs, pluginContributes.fileContextPanels]);
+  const activePrimaryPanel = React.useMemo(
+    () => primaryPanels.find((panel) => panel.id === activePrimaryPanelId) ?? primaryPanels[0],
+    [activePrimaryPanelId, primaryPanels],
+  );
+  React.useEffect(() => {
+    if (!activeActivityItemId) {
+      setActiveActivityItemId(defaultActivityItemId);
+      return;
+    }
+    const exists = resolvedActivityItems.some((item) => item.id === activeActivityItemId);
+    if (!exists) {
+      setActiveActivityItemId(defaultActivityItemId);
+    }
+  }, [activeActivityItemId, defaultActivityItemId, resolvedActivityItems]);
+  React.useEffect(() => {
+    if (!activePrimaryPanelId) {
+      setActivePrimaryPanelId(defaultPrimaryPanelId);
+      return;
+    }
+    const exists = primaryPanels.some((panel) => panel.id === activePrimaryPanelId);
+    if (!exists) {
+      setActivePrimaryPanelId(defaultPrimaryPanelId);
+    }
+  }, [activePrimaryPanelId, defaultPrimaryPanelId, primaryPanels]);
+  React.useEffect(() => {
+    if (activeEditorTab?.fileType === 'page') {
+      setShowFileContextPanel(true);
+    }
+  }, [activeEditorTab?.fileType]);
   const auxiliaryPanels = React.useMemo(() => {
     const panels = [...pluginContributes.auxiliaryPanels];
     if (aiPanelProps) {
@@ -494,6 +602,21 @@ export function AppShell({
     };
     return context;
   }, [hostCommandMap, persistence, pluginContext, pluginContributes.commands, workspaceId]);
+  const panelRenderContext = React.useMemo(() => ({
+    ...(sidebarProps?.contracts ? { contracts: sidebarProps.contracts } : {}),
+    ...(sidebarProps?.treeNodes ? { treeNodes: sidebarProps.treeNodes } : {}),
+    ...(sidebarProps?.selectedNodeId ? { selectedNodeId: sidebarProps.selectedNodeId } : {}),
+    ...(sidebarProps?.onSelectNode ? { onSelectNode: sidebarProps.onSelectNode } : {}),
+    ...(sidebarProps?.onInsertComponent ? { onInsertComponent: sidebarProps.onInsertComponent } : {}),
+    pluginContext: resolvedPluginContext,
+  }), [
+    resolvedPluginContext,
+    sidebarProps?.contracts,
+    sidebarProps?.onInsertComponent,
+    sidebarProps?.onSelectNode,
+    sidebarProps?.selectedNodeId,
+    sidebarProps?.treeNodes,
+  ]);
   const resolvedPluginContextRef = React.useRef(resolvedPluginContext);
   resolvedPluginContextRef.current = resolvedPluginContext;
   const runCommand = React.useCallback((commandId: string, payload?: unknown) => {
@@ -525,6 +648,15 @@ export function AppShell({
         setShowSidebar(nextState.showSidebar ?? true);
         setShowInspector(nextState.showInspector ?? true);
         setShowConsole(nextState.showConsole ?? true);
+        if (nextState.activePrimaryPanelId !== undefined) {
+          setActivePrimaryPanelId(nextState.activePrimaryPanelId);
+        }
+        if (nextState.showFileContextPanel !== undefined) {
+          setShowFileContextPanel(nextState.showFileContextPanel);
+        }
+        if (nextState.activeFileContextTabId !== undefined) {
+          setActiveFileContextTabId(nextState.activeFileContextTabId);
+        }
         if (nextState.showAssistantPanel !== undefined) {
           setShowAssistantPanel(nextState.showAssistantPanel);
         }
@@ -533,6 +665,9 @@ export function AppShell({
         }
         if (nextState.sidebarSize !== undefined) {
           setSidebarSize(nextState.sidebarSize);
+        }
+        if (nextState.fileContextPanelSize !== undefined) {
+          setFileContextPanelSize(nextState.fileContextPanelSize);
         }
         if (nextState.inspectorSize !== undefined) {
           setInspectorSize(nextState.inspectorSize);
@@ -566,7 +701,14 @@ export function AppShell({
     return () => {
       cancelled = true;
     };
-  }, [persistence, setAIPanelSize, setConsoleSize, setInspectorSize, setSidebarSize]);
+  }, [
+    persistence,
+    setAIPanelSize,
+    setConsoleSize,
+    setFileContextPanelSize,
+    setInspectorSize,
+    setSidebarSize,
+  ]);
 
   React.useEffect(() => {
     if (!layoutHydrated) {
@@ -577,21 +719,29 @@ export function AppShell({
       showSidebar,
       showInspector,
       showConsole,
+      activePrimaryPanelId,
+      showFileContextPanel,
+      activeFileContextTabId,
       showAssistantPanel,
       sidebarSize,
+      fileContextPanelSize,
       inspectorSize,
       assistantPanelSize: aiPanelSize,
       consoleSize,
       ...(activeAuxiliaryPanelId ? { activeAuxiliaryPanelId } : {}),
     }).catch(() => undefined);
   }, [
+    activeFileContextTabId,
+    activePrimaryPanelId,
     activeAuxiliaryPanelId,
     aiPanelSize,
     consoleSize,
+    fileContextPanelSize,
     layoutHydrated,
     persistence,
     showAssistantPanel,
     showConsole,
+    showFileContextPanel,
     showInspector,
     showSidebar,
     inspectorSize,
@@ -746,11 +896,25 @@ export function AppShell({
 
   const handleActivitySelectItem = (item: ActivityBarItemContribution) => {
     activityBarProps?.onSelectItem?.(item);
-    if (!item.targetSidebarTabId) {
+    setActiveActivityItemId(item.id);
+    const panelId = resolveActivityItemPanelId(item, primaryPanels);
+    if (panelId) {
+      setActivePrimaryPanelId(panelId);
+      if (!showSidebar) {
+        setShowSidebar(true);
+        setIsMaximized(false);
+      }
       return;
     }
-    setActiveSidebarTabId(item.targetSidebarTabId);
-    if (!showSidebar) {
+    const tabId = item.target?.type === 'tab' ? item.target.tabId : item.targetSidebarTabId;
+    if (!tabId) {
+      return;
+    }
+    setActiveFileContextTabId(tabId);
+    if (activeEditorTab?.fileType === 'page') {
+      setShowFileContextPanel(true);
+    }
+    if (!showSidebar && item.target?.type === 'panel') {
       setShowSidebar(true);
       setIsMaximized(false);
     }
@@ -812,6 +976,7 @@ export function AppShell({
   const handleChangeLocale = React.useCallback((nextLocale: SupportedLocale) => {
     void changeLanguage(nextLocale);
   }, []);
+  const shouldRenderFileContextPanel = activeEditorTab?.fileType === 'page' && showFileContextPanel;
 
   return (
     <div ref={rootRef} className="h-screen w-screen flex flex-col bg-bg-canvas text-text-primary overflow-hidden font-inter">
@@ -849,30 +1014,34 @@ export function AppShell({
           <ActivityBar
             {...activityBarProps}
             items={activityItems}
+            activeItemId={activeActivityItemId}
             onSelectItem={handleActivitySelectItem}
           />
         </div>
         
-        {showSidebar && (
+        {showSidebar && activePrimaryPanel ? (
           <div
             style={{ width: sidebarSize }}
             className="relative shrink-0 flex flex-col h-full"
             data-shenbi-shortcut-area="sidebar"
             onContextMenu={(event) => openContextMenu('sidebar', event)}
           >
-            <Sidebar
-              {...sidebarProps}
-              tabs={sidebarTabs}
-              activeTabId={activeSidebarTabId}
-              onChangeActiveTab={setActiveSidebarTabId}
-              pluginContext={resolvedPluginContext}
-            />
+            <div className="flex-1 overflow-hidden bg-bg-sidebar border-r border-border-ide flex flex-col">
+              {activePrimaryPanel.id !== 'files' ? (
+                <div className="h-8 shrink-0 flex items-center px-3 border-b border-border-ide bg-bg-panel text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                  {activePrimaryPanel.label}
+                </div>
+              ) : null}
+              <div className="flex-1 overflow-hidden">
+                {activePrimaryPanel.render(panelRenderContext)}
+              </div>
+            </div>
             <div 
               className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
               onMouseDown={(e) => startSidebarResize(e, 'horizontal', false)}
             />
           </div>
-        )}
+        ) : null}
         
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <EditorTabs
@@ -896,8 +1065,28 @@ export function AppShell({
           />
           
           <div className="flex-1 flex overflow-hidden">
+            {shouldRenderFileContextPanel ? (
+              <div
+                style={{ width: fileContextPanelSize }}
+                className="relative shrink-0 flex flex-col h-full"
+                data-shenbi-shortcut-area="sidebar"
+                onContextMenu={(event) => openContextMenu('sidebar', event)}
+              >
+                <Sidebar
+                  {...sidebarProps}
+                  tabs={fileContextTabs}
+                  activeTabId={activeFileContextTabId}
+                  onChangeActiveTab={setActiveFileContextTabId}
+                  pluginContext={resolvedPluginContext}
+                />
+                <div
+                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+                  onMouseDown={(e) => startFileContextPanelResize(e, 'horizontal', false)}
+                />
+              </div>
+            ) : null}
             {/* Editor/Canvas Area Container */}
-            <div className="flex-1 flex flex-col overflow-hidden relative bg-bg-canvas">
+            <div className="flex-1 min-w-[320px] flex flex-col overflow-hidden relative bg-bg-canvas">
               <main
                 data-shenbi-shortcut-area="canvas"
                 className="flex-1 overflow-auto p-12 flex justify-center items-start scrollbar-hide relative canvas-grid"
