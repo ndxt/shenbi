@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createFilesPlugin } from './plugin';
 
 describe('createFilesPlugin', () => {
-  it('creates a manifest with a files sidebar tab', () => {
+  it('creates a manifest with a files primary panel and activity item', () => {
     const plugin = createFilesPlugin({
       files: [],
       activeFileId: undefined,
@@ -14,6 +14,8 @@ describe('createFilesPlugin', () => {
     });
 
     expect(plugin.id).toBe('shenbi.plugin.files');
+    expect(plugin.contributes?.activityBarItems?.map((item) => item.id)).toEqual(['files']);
+    expect(plugin.contributes?.primaryPanels?.map((panel) => panel.id)).toEqual(['files']);
     expect(plugin.contributes?.sidebarTabs?.map((tab) => tab.id)).toEqual(['files']);
   });
 });

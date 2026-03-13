@@ -69,7 +69,7 @@ describe('FileExplorer', () => {
       />,
     );
 
-    fireEvent.click(screen.getByTitle('保存当前文件'));
+    fireEvent.click(screen.getByTitle('Save current file'));
     expect(onSaveActiveFile).toHaveBeenCalled();
 
     fireEvent.click(await screen.findByText('home'));

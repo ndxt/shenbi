@@ -26,10 +26,10 @@ describe('FilePanel', () => {
     expect(screen.getByText('Demo Page')).toBeInTheDocument();
     expect(screen.getByText('已保存: file-1')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '保存' }));
-    fireEvent.click(screen.getByRole('button', { name: '另存为' }));
-    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
-    fireEvent.click(screen.getByRole('button', { name: '打开' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save As' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
 
     expect(onSaveFile).toHaveBeenCalledTimes(1);
     expect(onSaveAsFile).toHaveBeenCalledTimes(1);
