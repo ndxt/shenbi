@@ -1,7 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import type { LocaleNamespaceResources, SupportedLocale } from './types';
-import { DEFAULT_LOCALE } from './types';
+import { DEFAULT_LOCALE, detectBrowserLocale } from './types';
 import zhCNCommon from '../locales/zh-CN/common.json';
 import zhCNEditorUi from '../locales/zh-CN/editorUi.json';
 import zhCNPreview from '../locales/zh-CN/preview.json';
@@ -22,31 +22,9 @@ export const resources = {
   },
 };
 
-function getStoredLocale(): SupportedLocale | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  const stored = localStorage.getItem('shenbi-locale');
-  if (stored === 'zh-CN' || stored === 'en-US') {
-    return stored;
-  }
-  return null;
-}
-
-function detectBrowserLocale(): SupportedLocale {
-  if (typeof window === 'undefined') {
-    return DEFAULT_LOCALE;
-  }
-  return navigator.language.startsWith('zh') ? 'zh-CN' : 'en-US';
-}
-
-function getInitialLocale(): SupportedLocale {
-  return getStoredLocale() ?? detectBrowserLocale();
-}
-
 i18n.use(initReactI18next).init({
   resources,
-  lng: getInitialLocale(),
+  lng: detectBrowserLocale(),
   fallbackLng: DEFAULT_LOCALE,
   defaultNS: 'common',
   interpolation: {
@@ -72,13 +50,6 @@ export function registerTranslationNamespace(
   }
 }
 
-export function setStoredLocale(locale: SupportedLocale): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('shenbi-locale', locale);
-  }
-}
-
 export async function changeLanguage(locale: SupportedLocale): Promise<void> {
   await i18n.changeLanguage(locale);
-  setStoredLocale(locale);
 }

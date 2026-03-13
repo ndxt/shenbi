@@ -74,5 +74,17 @@
     "errors": "Errors",
     "warnings": "Warnings",
     "language": "Language"
+  },
+  "titleBar": {
+    "changeLanguage": "Change Language",
+    "selectLanguage": "Select Language",
+    "changeTheme": "Change Theme",
+    "selectTheme": "Select Theme",
+    "themeOption": {
+      "dark": "Shenbi Dark",
+      "light": "Shenbi Light",
+      "cursor": "Cursor Dark",
+      "webstormDark": "WebStorm Dark"
+    }
   }
 }

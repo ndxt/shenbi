@@ -74,5 +74,17 @@
     "errors": "错误",
     "warnings": "警告",
     "language": "语言"
+  },
+  "titleBar": {
+    "changeLanguage": "切换语言",
+    "selectLanguage": "选择语言",
+    "changeTheme": "切换主题",
+    "selectTheme": "选择主题",
+    "themeOption": {
+      "dark": "Shenbi 深色",
+      "light": "Shenbi 亮色",
+      "cursor": "Cursor 深色",
+      "webstormDark": "WebStorm 深色"
+    }
   }
 }

@@ -1,10 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Palette, Check, PanelLeft, PanelBottom, PanelRight, Command, Search, Sparkles, Maximize, Minimize } from 'lucide-react';
+import {
+  Palette,
+  Check,
+  PanelLeft,
+  PanelBottom,
+  PanelRight,
+  Command,
+  Search,
+  Sparkles,
+  Maximize,
+  Minimize,
+  Languages,
+} from 'lucide-react';
+import {
+  type SupportedLocale,
+  useTranslation,
+} from '@shenbi/i18n';
 import { ThemeMode } from './AppShell';
 
 interface TitleBarProps {
   theme: ThemeMode;
   onToggleTheme: (theme: ThemeMode) => void;
+  locale: SupportedLocale;
+  onChangeLocale: (locale: SupportedLocale) => void;
   showSidebar: boolean;
   onToggleSidebar: () => void;
   showInspector: boolean;
@@ -22,6 +40,8 @@ interface TitleBarProps {
 export function TitleBar({ 
   theme, 
   onToggleTheme,
+  locale,
+  onChangeLocale,
   showSidebar,
   onToggleSidebar,
   showInspector,
@@ -35,13 +55,19 @@ export function TitleBar({
   onToggleMaximize,
   onOpenCommandPalette,
 }: TitleBarProps) {
+  const { t } = useTranslation('editorUi');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const languageDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target as Node)) {
+        setIsLanguageDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -51,10 +77,14 @@ export function TitleBar({
   }, [dropdownRef]);
 
   const themes: { id: ThemeMode; name: string }[] = [
-    { id: 'dark', name: 'Shenbi Dark' },
-    { id: 'light', name: 'Shenbi Light' },
-    { id: 'cursor', name: 'Cursor Dark' },
-    { id: 'webstorm-dark', name: 'WebStorm Dark' },
+    { id: 'dark', name: t('titleBar.themeOption.dark') },
+    { id: 'light', name: t('titleBar.themeOption.light') },
+    { id: 'cursor', name: t('titleBar.themeOption.cursor') },
+    { id: 'webstorm-dark', name: t('titleBar.themeOption.webstormDark') },
+  ];
+  const locales: { id: SupportedLocale; name: string }[] = [
+    { id: 'zh-CN', name: '简体中文' },
+    { id: 'en-US', name: 'English' },
   ];
   return (
     <div className="h-10 bg-bg-activity-bar border-b border-border-ide flex items-center justify-between px-4 shrink-0 select-none">
@@ -121,11 +151,49 @@ export function TitleBar({
           {isMaximized ? <Minimize size={16} /> : <Maximize size={16} />}
         </button>
 
+        <div className="relative" ref={languageDropdownRef}>
+          <button
+            onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
+            className={`flex items-center gap-1.5 p-1.5 rounded transition-colors ${
+              isLanguageDropdownOpen
+                ? 'bg-bg-panel text-blue-500'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-panel'
+            }`}
+            title={t('titleBar.changeLanguage')}
+            aria-label={t('statusBar.language')}
+          >
+            <Languages size={16} />
+          </button>
+
+          {isLanguageDropdownOpen && (
+            <div className="absolute top-full right-0 mt-1 w-40 bg-bg-panel border border-border-ide rounded shadow-lg py-1 z-50">
+              <div className="px-3 py-1.5 text-[10px] font-bold text-text-secondary uppercase tracking-wider border-b border-border-ide mb-1">
+                {t('titleBar.selectLanguage')}
+              </div>
+              {locales.map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => {
+                    onChangeLocale(option.id);
+                    setIsLanguageDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-text-primary hover:bg-bg-activity-bar transition-colors text-left"
+                >
+                  <div className="w-4 flex justify-center">
+                    {locale === option.id ? <Check size={14} className="text-blue-500" /> : null}
+                  </div>
+                  {option.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="relative" ref={dropdownRef}>
           <button 
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="flex items-center gap-1.5 p-1.5 rounded hover:bg-bg-panel transition-colors text-text-secondary hover:text-text-primary"
-            title="Change Theme"
+            title={t('titleBar.changeTheme')}
           >
             <Palette size={16} />
           </button>
@@ -133,7 +201,7 @@ export function TitleBar({
           {isDropdownOpen && (
           <div className="absolute top-full right-0 mt-1 w-48 bg-bg-panel border border-border-ide rounded shadow-lg py-1 z-50">
             <div className="px-3 py-1.5 text-[10px] font-bold text-text-secondary uppercase tracking-wider border-b border-border-ide mb-1">
-              Select Theme
+              {t('titleBar.selectTheme')}
             </div>
             {themes.map(t => (
               <button

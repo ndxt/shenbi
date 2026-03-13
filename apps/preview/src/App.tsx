@@ -35,6 +35,7 @@ import {
   treeManagementSkeletonSchema,
   userManagementSchema,
 } from './schemas';
+import { PREVIEW_PROJECT_ID, PREVIEW_WORKSPACE_ID } from './constants';
 import { ScenarioRuntimeView } from './runtime/ScenarioRuntimeView';
 
 import {
@@ -66,8 +67,6 @@ type ScenarioKey =
   | 'nine-grid';
 
 type AppMode = ShellMode;
-const WORKSPACE_ID = 'shenbi-preview-debug';
-const PROJECT_ID = 'default';
 const PREVIEW_PERSISTENCE_NAMESPACE = 'preview-debug';
 const ACTIVE_SCENARIO_PERSISTENCE_KEY = 'active-scenario';
 const SHELL_SESSION_PERSISTENCE_KEY = 'shell-session';
@@ -142,7 +141,7 @@ export function App() {
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const persistenceAdapter = useMemo(() => new LocalWorkspacePersistenceAdapter(), []);
   const workspacePersistence = useMemo(
-    () => createWorkspacePersistenceService(WORKSPACE_ID, persistenceAdapter),
+    () => createWorkspacePersistenceService(PREVIEW_WORKSPACE_ID, persistenceAdapter),
     [persistenceAdapter],
   );
   const [scenarioPersistenceHydrated, setScenarioPersistenceHydrated] = useState(false);
@@ -180,7 +179,7 @@ export function App() {
       setShellSessionHydrated(true);
       return;
     }
-    void vfs.initialize(PROJECT_ID)
+    void vfs.initialize(PREVIEW_PROJECT_ID)
       .then(() => {
         setVfsInitialized(true);
       })
@@ -217,7 +216,7 @@ export function App() {
         initialSchema: createEmptyShellSchema(),
         vfs,
         tabManager,
-        projectId: PROJECT_ID,
+        projectId: PREVIEW_PROJECT_ID,
       });
     },
   });
@@ -234,7 +233,7 @@ export function App() {
   // Refresh file tree
   const refreshFsTree = useCallback(() => {
     if (!vfsInitialized) return;
-    void vfs.listTree(PROJECT_ID).then((nodes) => {
+    void vfs.listTree(PREVIEW_PROJECT_ID).then((nodes) => {
       setFsTree(buildFSTree(nodes));
     });
   }, [vfs, vfsInitialized]);
@@ -336,7 +335,7 @@ export function App() {
           return;
         }
 
-        const nodes = await vfs.listTree(PROJECT_ID);
+        const nodes = await vfs.listTree(PREVIEW_PROJECT_ID);
         if (cancelled) {
           return;
         }
@@ -353,7 +352,7 @@ export function App() {
           let schema = persistedTab.schema;
           if (!persistedTab.isDirty) {
             try {
-              schema = await vfs.readFile(PROJECT_ID, persistedTab.fileId) as PageSchema;
+              schema = await vfs.readFile(PREVIEW_PROJECT_ID, persistedTab.fileId) as PageSchema;
             } catch {
               continue;
             }
@@ -572,15 +571,15 @@ export function App() {
     if (!vfsInitialized) return undefined;
     return {
       createFile: async (name: string, fileType: string, content: Record<string, unknown>, parentId?: string) => {
-        const node = await vfs.createFile(PROJECT_ID, parentId ?? null, name, fileType as any, content);
+        const node = await vfs.createFile(PREVIEW_PROJECT_ID, parentId ?? null, name, fileType as any, content);
         refreshFsTree();
         return node.id;
       },
       readFile: async (fileId: string) => {
-        return await vfs.readFile(PROJECT_ID, fileId) as Record<string, unknown>;
+        return await vfs.readFile(PREVIEW_PROJECT_ID, fileId) as Record<string, unknown>;
       },
       writeFile: async (fileId: string, content: Record<string, unknown>) => {
-        await vfs.writeFile(PROJECT_ID, fileId, content);
+        await vfs.writeFile(PREVIEW_PROJECT_ID, fileId, content);
       },
     };
   }, [refreshFsTree, vfs, vfsInitialized]);
@@ -901,7 +900,7 @@ export function App() {
 
   return (
     <AppShell
-      workspaceId={WORKSPACE_ID}
+      workspaceId={PREVIEW_WORKSPACE_ID}
       persistenceAdapter={persistenceAdapter}
       sidebarProps={{
         contracts: builtinContracts,

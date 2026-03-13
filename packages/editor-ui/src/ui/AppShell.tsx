@@ -23,6 +23,9 @@ import { useResize } from '../hooks/useResize';
 import {
   createWorkspacePersistenceService,
   LocalWorkspacePersistenceAdapter,
+  WORKSPACE_LAYOUT_NAMESPACE,
+  WORKSPACE_PREFERENCES_NAMESPACE,
+  WORKSPACE_WORKBENCH_KEY,
   type WorkspacePersistenceAdapter,
 } from '../persistence/workspace-persistence';
 import {
@@ -37,6 +40,12 @@ import {
   hostCommandsToMenus,
   hostCommandsToShortcuts,
 } from '../commands/host-command-registry';
+import {
+  changeLanguage,
+  detectBrowserLocale,
+  useCurrentLocale,
+  type SupportedLocale,
+} from '@shenbi/i18n';
 
 import { TitleBar } from './TitleBar';
 import type { ActivityBarItemContribution, ActivityBarProps } from './ActivityBar';
@@ -101,6 +110,11 @@ interface StoredLayoutState {
   consoleSize?: number;
 }
 
+interface StoredWorkbenchPreferences {
+  theme?: ThemeMode;
+  locale?: SupportedLocale;
+}
+
 export function AppShell({
   children,
   workspaceId,
@@ -135,7 +149,11 @@ export function AppShell({
   );
   const [loadedLayoutState, setLoadedLayoutState] = React.useState<StoredLayoutState | null>(null);
   const [layoutHydrated, setLayoutHydrated] = React.useState(false);
+  const [preferencesHydrated, setPreferencesHydrated] = React.useState(false);
   const [theme, setTheme] = React.useState<ThemeMode>('dark');
+  const currentLocale = useCurrentLocale();
+  const currentLocaleRef = React.useRef(currentLocale);
+  currentLocaleRef.current = currentLocale;
   
   // Panel Visibility State
   const [showSidebar, setShowSidebar] = React.useState(true);
@@ -490,8 +508,14 @@ export function AppShell({
   React.useEffect(() => {
     let cancelled = false;
 
-    void persistence.getJSON<StoredLayoutState>('layout', 'workbench')
-      .then((storedLayoutState) => {
+    void Promise.all([
+      persistence.getJSON<StoredLayoutState>(WORKSPACE_LAYOUT_NAMESPACE, WORKSPACE_WORKBENCH_KEY),
+      persistence.getJSON<StoredWorkbenchPreferences>(
+        WORKSPACE_PREFERENCES_NAMESPACE,
+        WORKSPACE_WORKBENCH_KEY,
+      ),
+    ])
+      .then(async ([storedLayoutState, storedPreferences]) => {
         if (cancelled) {
           return;
         }
@@ -519,6 +543,13 @@ export function AppShell({
         if (nextState.consoleSize !== undefined) {
           setConsoleSize(nextState.consoleSize);
         }
+
+        setTheme(storedPreferences?.theme ?? 'dark');
+
+        const nextLocale = storedPreferences?.locale ?? detectBrowserLocale();
+        if (nextLocale !== currentLocaleRef.current) {
+          await changeLanguage(nextLocale);
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -528,6 +559,7 @@ export function AppShell({
       .finally(() => {
         if (!cancelled) {
           setLayoutHydrated(true);
+          setPreferencesHydrated(true);
         }
       });
 
@@ -541,7 +573,7 @@ export function AppShell({
       return;
     }
 
-    void persistence.setJSON('layout', 'workbench', {
+    void persistence.setJSON(WORKSPACE_LAYOUT_NAMESPACE, WORKSPACE_WORKBENCH_KEY, {
       showSidebar,
       showInspector,
       showConsole,
@@ -565,6 +597,17 @@ export function AppShell({
     inspectorSize,
     sidebarSize,
   ]);
+
+  React.useEffect(() => {
+    if (!preferencesHydrated) {
+      return;
+    }
+
+    void persistence.setJSON(WORKSPACE_PREFERENCES_NAMESPACE, WORKSPACE_WORKBENCH_KEY, {
+      theme,
+      locale: currentLocale,
+    }).catch(() => undefined);
+  }, [currentLocale, persistence, preferencesHydrated, theme]);
 
   React.useEffect(() => {
     if (auxiliaryPanels.length === 0) {
@@ -766,11 +809,17 @@ export function AppShell({
     };
   }, [theme]);
 
+  const handleChangeLocale = React.useCallback((nextLocale: SupportedLocale) => {
+    void changeLanguage(nextLocale);
+  }, []);
+
   return (
     <div ref={rootRef} className="h-screen w-screen flex flex-col bg-bg-canvas text-text-primary overflow-hidden font-inter">
       <TitleBar 
         theme={theme} 
         onToggleTheme={toggleTheme}
+        locale={currentLocale}
+        onChangeLocale={handleChangeLocale}
         showSidebar={showSidebar}
         onToggleSidebar={() => { setShowSidebar(!showSidebar); setIsMaximized(false); }}
         showInspector={showInspector}

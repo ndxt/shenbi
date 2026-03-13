@@ -1,4 +1,5 @@
 import type { PluginPersistenceService } from '@shenbi/editor-plugin-api';
+import { isSupportedLocale, type SupportedLocale } from '@shenbi/i18n';
 
 export interface WorkspacePersistenceAdapter {
   getJSON: <T>(workspaceId: string, namespace: string, key: string) => Promise<T | undefined>;
@@ -7,9 +8,13 @@ export interface WorkspacePersistenceAdapter {
 }
 
 const STORAGE_PREFIX = 'shenbi:workspace';
+export const WORKSPACE_LAYOUT_NAMESPACE = 'layout';
+export const WORKSPACE_PREFERENCES_NAMESPACE = 'preferences';
+export const WORKSPACE_WORKBENCH_KEY = 'workbench';
 
 const LEGACY_KEY_MAP: Record<string, string[]> = {
-  'layout:workbench': ['shenbi:app-shell:layout'],
+  [`${WORKSPACE_LAYOUT_NAMESPACE}:${WORKSPACE_WORKBENCH_KEY}`]: ['shenbi:app-shell:layout'],
+  [`${WORKSPACE_PREFERENCES_NAMESPACE}:${WORKSPACE_WORKBENCH_KEY}`]: ['shenbi-locale'],
   'ai-chat:model-selection': ['shenbi:ai-chat:model-selection'],
   'ai-chat:session': ['shenbi:ai-chat:session'],
   'ai-chat:ui': ['shenbi:ai-chat:ui'],
@@ -37,6 +42,35 @@ function parseStoredJSON<T>(rawValue: string | null): T | undefined {
   }
 }
 
+function parseLegacyLocalePreference(rawValue: string | null): { locale: SupportedLocale } | undefined {
+  if (!rawValue) {
+    return undefined;
+  }
+
+  if (isSupportedLocale(rawValue)) {
+    return { locale: rawValue };
+  }
+
+  const parsedValue = parseStoredJSON<unknown>(rawValue);
+  if (isSupportedLocale(parsedValue)) {
+    return { locale: parsedValue };
+  }
+
+  return undefined;
+}
+
+function parseLegacyValue<T>(namespace: string, key: string, legacyKey: string, rawValue: string | null): T | undefined {
+  if (
+    namespace === WORKSPACE_PREFERENCES_NAMESPACE
+    && key === WORKSPACE_WORKBENCH_KEY
+    && legacyKey === 'shenbi-locale'
+  ) {
+    return parseLegacyLocalePreference(rawValue) as T | undefined;
+  }
+
+  return parseStoredJSON<T>(rawValue);
+}
+
 export class LocalWorkspacePersistenceAdapter implements WorkspacePersistenceAdapter {
   private readonly storage: Storage | undefined;
 
@@ -56,7 +90,7 @@ export class LocalWorkspacePersistenceAdapter implements WorkspacePersistenceAda
     }
 
     for (const legacyKey of getLegacyStorageKeys(namespace, key)) {
-      const legacyValue = parseStoredJSON<T>(this.storage.getItem(legacyKey));
+      const legacyValue = parseLegacyValue<T>(namespace, key, legacyKey, this.storage.getItem(legacyKey));
       if (legacyValue === undefined) {
         continue;
       }
