@@ -1,10 +1,12 @@
 import {
   type AuxiliaryPanelContribution,
   type ContextMenuContribution,
+  type FileContextPanelContribution,
   type MenuContribution,
   mergeContributions,
   type ActivityBarItemContribution,
   type InspectorTabContribution,
+  type PrimaryPanelContribution,
   type SidebarTabContribution,
 } from './contributions';
 import type { PluginContext } from './context';
@@ -36,6 +38,8 @@ export type EditorPluginActivateResult = void | EditorPluginCleanup | Promise<vo
 
 export interface PluginContributes {
   activityBarItems?: ActivityBarItemContribution[];
+  primaryPanels?: PrimaryPanelContribution[];
+  fileContextPanels?: FileContextPanelContribution[];
   sidebarTabs?: SidebarTabContribution[];
   inspectorTabs?: InspectorTabContribution[];
   auxiliaryPanels?: AuxiliaryPanelContribution[];
@@ -55,6 +59,8 @@ export interface EditorPluginManifest {
 
 export interface ResolvedPluginContributes {
   activityBarItems: ActivityBarItemContribution[];
+  primaryPanels: PrimaryPanelContribution[];
+  fileContextPanels: FileContextPanelContribution[];
   sidebarTabs: SidebarTabContribution[];
   inspectorTabs: InspectorTabContribution[];
   auxiliaryPanels: AuxiliaryPanelContribution[];
@@ -72,6 +78,8 @@ export function collectPluginContributes(
   plugins?: readonly EditorPluginManifest[],
 ): ResolvedPluginContributes {
   const activityBarItems: ActivityBarItemContribution[] = [];
+  const primaryPanels: PrimaryPanelContribution[] = [];
+  const fileContextPanels: FileContextPanelContribution[] = [];
   const sidebarTabs: SidebarTabContribution[] = [];
   const inspectorTabs: InspectorTabContribution[] = [];
   const auxiliaryPanels: AuxiliaryPanelContribution[] = [];
@@ -86,6 +94,8 @@ export function collectPluginContributes(
       continue;
     }
     activityBarItems.push(...(contributes.activityBarItems ?? []));
+    primaryPanels.push(...(contributes.primaryPanels ?? []));
+    fileContextPanels.push(...(contributes.fileContextPanels ?? []));
     sidebarTabs.push(...(contributes.sidebarTabs ?? []));
     inspectorTabs.push(...(contributes.inspectorTabs ?? []));
     auxiliaryPanels.push(...(contributes.auxiliaryPanels ?? []));
@@ -97,6 +107,8 @@ export function collectPluginContributes(
 
   return {
     activityBarItems: mergeContributions([], activityBarItems),
+    primaryPanels: mergeContributions([], primaryPanels),
+    fileContextPanels: mergeContributions([], fileContextPanels),
     sidebarTabs: mergeContributions([], sidebarTabs),
     inspectorTabs: mergeContributions([], inspectorTabs),
     auxiliaryPanels: mergeContributions([], auxiliaryPanels),
