@@ -177,6 +177,14 @@
     "methods": "方法",
     "contextData": "上下文数据"
   },
+  "workbench": {
+    "components": "组件",
+    "outline": "大纲",
+    "data": "数据库",
+    "debug": "调试",
+    "extensions": "扩展",
+    "settings": "设置"
+  },
   "statusBar": {
     "ready": "就绪",
     "errors": "错误",

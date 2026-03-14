@@ -300,7 +300,7 @@ export function AppShell({
     return (
       (preferredItem ? resolveActivityItemPanelId(preferredItem, primaryPanels) : undefined)
       ?? primaryPanels[0]?.id
-      ?? 'explorer'
+      ?? ''
     );
   }, [defaultActivityItemId, primaryPanels, resolvedActivityItems]);
   const legacySidebarTabs = React.useMemo(

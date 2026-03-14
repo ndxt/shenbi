@@ -4,6 +4,7 @@ import {
   type SidebarTabContribution,
   type SidebarTabRenderContext,
 } from '@shenbi/editor-plugin-api';
+import { i18n } from '@shenbi/i18n';
 import {
   createFilesSidebarTab,
   type CreateFilesSidebarTabOptions,
@@ -19,7 +20,7 @@ function createBuiltinSidebarTabs(): SidebarTabContribution[] {
   return [
     {
       id: 'components',
-      label: 'Components',
+      label: i18n.t('workbench.components', { ns: 'editorUi' }),
       order: 10,
       render: (context) => (
         <ComponentPanel
@@ -30,7 +31,7 @@ function createBuiltinSidebarTabs(): SidebarTabContribution[] {
     },
     {
       id: 'outline',
-      label: 'Outline',
+      label: i18n.t('workbench.outline', { ns: 'editorUi' }),
       order: 20,
       render: (context) => (
         <SchemaTree
@@ -43,7 +44,7 @@ function createBuiltinSidebarTabs(): SidebarTabContribution[] {
     },
     {
       id: 'data',
-      label: 'Data',
+      label: i18n.t('workbench.data', { ns: 'editorUi' }),
       order: 30,
       render: () => <PagePanel />,
     },

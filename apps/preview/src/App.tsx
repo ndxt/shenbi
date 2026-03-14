@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as antd from 'antd';
-import { Rocket, Undo2, Redo2, Trash2 } from 'lucide-react';
+import { Undo2, Redo2, Trash2 } from 'lucide-react';
 import {
   builtinContracts,
   getBuiltinContract,
@@ -148,7 +148,6 @@ export function App() {
   const [shellSessionHydrated, setShellSessionHydrated] = useState(false);
   const initialScenarioSnapshots = useMemo(() => createInitialScenarioSnapshots(), []);
   const initialScenarioSchemas = useMemo(() => createInitialScenarioState(), []);
-  const [activityMessage, setActivityMessage] = useState<string>('');
   const initialShellSchema = useMemo(() => createEmptyShellSchema(), []);
   const scenarioOptions = useMemo<{ label: string; value: ScenarioKey }[]>(() => ([
     { label: previewT('scenarios.userManagement'), value: 'user-management' },
@@ -751,35 +750,6 @@ export function App() {
           },
         ],
       }),
-      defineEditorPlugin({
-        id: 'preview.assets',
-        name: previewT('plugins.assets.name'),
-        contributes: {
-          activityBarItems: [
-            {
-              id: 'rocket',
-              label: previewT('plugins.assets.activityLabel'),
-              icon: Rocket,
-              order: 99,
-              section: 'main',
-              targetSidebarTabId: 'assets',
-              onClick: () => setActivityMessage(previewT('messages.activityTriggered')),
-            },
-          ],
-          sidebarTabs: [
-            {
-              id: 'assets',
-              label: previewT('plugins.assets.sidebarLabel'),
-              order: 99,
-              render: () => (
-                <div className="p-3 text-xs text-text-secondary">
-                  {previewT('plugins.assets.loaded')}
-                </div>
-              ),
-            },
-          ],
-        },
-      }),
       createAIChatPlugin({
         defaultWidth: 300,
         getAvailableComponents: () => builtinContracts,
@@ -943,8 +913,8 @@ export function App() {
       pluginContext={enhancedPluginContext}
       onCanvasSelectNode={handleCanvasSelectNode}
       onCanvasDeselectNode={handleCanvasDeselectNode}
-      selectedNodeSchemaId={selectedNode?.id}
-      hoveredNodeSchemaId={breadcrumbHoveredSchemaId}
+      {...(selectedNode?.id ? { selectedNodeSchemaId: selectedNode.id } : {})}
+      {...(breadcrumbHoveredSchemaId ? { hoveredNodeSchemaId: breadcrumbHoveredSchemaId } : {})}
       schemaName={activeSchema.name}
       breadcrumbItems={breadcrumbItems}
       onBreadcrumbSelect={handleBreadcrumbSelect}
@@ -1040,9 +1010,6 @@ export function App() {
           >
             <Trash2 size={15} />
           </button>
-          {activityMessage ? (
-            <span className="ml-2 text-text-secondary" style={{ fontSize: '11px' }}>{activityMessage}</span>
-          ) : null}
         </div>
       )}
     >

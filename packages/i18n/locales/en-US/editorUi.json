@@ -177,6 +177,14 @@
     "methods": "Methods",
     "contextData": "Context Data"
   },
+  "workbench": {
+    "components": "Components",
+    "outline": "Outline",
+    "data": "Database",
+    "debug": "Debug",
+    "extensions": "Extensions",
+    "settings": "Settings"
+  },
   "statusBar": {
     "ready": "Ready",
     "errors": "Errors",

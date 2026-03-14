@@ -4,7 +4,7 @@ import {
   type PrimaryPanelContribution,
   type SidebarTabRenderContext,
 } from '@shenbi/editor-plugin-api';
-import { ComponentPanel } from '../panels/ComponentPanel';
+import { i18n } from '@shenbi/i18n';
 import { PagePanel } from '../panels/PagePanel';
 import { SchemaTree } from '../panels/SchemaTree';
 
@@ -13,19 +13,8 @@ export type { PrimaryPanelContribution } from '@shenbi/editor-plugin-api';
 function createBuiltinPrimaryPanels(): PrimaryPanelContribution[] {
   return [
     {
-      id: 'explorer',
-      label: 'Components',
-      order: 10,
-      render: (context: SidebarTabRenderContext) => (
-        <ComponentPanel
-          {...(context.contracts ? { contracts: context.contracts } : {})}
-          {...(context.onInsertComponent ? { onInsert: context.onInsertComponent } : {})}
-        />
-      ),
-    },
-    {
       id: 'search',
-      label: 'Outline',
+      label: i18n.t('workbench.outline', { ns: 'editorUi' }),
       order: 20,
       render: (context: SidebarTabRenderContext) => (
         <SchemaTree
@@ -38,7 +27,7 @@ function createBuiltinPrimaryPanels(): PrimaryPanelContribution[] {
     },
     {
       id: 'data',
-      label: 'Data',
+      label: i18n.t('workbench.data', { ns: 'editorUi' }),
       order: 30,
       render: () => <PagePanel />,
     },

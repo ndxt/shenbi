@@ -5,7 +5,7 @@ import {
 } from '@shenbi/editor-plugin-api';
 import { FileText } from 'lucide-react';
 import { i18n } from '@shenbi/i18n';
-import { createFilesSidebarTab, type CreateFilesSidebarTabOptions } from './sidebar-tab';
+import type { CreateFilesSidebarTabOptions } from './sidebar-tab';
 import { FilePanel } from './FilePanel';
 import './i18n';
 
@@ -34,7 +34,6 @@ export function createFilesPlugin(options: CreateFilesPluginOptions): EditorPlug
       onRefresh={options.onRefresh}
     />
   ));
-  const sidebarTab = createFilesSidebarTab(options);
   return defineEditorPlugin({
     id: options.id ?? 'shenbi.plugin.files',
     name: options.name ?? i18n.t('pluginName', { ns: 'pluginFiles' }),
@@ -58,7 +57,6 @@ export function createFilesPlugin(options: CreateFilesPluginOptions): EditorPlug
           render: renderPrimaryPanel,
         },
       ],
-      sidebarTabs: [sidebarTab],
     },
   });
 }
