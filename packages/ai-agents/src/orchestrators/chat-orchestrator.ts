@@ -11,6 +11,7 @@ export async function* chatOrchestrator(
   let emittedDelta = false;
   for await (const chunk of deps.llm.streamChat({
     prompt: request.prompt,
+    ...(request.attachments ? { attachments: request.attachments } : {}),
     plannerModel: request.plannerModel,
     blockModel: request.blockModel,
     context,

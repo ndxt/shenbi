@@ -3,7 +3,7 @@ import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import { aiClient } from '../ai/sse-client';
 import { executeAgentOperation } from '../ai/operation-executor';
-import { createSchemaDigest, type AgentIntent, type PagePlan, type RunMetadata, type RunRequest } from '../ai/api-types';
+import { createSchemaDigest, type AgentIntent, type PagePlan, type RunAttachmentInput, type RunMetadata, type RunRequest } from '../ai/api-types';
 import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
 
 export type PlanConfig = PagePlan;
@@ -298,6 +298,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             onError: (err: string) => void,
             blockConcurrency?: number,
             onRunComplete?: (result: LastRunResult) => void,
+            attachments: RunAttachmentInput[] = [],
         ) => {
             if (!bridgeRef.current) return;
             if (isRunningRef.current) return;
@@ -332,6 +333,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
 
             const request: RunRequest = {
                 prompt,
+                ...(attachments.length > 0 ? { attachments } : {}),
                 ...(conversationId ? { conversationId } : {}),
                 ...(selectedNodeId ? { selectedNodeId } : {}),
                 ...(plannerModel ? { plannerModel } : {}),

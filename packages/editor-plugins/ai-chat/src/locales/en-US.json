@@ -53,15 +53,21 @@
     }
   },
   "input": {
+    "attachLabel": "Attach",
+    "removeAttachment": "Remove attachment",
     "historyLabel": "History",
     "empty": "Empty",
     "remove": "Remove",
-    "placeholder": "Enter debug prompt, Enter to send, Shift+Enter for new line"
+    "placeholder": "Enter debug prompt, Enter to send, Shift+Enter for new line",
+    "unsupportedFiles": "These files are not supported yet: {{files}}",
+    "attachmentReadFailed": "Failed to read attachment",
+    "attachmentOnlyPrompt": "Please analyze the attachment and provide guidance."
   },
   "message": {
     "you": "You",
     "assistant": "Shenbi AI",
-    "welcome": "Hello! I'm Shenbi Intelligent Development Assistant.\nI can help you generate layouts, bind data, and adjust styles.\nHow can I help you today?"
+    "welcome": "Hello! I'm Shenbi Intelligent Development Assistant.\nI can help you generate layouts, bind data, and adjust styles.\nHow can I help you today?",
+    "attachmentUnavailable": "Attachment unavailable: {{name}}"
   },
   "result": {
     "generateComplete": "Generation Complete",

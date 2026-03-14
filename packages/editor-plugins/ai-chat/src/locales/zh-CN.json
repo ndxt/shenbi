@@ -53,15 +53,21 @@
     }
   },
   "input": {
+    "attachLabel": "附件",
+    "removeAttachment": "移除附件",
     "historyLabel": "历史输入",
     "empty": "空",
     "remove": "删除",
-    "placeholder": "输入调试提示词，Enter 发送，Shift+Enter 换行"
+    "placeholder": "输入调试提示词，Enter 发送，Shift+Enter 换行",
+    "unsupportedFiles": "这些文件暂不支持上传: {{files}}",
+    "attachmentReadFailed": "附件读取失败",
+    "attachmentOnlyPrompt": "请结合附件内容分析并给出建议。"
   },
   "message": {
     "you": "你",
     "assistant": "Shenbi AI",
-    "welcome": "你好！我是 Shenbi 智能开发助手。\n可以帮您生成布局、绑定数据、调整样式。\n有什么我可以帮您的吗？"
+    "welcome": "你好！我是 Shenbi 智能开发助手。\n可以帮您生成布局、绑定数据、调整样式。\n有什么我可以帮您的吗？",
+    "attachmentUnavailable": "附件不可用: {{name}}"
   },
   "result": {
     "generateComplete": "生成完成",

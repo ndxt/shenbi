@@ -2,8 +2,20 @@ import { LLMError } from './errors.ts';
 
 export interface OpenAICompatibleMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  content: string | OpenAICompatibleContentPart[];
 }
+
+export type OpenAICompatibleContentPart =
+  | {
+    type: 'text';
+    text: string;
+  }
+  | {
+    type: 'image_url';
+    image_url: {
+      url: string;
+    };
+  };
 
 export interface OpenAICompatibleClientOptions {
   baseUrl: string;

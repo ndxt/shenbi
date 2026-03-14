@@ -4,10 +4,41 @@ import { chatOrchestrator } from '../orchestrators/chat-orchestrator';
 import { modifyOrchestrator } from '../orchestrators/modify-orchestrator';
 import { pageBuilderOrchestrator } from '../orchestrators/page-builder-orchestrator';
 import { createOrchestratorRegistry, type OrchestratorFunction } from '../orchestrators/registry';
-import type { AgentEvent, AgentIntent, AgentOperation, AgentRuntimeContext, AgentRuntimeDeps, RunMetadata, RunRequest } from '../types';
+import type {
+  AgentEvent,
+  AgentIntent,
+  AgentMemoryAttachment,
+  AgentOperation,
+  AgentRuntimeContext,
+  AgentRuntimeDeps,
+  RunMetadata,
+  RunRequest,
+} from '../types';
 
 function createSessionId(): string {
   return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getOriginalPrompt(request: RunRequest): string {
+  const originalPrompt = (request as RunRequest & { _originalPrompt?: unknown })._originalPrompt;
+  return typeof originalPrompt === 'string' ? originalPrompt : request.prompt;
+}
+
+function getMemoryAttachments(request: RunRequest): AgentMemoryAttachment[] | undefined {
+  const internalAttachments = (request as RunRequest & { _memoryAttachments?: unknown })._memoryAttachments;
+  if (Array.isArray(internalAttachments)) {
+    return internalAttachments as AgentMemoryAttachment[];
+  }
+  if (!request.attachments || request.attachments.length === 0) {
+    return undefined;
+  }
+  return request.attachments.map((attachment) => ({
+    id: attachment.id,
+    kind: attachment.kind,
+    name: attachment.name,
+    mimeType: attachment.mimeType,
+    sizeBytes: attachment.sizeBytes,
+  }));
 }
 
 function hasPageBuilderTools(deps: AgentRuntimeDeps): boolean {
@@ -15,7 +46,10 @@ function hasPageBuilderTools(deps: AgentRuntimeDeps): boolean {
 }
 
 function hasModifyTool(deps: AgentRuntimeDeps): boolean {
-  return Boolean(deps.tools.get('modifySchema'));
+  return Boolean(
+    deps.tools.get('modifySchema')
+    || (deps.tools.get('planModify') && deps.tools.get('executeComplexOp')),
+  );
 }
 
 async function classifyIntent(
@@ -126,9 +160,11 @@ export async function* runAgentStream(
       lastBlockIds,
     });
 
+    const memoryAttachments = getMemoryAttachments(request);
     await deps.memory.appendConversationMessage(conversationId, {
       role: 'user',
-      text: request.prompt,
+      text: getOriginalPrompt(request),
+      ...(memoryAttachments ? { attachments: memoryAttachments } : {}),
     });
 
     yield { type: 'run:start', data: { sessionId, conversationId } };

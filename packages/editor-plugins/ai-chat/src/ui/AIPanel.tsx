@@ -6,6 +6,7 @@ import {
 } from '@shenbi/editor-plugin-api';
 import { useTranslation } from '@shenbi/i18n';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
+import { createPendingAttachment, materializePendingAttachments, type PendingAttachment } from '../attachments';
 import { useModels } from '../hooks/useModels';
 import { useChatSession } from '../hooks/useChatSession';
 import { useAgentRun } from '../hooks/useAgentRun';
@@ -50,6 +51,7 @@ export function AIPanel({
   const [thinkingEnabled, setThinkingEnabled] = React.useState(false);
   const [blockConcurrency, setBlockConcurrency] = React.useState(3);
   const [draftText, setDraftText] = React.useState('');
+  const [pendingAttachments, setPendingAttachments] = React.useState<PendingAttachment[]>([]);
   const [promptHistory, setPromptHistory] = React.useState<string[]>([]);
   const [uiHydrated, setUIHydrated] = React.useState(!persistence);
   const {
@@ -238,8 +240,40 @@ export function AIPanel({
     }
     resetSession();
     setDraftText('');
+    setPendingAttachments([]);
     void executePluginCommand(pluginContext ?? {}, 'workspace.resetDocument');
   }, [isRunning, pluginContext, resetSession]);
+
+  const handleAddFiles = React.useCallback((files: File[]) => {
+    const nextAttachments: PendingAttachment[] = [];
+    const unsupportedFiles: string[] = [];
+
+    for (const file of files) {
+      const attachment = createPendingAttachment(file);
+      if (!attachment) {
+        unsupportedFiles.push(file.name);
+        continue;
+      }
+      nextAttachments.push(attachment);
+    }
+
+    if (unsupportedFiles.length > 0) {
+      addMessage({
+        role: 'assistant',
+        content: `[Error]: ${t('input.unsupportedFiles', { files: unsupportedFiles.join(', ') })}`,
+      });
+    }
+
+    if (nextAttachments.length === 0) {
+      return;
+    }
+
+    setPendingAttachments((previous) => [...previous, ...nextAttachments]);
+  }, [addMessage, t]);
+
+  const handleRemoveAttachment = React.useCallback((attachmentId: string) => {
+    setPendingAttachments((previous) => previous.filter((attachment) => attachment.id !== attachmentId));
+  }, []);
 
   const handleSend = (text: string) => {
     if (modelSelectionBlocked) {
@@ -247,31 +281,50 @@ export function AIPanel({
       return;
     }
 
-    const currentConvId = conversationId ?? `conv-${Date.now()}`;
-    if (!conversationId) setConversationId(currentConvId);
+    void (async () => {
+      const currentConvId = conversationId ?? `conv-${Date.now()}`;
+      const userText = text.trim();
+      const requestPrompt = userText || t('input.attachmentOnlyPrompt');
+      if (!conversationId) setConversationId(currentConvId);
 
-    addMessage({ role: 'user', content: text });
-    rememberPrompt(text);
-    setDraftText('');
+      try {
+        const { runAttachments, refs } = await materializePendingAttachments(pendingAttachments);
+        addMessage({
+          role: 'user',
+          content: userText,
+          ...(refs.length > 0 ? { attachments: refs } : {}),
+        });
+        if (userText) {
+          rememberPrompt(userText);
+        }
+        setDraftText('');
+        setPendingAttachments([]);
 
-
-    void runAgent(
-      text,
-      plannerModel,
-      blockModel,
-      thinkingEnabled,
-      currentConvId,
-      () => addMessage({ role: 'assistant', content: '' }),
-      (id, chunk) => updateMessage(id, (prev) => prev + chunk),
-      () => { /* metadata now stored in runResult message */ },
-      (err) => {
-        addMessage({ role: 'assistant', content: `[Error]: ${err}` });
-      },
-      blockConcurrency,
-      (result) => {
-        addMessage({ role: 'system', content: '', runResult: result });
-      },
-    );
+        await runAgent(
+          requestPrompt,
+          plannerModel,
+          blockModel,
+          thinkingEnabled,
+          currentConvId,
+          () => addMessage({ role: 'assistant', content: '' }),
+          (id, chunk) => updateMessage(id, (prev) => prev + chunk),
+          () => { /* metadata now stored in runResult message */ },
+          (err) => {
+            addMessage({ role: 'assistant', content: `[Error]: ${err}` });
+          },
+          blockConcurrency,
+          (result) => {
+            addMessage({ role: 'system', content: '', runResult: result });
+          },
+          runAttachments,
+        );
+      } catch (error) {
+        addMessage({
+          role: 'assistant',
+          content: `[Error]: ${error instanceof Error ? error.message : t('input.attachmentReadFailed')}`,
+        });
+      }
+    })();
   };
 
   return (
@@ -439,6 +492,9 @@ export function AIPanel({
             onSelectPreset={applyPromptText}
             onSelectHistory={applyPromptText}
             onRemoveHistory={handleRemoveHistory}
+            attachments={pendingAttachments}
+            onAddFiles={handleAddFiles}
+            onRemoveAttachment={handleRemoveAttachment}
           />
         </div>
       </div>

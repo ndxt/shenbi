@@ -1,4 +1,4 @@
-import type { AgentMemoryMessage, AgentOperation } from '../types';
+import type { AgentMemoryAttachment, AgentMemoryMessage, AgentOperation } from '../types';
 
 export interface FormatHistoryOptions {
   maxTurns?: number;
@@ -59,6 +59,21 @@ function summarizeOperations(operations: AgentOperation[]): string {
   return operations.map((operation) => summarizeOperation(operation)).join(', ');
 }
 
+function formatAttachmentSize(sizeBytes: number): string {
+  if (sizeBytes >= 1024 * 1024) {
+    return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (sizeBytes >= 1024) {
+    return `${Math.round(sizeBytes / 1024)} KB`;
+  }
+  return `${sizeBytes} B`;
+}
+
+function summarizeAttachment(attachment: AgentMemoryAttachment): string {
+  const kindLabel = attachment.kind === 'image' ? '图片' : '文档';
+  return `${kindLabel}: ${attachment.name} (${attachment.mimeType}, ${formatAttachmentSize(attachment.sizeBytes)})`;
+}
+
 function shouldIncludeOperations(
   message: AgentMemoryMessage,
   schemaDigest: string | undefined,
@@ -91,6 +106,14 @@ export function formatConversationHistory(
     lines.push('---');
     if (turn.user) {
       lines.push(`用户: ${truncateText(turn.user.text, maxCharsPerTurn)}`);
+      if (turn.user.attachments) {
+        for (const attachment of turn.user.attachments) {
+          lines.push(`      [附件: ${summarizeAttachment(attachment)}]`);
+          if (attachment.kind === 'document' && attachment.extractedTextPreview) {
+            lines.push(`      [文档摘要: ${truncateText(attachment.extractedTextPreview, maxCharsPerTurn)}]`);
+          }
+        }
+      }
     }
     for (const assistantMessage of turn.assistantMessages) {
       lines.push(`助手: ${truncateText(assistantMessage.text, maxCharsPerTurn)}`);

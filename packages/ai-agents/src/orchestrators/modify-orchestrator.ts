@@ -10,17 +10,6 @@ import type {
 } from '../types';
 import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
 
-function getRequiredTool<TInput, TOutput>(
-  deps: AgentRuntimeDeps,
-  name: string,
-): AgentTool<TInput, TOutput> {
-  const tool = deps.tools.get(name);
-  if (!tool) {
-    throw new Error(`Missing required tool: ${name}`);
-  }
-  return tool as AgentTool<TInput, TOutput>;
-}
-
 interface PlanModifyResult {
   explanation: string;
   plannerMetrics: AgentOperationMetrics;
@@ -36,20 +25,72 @@ interface ComplexOpResult {
   metrics: AgentOperationMetrics;
 }
 
+interface LegacyModifySchemaResult {
+  explanation: string;
+  operations: AgentOperation[];
+}
+
+function summarizeOperation(operation: AgentOperation): { op: string; label?: string; nodeId?: string } {
+  return {
+    op: operation.op,
+    ...('nodeId' in operation && typeof operation.nodeId === 'string' ? { nodeId: operation.nodeId } : {}),
+  };
+}
+
 export async function* modifyOrchestrator(
   request: RunRequest,
   context: AgentRuntimeContext,
   deps: AgentRuntimeDeps,
   _metadata: RunMetadata,
 ): AsyncGenerator<AgentEvent> {
-  const planModify = getRequiredTool<ModifySchemaInput, PlanModifyResult>(deps, 'planModify');
-  const executeComplexOp = getRequiredTool<
+  const legacyModifySchema = deps.tools.get('modifySchema') as AgentTool<ModifySchemaInput, LegacyModifySchemaResult> | undefined;
+  const planModify = deps.tools.get('planModify') as AgentTool<ModifySchemaInput, PlanModifyResult> | undefined;
+  const executeComplexOp = deps.tools.get('executeComplexOp') as AgentTool<
     { skeleton: unknown; index: number; input: ModifySchemaInput },
     ComplexOpResult
-  >(deps, 'executeComplexOp');
+  > | undefined;
 
   yield { type: 'message:start', data: { role: 'assistant' } };
   yield { type: 'tool:start', data: { tool: 'modifySchema', label: 'Planning schema modifications' } };
+
+  if (!planModify || !executeComplexOp) {
+    if (!legacyModifySchema) {
+      throw new Error('Missing required tool: modifySchema');
+    }
+
+    const result = await legacyModifySchema.execute({ request, context });
+    const operationSummaries = result.operations.map((operation) => summarizeOperation(operation));
+
+    yield {
+      type: 'tool:result',
+      data: {
+        tool: 'modifySchema',
+        ok: true,
+        summary: `Prepared ${result.operations.length} schema operations.`,
+      },
+    };
+    yield { type: 'message:delta', data: { text: result.explanation } };
+    yield {
+      type: 'modify:start',
+      data: {
+        operationCount: result.operations.length,
+        explanation: result.explanation,
+        operations: operationSummaries,
+      },
+    };
+    for (const [index, operation] of result.operations.entries()) {
+      yield {
+        type: 'modify:op',
+        data: {
+          index,
+          operation,
+          ...('_metrics' in operation && operation._metrics ? { metrics: operation._metrics as AgentOperationMetrics } : {}),
+        },
+      };
+    }
+    yield { type: 'modify:done', data: {} };
+    return;
+  }
 
   // ---- Phase 1 ----
   const plan = await planModify.execute({ request, context });

@@ -11,6 +11,7 @@ import {
   type OpenAICompatibleRequestDebugSummary,
   type OpenAICompatibleThinking,
 } from '../adapters/openai-compatible.ts';
+import { buildUserMessageContentFromLines } from './request-attachments.ts';
 
 const env = loadEnv();
 const clientCache = new Map<string, OpenAICompatibleClient>();
@@ -151,7 +152,7 @@ function createMessages(input: ClassifyIntentInput): OpenAICompatibleMessage[] {
     },
     {
       role: 'user',
-      content: [
+      content: buildUserMessageContentFromLines([
         `Prompt: ${input.request.prompt}`,
         `Document Exists: ${input.context.document.exists ? 'yes' : 'no'}`,
         `Schema Summary: ${input.context.document.summary}`,
@@ -160,7 +161,7 @@ function createMessages(input: ClassifyIntentInput): OpenAICompatibleMessage[] {
         input.context.document.tree ?? '[schema tree unavailable]',
         'Conversation History:',
         conversationHistory,
-      ].join('\n'),
+      ], input.request.attachments),
     },
   ];
 }

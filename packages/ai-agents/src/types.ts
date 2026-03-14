@@ -11,6 +11,7 @@ import type {
   ModifyResult,
   PagePlan as SharedPagePlan,
   PageType,
+  RunAttachmentInput,
   RunMetadata,
   RunRequest,
   RunResponse,
@@ -27,6 +28,7 @@ export type {
   ModelInfo,
   ModifyResult,
   PageType,
+  RunAttachmentInput,
   RunMetadata,
   RunRequest,
   RunResponse,
@@ -48,6 +50,7 @@ export interface AgentToolRegistry {
 export interface AgentMemoryMessage {
   role: 'user' | 'assistant';
   text: string;
+  attachments?: AgentMemoryAttachment[];
   meta?: {
     sessionId?: string;
     intent?: AgentIntent;
@@ -55,6 +58,15 @@ export interface AgentMemoryMessage {
     schemaDigest?: string;
     failed?: boolean;
   };
+}
+
+export interface AgentMemoryAttachment {
+  id: string;
+  kind: RunAttachmentInput['kind'];
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  extractedTextPreview?: string;
 }
 
 export interface AgentMemoryEntry {

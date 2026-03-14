@@ -43,6 +43,11 @@ import {
   type OpenAICompatibleThinking,
 } from '../adapters/openai-compatible.ts';
 import {
+  buildUserMessageContent,
+  buildUserMessageContentFromLines,
+  prepareRunRequest,
+} from './request-attachments.ts';
+import {
   isNodeLike,
   normalizeGeneratedNode,
   normalizeGeneratedNodeWithDiagnostics,
@@ -1380,7 +1385,7 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
     },
     {
       role: 'user',
-      content: [
+      content: buildUserMessageContentFromLines([
         `Prompt: ${input.request.prompt}`,
         `Schema Summary: ${input.context.document.summary}`,
         'Schema Tree:',
@@ -1390,7 +1395,7 @@ function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] 
         conversationHistory,
         `Selected Node: ${input.context.selectedNodeId ?? 'none'}`,
         'Your response must start with { and end with }. No other text.',
-      ].join('\n'),
+      ], input.request.attachments),
     },
   ];
 }
@@ -1492,7 +1497,7 @@ function createBlockMessages(
     },
     {
       role: 'user',
-      content: [
+      content: buildUserMessageContentFromLines([
         // IMPORTANT: Use block.description, NOT request.prompt!
         // Sending the full user prompt causes the LLM to generate content for ALL regions,
         // leading to one block absorbing the entire page. The planner already decomposed
@@ -1509,7 +1514,7 @@ function createBlockMessages(
         conversationHistory,
         ...(qualityFeedbackSummary ? [qualityFeedbackSummary] : []),
         'Your response must start with { and end with }. No other text.',
-      ].join('\n'),
+      ], input.request.attachments),
     },
   ];
 }
@@ -1758,10 +1763,13 @@ function createRuntimeDeps(memory: AgentMemoryStore, trace?: RunTraceRecord): Ag
         const prompt = typeof request === 'object' && request && 'prompt' in request
           ? String((request as { prompt: unknown }).prompt)
           : 'No prompt';
+        const attachments = typeof request === 'object' && request && 'attachments' in request
+          ? ((request as { attachments?: RunRequest['attachments'] }).attachments ?? undefined)
+          : undefined;
         const thinking = getThinkingFromUnknown(request);
         const { content: text } = await client.chat(model, [
           { role: 'system', content: 'You are a helpful low-code assistant.' },
-          { role: 'user', content: prompt },
+          { role: 'user', content: buildUserMessageContent(prompt, attachments) },
         ], thinking);
         return { text };
       },
@@ -1769,6 +1777,9 @@ function createRuntimeDeps(memory: AgentMemoryStore, trace?: RunTraceRecord): Ag
         const prompt = typeof request === 'object' && request && 'prompt' in request
           ? String((request as { prompt: unknown }).prompt)
           : 'No prompt';
+        const attachments = typeof request === 'object' && request && 'attachments' in request
+          ? ((request as { attachments?: RunRequest['attachments'] }).attachments ?? undefined)
+          : undefined;
         const requestedChatModel = getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL;
         const chatModelRef = parseProviderModelRef(requestedChatModel);
         const client = createClient(chatModelRef.provider);
@@ -1776,7 +1787,7 @@ function createRuntimeDeps(memory: AgentMemoryStore, trace?: RunTraceRecord): Ag
         const thinking = getThinkingFromUnknown(request);
         yield* client.streamChat(model, [
           { role: 'system', content: 'You are a helpful low-code assistant.' },
-          { role: 'user', content: prompt },
+          { role: 'user', content: buildUserMessageContent(prompt, attachments) },
         ], thinking);
       },
     },
@@ -1963,9 +1974,10 @@ export async function attachTraceMemoryBestEffort(
 export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): AgentRuntime {
   return {
     async run(request) {
-      const trace = createTrace(request);
+      const preparedRequest = await prepareRunRequest(request);
+      const trace = createTrace(preparedRequest);
       try {
-        const events = await runAgent(request, createRuntimeDeps(memory, trace));
+        const events = await runAgent(preparedRequest, createRuntimeDeps(memory, trace));
         const metadata = extractMetadata(events);
         if (metadata.conversationId) {
           await attachTraceMemoryBestEffort(trace, memory, metadata.conversationId, metadata.sessionId);
@@ -1982,8 +1994,9 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
     },
 
     async *runStream(request) {
-      const trace = createTrace(request);
-      const generator = runAgentStream(request, createRuntimeDeps(memory, trace));
+      const preparedRequest = await prepareRunRequest(request);
+      const trace = createTrace(preparedRequest);
+      const generator = runAgentStream(preparedRequest, createRuntimeDeps(memory, trace));
       let terminalEvent: AgentEvent | undefined;
 
       try {

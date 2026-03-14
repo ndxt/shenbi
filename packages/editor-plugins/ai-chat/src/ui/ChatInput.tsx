@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Square, Lightbulb, History, X } from 'lucide-react';
+import { Send, Square, Lightbulb, History, X, Paperclip, FileImage, FileText } from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
+import type { PendingAttachment } from '../attachments';
 
 export interface PromptOption {
     label: string;
@@ -26,6 +27,9 @@ interface ChatInputProps {
     onSelectPreset?: (text: string) => void;
     onSelectHistory?: (text: string) => void;
     onRemoveHistory?: (text: string) => void;
+    attachments?: PendingAttachment[];
+    onAddFiles?: (files: File[]) => void;
+    onRemoveAttachment?: (attachmentId: string) => void;
 }
 
 // 简单的自定义 Popover/Menu 组件 — 使用 fixed 定位逃逸 overflow-hidden 祖先
@@ -158,9 +162,14 @@ export function ChatInput({
     onSelectPreset,
     onSelectHistory,
     onRemoveHistory,
+    attachments = [],
+    onAddFiles,
+    onRemoveAttachment,
 }: ChatInputProps) {
     const { t } = useTranslation('pluginAiChat');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const hasQuickActions = promptPresets.length > 0 || promptHistory.length > 0 || Boolean(onAddFiles);
 
     // Auto-resize logic
     useEffect(() => {
@@ -183,10 +192,18 @@ export function ChatInput({
     };
 
     const handleSend = () => {
-        if (text.trim() && !isRunning) {
+        if ((text.trim() || attachments.length > 0) && !isRunning) {
             onSend(text.trim());
         }
         // focus input after typing/sending finishes ideally handled by the wrapper
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files ?? []);
+        if (files.length > 0) {
+            onAddFiles?.(files);
+        }
+        event.target.value = '';
     };
 
     const handleSelectPreset = (val: string) => {
@@ -201,65 +218,125 @@ export function ChatInput({
 
     return (
         <div className="flex w-full flex-col gap-1.5">
-            <div className="flex items-center gap-2 mb-0.5">
-                {(promptPresets.length > 0) && (
-                    <DropdownMenu
-                        icon={Lightbulb}
-                        label={t('presets.label')}
-                        items={promptPresets}
-                        onSelect={handleSelectPreset}
-                        disabled={disabled || isRunning}
-                        emptyText={t('input.empty')}
-                        removeText={t('input.remove')}
-                    />
+            <div className="rounded-md border border-border-ide bg-bg-activity-bar shadow-sm overflow-hidden">
+                {hasQuickActions && (
+                    <div className="border-b border-border-ide px-2 py-2">
+                        <div className="flex items-center gap-1.5 overflow-x-auto shenbi-custom-scrollbar">
+                            {(promptPresets.length > 0) && (
+                                <div className="shrink-0">
+                                    <DropdownMenu
+                                        icon={Lightbulb}
+                                        label={t('presets.label')}
+                                        items={promptPresets}
+                                        onSelect={handleSelectPreset}
+                                        disabled={disabled || isRunning}
+                                        emptyText={t('input.empty')}
+                                        removeText={t('input.remove')}
+                                    />
+                                </div>
+                            )}
+                            {(promptHistory.length > 0) && (
+                                <div className="shrink-0">
+                                    <DropdownMenu
+                                        icon={History}
+                                        label={t('input.historyLabel')}
+                                        items={promptHistory.map((h) => ({
+                                            label: h,
+                                            value: h,
+                                            onRemove: onRemoveHistory,
+                                        }))}
+                                        onSelect={handleSelectHistory}
+                                        disabled={disabled || isRunning}
+                                        emptyText={t('input.empty')}
+                                        removeText={t('input.remove')}
+                                    />
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-transparent transition-colors text-text-secondary hover:bg-bg-panel hover:text-text-primary hover:border-border-ide ${disabled || isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                style={{ fontSize: '11px' }}
+                                onClick={() => fileInputRef.current?.click()}
+                                title={t('input.attachLabel')}
+                                disabled={disabled || isRunning}
+                            >
+                                <Paperclip size={12} />
+                                <span className="whitespace-nowrap">{t('input.attachLabel')}</span>
+                                {attachments.length > 0 && (
+                                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] text-blue-300">
+                                        {attachments.length}
+                                    </span>
+                                )}
+                            </button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                hidden
+                                aria-hidden="true"
+                                tabIndex={-1}
+                                multiple
+                                accept="image/*,.pdf,.doc,.docx"
+                                onChange={handleFileChange}
+                                disabled={disabled || isRunning}
+                            />
+                        </div>
+                    </div>
                 )}
-                {(promptHistory.length > 0) && (
-                    <DropdownMenu
-                        icon={History}
-                        label={t('input.historyLabel')}
-                        items={promptHistory.map((h) => ({
-                            label: h,
-                            value: h,
-                            onRemove: onRemoveHistory,
-                        }))}
-                        onSelect={handleSelectHistory}
-                        disabled={disabled || isRunning}
-                        emptyText={t('input.empty')}
-                        removeText={t('input.remove')}
-                    />
-                )}
-            </div>
 
-            <div className="relative flex items-stretch w-full">
-                <textarea
-                    ref={textareaRef}
-                    className="shenbi-custom-scrollbar w-full bg-bg-activity-bar border border-border-ide text-text-primary rounded pl-3 pr-3 pt-2 pb-8 min-h-[60px] max-h-[250px] focus:outline-none focus:border-blue-500 transition-colors shadow-sm resize-none leading-relaxed"
-                    style={{ fontSize: '12px' }}
-                    placeholder={t('input.placeholder')}
-                    value={text}
-                    onChange={(e) => onTextChange(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={disabled || isRunning}
-                />
-                <div className="absolute right-1.5 bottom-1.5 flex items-center justify-center bg-bg-activity-bar rounded">
-                    {isRunning ? (
-                        <button
-                            onClick={onCancel}
-                            className="p-1 text-text-primary hover:bg-bg-panel rounded transition-colors border border-border-ide bg-bg-canvas"
-                            title="Cancel"
-                        >
-                            <Square size={13} fill="currentColor" />
-                        </button>
-                    ) : (
-                        <button
-                            onClick={handleSend}
-                            disabled={!text.trim() || disabled}
-                            className="p-1 text-white bg-blue-600 hover:bg-blue-500 disabled:bg-bg-canvas disabled:text-text-secondary disabled:border disabled:border-border-ide rounded transition-colors shadow-sm flex items-center justify-center h-[26px] w-[26px]"
-                            title="Send"
-                        >
-                            <Send size={13} className="-ml-0.5 mt-0.5" />
-                        </button>
-                    )}
+                {attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 border-b border-border-ide px-2 py-2">
+                        {attachments.map((attachment) => (
+                            <div
+                                key={attachment.id}
+                                className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border-ide bg-bg-canvas px-2 py-1 text-text-primary"
+                                style={{ fontSize: '11px' }}
+                            >
+                                {attachment.kind === 'image' ? <FileImage size={12} className="shrink-0" /> : <FileText size={12} className="shrink-0" />}
+                                <span className="max-w-[190px] truncate" title={attachment.name}>{attachment.name}</span>
+                                <button
+                                    type="button"
+                                    className="shrink-0 text-text-secondary hover:text-text-primary"
+                                    onClick={() => onRemoveAttachment?.(attachment.id)}
+                                    title={t('input.removeAttachment')}
+                                >
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <div className="relative flex items-stretch w-full">
+                    <textarea
+                        ref={textareaRef}
+                        className="shenbi-custom-scrollbar w-full bg-transparent text-text-primary pl-3 pr-12 pt-2.5 pb-3 min-h-[68px] max-h-[250px] focus:outline-none resize-none leading-relaxed"
+                        style={{ fontSize: '12px' }}
+                        placeholder={t('input.placeholder')}
+                        value={text}
+                        onChange={(e) => onTextChange(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={disabled || isRunning}
+                    />
+                    <div className="absolute right-2 bottom-2 flex items-center justify-center rounded">
+                        {isRunning ? (
+                            <button
+                                onClick={onCancel}
+                                className="p-1.5 text-text-primary hover:bg-bg-panel rounded transition-colors border border-border-ide bg-bg-canvas"
+                                title="Cancel"
+                            >
+                                <Square size={13} fill="currentColor" />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleSend}
+                                disabled={(!text.trim() && attachments.length === 0) || disabled}
+                                className="p-1.5 text-white bg-blue-600 hover:bg-blue-500 disabled:bg-bg-canvas disabled:text-text-secondary disabled:border disabled:border-border-ide rounded transition-colors shadow-sm flex items-center justify-center h-[28px] w-[28px]"
+                                title="Send"
+                            >
+                                <Send size={13} className="-ml-0.5 mt-0.5" />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

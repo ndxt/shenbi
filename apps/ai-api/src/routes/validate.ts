@@ -3,6 +3,7 @@
  */
 import { ValidationError } from '../adapters/errors.ts';
 import type { FinalizeRequest, RunRequest } from '@shenbi/ai-contracts';
+import { MAX_ATTACHMENT_BYTES, SUPPORTED_DOCUMENT_MIME_TYPES } from '../runtime/request-attachments.ts';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -20,6 +21,19 @@ function isPageSchemaLike(value: unknown): boolean {
   return Array.isArray(body)
     ? body.every((item) => isSchemaNodeLike(item))
     : isSchemaNodeLike(body);
+}
+
+function isValidAttachmentMime(kind: unknown, mimeType: unknown): boolean {
+  if (typeof mimeType !== 'string') {
+    return false;
+  }
+  if (kind === 'image') {
+    return mimeType.startsWith('image/');
+  }
+  if (kind === 'document') {
+    return SUPPORTED_DOCUMENT_MIME_TYPES.has(mimeType);
+  }
+  return false;
 }
 
 export function validateRunRequest(body: unknown): RunRequest {
@@ -65,6 +79,55 @@ export function validateRunRequest(body: unknown): RunRequest {
       throw new ValidationError('context.workspaceFileIds must be an array of strings');
     }
     req.context.workspaceFileIds = [...ctx['workspaceFileIds']];
+  }
+
+  if (body['attachments'] !== undefined) {
+    if (!Array.isArray(body['attachments'])) {
+      throw new ValidationError('attachments must be an array');
+    }
+    req.attachments = body['attachments'].map((attachment, index) => {
+      if (!isRecord(attachment)) {
+        throw new ValidationError(`attachments[${index}] must be an object`);
+      }
+
+      const kind = attachment['kind'];
+      const name = attachment['name'];
+      const mimeType = attachment['mimeType'];
+      const sizeBytes = attachment['sizeBytes'];
+      const dataUrl = attachment['dataUrl'];
+      const id = attachment['id'];
+
+      if (typeof id !== 'string' || id.trim() === '') {
+        throw new ValidationError(`attachments[${index}].id must be a non-empty string`);
+      }
+      if (kind !== 'image' && kind !== 'document') {
+        throw new ValidationError(`attachments[${index}].kind must be "image" or "document"`);
+      }
+      if (typeof name !== 'string' || name.trim() === '') {
+        throw new ValidationError(`attachments[${index}].name must be a non-empty string`);
+      }
+      if (!isValidAttachmentMime(kind, mimeType)) {
+        throw new ValidationError(`attachments[${index}].mimeType is not supported`);
+      }
+      if (!Number.isFinite(sizeBytes) || Number(sizeBytes) <= 0 || Number(sizeBytes) > MAX_ATTACHMENT_BYTES) {
+        throw new ValidationError(`attachments[${index}].sizeBytes must be between 1 and ${MAX_ATTACHMENT_BYTES}`);
+      }
+      if (
+        typeof dataUrl !== 'string'
+        || !dataUrl.startsWith(`data:${mimeType};base64,`)
+      ) {
+        throw new ValidationError(`attachments[${index}].dataUrl must be a matching base64 data URL`);
+      }
+
+      return {
+        id: id.trim(),
+        kind,
+        name: name.trim(),
+        mimeType: mimeType as string,
+        sizeBytes: Number(sizeBytes),
+        dataUrl,
+      };
+    });
   }
 
   if (typeof body['plannerModel'] === 'string') req.plannerModel = body['plannerModel'];

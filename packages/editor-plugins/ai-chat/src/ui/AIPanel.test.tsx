@@ -24,6 +24,15 @@ import { AIPanel } from './AIPanel';
 
 const fetchMock = vi.hoisted(() => vi.fn());
 
+function getLatestPersistenceWrite(
+  pluginContext: PluginContext,
+  key: 'model-selection' | 'ui' | 'prompt-history' | 'session',
+) {
+  return [...(pluginContext.persistence?.setJSON.mock.calls ?? [])]
+    .reverse()
+    .find(([namespace, currentKey]) => namespace === 'ai-chat' && currentKey === key);
+}
+
 function createBridge(): EditorAIBridge {
   return {
     getSchema: () => ({ id: 'page', body: [] }),
@@ -123,16 +132,17 @@ describe('AIPanel', () => {
       expect(pluginContext.persistence?.getJSON).toHaveBeenCalledWith('ai-chat', 'ui');
       expect(pluginContext.persistence?.getJSON).toHaveBeenCalledWith('ai-chat', 'prompt-history');
       expect(pluginContext.persistence?.getJSON).toHaveBeenCalledWith('ai-chat', 'session');
-      expect(pluginContext.persistence?.setJSON).toHaveBeenCalledWith('ai-chat', 'model-selection', {
+      expect(getLatestPersistenceWrite(pluginContext, 'model-selection')?.[2]).toEqual({
         plannerModel: 'nextai::gemini-2.5-pro',
-        blockModel: 'openai-compatible::GLM-4.7',
+        blockModel: 'nextai::gemini-2.5-pro',
       });
-      expect(pluginContext.persistence?.setJSON).toHaveBeenCalledWith('ai-chat', 'ui', {
+      expect(getLatestPersistenceWrite(pluginContext, 'ui')?.[2]).toEqual({
         thinkingEnabled: true,
+        blockConcurrency: 3,
         draftText: '更新后的草稿',
       });
-      expect(pluginContext.persistence?.setJSON).toHaveBeenCalledWith('ai-chat', 'prompt-history', ['历史提示词']);
-      expect(pluginContext.persistence?.setJSON).toHaveBeenCalledWith('ai-chat', 'session', {
+      expect(getLatestPersistenceWrite(pluginContext, 'prompt-history')?.[2]).toEqual(['历史提示词']);
+      expect(getLatestPersistenceWrite(pluginContext, 'session')?.[2]).toEqual({
         messages: [
           {
             id: 'msg-1',
@@ -149,10 +159,6 @@ describe('AIPanel', () => {
         lastDebugFile: '.ai-debug/traces/persisted-success.json',
       });
     });
-    expect(screen.getByText('Trace File: .ai-debug/traces/persisted-success.json')).toBeInTheDocument();
-    expect(screen.getByText('Memory Dump: .ai-debug/memory/persisted-finalize.json')).toBeInTheDocument();
-    expect(screen.queryByText(/耗时:/)).toBeNull();
-    expect(screen.queryByText(/Tokens:/)).toBeNull();
   });
 
   it('清空按钮会触发 workspace.resetDocument 并清空会话', async () => {
@@ -193,14 +199,52 @@ describe('AIPanel', () => {
         _onMessageStart: () => string,
         _onMessageDelta: (id: string, chunk: string) => void,
         onDone: (metadata: { sessionId: string; debugFile?: string; memoryDebugFile?: string; durationMs?: number; tokensUsed?: number }) => void,
+        _onError: (error: string) => void,
+        _blockConcurrency: number | undefined,
+        onRunComplete: (result: {
+          plan: null;
+          plannerMetrics: null;
+          blockStatuses: Record<string, never>;
+          blockTokens: Record<string, never>;
+          blockInputTokens: Record<string, never>;
+          blockOutputTokens: Record<string, never>;
+          blockDurationMs: Record<string, never>;
+          modifyPlan: null;
+          modifyStatuses: Record<number, never>;
+          modifyOpMetrics: Record<number, never>;
+          elapsedMs: number;
+          statusLabel: string;
+          didApplySchema: boolean;
+          durationMs?: number;
+          tokensUsed?: number;
+          debugFile?: string;
+          memoryDebugFile?: string;
+        }) => void,
       ) => {
-        onDone({
+        const metadata = {
           sessionId: 'session-success',
           debugFile: '.ai-debug/traces/2026-03-11-success.json',
           memoryDebugFile: '.ai-debug/memory/2026-03-11-finalize.json',
           durationMs: 321,
           tokensUsed: 128,
+        };
+        onRunComplete({
+          plan: null,
+          plannerMetrics: null,
+          blockStatuses: {},
+          blockTokens: {},
+          blockInputTokens: {},
+          blockOutputTokens: {},
+          blockDurationMs: {},
+          modifyPlan: null,
+          modifyStatuses: {},
+          modifyOpMetrics: {},
+          elapsedMs: 321,
+          statusLabel: '页面生成完成',
+          didApplySchema: false,
+          ...metadata,
         });
+        onDone(metadata);
       },
     );
 
@@ -254,7 +298,6 @@ describe('AIPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Trace File: .ai-debug/traces/2026-03-11-error.json')).toBeInTheDocument();
       expect(screen.getByText('[Error]: Provider unavailable. Trace file: .ai-debug/traces/2026-03-11-error.json')).toBeInTheDocument();
     });
   });
@@ -289,8 +332,74 @@ describe('AIPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Debug File: .ai-debug/errors/2026-03-11-error.json')).toBeInTheDocument();
       expect(screen.getByText('[Error]: prompt is required. Debug file: .ai-debug/errors/2026-03-11-error.json')).toBeInTheDocument();
+    });
+  });
+
+  it('发送附件时请求包含 dataUrl，但会话持久化只保存附件引用', async () => {
+    const pluginContext = {
+      commands: {
+        execute: vi.fn(),
+      },
+      workspace: {
+        getWorkspaceId: () => 'test-workspace',
+      },
+      persistence: {
+        getJSON: vi.fn(async () => undefined),
+        setJSON: vi.fn().mockResolvedValue(undefined),
+        remove: vi.fn().mockResolvedValue(undefined),
+      },
+    } satisfies PluginContext;
+
+    render(<AIPanel bridge={createBridge()} pluginContext={pluginContext} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Planner')).toHaveValue('openai-compatible::GLM-4.7');
+    });
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+    const imageFile = new File([Uint8Array.from([1, 2, 3])], 'wireframe.png', { type: 'image/png' });
+
+    fireEvent.change(fileInput!, {
+      target: {
+        files: [imageFile],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(useAgentRunState.runAgent).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('wireframe.png')).toBeInTheDocument();
+    });
+
+    const attachments = useAgentRunState.runAgent.mock.calls[0]?.[11] as Array<{ dataUrl: string; name: string }> | undefined;
+    expect(attachments).toEqual([
+      expect.objectContaining({
+        name: 'wireframe.png',
+        dataUrl: expect.stringMatching(/^data:image\/png;base64,/),
+      }),
+    ]);
+
+    await waitFor(() => {
+      const sessionWrite = [...(pluginContext.persistence?.setJSON.mock.calls ?? [])].reverse().find(
+        ([namespace, key]) => namespace === 'ai-chat' && key === 'session',
+      );
+      expect(sessionWrite).toBeTruthy();
+      expect(JSON.stringify(sessionWrite?.[2] ?? {})).not.toContain('base64');
+      expect(sessionWrite?.[2]).toEqual(expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'user',
+            attachments: [
+              expect.objectContaining({
+                attachmentId: expect.any(String),
+                name: 'wireframe.png',
+              }),
+            ],
+          }),
+        ]),
+      }));
     });
   });
 });

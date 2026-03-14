@@ -57,6 +57,58 @@ describe('validateRunRequest', () => {
       },
     })).toThrow(/intent/i);
   });
+
+  it('accepts supported attachments', () => {
+    const request = validateRunRequest({
+      prompt: 'look at this image',
+      attachments: [
+        {
+          id: 'img-1',
+          kind: 'image',
+          name: 'wireframe.png',
+          mimeType: 'image/png',
+          sizeBytes: 128,
+          dataUrl: 'data:image/png;base64,Zm9v',
+        },
+        {
+          id: 'doc-1',
+          kind: 'document',
+          name: 'brief.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 256,
+          dataUrl: 'data:application/pdf;base64,Zm9v',
+        },
+      ],
+      context: {
+        schemaSummary: 'pageId=page-1',
+        componentSummary: 'Card',
+      },
+    });
+
+    expect(request.attachments).toHaveLength(2);
+    expect(request.attachments?.[0]?.kind).toBe('image');
+    expect(request.attachments?.[1]?.kind).toBe('document');
+  });
+
+  it('rejects unsupported attachment mime types', () => {
+    expect(() => validateRunRequest({
+      prompt: 'modify page',
+      attachments: [
+        {
+          id: 'file-1',
+          kind: 'document',
+          name: 'brief.txt',
+          mimeType: 'text/plain',
+          sizeBytes: 128,
+          dataUrl: 'data:text/plain;base64,Zm9v',
+        },
+      ],
+      context: {
+        schemaSummary: 'pageId=page-1',
+        componentSummary: 'Card',
+      },
+    })).toThrow(/mimeType/i);
+  });
 });
 
 describe('validateFinalizeRequest', () => {

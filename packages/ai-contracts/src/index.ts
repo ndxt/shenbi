@@ -4,6 +4,17 @@ export interface ThinkingConfig {
   type: 'enabled' | 'disabled';
 }
 
+export type RunAttachmentKind = 'image' | 'document';
+
+export interface RunAttachmentInput {
+  id: string;
+  kind: RunAttachmentKind;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  dataUrl: string;
+}
+
 export type AgentIntent =
   | 'schema.create'
   | 'schema.modify'
@@ -34,6 +45,7 @@ export type LayoutRow =
 
 export interface RunRequest {
   prompt: string;
+  attachments?: RunAttachmentInput[];
   intent?: AgentIntent;
   plannerModel?: string;
   blockModel?: string;

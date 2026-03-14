@@ -19,6 +19,7 @@ import {
   type OpenAICompatibleRequestDebugSummary,
   type OpenAICompatibleThinking,
 } from '../adapters/openai-compatible.ts';
+import { buildUserMessageContentFromLines } from './request-attachments.ts';
 
 const env = loadEnv();
 const clientCache = new Map<string, OpenAICompatibleClient>();
@@ -567,7 +568,7 @@ function createPlanMessages(input: ModifySchemaInput): OpenAICompatibleMessage[]
     },
     {
       role: 'user',
-      content: [
+      content: buildUserMessageContentFromLines([
         `Prompt: ${input.request.prompt}`,
         `Schema Summary: ${input.context.document.summary}`,
         ...(selectedNodeHint ? [selectedNodeHint] : []),
@@ -577,7 +578,7 @@ function createPlanMessages(input: ModifySchemaInput): OpenAICompatibleMessage[]
         conversationHistory,
         'Last Successful Operations:',
         lastOperations,
-      ].join('\n'),
+      ], input.request.attachments),
     },
   ];
 }
@@ -622,14 +623,14 @@ function createInsertNodeMessages(
     },
     {
       role: 'user',
-      content: [
+      content: buildUserMessageContentFromLines([
         `Task: ${skeleton.description ?? 'Generate a node'}`,
         parentInfo,
         indexInfo,
         '',
         'Schema Tree (for context):',
         documentTree,
-      ].join('\n'),
+      ], input.request.attachments),
     },
   ];
 }

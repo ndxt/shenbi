@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { PluginPersistenceService } from '@shenbi/editor-plugin-api';
 import type { RunMetadata } from '../ai/api-types';
 import type { LastRunResult } from './useAgentRun';
+import type { ChatAttachmentRef } from '../attachments';
 
 const PERSISTENCE_NAMESPACE = 'ai-chat';
 const PERSISTENCE_KEY = 'session';
@@ -10,6 +11,7 @@ export interface ChatMessage {
     id: string;
     role: 'user' | 'assistant' | 'system';
     content: string;
+    attachments?: ChatAttachmentRef[];
     timestamp: number;
     /** When present, this message represents a completed run result card. */
     runResult?: LastRunResult | undefined;
