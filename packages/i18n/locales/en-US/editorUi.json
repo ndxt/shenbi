@@ -179,7 +179,7 @@
   },
   "workbench": {
     "components": "Components",
-    "outline": "Outline",
+    "outline": "Search",
     "data": "Database",
     "debug": "Debug",
     "extensions": "Extensions",

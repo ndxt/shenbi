@@ -303,6 +303,18 @@ export function AppShell({
       ?? ''
     );
   }, [defaultActivityItemId, primaryPanels, resolvedActivityItems]);
+  const activeActivityItem = React.useMemo(
+    () => resolvedActivityItems.find((item) => item.id === activeActivityItemId),
+    [activeActivityItemId, resolvedActivityItems],
+  );
+  const activeActivityPanelId = React.useMemo(
+    () => (
+      activeActivityItem
+        ? resolveActivityItemPanelId(activeActivityItem, primaryPanels)
+        : undefined
+    ),
+    [activeActivityItem, primaryPanels],
+  );
   const legacySidebarTabs = React.useMemo(
     () => [
       ...pluginContributes.sidebarTabs,
@@ -350,7 +362,11 @@ export function AppShell({
     return [...contextualTabs, ...fileContextLegacyTabs];
   }, [activeEditorTab, fileContextLegacyTabs, pluginContributes.fileContextPanels]);
   const activePrimaryPanel = React.useMemo(
-    () => primaryPanels.find((panel) => panel.id === activePrimaryPanelId) ?? primaryPanels[0],
+    () => (
+      activePrimaryPanelId
+        ? primaryPanels.find((panel) => panel.id === activePrimaryPanelId)
+        : undefined
+    ),
     [activePrimaryPanelId, primaryPanels],
   );
   React.useEffect(() => {
@@ -364,15 +380,25 @@ export function AppShell({
     }
   }, [activeActivityItemId, defaultActivityItemId, resolvedActivityItems]);
   React.useEffect(() => {
-    if (!activePrimaryPanelId) {
+    if (!activeActivityItemId) {
       setActivePrimaryPanelId(defaultPrimaryPanelId);
+      return;
+    }
+    if (!activeActivityPanelId) {
+      if (activePrimaryPanelId !== '') {
+        setActivePrimaryPanelId('');
+      }
+      return;
+    }
+    if (!activePrimaryPanelId) {
+      setActivePrimaryPanelId(activeActivityPanelId);
       return;
     }
     const exists = primaryPanels.some((panel) => panel.id === activePrimaryPanelId);
     if (!exists) {
-      setActivePrimaryPanelId(defaultPrimaryPanelId);
+      setActivePrimaryPanelId(activeActivityPanelId);
     }
-  }, [activePrimaryPanelId, defaultPrimaryPanelId, primaryPanels]);
+  }, [activeActivityItemId, activeActivityPanelId, activePrimaryPanelId, defaultPrimaryPanelId, primaryPanels]);
   React.useEffect(() => {
     if (activeEditorTab?.fileType === 'page') {
       setShowFileContextPanel(true);
@@ -929,6 +955,11 @@ export function AppShell({
     }
     const tabId = item.target?.type === 'tab' ? item.target.tabId : item.targetSidebarTabId;
     if (!tabId) {
+      setActivePrimaryPanelId('');
+      if (!showSidebar) {
+        setShowSidebar(true);
+        setIsMaximized(false);
+      }
       return;
     }
     setActiveFileContextTabId(tabId);
@@ -1043,7 +1074,7 @@ export function AppShell({
           />
         </div>
         
-        {showSidebar && activePrimaryPanel ? (
+        {showSidebar ? (
           <div
             style={{ width: sidebarSize }}
             className="relative shrink-0 flex flex-col h-full"
@@ -1051,13 +1082,13 @@ export function AppShell({
             onContextMenu={(event) => openContextMenu('sidebar', event)}
           >
             <div className="flex-1 overflow-hidden bg-bg-sidebar border-r border-border-ide flex flex-col">
-              {activePrimaryPanel.id !== 'files' ? (
+              {activePrimaryPanel && activePrimaryPanel.id !== 'files' ? (
                 <div className="h-8 shrink-0 flex items-center px-3 border-b border-border-ide bg-bg-panel text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                   {activePrimaryPanel.label}
                 </div>
               ) : null}
               <div className="flex-1 overflow-hidden">
-                {activePrimaryPanel.render(panelRenderContext)}
+                {activePrimaryPanel ? activePrimaryPanel.render(panelRenderContext) : null}
               </div>
             </div>
             <div 

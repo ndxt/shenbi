@@ -3,7 +3,7 @@ import {
   defineEditorPlugin,
   type EditorPluginManifest,
 } from '@shenbi/editor-plugin-api';
-import { FileText } from 'lucide-react';
+import { FolderOpen } from 'lucide-react';
 import { i18n } from '@shenbi/i18n';
 import type { CreateFilesSidebarTabOptions } from './sidebar-tab';
 import { FilePanel } from './FilePanel';
@@ -42,7 +42,7 @@ export function createFilesPlugin(options: CreateFilesPluginOptions): EditorPlug
         {
           id: options.activityItemId ?? 'files',
           label: options.activityLabel ?? panelLabel,
-          icon: FileText,
+          icon: FolderOpen,
           order: options.activityOrder ?? 5,
           active: true,
           section: 'main',

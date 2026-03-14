@@ -179,7 +179,7 @@
   },
   "workbench": {
     "components": "组件",
-    "outline": "大纲",
+    "outline": "搜索",
     "data": "数据库",
     "debug": "调试",
     "extensions": "扩展",
