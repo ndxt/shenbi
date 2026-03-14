@@ -233,8 +233,14 @@ function FileTypeDropdown({
         onClose();
       }
     };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    // Delay so that the opening click doesn't immediately close the dropdown
+    const raf = requestAnimationFrame(() => {
+      document.addEventListener('mousedown', handleClick);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('mousedown', handleClick);
+    };
   }, [onClose]);
 
   return (
