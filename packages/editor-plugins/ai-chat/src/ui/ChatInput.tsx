@@ -254,19 +254,14 @@ export function ChatInput({
                             )}
                             <button
                                 type="button"
-                                className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-transparent transition-colors text-text-secondary hover:bg-bg-panel hover:text-text-primary hover:border-border-ide ${disabled || isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`shrink-0 flex items-center gap-1.5 px-2 py-1 rounded transition-colors text-text-secondary hover:bg-bg-activity-bar hover:text-text-primary ${disabled || isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 style={{ fontSize: '11px' }}
                                 onClick={() => fileInputRef.current?.click()}
                                 title={t('input.attachLabel')}
                                 disabled={disabled || isRunning}
                             >
                                 <Paperclip size={12} />
-                                <span className="whitespace-nowrap">{t('input.attachLabel')}</span>
-                                {attachments.length > 0 && (
-                                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] text-blue-300">
-                                        {attachments.length}
-                                    </span>
-                                )}
+                                <span>{t('input.attachLabel')}</span>
                             </button>
                             <input
                                 ref={fileInputRef}
@@ -317,11 +312,14 @@ export function ChatInput({
                         onKeyDown={handleKeyDown}
                         disabled={disabled || isRunning}
                     />
-                    <div className="absolute right-2 bottom-2 flex items-center justify-center rounded">
+                    <div
+                        className="pointer-events-none absolute inset-0 flex items-end justify-end p-2"
+                        style={{ zIndex: 1 }}
+                    >
                         {isRunning ? (
                             <button
                                 onClick={onCancel}
-                                className="p-1.5 text-text-primary hover:bg-bg-panel rounded transition-colors border border-border-ide bg-bg-canvas"
+                                className="pointer-events-auto p-1.5 text-text-primary hover:bg-bg-panel rounded transition-colors border border-border-ide bg-bg-canvas"
                                 title="Cancel"
                             >
                                 <Square size={13} fill="currentColor" />
@@ -330,7 +328,7 @@ export function ChatInput({
                             <button
                                 onClick={handleSend}
                                 disabled={(!text.trim() && attachments.length === 0) || disabled}
-                                className="p-1.5 text-white bg-blue-600 hover:bg-blue-500 disabled:bg-bg-canvas disabled:text-text-secondary disabled:border disabled:border-border-ide rounded transition-colors shadow-sm flex items-center justify-center h-[28px] w-[28px]"
+                                className="pointer-events-auto p-1.5 text-white bg-blue-600 hover:bg-blue-500 disabled:bg-bg-canvas disabled:text-text-secondary disabled:border disabled:border-border-ide rounded transition-colors shadow-sm flex items-center justify-center h-[28px] w-[28px]"
                                 title="Send"
                             >
                                 <Send size={13} className="-ml-0.5 mt-0.5" />
