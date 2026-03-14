@@ -1,3 +1,5 @@
+import './i18n';
+
 export * from './ActionPanel';
 export * from './inspector-tabs';
 export * from './plugin';

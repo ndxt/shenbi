@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '@shenbi/i18n';
 import { Play, Network, Clock, Database, ChevronRight, Activity, Code, Settings } from 'lucide-react';
 
 export interface ActionPanelProps {
@@ -7,15 +8,17 @@ export interface ActionPanelProps {
 }
 
 export function ActionPanel({ actions, onChange }: ActionPanelProps) {
+  const { t } = useTranslation('pluginSetter');
+
   return (
     <div className="flex flex-col h-full bg-bg-panel text-text-primary overflow-hidden">
       
       {/* Top Action Toolbar */}
       <div className="p-2 border-b border-border-ide/50 flex items-center justify-between shrink-0">
-        <span className="text-[11px] font-semibold text-text-secondary uppercase opacity-80 pl-1">交互编排 (Actions)</span>
+        <span className="text-[11px] font-semibold text-text-secondary uppercase opacity-80 pl-1">{t('panel.actions')}</span>
         <button className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 hover:text-blue-400 px-2 py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition-colors">
           <Play size={13} strokeWidth={2} />
-          <span>新建流</span>
+          <span>{t('actions.newFlow')}</span>
         </button>
       </div>
 
@@ -27,7 +30,7 @@ export function ActionPanel({ actions, onChange }: ActionPanelProps) {
           <div className="p-2 border-b border-border-ide/40 flex bg-bg-sidebar">
             <input 
               type="text" 
-              placeholder="搜索 Action..." 
+              placeholder={t('actions.searchPlaceholder')} 
               className="w-full bg-text-primary/[0.03] dark:bg-text-primary/[0.05] border border-transparent rounded-md px-2.5 py-1.5 text-[12px] outline-none focus:bg-transparent focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 text-text-primary transition-colors"
             />
           </div>
@@ -48,7 +51,7 @@ export function ActionPanel({ actions, onChange }: ActionPanelProps) {
                <h3 className="text-[13px] font-medium truncate">getUserList</h3>
              </div>
              <div className="flex gap-2 shrink-0">
-               <span className="text-[10px] bg-green-500/10 text-green-500 dark:text-green-400 px-2 py-0.5 rounded-md border border-green-500/20 font-medium">Fetch API</span>
+               <span className="text-[10px] bg-green-500/10 text-green-500 dark:text-green-400 px-2 py-0.5 rounded-md border border-green-500/20 font-medium">{t('actions.fetchApi')}</span>
              </div>
           </div>
           
@@ -68,7 +71,7 @@ export function ActionPanel({ actions, onChange }: ActionPanelProps) {
                   {/* Config Node */}
                   <div className="w-full max-w-[280px] bg-bg-sidebar/80 backdrop-blur-md border border-border-ide/50 rounded-lg p-3 shadow-xl hover:border-blue-500/50 transition-colors cursor-pointer group">
                     <div className="flex items-center justify-between mb-2">
-                       <span className="text-[11px] font-semibold text-text-secondary uppercase opacity-80">准备请求参数</span>
+                       <span className="text-[11px] font-semibold text-text-secondary uppercase opacity-80">{t('actions.prepareRequestParams')}</span>
                        <Settings size={14} strokeWidth={1.5} className="text-text-secondary/50 group-hover:text-blue-400 transition-colors" />
                     </div>
                     <div className="text-[12px] bg-text-primary/[0.02] p-2.5 rounded-md font-mono text-yellow-600 dark:text-yellow-400 border border-border-ide/30">
@@ -93,7 +96,7 @@ export function ActionPanel({ actions, onChange }: ActionPanelProps) {
                      <div className="w-7 h-7 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center shrink-0">
                        <Activity size={14} strokeWidth={1.5} className="text-green-500" />
                      </div>
-                     <span className="text-[12px] font-medium text-text-primary/90">将结果赋值给 state.userList</span>
+                     <span className="text-[12px] font-medium text-text-primary/90">{t('actions.assignResultTo', { target: 'state.userList' })}</span>
                   </div>
 
                 </div>

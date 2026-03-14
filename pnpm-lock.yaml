@@ -177,6 +177,9 @@ importers:
       '@shenbi/editor-plugin-api':
         specifier: workspace:*
         version: link:../api
+      '@shenbi/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
       '@shenbi/schema':
         specifier: workspace:*
         version: link:../../schema
@@ -294,6 +297,9 @@ importers:
       '@shenbi/editor-plugin-api':
         specifier: workspace:*
         version: link:../api
+      '@shenbi/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
       '@shenbi/schema':
         specifier: workspace:*
         version: link:../../schema

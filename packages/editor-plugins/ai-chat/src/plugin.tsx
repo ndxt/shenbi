@@ -10,6 +10,10 @@ import {
   type EditorBridgeSnapshot,
 } from './ai/editor-ai-bridge';
 import { AIPanel, type AIPanelProps } from './ui/AIPanel';
+import { registerAiChatLocale } from './i18n';
+
+// Register i18n locale resources
+registerAiChatLocale();
 
 export interface CreateAIChatPluginOptions extends AIPanelProps {
   id?: string;

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ChatMessage } from '../hooks/useChatSession';
 import { User, Sparkles } from 'lucide-react';
+import { useTranslation } from '@shenbi/i18n';
 import { RunResultCard } from './RunResultCard';
 
 interface ChatMessageListProps {
@@ -9,6 +10,8 @@ interface ChatMessageListProps {
 }
 
 export function ChatMessageList({ messages, onDismissRunResult }: ChatMessageListProps) {
+    const { t } = useTranslation('pluginAiChat');
+
     return (
         <div className="flex flex-col gap-6">
             {messages.map((msg) => (
@@ -32,7 +35,7 @@ export function ChatMessageList({ messages, onDismissRunResult }: ChatMessageLis
                                     </div>
                                 )}
                                 <span className="font-semibold text-text-primary" style={{ fontSize: '12px' }}>
-                                    {msg.role === 'user' ? '你' : 'Shenbi AI'}
+                                    {msg.role === 'user' ? t('message.you') : t('message.assistant')}
                                 </span>
                             </div>
                             <div className={`leading-relaxed text-text-primary whitespace-pre-wrap pl-7 ${msg.role === 'user' ? 'opacity-90' : ''}`} style={{ fontSize: '12px' }}>

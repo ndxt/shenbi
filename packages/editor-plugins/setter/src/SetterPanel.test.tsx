@@ -82,7 +82,7 @@ describe('SetterPanel/Props contract-driven controls', () => {
     const selectedNode: SchemaNode = {
       id: 'table-1',
       component: 'Table',
-      props: { pagination: { current: 1, pageSize: 10 } },
+      props: { rowSelection: { type: 'checkbox' } },
     };
 
     render(
@@ -94,12 +94,12 @@ describe('SetterPanel/Props contract-driven controls', () => {
       />,
     );
 
-    const editor = screen.getByLabelText('pagination');
+    const editor = screen.getByLabelText('rowSelection');
     fireEvent.change(editor, { target: { value: '{' } });
     fireEvent.blur(editor);
 
     expect(onPatchProps).not.toHaveBeenCalled();
-    expect(screen.getByText('属性值必须是对象 JSON')).toBeInTheDocument();
+    expect(screen.getByText('Property value must be a valid JSON object')).toBeInTheDocument();
   });
 
   it('allowExpression 的 boolean 遇到表达式时降级为文本输入', () => {
@@ -141,8 +141,8 @@ describe('SetterPanel/Props contract-driven controls', () => {
       />,
     );
 
-    expect(screen.getByText('基础属性')).toBeInTheDocument();
-    expect(screen.getByText('结构属性')).toBeInTheDocument();
+    expect(screen.getByText('Basic Props')).toBeInTheDocument();
+    expect(screen.getByText('Structural Props')).toBeInTheDocument();
   });
 
   it('高级属性 JSON 视图可回写 props patch', () => {
@@ -163,7 +163,7 @@ describe('SetterPanel/Props contract-driven controls', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '打开 JSON 视图' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open JSON View' }));
     const editor = screen.getByLabelText('props json');
     fireEvent.change(editor, {
       target: {
@@ -193,13 +193,13 @@ describe('SetterPanel/Props contract-driven controls', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '打开 JSON 视图' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open JSON View' }));
     const editor = screen.getByLabelText('props json');
     fireEvent.change(editor, { target: { value: '[]' } });
     fireEvent.blur(editor);
 
     expect(onPatchProps).not.toHaveBeenCalled();
-    expect(screen.getByText('props 必须是对象 JSON')).toBeInTheDocument();
+    expect(screen.getByText('props must be a valid JSON object')).toBeInTheDocument();
   });
 
   it('Table.columns 可视化编辑会回写 onPatchColumns', () => {
@@ -221,7 +221,7 @@ describe('SetterPanel/Props contract-driven controls', () => {
       />,
     );
 
-    const titleInput = screen.getByLabelText('列1 标题');
+    const titleInput = screen.getByLabelText('Column 1 Title');
     fireEvent.change(titleInput, { target: { value: '用户名' } });
 
     expect(onPatchColumns).toHaveBeenCalled();
@@ -249,7 +249,7 @@ describe('SetterPanel/Props contract-driven controls', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '打开 JSON 视图' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open JSON View' }));
     const editor = screen.getByLabelText('props json');
     fireEvent.change(editor, {
       target: {

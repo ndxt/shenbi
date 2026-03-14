@@ -1,35 +1,37 @@
 import React, { useState } from 'react';
 import { Database, Plus, ChevronDown, ChevronRight, Activity, Terminal, Code } from 'lucide-react';
+import { useTranslation } from '@shenbi/i18n';
 
 export function PagePanel() {
+  const { t } = useTranslation('editorUi');
   return (
     <div className="flex flex-col h-full bg-bg-sidebar text-text-primary overflow-y-auto">
       <div className="p-2 border-b border-border-ide/50 flex items-center justify-between sticky top-0 bg-bg-panel z-10 shrink-0">
-        <span className="text-[11px] font-semibold text-text-secondary uppercase opacity-80 pl-1">页面状态 (Page Data)</span>
+        <span className="text-[11px] font-semibold text-text-secondary uppercase opacity-80 pl-1">{t('pagePanel.title')}</span>
       </div>
-      
+
       <div className="p-2 flex flex-col gap-3">
-        <DataGroup title="页面参数 (Params)" icon={<Database size={14} strokeWidth={1.5} className="text-blue-500" />}>
+        <DataGroup title={t('pagePanel.params')} icon={<Database size={14} strokeWidth={1.5} className="text-blue-500" />}>
           <DataItem name="id" type="string" value="123" />
           <DataItem name="mode" type="string" value="edit" />
         </DataGroup>
-        
-        <DataGroup title="状态数据 (State / Computed)" icon={<Activity size={14} strokeWidth={1.5} className="text-green-500" />}>
+
+        <DataGroup title={t('pagePanel.stateData')} icon={<Activity size={14} strokeWidth={1.5} className="text-green-500" />}>
           <DataItem name="userList" type="array" value="[...]" />
           <DataItem name="isLoading" type="boolean" value="false" />
           <DataItem name="searchQuery" type="string" value="''" />
           <div className="mt-1 flex items-center gap-1.5 text-[11px] text-text-secondary/80 border border-dashed border-border-ide/50 p-1.5 rounded-md cursor-pointer hover:bg-text-primary/5 transition-colors">
             <Plus size={13} strokeWidth={1.5} />
-            <span>新增 State 参数</span>
+            <span>{t('pagePanel.addState')}</span>
           </div>
         </DataGroup>
 
-        <DataGroup title="方法 (Methods)" icon={<Terminal size={14} strokeWidth={1.5} className="text-yellow-500" />}>
+        <DataGroup title={t('pagePanel.methods')} icon={<Terminal size={14} strokeWidth={1.5} className="text-yellow-500" />}>
           <DataItem name="fetchUsers" type="async function" value="(params) => Promise" isFunction />
           <DataItem name="formatDate" type="function" value="(date) => string" isFunction />
         </DataGroup>
 
-        <DataGroup title="上下文数据 (Context)" icon={<Code size={14} strokeWidth={1.5} className="text-purple-500" />}>
+        <DataGroup title={t('pagePanel.contextData')} icon={<Code size={14} strokeWidth={1.5} className="text-purple-500" />}>
           <DataItem name="theme" type="object" value="{ color: 'dark' }" />
           <DataItem name="currentUser" type="object" value="{ name: 'admin' }" />
         </DataGroup>

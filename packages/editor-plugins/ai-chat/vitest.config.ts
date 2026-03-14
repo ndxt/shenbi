@@ -12,6 +12,7 @@ export default defineConfig({
       '@shenbi/editor-core': path.resolve(__dirname, '../../editor-core/src/index.ts'),
       '@shenbi/editor-plugin-api': path.resolve(__dirname, '../api/src/index.ts'),
       '@shenbi/schema': path.resolve(__dirname, '../../schema/types/index.ts'),
+      '@shenbi/i18n': path.resolve(__dirname, '../../i18n/src/index.ts'),
     },
   },
   test: {
