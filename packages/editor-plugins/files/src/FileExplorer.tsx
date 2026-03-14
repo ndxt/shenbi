@@ -56,33 +56,20 @@ function useDialog() {
   const DialogPortal = dlg.open
     ? createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onMouseDown={(e) => { if (e.target === e.currentTarget) handleCancel(); }}
         >
-          <div className="absolute inset-0 bg-black/50" />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
           <div
-            className="relative z-10 w-[300px] rounded-[6px] border border-[#3c3c3c] bg-[#1e1e1e] shadow-[0_4px_24px_rgba(0,0,0,0.5)] overflow-hidden"
+            style={{ position: 'relative', zIndex: 10, width: 340, borderRadius: 8, border: '1px solid #454545', background: '#252526', boxShadow: '0 8px 32px rgba(0,0,0,0.6)', overflow: 'hidden' }}
             onKeyDown={(e) => { if (e.key === 'Enter') handleOk(); else if (e.key === 'Escape') handleCancel(); }}
           >
-            <div className="px-5 pt-5 pb-4">
-              <p className="text-[13px] text-[#cccccc] leading-relaxed">{dlg.message}</p>
+            <div style={{ padding: '20px 24px 16px' }}>
+              <p style={{ fontSize: 13, color: '#cccccc', lineHeight: 1.6, margin: 0 }}>{dlg.message}</p>
             </div>
-            <div className="flex items-center justify-end gap-2 px-5 py-3 bg-[#252526]">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="h-[28px] rounded px-4 text-[13px] text-[#cccccc] hover:text-white hover:bg-[rgba(255,255,255,0.1)] transition-colors focus:outline-none"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={handleOk}
-                autoFocus
-                className="h-[28px] rounded bg-[#007acc] px-4 text-[13px] text-white hover:bg-[#005a9e] transition-colors focus:outline-none"
-              >
-                确认
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 24px', background: '#1e1e1e' }}>
+              <DialogButton label="取消" onClick={handleCancel} />
+              <DialogButton label="确认" onClick={handleOk} primary autoFocus />
             </div>
           </div>
         </div>,
@@ -91,6 +78,29 @@ function useDialog() {
     : null;
 
   return { confirm, DialogPortal };
+}
+
+// Dialog button with inline hover
+function DialogButton({ label, onClick, primary, autoFocus }: { label: string; onClick: () => void; primary?: boolean; autoFocus?: boolean }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      autoFocus={autoFocus}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        height: 28, borderRadius: 4, padding: '0 16px', fontSize: 13, border: 'none', cursor: 'pointer',
+        transition: 'background 0.15s, color 0.15s',
+        ...(primary
+          ? { background: hover ? '#1a8cd8' : '#007acc', color: '#fff' }
+          : { background: hover ? 'rgba(255,255,255,0.1)' : 'transparent', color: hover ? '#fff' : '#cccccc' }),
+      }}
+    >
+      {label}
+    </button>
+  );
 }
 
 export interface FileExplorerProps {
@@ -156,19 +166,53 @@ function getFileIcon(fileType?: FileType): React.ElementType {
   }
 }
 
-function getFileIconColor(fileType?: FileType, isActive?: boolean): string {
-  if (isActive) return 'text-blue-400';
+// Returns CSS color string for inline style (not a Tailwind class)
+function getFileIconColorValue(fileType?: FileType, isActive?: boolean): string {
+  if (isActive) return '#60a5fa';
   switch (fileType) {
-    case 'page': return 'text-[#519aba]';
-    case 'api': return 'text-green-400';
-    case 'flow': return 'text-purple-400';
-    case 'db': return 'text-yellow-400';
-    case 'dict': return 'text-orange-400';
-    default: return 'text-[#519aba]';
+    case 'page': return '#519aba';
+    case 'api': return '#4ade80';
+    case 'flow': return '#c084fc';
+    case 'db': return '#facc15';
+    case 'dict': return '#fb923c';
+    default: return '#519aba';
   }
 }
 
-// ─── New-file type picker dropdown ───────────────────────────────────────────
+// Helper: returns inline color for file type icons
+function getFileTypeColor(fileType: FileType): string {
+  switch (fileType) {
+    case 'page': return '#519aba';
+    case 'api': return '#4ade80';
+    case 'flow': return '#c084fc';
+    case 'db': return '#facc15';
+    case 'dict': return '#fb923c';
+    default: return '#519aba';
+  }
+}
+
+// Reusable context menu item with inline hover
+function MenuItemBtn({ children, onClick, danger }: { children: React.ReactNode; onClick?: () => void; danger?: boolean }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '5px 12px',
+        fontSize: 12, border: 'none', cursor: 'pointer',
+        color: hover ? '#fff' : (danger ? '#f87171' : '#cccccc'),
+        background: hover ? '#04395e' : 'transparent',
+        transition: 'background 0.1s, color 0.1s',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 
 function FileTypeDropdown({
   top,
@@ -196,23 +240,14 @@ function FileTypeDropdown({
   return (
     <div
       ref={ref}
-      className="fixed z-50 min-w-[150px] rounded-[5px] border border-[var(--border-ide)] bg-[var(--bg-panel)] py-1 shadow-xl"
-      style={{ top, left }}
+      style={{ position: 'fixed', zIndex: 50, minWidth: 160, borderRadius: 5, border: '1px solid #454545', background: '#252526', padding: '4px 0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', top, left }}
     >
-      {FILE_TYPE_OPTIONS.map((opt) => {
-        const Icon = opt.icon;
-        return (
-          <button
-            key={opt.fileType}
-            type="button"
-            className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.07)] transition-colors"
-            onClick={() => { onSelect(opt.fileType); onClose(); }}
-          >
-            <Icon size={14} className={opt.iconColor} />
-            <span>{opt.labelZh}</span>
-          </button>
-        );
-      })}
+      {FILE_TYPE_OPTIONS.map((opt) => (
+        <MenuItemBtn key={opt.fileType} onClick={() => { onSelect(opt.fileType); onClose(); }}>
+          <opt.icon size={14} style={{ color: getFileTypeColor(opt.fileType) }} />
+          <span>{opt.labelZh}</span>
+        </MenuItemBtn>
+      ))}
     </div>
   );
 }
@@ -251,7 +286,7 @@ function InlineCreateInput({
   };
 
   const Icon = type === 'directory' ? Folder : getFileIcon(fileType);
-  const iconColor = type === 'directory' ? 'text-[#e8c17a]' : getFileIconColor(fileType);
+  const iconColorValue = type === 'directory' ? '#e8c17a' : getFileIconColorValue(fileType);
 
   return (
     <div
@@ -265,11 +300,12 @@ function InlineCreateInput({
           style={{ left: `${i * 16 + 16}px` }}
         />
       ))}
-      <span className="w-[16px] shrink-0" />
-      <Icon size={14} className={`shrink-0 ${iconColor}`} />
+      <span style={{ width: 16, flexShrink: 0 }} />
+      <Icon size={14} style={{ flexShrink: 0, color: iconColorValue }} />
       <input
         ref={inputRef}
-        className="flex-1 min-w-0 h-[16px] rounded-[2px] border border-[#007acc] bg-[var(--bg-panel)] px-1 py-0 text-[12px] text-[var(--text-primary)] outline-none"
+        className="flex-1 min-w-0 outline-none"
+        style={{ height: 16, borderRadius: 2, border: '1px solid #007acc', background: 'var(--bg-panel)', padding: '0 4px', fontSize: 12, color: 'var(--text-primary)' }}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
@@ -399,63 +435,63 @@ function TreeNodeItem({
   const isDragSource = dragState?.dragNodeId === node.id;
   const dropZone = dragState?.targetNodeId === node.id ? dragState.zone : null;
 
-  // VS Code row style
-  const rowBg = isActive
-    ? 'bg-[#37373d]'
-    : dropZone === 'inside'
-    ? 'bg-[#2a2d2e]'
-    : '';
+  // Row hover state
+  const [rowHover, setRowHover] = useState(false);
 
-  const rowHover = 'hover:bg-[#2a2d2e]';
+  // VS Code row style
+  const rowBgColor = isActive
+    ? '#37373d'
+    : dropZone === 'inside'
+    ? '#2a2d2e'
+    : (rowHover && !isDragSource)
+    ? '#2a2d2e'
+    : 'transparent';
 
   const textColor = isActive
-    ? 'text-[var(--text-primary)]'
+    ? 'var(--text-primary)'
     : isDirty
-    ? 'text-[var(--text-primary)]'
-    : 'text-[var(--text-secondary)]';
+    ? 'var(--text-primary)'
+    : 'var(--text-secondary)';
 
   return (
     <>
       <div
         ref={rowRef}
-        className={`
-          group relative flex h-[22px] cursor-pointer select-none items-center text-[13px]
-          ${rowBg} ${!isActive && !isDragSource ? rowHover : ''}
-          ${isFocused && !isActive ? 'outline outline-1 outline-[rgba(0,122,204,0.5)] -outline-offset-1' : ''}
-          ${isDragSource ? 'opacity-40' : ''}
-          ${textColor}
-        `}
-        style={{ paddingLeft: `${depth * 16 + 4}px` }}
+        className="relative flex cursor-pointer select-none items-center"
+        style={{
+          height: 22, fontSize: 13,
+          paddingLeft: depth * 16 + 4,
+          background: rowBgColor,
+          color: textColor,
+          opacity: isDragSource ? 0.4 : 1,
+          outline: isFocused && !isActive ? '1px solid rgba(0,122,204,0.5)' : 'none',
+          outlineOffset: -1,
+          transition: 'background 0.1s',
+        }}
         draggable={!isRenaming && !!onDragStart}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={(e) => onContextMenu(e, node)}
+        onMouseEnter={() => setRowHover(true)}
+        onMouseLeave={() => setRowHover(false)}
         onDragStart={(e) => onDragStart?.(e, node.id)}
         onDragOver={(e) => onDragOver?.(e, node, isExpanded)}
         onDragLeave={(e) => onDragLeave?.(e)}
         onDrop={(e) => onDrop?.(e, node, isExpanded)}
         onDragEnd={(e) => onDragEnd?.(e)}
       >
-        {/* Drop zone indicator lines */}
         {dropZone === 'before' && (
-          <div
-            className="pointer-events-none absolute left-0 right-0 h-[2px] bg-[#007acc]"
-            style={{ top: 0, marginLeft: `${depth * 16 + 4}px` }}
-          />
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 2, background: '#007acc', marginLeft: depth * 16 + 4, pointerEvents: 'none' }} />
         )}
         {dropZone === 'after' && (
-          <div
-            className="pointer-events-none absolute left-0 right-0 h-[2px] bg-[#007acc]"
-            style={{ bottom: 0, marginLeft: `${depth * 16 + 4}px` }}
-          />
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, background: '#007acc', marginLeft: depth * 16 + 4, pointerEvents: 'none' }} />
         )}
 
-        {/* Indent guide lines — shown on group hover */}
+        {/* Indent guide lines */}
         {Array.from({ length: depth }, (_, i) => (
           <span
             key={i}
-            className="absolute top-0 bottom-0 w-px bg-[var(--border-ide)] opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ left: `${i * 16 + 16}px` }}
+            style={{ position: 'absolute', top: 0, bottom: 0, width: 1, left: i * 16 + 16, background: 'var(--border-ide)', opacity: rowHover ? 0.6 : 0, transition: 'opacity 0.15s' }}
           />
         ))}
 
@@ -470,21 +506,22 @@ function TreeNodeItem({
           <span className="w-[16px] shrink-0" />
         )}
 
-        {/* Icon */}
         <Icon
           size={16}
-          className={`mr-[6px] shrink-0 ${
-            isDir
-              ? (isExpanded ? 'text-[#dcb67a]' : 'text-[#e8c17a]')
-              : getFileIconColor(node.fileType, isActive)
-          }`}
+          style={{
+            marginRight: 6, flexShrink: 0,
+            color: isDir
+              ? (isExpanded ? '#dcb67a' : '#e8c17a')
+              : getFileIconColorValue(node.fileType, isActive),
+          }}
         />
 
         {/* Name / rename input */}
         {isRenaming ? (
           <input
             ref={inputRef}
-            className="flex-1 min-w-0 h-[16px] rounded-[2px] border border-[#007acc] bg-[var(--bg-panel)] px-1 py-0 text-[12px] text-[var(--text-primary)] outline-none"
+            className="flex-1 min-w-0 outline-none"
+            style={{ height: 16, borderRadius: 2, border: '1px solid #007acc', background: 'var(--bg-panel)', padding: '0 4px', fontSize: 12, color: 'var(--text-primary)' }}
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={handleRenameKeyDown}
@@ -509,19 +546,15 @@ function TreeNodeItem({
         )}
 
         {/* Hover action buttons */}
-        {!isRenaming && (
-          <span className="ml-auto flex items-center gap-0.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {isDir && (
-              <>
-                <span
-                  className="flex h-[18px] w-[18px] items-center justify-center rounded hover:bg-[rgba(255,255,255,0.1)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                  title="新建文件"
-                  onClick={(e) => { e.stopPropagation(); onContextMenu(e as unknown as React.MouseEvent, node); }}
-                >
-                  <FolderPlus size={13} />
-                </span>
-              </>
-            )}
+        {!isRenaming && isDir && rowHover && (
+          <span className="ml-auto flex items-center gap-0.5 px-1">
+            <span
+              style={{ display: 'flex', height: 18, width: 18, alignItems: 'center', justifyContent: 'center', borderRadius: 4, cursor: 'pointer', color: 'var(--text-secondary)' }}
+              title="新建文件"
+              onClick={(e) => { e.stopPropagation(); onContextMenu(e as unknown as React.MouseEvent, node); }}
+            >
+              <FolderPlus size={13} />
+            </span>
           </span>
         )}
       </div>
@@ -594,16 +627,106 @@ function ToolbarBtn({
   onClick?: (() => void) | undefined;
   disabled?: boolean | undefined;
 }) {
+  const [hover, setHover] = useState(false);
   return (
     <button
       type="button"
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className="flex h-[22px] w-[22px] items-center justify-center rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.07)] transition-colors disabled:cursor-not-allowed disabled:opacity-30"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', height: 22, width: 22, alignItems: 'center', justifyContent: 'center',
+        borderRadius: 4, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+        color: hover && !disabled ? 'var(--text-primary)' : 'var(--text-secondary)',
+        background: hover && !disabled ? 'rgba(255,255,255,0.1)' : 'transparent',
+        opacity: disabled ? 0.3 : 1,
+        transition: 'background 0.15s, color 0.15s',
+      }}
     >
       <Icon size={15} />
     </button>
+  );
+}
+
+// ─── Context Menu Panel with state-based submenu ────────────────────────────
+
+function ContextMenuPanel({
+  contextMenu,
+  closeContextMenu,
+  startCreating,
+  startRename,
+  handleDelete,
+  t,
+}: {
+  contextMenu: ContextMenuState;
+  closeContextMenu: () => void;
+  startCreating: (parentId: string | null, type: 'file' | 'directory', fileType?: FileType | undefined) => void;
+  startRename: (id: string) => void;
+  handleDelete: (id: string) => void;
+  t: (key: string) => string;
+}) {
+  const [submenuOpen, setSubmenuOpen] = useState(false);
+  const submenuTimer = useRef<number | undefined>(undefined);
+
+  const openSubmenu = () => { clearTimeout(submenuTimer.current); setSubmenuOpen(true); };
+  const closeSubmenu = () => { submenuTimer.current = window.setTimeout(() => setSubmenuOpen(false), 150); };
+  const keepSubmenu = () => { clearTimeout(submenuTimer.current); };
+
+  const panelStyle: React.CSSProperties = {
+    position: 'fixed', zIndex: 50, minWidth: 200, borderRadius: 5,
+    border: '1px solid #454545', background: '#252526',
+    padding: '4px 0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+    left: contextMenu.x, top: contextMenu.y,
+  };
+
+  const subStyle: React.CSSProperties = {
+    position: 'absolute', left: 'calc(100% - 2px)', top: 0, minWidth: 200, borderRadius: 5,
+    border: '1px solid #454545', background: '#252526',
+    padding: '4px 0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+  };
+
+  return (
+    <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
+      {/* New File -> submenu */}
+      <div style={{ position: 'relative' }} onMouseEnter={openSubmenu} onMouseLeave={closeSubmenu}>
+        <MenuItemBtn>
+          <FilePlus size={14} style={{ color: '#999' }} />
+          <span style={{ flex: 1 }}>{t('menu.newFile')}</span>
+          <ChevronRight size={14} style={{ color: '#999' }} />
+        </MenuItemBtn>
+        {submenuOpen && (
+          <div style={subStyle} onMouseEnter={keepSubmenu} onMouseLeave={closeSubmenu}>
+            {FILE_TYPE_OPTIONS.map((opt) => (
+              <MenuItemBtn key={opt.fileType} onClick={() => { closeContextMenu(); startCreating(contextMenu.targetParentId, 'file', opt.fileType); }}>
+                <opt.icon size={14} style={{ color: getFileTypeColor(opt.fileType) }} />
+                <span>{opt.labelZh}</span>
+              </MenuItemBtn>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <MenuItemBtn onClick={() => { closeContextMenu(); startCreating(contextMenu.targetParentId, 'directory'); }}>
+        <FolderPlus size={14} style={{ color: '#999' }} />
+        <span>{t('menu.newFolder')}</span>
+      </MenuItemBtn>
+
+      {contextMenu.node && (
+        <>
+          <div style={{ margin: '4px 4px', height: 1, background: '#454545' }} />
+          <MenuItemBtn onClick={() => { closeContextMenu(); startRename(contextMenu.node!.id); }}>
+            <Pencil size={14} style={{ color: '#999' }} />
+            <span>{t('menu.rename')}</span>
+          </MenuItemBtn>
+          <MenuItemBtn danger onClick={() => { closeContextMenu(); void handleDelete(contextMenu.node!.id); }}>
+            <Trash2 size={14} />
+            <span>{t('menu.delete')}</span>
+          </MenuItemBtn>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -641,6 +764,7 @@ export function FileExplorer({
   const autoExpandTimerRef = useRef<number | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const newFileBtnRef = useRef<HTMLButtonElement>(null);
+  const [toolbarHover, setToolbarHover] = useState(false);
 
   // New-file type dropdown (from toolbar + button)
   const [typeDropdown, setTypeDropdown] = useState<{
@@ -948,11 +1072,16 @@ export function FileExplorer({
     <div className="h-full flex flex-col text-[13px] text-[var(--text-primary)] bg-[var(--bg-sidebar)]" ref={containerRef}>
 
       {/* ── Section header + toolbar ── */}
-      <div className="flex items-center px-3 pt-[10px] pb-[4px] gap-0.5 group/toolbar">
-        <span className="flex-1 text-[11px] font-semibold tracking-widest uppercase text-[var(--text-secondary)] opacity-70 select-none">
+      <div
+        className="flex items-center px-3 gap-0.5"
+        style={{ paddingTop: 10, paddingBottom: 4 }}
+        onMouseEnter={() => setToolbarHover(true)}
+        onMouseLeave={() => setToolbarHover(false)}
+      >
+        <span className="flex-1 select-none" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', opacity: 0.7 }}>
           {t('title')}
         </span>
-        <span className="flex items-center gap-0.5 opacity-0 group-hover/toolbar:opacity-100 transition-opacity">
+        <span className="flex items-center gap-0.5" style={{ opacity: toolbarHover ? 1 : 0, transition: 'opacity 0.15s' }}>
           <button
             ref={newFileBtnRef}
             type="button"
@@ -961,7 +1090,11 @@ export function FileExplorer({
               const rect = newFileBtnRef.current?.getBoundingClientRect();
               if (rect) setTypeDropdown({ top: rect.bottom + 4, left: rect.left, parentId: null });
             }}
-            className="flex h-[22px] w-[22px] items-center justify-center rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.07)] transition-colors"
+            style={{
+              display: 'flex', height: 22, width: 22, alignItems: 'center', justifyContent: 'center',
+              borderRadius: 4, border: 'none', cursor: 'pointer',
+              color: 'var(--text-secondary)', background: 'transparent', transition: 'background 0.15s, color 0.15s',
+            }}
           >
             <FilePlus size={15} />
           </button>
@@ -1031,81 +1164,14 @@ export function FileExplorer({
 
       {/* ── Context Menu ── */}
       {contextMenu.open && (
-        <div
-          className="fixed z-50 min-w-[180px] rounded-[5px] border border-[var(--border-ide)] bg-[var(--bg-panel)] py-1 shadow-xl"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* New file submenu */}
-          <div className="group/submenu relative w-full">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[#04395e] hover:text-white transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <FilePlus size={14} className="text-[var(--text-secondary)]" />
-                <span>{t('menu.newFile')}</span>
-              </div>
-              <ChevronRight size={14} className="text-[var(--text-secondary)]" />
-            </button>
-            {/* The submenu itself */}
-            <div className="absolute left-[calc(100%-4px)] top-[0px] hidden w-[180px] flex-col rounded-[5px] border border-[var(--border-ide)] bg-[var(--bg-panel)] py-1 shadow-xl group-hover/submenu:flex">
-              {FILE_TYPE_OPTIONS.map((opt) => {
-                const Icon = opt.icon;
-                return (
-                  <button
-                    key={opt.fileType}
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[#04395e] hover:text-white transition-colors"
-                    onClick={() => {
-                      const parentId = contextMenu.targetParentId;
-                      closeContextMenu();
-                      startCreating(parentId, 'file', opt.fileType);
-                    }}
-                  >
-                    <Icon size={14} className={opt.iconColor} />
-                    <span>{t('menu.newFile')} ({opt.labelZh})</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[#04395e] hover:text-white transition-colors"
-            onClick={() => {
-              const parentId = contextMenu.targetParentId;
-              closeContextMenu();
-              startCreating(parentId, 'directory');
-            }}
-          >
-            <FolderPlus size={14} className="text-[var(--text-secondary)]" />
-            <span>{t('menu.newFolder')}</span>
-          </button>
-
-          {contextMenu.node && (
-            <>
-              <div className="my-1 h-px bg-[var(--border-ide)] mx-1" />
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[#04395e] hover:text-white transition-colors"
-                onClick={() => { closeContextMenu(); startRename(contextMenu.node!.id); }}
-              >
-                <Pencil size={14} className="text-[var(--text-secondary)]" />
-                <span>{t('menu.rename')}</span>
-              </button>
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-red-400 hover:bg-[#04395e] hover:text-white transition-colors"
-                onClick={() => { closeContextMenu(); void handleDelete(contextMenu.node!.id); }}
-              >
-                <Trash2 size={14} />
-                <span>{t('menu.delete')}</span>
-              </button>
-            </>
-          )}
-        </div>
+        <ContextMenuPanel
+          contextMenu={contextMenu}
+          closeContextMenu={closeContextMenu}
+          startCreating={startCreating}
+          startRename={startRename}
+          handleDelete={handleDelete}
+          t={t}
+        />
       )}
 
       {/* ── File type dropdown (toolbar + button) ── */}
