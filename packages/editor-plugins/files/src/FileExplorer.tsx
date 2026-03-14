@@ -61,18 +61,17 @@ function useDialog() {
         >
           <div className="absolute inset-0 bg-black/50" />
           <div
-            className="relative z-10 w-[300px] rounded-lg border border-[var(--border-ide)] bg-[var(--bg-panel)] shadow-2xl"
+            className="relative z-10 w-[300px] rounded-[6px] border border-[#3c3c3c] bg-[#1e1e1e] shadow-[0_4px_24px_rgba(0,0,0,0.5)] overflow-hidden"
             onKeyDown={(e) => { if (e.key === 'Enter') handleOk(); else if (e.key === 'Escape') handleCancel(); }}
           >
-            <div className="px-4 pt-4 pb-3">
-              <p className="text-[13px] text-[var(--text-primary)] leading-relaxed">{dlg.message}</p>
+            <div className="px-5 pt-5 pb-4">
+              <p className="text-[13px] text-[#cccccc] leading-relaxed">{dlg.message}</p>
             </div>
-            <div className="h-px bg-[var(--border-ide)]" />
-            <div className="flex items-center justify-end gap-2 px-4 py-3">
+            <div className="flex items-center justify-end gap-2 px-5 py-3 bg-[#252526]">
               <button
                 type="button"
                 onClick={handleCancel}
-                className="h-[26px] rounded px-3 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+                className="h-[28px] rounded px-4 text-[13px] text-[#cccccc] hover:text-white hover:bg-[rgba(255,255,255,0.1)] transition-colors focus:outline-none"
               >
                 取消
               </button>
@@ -80,7 +79,7 @@ function useDialog() {
                 type="button"
                 onClick={handleOk}
                 autoFocus
-                className="h-[26px] rounded bg-blue-600 px-3 text-[12px] text-white hover:bg-blue-500 transition-colors"
+                className="h-[28px] rounded bg-[#007acc] px-4 text-[13px] text-white hover:bg-[#005a9e] transition-colors focus:outline-none"
               >
                 确认
               </button>
@@ -402,12 +401,12 @@ function TreeNodeItem({
 
   // VS Code row style
   const rowBg = isActive
-    ? 'bg-[rgba(255,255,255,0.1)]'
+    ? 'bg-[#37373d]'
     : dropZone === 'inside'
-    ? 'bg-[rgba(255,255,255,0.07)]'
+    ? 'bg-[#2a2d2e]'
     : '';
 
-  const rowHover = 'hover:bg-[rgba(255,255,255,0.07)]';
+  const rowHover = 'hover:bg-[#2a2d2e]';
 
   const textColor = isActive
     ? 'text-[var(--text-primary)]'
@@ -1037,29 +1036,44 @@ export function FileExplorer({
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* New file sub-items */}
-          {FILE_TYPE_OPTIONS.map((opt) => {
-            const Icon = opt.icon;
-            return (
-              <button
-                key={opt.fileType}
-                type="button"
-                className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.07)] transition-colors"
-                onClick={() => {
-                  const parentId = contextMenu.targetParentId;
-                  closeContextMenu();
-                  startCreating(parentId, 'file', opt.fileType);
-                }}
-              >
-                <Icon size={14} className={opt.iconColor} />
-                <span>{t('menu.newFile')} ({opt.labelZh})</span>
-              </button>
-            );
-          })}
+          {/* New file submenu */}
+          <div className="group/submenu relative w-full">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[#04395e] hover:text-white transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <FilePlus size={14} className="text-[var(--text-secondary)]" />
+                <span>{t('menu.newFile')}</span>
+              </div>
+              <ChevronRight size={14} className="text-[var(--text-secondary)]" />
+            </button>
+            {/* The submenu itself */}
+            <div className="absolute left-[calc(100%-4px)] top-[0px] hidden w-[180px] flex-col rounded-[5px] border border-[var(--border-ide)] bg-[var(--bg-panel)] py-1 shadow-xl group-hover/submenu:flex">
+              {FILE_TYPE_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                return (
+                  <button
+                    key={opt.fileType}
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[#04395e] hover:text-white transition-colors"
+                    onClick={() => {
+                      const parentId = contextMenu.targetParentId;
+                      closeContextMenu();
+                      startCreating(parentId, 'file', opt.fileType);
+                    }}
+                  >
+                    <Icon size={14} className={opt.iconColor} />
+                    <span>{t('menu.newFile')} ({opt.labelZh})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <button
             type="button"
-            className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.07)] transition-colors"
+            className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[#04395e] hover:text-white transition-colors"
             onClick={() => {
               const parentId = contextMenu.targetParentId;
               closeContextMenu();
@@ -1075,7 +1089,7 @@ export function FileExplorer({
               <div className="my-1 h-px bg-[var(--border-ide)] mx-1" />
               <button
                 type="button"
-                className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.07)] transition-colors"
+                className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-[var(--text-primary)] hover:bg-[#04395e] hover:text-white transition-colors"
                 onClick={() => { closeContextMenu(); startRename(contextMenu.node!.id); }}
               >
                 <Pencil size={14} className="text-[var(--text-secondary)]" />
@@ -1083,7 +1097,7 @@ export function FileExplorer({
               </button>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-red-400 hover:bg-[rgba(255,255,255,0.07)] transition-colors"
+                className="flex w-full items-center gap-2 px-3 py-[5px] text-[12px] text-red-400 hover:bg-[#04395e] hover:text-white transition-colors"
                 onClick={() => { closeContextMenu(); void handleDelete(contextMenu.node!.id); }}
               >
                 <Trash2 size={14} />
