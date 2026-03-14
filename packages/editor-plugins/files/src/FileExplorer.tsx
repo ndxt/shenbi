@@ -202,7 +202,7 @@ function MenuItemBtn({ children, onClick, danger }: { children: React.ReactNode;
       onMouseLeave={() => setHover(false)}
       style={{
         display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '5px 12px',
-        fontSize: 12, border: 'none', cursor: 'pointer',
+        fontSize: 12, border: 'none', cursor: 'pointer', textAlign: 'left',
         color: hover ? '#fff' : (danger ? '#f87171' : '#cccccc'),
         background: hover ? '#04395e' : 'transparent',
         transition: 'background 0.1s, color 0.1s',
