@@ -300,12 +300,11 @@ function InlineCreateInput({
           style={{ left: `${i * 16 + 16}px` }}
         />
       ))}
-      <span style={{ width: 16, flexShrink: 0 }} />
       <Icon size={14} style={{ flexShrink: 0, color: iconColorValue }} />
       <input
         ref={inputRef}
         className="flex-1 min-w-0 outline-none"
-        style={{ height: 16, borderRadius: 2, border: '1px solid #007acc', background: 'var(--bg-panel)', padding: '0 4px', fontSize: 12, color: 'var(--text-primary)' }}
+        style={{ height: 20, borderRadius: 2, border: '1px solid #007acc', background: 'var(--bg-panel)', padding: '0 4px', fontSize: 12, color: 'var(--text-primary)' }}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
