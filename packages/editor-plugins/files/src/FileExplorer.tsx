@@ -1085,22 +1085,7 @@ export function FileExplorer({
           {t('title')}
         </span>
         <span className="flex items-center gap-0.5">
-          <button
-            ref={newFileBtnRef}
-            type="button"
-            title={t('toolbar.newFile')}
-            onClick={() => {
-              const rect = newFileBtnRef.current?.getBoundingClientRect();
-              if (rect) setTypeDropdown({ top: rect.bottom + 4, left: rect.left, parentId: null });
-            }}
-            style={{
-              display: 'flex', height: 22, width: 22, alignItems: 'center', justifyContent: 'center',
-              borderRadius: 4, border: 'none', cursor: 'pointer',
-              color: 'var(--text-secondary)', background: 'transparent', transition: 'background 0.15s, color 0.15s',
-            }}
-          >
-            <FilePlus size={15} />
-          </button>
+          <ToolbarBtn icon={FilePlus} title={t('toolbar.newFile')} onClick={() => startCreating(null, 'file', 'page')} />
           <ToolbarBtn icon={FolderPlus} title={t('toolbar.newFolder')} onClick={() => startCreating(null, 'directory')} />
           <ToolbarBtn icon={Save} title={t('toolbar.saveCurrentFile')} onClick={onSaveActiveFile} disabled={!canSaveActiveFile || !onSaveActiveFile} />
           <ToolbarBtn icon={RefreshCw} title={t('toolbar.refresh')} onClick={onRefresh} />
