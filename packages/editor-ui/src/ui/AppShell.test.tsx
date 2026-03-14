@@ -17,6 +17,17 @@ function AppShell(props: AppShellProps) {
   return <RawAppShell {...props} workspaceId={props.workspaceId ?? 'test-workspace'} />;
 }
 
+function createPageTab() {
+  return {
+    fileId: 'page-1',
+    filePath: '/page-1.json',
+    fileType: 'page' as const,
+    fileName: 'Page 1',
+    schema: { id: 'page', name: 'Page 1', body: [] },
+    isDirty: false,
+  };
+}
+
 describe('AppShell', () => {
   it('辅助面板宽度拖拽后会持久化并在重新挂载后恢复', async () => {
     window.localStorage.clear();
@@ -49,17 +60,20 @@ describe('AppShell', () => {
     expect(firstPanel).not.toBeNull();
     expect(firstPanel).toHaveStyle({ width: '300px' });
 
-    const resizeHandles = firstRender.container.querySelectorAll('.cursor-col-resize');
-    fireEvent.mouseDown(resizeHandles[1] as Element, { clientX: 1000 });
+    const resizeHandle = firstPanel?.querySelector('.cursor-col-resize');
+    expect(resizeHandle).not.toBeNull();
+    fireEvent.mouseDown(resizeHandle as Element, { clientX: 1000 });
     fireEvent.mouseMove(document, { clientX: 900 });
     fireEvent.mouseUp(document);
 
-    expect(firstPanel).toHaveStyle({ width: '400px' });
+    await waitFor(() => {
+      expect(firstPanel).toHaveStyle({ width: '400px' });
+    });
 
     firstRender.unmount();
 
     render(
-      <AppShell plugins={plugins}>
+      <AppShell tabs={[createPageTab()]} activeTabId="page-1" plugins={plugins}>
         <div>Content</div>
       </AppShell>,
     );
@@ -90,7 +104,7 @@ describe('AppShell', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Components')).toBeInTheDocument();
+      expect(document.querySelector('[data-shenbi-shortcut-area="sidebar"]')).not.toBeNull();
     });
   });
 
@@ -112,7 +126,7 @@ describe('AppShell', () => {
     await waitFor(() => {
       expect(adapter.getJSON).toHaveBeenCalledWith('test-workspace', 'layout', 'workbench');
     });
-    expect(screen.queryByText('Components')).toBeNull();
+    expect(document.querySelector('[data-shenbi-shortcut-area="sidebar"]')).toBeNull();
 
     fireEvent.click(screen.getByTitle('Toggle Sidebar'));
 
@@ -129,7 +143,9 @@ describe('AppShell', () => {
     );
 
     // Verify regions by presence of characteristic text or roles
-    expect(screen.getByText('Components')).toBeInTheDocument();
+    expect(document.querySelector('[data-shenbi-shortcut-area="activity-bar"]')).not.toBeNull();
+    expect(document.querySelector('[data-shenbi-shortcut-area="sidebar"]')).not.toBeNull();
+    expect(document.querySelector('[data-shenbi-shortcut-area="inspector"]')).not.toBeNull();
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('Run')).toBeInTheDocument();
     expect(screen.getByText('Editor UI Package')).toBeInTheDocument();
@@ -160,7 +176,7 @@ describe('AppShell', () => {
     expect(onCanvasSelectNode).toHaveBeenCalledWith('node-1');
   });
 
-  it('支持通过 plugins 注入侧栏和检查器 tab', () => {
+  it('支持通过 plugins 注入侧栏和检查器 tab', async () => {
     const plugins = [
       defineEditorPlugin({
         id: 'plugin.empty',
@@ -207,12 +223,12 @@ describe('AppShell', () => {
     ];
 
     render(
-      <AppShell plugins={plugins}>
+      <AppShell tabs={[createPageTab()]} activeTabId="page-1" plugins={plugins}>
         <div>Content</div>
       </AppShell>,
     );
 
-    fireEvent.click(screen.getByText('PluginAssets'));
+    fireEvent.click(await screen.findByText('PluginAssets'));
     expect(screen.getByText('Plugin Assets Panel')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('PluginDebug'));
@@ -348,6 +364,8 @@ describe('AppShell', () => {
 
     render(
       <AppShell
+        tabs={[createPageTab()]}
+        activeTabId="page-1"
         pluginContext={{
           commands: {
             execute: hostExecute,
@@ -558,7 +576,9 @@ describe('AppShell', () => {
     fireEvent.keyDown(screen.getByText('Content'), { key: 'l', ctrlKey: true, shiftKey: true });
     expect(pluginExecute).not.toHaveBeenCalled();
 
-    fireEvent.keyDown(screen.getByText('Components'), { key: 'l', ctrlKey: true, shiftKey: true });
+    const sidebarArea = document.querySelector('[data-shenbi-shortcut-area="sidebar"]');
+    expect(sidebarArea).not.toBeNull();
+    fireEvent.keyDown(sidebarArea as Element, { key: 'l', ctrlKey: true, shiftKey: true });
     expect(pluginExecute).toHaveBeenCalledTimes(1);
   });
 
@@ -675,7 +695,7 @@ describe('AppShell', () => {
     expect(screen.getByLabelText('Command Palette Search')).toBeInTheDocument();
   });
 
-  it('宿主菜单会显示在工具栏中', () => {
+  it('宿主命令默认不会显示在工具栏中', () => {
     const hostExecute = vi.fn();
 
     render(
@@ -690,9 +710,9 @@ describe('AppShell', () => {
       </AppShell>,
     );
 
-    expect(screen.getByRole('button', { name: 'Save File' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Hide Sidebar' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save File' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Hide Sidebar' })).toBeNull();
   });
 
   it('未聚焦编辑器时 editorFocused 命令不会出现在菜单中', async () => {
@@ -820,7 +840,12 @@ describe('AppShell', () => {
       </AppShell>,
     );
 
-    fireEvent.contextMenu(screen.getByText('Components'));
+    const sidebarArea = document.querySelector('[data-shenbi-shortcut-area="sidebar"]');
+    const activityBarArea = document.querySelector('[data-shenbi-shortcut-area="activity-bar"]');
+    expect(sidebarArea).not.toBeNull();
+    expect(activityBarArea).not.toBeNull();
+
+    fireEvent.contextMenu(sidebarArea as Element);
     expect(screen.getByRole('menuitem', { name: 'Hide Sidebar' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Save File' })).not.toBeInTheDocument();
 
@@ -830,7 +855,7 @@ describe('AppShell', () => {
     expect(screen.queryByRole('menuitem', { name: 'Hide Sidebar' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('menu'));
-    fireEvent.contextMenu(screen.getByLabelText('Explorer'));
+    fireEvent.contextMenu(activityBarArea as Element);
     expect(screen.getByRole('menuitem', { name: 'Hide Console' })).toBeInTheDocument();
   });
 
@@ -910,7 +935,9 @@ describe('AppShell', () => {
       </AppShell>,
     );
 
-    fireEvent.contextMenu(screen.getByText('Components'));
+    const sidebarArea = document.querySelector('[data-shenbi-shortcut-area="sidebar"]');
+    expect(sidebarArea).not.toBeNull();
+    fireEvent.contextMenu(sidebarArea as Element);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Sidebar Context Run' }));
 
     expect(pluginExecute).toHaveBeenCalledTimes(1);

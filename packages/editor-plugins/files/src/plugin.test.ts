@@ -16,6 +16,6 @@ describe('createFilesPlugin', () => {
     expect(plugin.id).toBe('shenbi.plugin.files');
     expect(plugin.contributes?.activityBarItems?.map((item) => item.id)).toEqual(['files']);
     expect(plugin.contributes?.primaryPanels?.map((panel) => panel.id)).toEqual(['files']);
-    expect(plugin.contributes?.sidebarTabs?.map((tab) => tab.id)).toEqual(['files']);
+    expect(plugin.contributes?.sidebarTabs).toBeUndefined();
   });
 });

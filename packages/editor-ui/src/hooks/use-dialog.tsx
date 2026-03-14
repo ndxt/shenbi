@@ -6,14 +6,12 @@ interface DialogState {
   type: 'confirm' | 'prompt';
   message: string;
   defaultValue?: string;
-  resolve: ((value: boolean | string | null) => void) | null;
 }
 
 const initialState: DialogState = {
   open: false,
   type: 'confirm',
   message: '',
-  resolve: null,
 };
 
 function InlineDialog({
@@ -27,7 +25,7 @@ function InlineDialog({
   state: DialogState;
   onConfirm: () => void;
   onCancel: () => void;
-  inputRef: React.RefObject<HTMLInputElement>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
   inputValue: string;
   setInputValue: (v: string) => void;
 }) {
@@ -116,7 +114,7 @@ export function useDialog(): DialogControls {
   const confirm = useCallback((message: string): Promise<boolean> => {
     return new Promise((resolve) => {
       resolveRef.current = resolve as (value: boolean | string | null) => void;
-      setState({ open: true, type: 'confirm', message, resolve });
+      setState({ open: true, type: 'confirm', message });
     });
   }, []);
 
@@ -124,7 +122,7 @@ export function useDialog(): DialogControls {
     return new Promise((resolve) => {
       resolveRef.current = resolve as (value: boolean | string | null) => void;
       setInputValue(defaultValue);
-      setState({ open: true, type: 'prompt', message, defaultValue, resolve });
+      setState({ open: true, type: 'prompt', message, defaultValue });
       // Focus input after render
       setTimeout(() => inputRef.current?.focus(), 0);
     });
