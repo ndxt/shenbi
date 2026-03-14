@@ -32,6 +32,11 @@ export const filesLocaleResources = {
     menu: {
       newFile: '新建文件',
       newFolder: '新建文件夹',
+      newPage: '新建页面',
+      newApi: '新建 API',
+      newFlow: '新建流程',
+      newDb: '新建数据表',
+      newDict: '新建字典',
       rename: '重命名',
       delete: '删除'
     },
@@ -74,6 +79,11 @@ export const filesLocaleResources = {
     menu: {
       newFile: 'New File',
       newFolder: 'New Folder',
+      newPage: 'New Page',
+      newApi: 'New API',
+      newFlow: 'New Flow',
+      newDb: 'New Database',
+      newDict: 'New Dictionary',
       rename: 'Rename',
       delete: 'Delete'
     },

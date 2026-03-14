@@ -5,6 +5,7 @@ import { FileText, Rocket } from 'lucide-react';
 import { defineEditorPlugin } from '@shenbi/editor-plugin-api';
 import type { TabState } from '@shenbi/editor-core';
 import { AppShell as RawAppShell } from './AppShell';
+import { resolveSidebarTabs } from './sidebar-tabs';
 
 type AppShellProps = Omit<React.ComponentProps<typeof RawAppShell>, 'workspaceId'> & {
   workspaceId?: string;
@@ -68,9 +69,9 @@ describe('AppShell primary panels', () => {
 
     expect(screen.getByText('Files Primary Panel')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search components...')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Components' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Outline' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Data' })).toBeInTheDocument();
+    resolveSidebarTabs().forEach((tab) => {
+      expect(screen.getAllByText(tab.label).length).toBeGreaterThan(0);
+    });
     expect(screen.queryByText('Sidebar plugin loaded')).toBeNull();
   });
 

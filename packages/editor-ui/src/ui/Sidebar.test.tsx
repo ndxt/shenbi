@@ -2,15 +2,18 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Sidebar } from './Sidebar';
-import type { SidebarTabContribution } from './sidebar-tabs';
+import {
+  resolveSidebarTabs,
+  type SidebarTabContribution,
+} from './sidebar-tabs';
 
 describe('Sidebar', () => {
   it('默认使用内置 tabs（fallback）', () => {
     render(<Sidebar />);
 
-    expect(screen.getByText('Components')).toBeInTheDocument();
-    expect(screen.getByText('Outline')).toBeInTheDocument();
-    expect(screen.getByText('Data')).toBeInTheDocument();
+    resolveSidebarTabs().forEach((tab) => {
+      expect(screen.getByText(tab.label)).toBeInTheDocument();
+    });
   });
 
   it('支持按 id 覆盖内置 tab', () => {

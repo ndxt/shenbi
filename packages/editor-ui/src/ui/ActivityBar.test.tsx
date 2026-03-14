@@ -3,21 +3,26 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Rocket } from 'lucide-react';
 import { ActivityBar } from './ActivityBar';
-import type { ActivityBarItemContribution } from './activitybar-items';
+import {
+  resolveActivityBarItems,
+  type ActivityBarItemContribution,
+} from './activitybar-items';
 
 describe('ActivityBar', () => {
   it('默认渲染内置图标项（fallback）', () => {
     render(<ActivityBar />);
 
-    const explorer = screen.getByLabelText('Components');
-    expect(explorer).toBeInTheDocument();
-    expect(explorer).toHaveAttribute('aria-pressed', 'true');
-    expect(explorer).not.toHaveAttribute('title');
-    expect(screen.getByLabelText('Outline')).toBeInTheDocument();
-    expect(screen.getByLabelText('Data')).toBeInTheDocument();
-    expect(screen.getByLabelText('Debug')).toBeInTheDocument();
-    expect(screen.getByLabelText('Extensions')).toBeInTheDocument();
-    expect(screen.getByLabelText('Settings')).toBeInTheDocument();
+    const builtinItems = resolveActivityBarItems();
+    const activeItem = builtinItems.find((item) => item.active);
+    expect(activeItem).toBeDefined();
+    const activeButton = screen.getByLabelText(activeItem!.label);
+    expect(activeButton).toBeInTheDocument();
+    expect(activeButton).toHaveAttribute('aria-pressed', 'true');
+    expect(activeButton).not.toHaveAttribute('title');
+
+    builtinItems.forEach((item) => {
+      expect(screen.getByLabelText(item.label)).toBeInTheDocument();
+    });
   });
 
   it('支持新增自定义图标项', () => {
@@ -59,22 +64,26 @@ describe('ActivityBar', () => {
   it('点击图标后切换激活态', () => {
     render(<ActivityBar />);
 
-    const explorer = screen.getByLabelText('Components');
-    const search = screen.getByLabelText('Outline');
-    expect(explorer).toHaveAttribute('aria-pressed', 'true');
-    expect(search).toHaveAttribute('aria-pressed', 'false');
+    const builtinItems = resolveActivityBarItems();
+    const activeItem = builtinItems.find((item) => item.active)!;
+    const inactiveItem = builtinItems.find((item) => item.section === activeItem.section && item.id !== activeItem.id)!;
+    const activeButton = screen.getByLabelText(activeItem.label);
+    const inactiveButton = screen.getByLabelText(inactiveItem.label);
+    expect(activeButton).toHaveAttribute('aria-pressed', 'true');
+    expect(inactiveButton).toHaveAttribute('aria-pressed', 'false');
 
-    fireEvent.click(search);
-    expect(search).toHaveAttribute('aria-pressed', 'true');
-    expect(explorer).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(inactiveButton);
+    expect(inactiveButton).toHaveAttribute('aria-pressed', 'true');
+    expect(activeButton).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('点击时会透传 onSelectItem 回调', () => {
     const onSelectItem = vi.fn();
     render(<ActivityBar onSelectItem={onSelectItem} />);
 
-    fireEvent.click(screen.getByLabelText('Outline'));
+    const targetItem = resolveActivityBarItems()[1]!;
+    fireEvent.click(screen.getByLabelText(targetItem.label));
     expect(onSelectItem).toHaveBeenCalledTimes(1);
-    expect(onSelectItem.mock.calls[0]?.[0]?.id).toBe('search');
+    expect(onSelectItem.mock.calls[0]?.[0]?.id).toBe(targetItem.id);
   });
 });

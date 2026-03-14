@@ -58,8 +58,9 @@ describe('AppShell persistence', () => {
     const firstPanel = screen.getByText('Plugin AI Width Panel').closest('div[style]');
     expect(firstPanel).not.toBeNull();
 
-    const resizeHandles = firstRender.container.querySelectorAll('.cursor-col-resize');
-    fireEvent.mouseDown(resizeHandles[1] as Element, { clientX: 1000 });
+    const resizeHandle = firstPanel?.querySelector('.cursor-col-resize');
+    expect(resizeHandle).not.toBeNull();
+    fireEvent.mouseDown(resizeHandle as Element, { clientX: 1000 });
     fireEvent.mouseMove(document, { clientX: 900 });
     fireEvent.mouseUp(document);
 
@@ -69,7 +70,7 @@ describe('AppShell persistence', () => {
 
     fireEvent.click(screen.getByTitle('Toggle Sidebar'));
     await waitFor(() => {
-      expect(screen.queryByText('Components')).toBeNull();
+      expect(document.querySelector('[data-shenbi-shortcut-area="sidebar"]')).toBeNull();
     });
 
     firstRender.unmount();
@@ -81,7 +82,7 @@ describe('AppShell persistence', () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByText('Components')).toBeNull();
+      expect(document.querySelector('[data-shenbi-shortcut-area="sidebar"]')).toBeNull();
     });
     const secondPanel = (await screen.findByText('Plugin AI Width Panel')).closest('div[style]');
     expect(secondPanel).not.toBeNull();
@@ -99,7 +100,7 @@ describe('AppShell persistence', () => {
 
     fireEvent.click(screen.getByTitle('Toggle Sidebar'));
     await waitFor(() => {
-      expect(screen.queryByText('Components')).toBeNull();
+      expect(document.querySelector('[data-shenbi-shortcut-area="sidebar"]')).toBeNull();
     });
     firstRender.unmount();
 
@@ -110,7 +111,7 @@ describe('AppShell persistence', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Components')).toBeInTheDocument();
+      expect(document.querySelector('[data-shenbi-shortcut-area="sidebar"]')).not.toBeNull();
     });
   });
 
@@ -190,7 +191,7 @@ describe('AppShell persistence', () => {
     await waitFor(() => {
       expect(adapter.getJSON).toHaveBeenCalledWith(TEST_WORKSPACE_ID, 'layout', 'workbench');
       expect(adapter.getJSON).toHaveBeenCalledWith(TEST_WORKSPACE_ID, 'preferences', 'workbench');
-      expect(screen.queryByText('Components')).toBeNull();
+      expect(document.querySelector('[data-shenbi-shortcut-area="sidebar"]')).toBeNull();
       expect(document.documentElement.classList.contains('theme-light')).toBe(true);
     });
 
