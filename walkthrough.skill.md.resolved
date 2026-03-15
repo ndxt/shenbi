@@ -1,0 +1,54 @@
+# Phase 1 完成：Claude Code Skill 创建
+
+## 创建的文件
+
+### Skill 主目录: `.claude/skills/shenbi-schema/`
+
+| 文件 | 大小 | 内容 |
+|------|------|------|
+| [SKILL.md](file:///d:/Code/lowcode/shenbi-codes/shenbi/.claude/skills/shenbi-schema/SKILL.md) | 7.4KB | 主指令文件：12 条核心生成规则 + 设计指南 + 升级说明 |
+| [schema-spec.md](file:///d:/Code/lowcode/shenbi-codes/shenbi/.claude/skills/shenbi-schema/references/schema-spec.md) | 3.4KB | PageSchema, SchemaNode, LoopDirective, ColumnSchema 等类型定义 |
+| [context-system.md](file:///d:/Code/lowcode/shenbi-codes/shenbi/.claude/skills/shenbi-schema/references/context-system.md) | 4.9KB | 表达式语法、ExpressionContext、JSFunction、State/Computed/Methods/Watchers/DataSources |
+| [action-system.md](file:///d:/Code/lowcode/shenbi-codes/shenbi/.claude/skills/shenbi-schema/references/action-system.md) | 6.6KB | 20+ Action 类型完整参考 + CRUD/删除确认等常见模式 |
+| [component-contracts.md](file:///d:/Code/lowcode/shenbi-codes/shenbi/.claude/skills/shenbi-schema/references/component-contracts.md) | 52KB | **105 个组件**契约（脚本自动生成），含 props/events/slots/children |
+| [examples.md](file:///d:/Code/lowcode/shenbi-codes/shenbi/.claude/skills/shenbi-schema/references/examples.md) | 23KB | 5 个完整 PageSchema 示例 + Zone 布局片段 |
+
+### 自动生成脚本
+
+| 文件 | 用途 |
+|------|------|
+| [generate-skill-refs.ts](file:///d:/Code/lowcode/shenbi-codes/shenbi/scripts/generate-skill-refs.ts) | 从源代码自动生成 `component-contracts.md` |
+
+## 验证结果
+
+```
+✅ Generated component-contracts.md
+   Total contracts: 105
+   - Layout: 16
+   - General: 7
+   - Navigation: 8
+   - Data Entry: 23
+   - Data Display: 29
+   - Feedback: 12
+   - Charts: 6
+   - Other: 4
+```
+
+## 使用方式
+
+在 Claude Code 中使用：
+
+```
+用 shenbi-schema skill 生成一个用户管理页面的 JSON
+```
+
+## 升级流程
+
+新增组件契约后只需3步：
+1. 在 `packages/schema/contracts/` 创建新契约文件
+2. 在 `packages/schema/contracts/index.ts` 注册并添加到 `builtinContracts`
+3. 运行 `npx tsx scripts/generate-skill-refs.ts`
+
+## 下一步
+
+Phase 2：在 Shell 模式中添加 JSON 导入功能，用于预览 Claude Code 生成的 JSON schema。

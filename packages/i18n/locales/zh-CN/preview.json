@@ -45,7 +45,15 @@
     "redo": "重做 (Ctrl+Shift+Z)",
     "clearPage": "清空页面",
     "currentFile": "当前文件",
-    "untitled": "未命名页面"
+    "untitled": "未命名页面",
+    "importJSON": "导入 JSON 文件"
+  },
+  "import": {
+    "invalidJSON": "文件内容不是有效的 JSON",
+    "missingBody": "JSON 缺少 body 字段，不是有效的 PageSchema",
+    "success": "导入成功",
+    "successPreview": "导入成功（预览模式）",
+    "readError": "读取文件失败"
   },
   "prompt": {
     "enterFileName": "请输入文件名",

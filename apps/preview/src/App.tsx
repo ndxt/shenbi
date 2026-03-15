@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as antd from 'antd';
-import { Undo2, Redo2, Trash2 } from 'lucide-react';
+import { Undo2, Redo2, Trash2, FileUp } from 'lucide-react';
 import {
   builtinContracts,
   getBuiltinContract,
@@ -171,6 +171,7 @@ export function App() {
   const [fileExplorerExpandedIds, setFileExplorerExpandedIds] = useState<string[]>([]);
   const [fileExplorerFocusedId, setFileExplorerFocusedId] = useState<string | undefined>();
   const [shellSaveSources, setShellSaveSources] = useState<Record<string, 'manual' | 'auto'>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize VFS
   useEffect(() => {
@@ -666,6 +667,47 @@ export function App() {
     void fileEditor.commands.execute('fs.move', { nodeId, newParentId, afterNodeId });
   }, [fileEditor.commands]);
 
+  // Import JSON file handler
+  const handleImportJSONFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so the same file can be re-imported
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    try {
+      const text = await file.text();
+      let schema: PageSchema;
+
+      try {
+        schema = JSON.parse(text) as PageSchema;
+      } catch {
+        antd.message.error(previewT('import.invalidJSON'));
+        return;
+      }
+
+      if (!schema || typeof schema !== 'object' || !('body' in schema)) {
+        antd.message.error(previewT('import.missingBody'));
+        return;
+      }
+
+      // Overwrite current page schema directly
+      await fileEditor.commands.execute('editor.restoreSnapshot', {
+        snapshot: {
+          schema,
+          isDirty: true,
+          ...(shellSnapshot.currentFileId ? { currentFileId: shellSnapshot.currentFileId } : {}),
+        },
+      });
+
+      antd.message.success(previewT('import.success'));
+    } catch {
+      antd.message.error(previewT('import.readError'));
+    }
+  }, [fileEditor.commands, previewT, shellSnapshot.currentFileId]);
+
   const handleExpandedIdsChange = useCallback((nextExpandedIds: string[]) => {
     setFileExplorerExpandedIds((previous) => (
       areStringArraysEqual(previous, nextExpandedIds) ? previous : nextExpandedIds
@@ -967,6 +1009,23 @@ export function App() {
           ) : null}
           {appMode === 'shell' ? (
             <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                style={{ display: 'none' }}
+                onChange={handleImportJSONFile}
+              />
+              <button
+                type="button"
+                aria-label={previewT('toolbar.importJSON')}
+                className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary"
+                onClick={() => fileInputRef.current?.click()}
+                title={previewT('toolbar.importJSON')}
+              >
+                <FileUp size={15} />
+              </button>
               <span
                 aria-label={previewT('toolbar.currentFile')}
                 className="max-w-[220px] truncate text-text-secondary"

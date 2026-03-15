@@ -45,7 +45,15 @@
     "redo": "Redo (Ctrl+Shift+Z)",
     "clearPage": "Clear Page",
     "currentFile": "Current File",
-    "untitled": "Untitled Page"
+    "untitled": "Untitled Page",
+    "importJSON": "Import JSON File"
+  },
+  "import": {
+    "invalidJSON": "File content is not valid JSON",
+    "missingBody": "JSON is missing the body field, not a valid PageSchema",
+    "success": "Import successful",
+    "successPreview": "Import successful (preview mode)",
+    "readError": "Failed to read file"
   },
   "prompt": {
     "enterFileName": "Enter file name",
