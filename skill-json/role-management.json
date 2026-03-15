@@ -1,0 +1,576 @@
+{
+  "id": "role-management",
+  "name": "角色管理",
+  "state": {
+    "roleList": {
+      "default": [
+        { "id": 1, "name": "超级管理员", "code": "SUPER_ADMIN", "desc": "拥有系统全部权限，不可删除", "userCount": 2,  "status": true,  "createdAt": "2024-01-01", "protected": true  },
+        { "id": 2, "name": "系统管理员", "code": "SYS_ADMIN",   "desc": "负责系统配置与用户管理",   "userCount": 5,  "status": true,  "createdAt": "2024-01-01", "protected": false },
+        { "id": 3, "name": "审计员",     "code": "AUDITOR",     "desc": "只读权限，可查看日志审计", "userCount": 3,  "status": true,  "createdAt": "2024-03-10", "protected": false },
+        { "id": 4, "name": "业务操作员", "code": "BIZ_OPERATOR","desc": "负责日常业务数据录入与处理","userCount": 28, "status": true,  "createdAt": "2024-03-15", "protected": false },
+        { "id": 5, "name": "数据分析师", "code": "DATA_ANALYST", "desc": "可查看报表与数据看板",     "userCount": 8,  "status": false, "createdAt": "2024-06-01", "protected": false },
+        { "id": 6, "name": "访客",       "code": "GUEST",       "desc": "仅可浏览公开页面",         "userCount": 12, "status": false, "createdAt": "2024-08-20", "protected": false }
+      ]
+    },
+    "total": { "default": 6 },
+    "loading": { "default": false },
+    "nameKeyword": { "default": "" },
+    "statusFilter": { "default": null },
+    "pagination": { "default": { "current": 1, "pageSize": 10 } },
+    "selectedRowKeys": { "default": [] },
+    "dialogMode": { "default": null },
+    "currentRecord": { "default": {} }
+  },
+  "computed": {
+    "selectedCount": {
+      "deps": ["state.selectedRowKeys"],
+      "expr": "{{state.selectedRowKeys.length}}"
+    },
+    "dialogTitle": {
+      "deps": ["state.dialogMode"],
+      "expr": "{{state.dialogMode === 'edit' ? '编辑角色' : '新增角色'}}"
+    }
+  },
+  "methods": {
+    "fetchRoles": {
+      "body": [
+        { "type": "setState", "key": "loading", "value": true },
+        {
+          "type": "fetch",
+          "datasource": "roleList",
+          "onSuccess": [
+            { "type": "setState", "key": "roleList", "value": "{{response.data.list}}" },
+            { "type": "setState", "key": "total",    "value": "{{response.data.total}}" }
+          ],
+          "onError": [{ "type": "message", "level": "error", "content": "获取角色列表失败" }],
+          "onFinally": [{ "type": "setState", "key": "loading", "value": false }]
+        }
+      ]
+    },
+    "handleSearch": {
+      "body": [
+        { "type": "setState", "key": "pagination.current", "value": 1 },
+        { "type": "callMethod", "name": "fetchRoles" }
+      ]
+    },
+    "handleReset": {
+      "body": [
+        { "type": "setState", "key": "nameKeyword",  "value": "" },
+        { "type": "setState", "key": "statusFilter", "value": null },
+        { "type": "setState", "key": "pagination.current", "value": 1 },
+        { "type": "callMethod", "name": "fetchRoles" }
+      ]
+    },
+    "openAddDialog": {
+      "body": [
+        { "type": "setState", "key": "dialogMode",    "value": "add" },
+        { "type": "setState", "key": "currentRecord", "value": { "status": true } },
+        { "type": "modal", "id": "roleDialog", "open": true }
+      ]
+    },
+    "openEditDialog": {
+      "params": ["record"],
+      "body": [
+        { "type": "setState", "key": "dialogMode",    "value": "edit" },
+        { "type": "setState", "key": "currentRecord", "value": "{{params.record}}" },
+        { "type": "modal", "id": "roleDialog", "open": true }
+      ]
+    },
+    "closeDialog": {
+      "body": [
+        { "type": "modal", "id": "roleDialog", "open": false },
+        { "type": "resetForm", "formRef": "role-form" },
+        { "type": "setState", "key": "dialogMode",    "value": null },
+        { "type": "setState", "key": "currentRecord", "value": {} }
+      ]
+    },
+    "handleSave": {
+      "body": [
+        {
+          "type": "validate",
+          "formRef": "role-form",
+          "onSuccess": [
+            {
+              "type": "condition",
+              "if": "{{state.dialogMode === 'edit'}}",
+              "then": [
+                {
+                  "type": "fetch", "method": "PUT",
+                  "url": "{{'/api/roles/' + state.currentRecord.id}}",
+                  "onSuccess": [
+                    { "type": "message", "level": "success", "content": "编辑成功" },
+                    { "type": "callMethod", "name": "closeDialog" },
+                    { "type": "callMethod", "name": "fetchRoles" }
+                  ],
+                  "onError": [{ "type": "message", "level": "error", "content": "编辑失败" }]
+                }
+              ],
+              "else": [
+                {
+                  "type": "fetch", "method": "POST", "url": "/api/roles",
+                  "onSuccess": [
+                    { "type": "message", "level": "success", "content": "新增成功" },
+                    { "type": "callMethod", "name": "closeDialog" },
+                    { "type": "callMethod", "name": "fetchRoles" }
+                  ],
+                  "onError": [{ "type": "message", "level": "error", "content": "新增失败，角色编码可能已存在" }]
+                }
+              ]
+            }
+          ],
+          "onError": [{ "type": "message", "level": "warning", "content": "请检查表单填写是否完整" }]
+        }
+      ]
+    },
+    "toggleStatus": {
+      "params": ["record", "checked"],
+      "body": [
+        {
+          "type": "fetch", "method": "PUT",
+          "url": "{{'/api/roles/' + params.record.id + '/status'}}",
+          "onSuccess": [
+            { "type": "message", "level": "success", "content": "{{params.checked ? '已启用' : '已停用'}}" },
+            { "type": "callMethod", "name": "fetchRoles" }
+          ],
+          "onError": [{ "type": "message", "level": "error", "content": "状态切换失败" }]
+        }
+      ]
+    },
+    "batchDelete": {
+      "body": [
+        {
+          "type": "fetch", "method": "DELETE", "url": "/api/roles/batch",
+          "onSuccess": [
+            { "type": "message", "level": "success", "content": "批量删除成功" },
+            { "type": "setState", "key": "selectedRowKeys", "value": [] },
+            { "type": "callMethod", "name": "fetchRoles" }
+          ],
+          "onError": [{ "type": "message", "level": "error", "content": "批量删除失败" }]
+        }
+      ]
+    }
+  },
+  "dataSources": {
+    "roleList": {
+      "api": {
+        "method": "GET",
+        "url": "/api/roles",
+        "params": {
+          "name": "{{state.nameKeyword}}",
+          "status": "{{state.statusFilter}}",
+          "page": "{{state.pagination.current}}",
+          "pageSize": "{{state.pagination.pageSize}}"
+        }
+      }
+    }
+  },
+  "lifecycle": {
+    "onMount": [{ "type": "callMethod", "name": "fetchRoles" }]
+  },
+  "body": {
+    "id": "root",
+    "component": "Container",
+    "props": { "direction": "column", "gap": 16 },
+    "children": [
+      {
+        "id": "search-card",
+        "component": "Card",
+        "props": { "bordered": false },
+        "children": [
+          {
+            "id": "search-form",
+            "component": "Form",
+            "props": { "layout": "inline" },
+            "children": [
+              {
+                "id": "search-name-item",
+                "component": "Form.Item",
+                "props": { "label": "角色名称" },
+                "children": [
+                  {
+                    "id": "search-name-input",
+                    "component": "Input",
+                    "props": {
+                      "placeholder": "请输入角色名称",
+                      "value": "{{state.nameKeyword}}",
+                      "allowClear": true,
+                      "style": { "width": 200 }
+                    },
+                    "events": {
+                      "onChange": [{ "type": "setState", "key": "nameKeyword", "value": "{{event.target.value}}" }]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "search-status-item",
+                "component": "Form.Item",
+                "props": { "label": "状态" },
+                "children": [
+                  {
+                    "id": "search-status-select",
+                    "component": "Select",
+                    "props": {
+                      "placeholder": "全部状态",
+                      "value": "{{state.statusFilter}}",
+                      "allowClear": true,
+                      "style": { "width": 140 },
+                      "options": [
+                        { "label": "启用", "value": true },
+                        { "label": "停用", "value": false }
+                      ]
+                    },
+                    "events": {
+                      "onChange": [{ "type": "setState", "key": "statusFilter", "value": "{{event}}" }]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "search-actions-item",
+                "component": "Form.Item",
+                "children": [
+                  {
+                    "id": "search-actions-space",
+                    "component": "Space",
+                    "children": [
+                      {
+                        "id": "search-btn",
+                        "component": "Button",
+                        "props": { "type": "primary" },
+                        "children": "查询",
+                        "events": { "onClick": [{ "type": "callMethod", "name": "handleSearch" }] }
+                      },
+                      {
+                        "id": "reset-btn",
+                        "component": "Button",
+                        "children": "重置",
+                        "events": { "onClick": [{ "type": "callMethod", "name": "handleReset" }] }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "table-card",
+        "component": "Card",
+        "props": { "bordered": false },
+        "children": [
+          {
+            "id": "toolbar",
+            "component": "Flex",
+            "props": { "justify": "space-between", "align": "center" },
+            "style": { "marginBottom": "12px" },
+            "children": [
+              {
+                "id": "toolbar-left",
+                "component": "Space",
+                "children": [
+                  {
+                    "id": "add-btn",
+                    "component": "Button",
+                    "props": { "type": "dashed" },
+                    "children": "+ 新增角色",
+                    "events": { "onClick": [{ "type": "callMethod", "name": "openAddDialog" }] }
+                  },
+                  {
+                    "id": "batch-delete-confirm",
+                    "component": "Popconfirm",
+                    "props": {
+                      "title": "{{\"确认批量删除选中的 \" + computed.selectedCount + \" 个角色？\"}}",
+                      "okText": "确认删除",
+                      "cancelText": "取消",
+                      "okButtonProps": { "danger": true },
+                      "disabled": "{{computed.selectedCount === 0}}"
+                    },
+                    "events": {
+                      "onConfirm": [{ "type": "callMethod", "name": "batchDelete" }]
+                    },
+                    "children": [
+                      {
+                        "id": "batch-delete-btn",
+                        "component": "Button",
+                        "props": {
+                          "danger": true,
+                          "disabled": "{{computed.selectedCount === 0}}"
+                        },
+                        "children": "批量删除"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "toolbar-right",
+                "component": "Alert",
+                "if": "{{computed.selectedCount > 0}}",
+                "props": {
+                  "type": "info",
+                  "showIcon": true,
+                  "banner": false,
+                  "message": "{{\"已选择 \" + computed.selectedCount + \" 个角色\"}}",
+                  "style": { "padding": "4px 12px" }
+                }
+              }
+            ]
+          },
+          {
+            "id": "role-table",
+            "component": "Table",
+            "props": {
+              "rowKey": "id",
+              "dataSource": "{{state.roleList}}",
+              "loading": "{{state.loading}}",
+              "rowSelection": {
+                "selectedRowKeys": "{{state.selectedRowKeys}}",
+                "getCheckboxProps": {
+                  "type": "JSFunction",
+                  "params": ["record"],
+                  "body": "return { disabled: record.protected };"
+                }
+              },
+              "pagination": {
+                "current": "{{state.pagination.current}}",
+                "pageSize": "{{state.pagination.pageSize}}",
+                "total": "{{state.total}}",
+                "showSizeChanger": true,
+                "showTotal": { "type": "JSFunction", "params": ["total"], "body": "return `共 ${total} 条`;" }
+              }
+            },
+            "events": {
+              "onChange": [
+                { "type": "setState", "key": "pagination.current",  "value": "{{event[0]?.current}}" },
+                { "type": "setState", "key": "pagination.pageSize", "value": "{{event[0]?.pageSize}}" },
+                { "type": "callMethod", "name": "fetchRoles" }
+              ],
+              "rowSelection.onChange": [
+                { "type": "setState", "key": "selectedRowKeys", "value": "{{event[0]}}" }
+              ]
+            },
+            "columns": [
+              { "title": "角色名称", "dataIndex": "name", "width": 130 },
+              {
+                "title": "角色编码",
+                "dataIndex": "code",
+                "width": 150,
+                "render": {
+                  "id": "code-tag",
+                  "component": "Tag",
+                  "props": { "color": "blue" },
+                  "children": "{{text}}"
+                }
+              },
+              { "title": "描述", "dataIndex": "desc" },
+              {
+                "title": "用户数",
+                "dataIndex": "userCount",
+                "width": 80,
+                "render": {
+                  "id": "user-count-badge",
+                  "component": "Badge",
+                  "props": {
+                    "count": "{{text}}",
+                    "showZero": true,
+                    "color": "{{text > 0 ? '#1677ff' : '#d9d9d9'}}"
+                  }
+                }
+              },
+              {
+                "title": "状态",
+                "dataIndex": "status",
+                "width": 90,
+                "render": {
+                  "id": "status-switch",
+                  "component": "Switch",
+                  "props": {
+                    "checked": "{{text}}",
+                    "checkedChildren": "启用",
+                    "unCheckedChildren": "停用",
+                    "disabled": "{{record.protected}}"
+                  },
+                  "events": {
+                    "onChange": [
+                      {
+                        "type": "callMethod",
+                        "name": "toggleStatus",
+                        "params": { "record": "{{record}}", "checked": "{{event[0]}}" }
+                      }
+                    ]
+                  }
+                }
+              },
+              { "title": "创建时间", "dataIndex": "createdAt", "width": 120 },
+              {
+                "title": "操作",
+                "key": "actions",
+                "width": 180,
+                "render": {
+                  "id": "action-space",
+                  "component": "Space",
+                  "children": [
+                    {
+                      "id": "edit-btn",
+                      "component": "Button",
+                      "props": { "type": "link", "size": "small" },
+                      "children": "编辑",
+                      "events": {
+                        "onClick": [
+                          { "type": "callMethod", "name": "openEditDialog", "params": { "record": "{{record}}" } }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "perm-btn",
+                      "component": "Button",
+                      "props": { "type": "link", "size": "small" },
+                      "children": "权限配置",
+                      "events": {
+                        "onClick": [{ "type": "navigate", "to": "{{'/system/roles/' + record.id + '/permissions'}}" }]
+                      }
+                    },
+                    {
+                      "id": "delete-confirm",
+                      "component": "Popconfirm",
+                      "props": {
+                        "title": "{{\"确认删除角色「\" + record.name + \"」？\"}}",
+                        "okText": "确认",
+                        "cancelText": "取消",
+                        "okButtonProps": { "danger": true },
+                        "disabled": "{{record.protected}}"
+                      },
+                      "events": {
+                        "onConfirm": [
+                          {
+                            "type": "fetch", "method": "DELETE",
+                            "url": "{{'/api/roles/' + record.id}}",
+                            "onSuccess": [
+                              { "type": "message", "level": "success", "content": "删除成功" },
+                              { "type": "callMethod", "name": "fetchRoles" }
+                            ],
+                            "onError": [{ "type": "message", "level": "error", "content": "删除失败" }]
+                          }
+                        ]
+                      },
+                      "children": [
+                        {
+                          "id": "delete-btn",
+                          "component": "Button",
+                          "props": {
+                            "type": "link",
+                            "size": "small",
+                            "danger": true,
+                            "disabled": "{{record.protected}}"
+                          },
+                          "children": "删除"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "dialogs": [
+    {
+      "id": "roleDialog",
+      "component": "Modal",
+      "props": {
+        "open": true,
+        "title": "{{computed.dialogTitle}}",
+        "width": 520,
+        "okText": "保存",
+        "cancelText": "取消",
+        "destroyOnClose": true
+      },
+      "events": {
+        "onCancel": [{ "type": "callMethod", "name": "closeDialog" }],
+        "onOk": [{ "type": "callMethod", "name": "handleSave" }]
+      },
+      "children": [
+        {
+          "id": "role-form",
+          "component": "Form",
+          "props": { "layout": "vertical", "initialValues": "{{state.currentRecord}}" },
+          "children": [
+            {
+              "id": "form-name-item",
+              "component": "Form.Item",
+              "props": {
+                "name": "name",
+                "label": "角色名称",
+                "rules": [
+                  { "required": true, "message": "请输入角色名称" },
+                  { "max": 30, "message": "不超过30个字符" }
+                ]
+              },
+              "children": [
+                {
+                  "id": "form-name-input",
+                  "component": "Input",
+                  "props": { "placeholder": "请输入角色名称" }
+                }
+              ]
+            },
+            {
+              "id": "form-code-item",
+              "component": "Form.Item",
+              "props": {
+                "name": "code",
+                "label": "角色编码",
+                "rules": [
+                  { "required": true, "message": "请输入角色编码" },
+                  { "pattern": "^[A-Z][A-Z0-9_]*$", "message": "大写字母开头，仅含大写字母、数字和下划线" }
+                ]
+              },
+              "children": [
+                {
+                  "id": "form-code-input",
+                  "component": "Input",
+                  "props": {
+                    "placeholder": "如：BIZ_OPERATOR",
+                    "disabled": "{{state.dialogMode === 'edit'}}"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "form-desc-item",
+              "component": "Form.Item",
+              "props": { "name": "desc", "label": "描述" },
+              "children": [
+                {
+                  "id": "form-desc-textarea",
+                  "component": "Input.TextArea",
+                  "props": { "placeholder": "请输入角色描述（选填）", "rows": 3, "maxLength": 200, "showCount": true }
+                }
+              ]
+            },
+            {
+              "id": "form-status-item",
+              "component": "Form.Item",
+              "props": { "name": "status", "label": "状态", "valuePropName": "checked" },
+              "children": [
+                {
+                  "id": "form-status-switch",
+                  "component": "Switch",
+                  "props": {
+                    "checkedChildren": "启用",
+                    "unCheckedChildren": "停用"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

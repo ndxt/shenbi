@@ -1,0 +1,520 @@
+{
+  "id": "contract-form",
+  "name": "合同录入",
+  "state": {
+    "submitting": { "default": false },
+    "fileList": { "default": [] },
+    "clauses": {
+      "default": [
+        { "id": 1, "name": "", "amount": null }
+      ]
+    },
+    "nextClauseId": { "default": 2 }
+  },
+  "methods": {
+    "addClause": {
+      "body": [
+        {
+          "type": "setState",
+          "key": "clauses",
+          "value": "{{state.clauses.concat([{ id: state.nextClauseId, name: '', amount: null }])}}"
+        },
+        {
+          "type": "setState",
+          "key": "nextClauseId",
+          "value": "{{state.nextClauseId + 1}}"
+        }
+      ]
+    },
+    "removeClause": {
+      "params": ["id"],
+      "body": [
+        {
+          "type": "setState",
+          "key": "clauses",
+          "value": "{{state.clauses.filter(c => c.id !== params.id)}}"
+        }
+      ]
+    },
+    "updateClauseName": {
+      "params": ["id", "name"],
+      "body": [
+        {
+          "type": "setState",
+          "key": "clauses",
+          "value": "{{state.clauses.map(c => c.id === params.id ? { ...c, name: params.name } : c)}}"
+        }
+      ]
+    },
+    "updateClauseAmount": {
+      "params": ["id", "amount"],
+      "body": [
+        {
+          "type": "setState",
+          "key": "clauses",
+          "value": "{{state.clauses.map(c => c.id === params.id ? { ...c, amount: params.amount } : c)}}"
+        }
+      ]
+    },
+    "handleSubmit": {
+      "body": [
+        {
+          "type": "validate",
+          "formRef": "contract-form-ref",
+          "onSuccess": [
+            { "type": "setState", "key": "submitting", "value": true },
+            {
+              "type": "fetch",
+              "method": "POST",
+              "url": "/api/contracts",
+              "onSuccess": [
+                { "type": "message", "level": "success", "content": "合同提交成功" },
+                { "type": "navigate", "back": true }
+              ],
+              "onError": [
+                { "type": "message", "level": "error", "content": "提交失败，请重试" }
+              ],
+              "onFinally": [
+                { "type": "setState", "key": "submitting", "value": false }
+              ]
+            }
+          ],
+          "onError": [
+            { "type": "message", "level": "warning", "content": "请检查表单填写是否完整" }
+          ]
+        }
+      ]
+    },
+    "handleReset": {
+      "body": [
+        { "type": "resetForm", "formRef": "contract-form-ref" },
+        { "type": "setState", "key": "clauses", "value": [{ "id": 1, "name": "", "amount": null }] },
+        { "type": "setState", "key": "nextClauseId", "value": 2 },
+        { "type": "setState", "key": "fileList", "value": [] }
+      ]
+    }
+  },
+  "body": {
+    "id": "root",
+    "component": "Container",
+    "props": { "direction": "column", "gap": 16 },
+    "children": [
+      {
+        "id": "page-header-row",
+        "component": "Flex",
+        "props": { "justify": "space-between", "align": "center" },
+        "children": [
+          {
+            "id": "page-title",
+            "component": "__fragment",
+            "children": "合同录入"
+          },
+          {
+            "id": "breadcrumb",
+            "component": "Breadcrumb",
+            "props": {
+              "items": [
+                { "title": "首页" },
+                { "title": "合同管理" },
+                { "title": "新增合同" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "form-card",
+        "component": "Card",
+        "props": { "bordered": false },
+        "children": [
+          {
+            "id": "contract-form-ref",
+            "component": "Form",
+            "props": { "layout": "vertical" },
+            "children": [
+              {
+                "id": "section-basic",
+                "component": "Divider",
+                "props": { "orientation": "left", "plain": true },
+                "children": "基础信息"
+              },
+              {
+                "id": "basic-row",
+                "component": "Row",
+                "props": { "gutter": [24, 0] },
+                "children": [
+                  {
+                    "id": "col-name",
+                    "component": "Col",
+                    "props": { "span": 12 },
+                    "children": [
+                      {
+                        "id": "item-name",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "contractName",
+                          "label": "合同名称",
+                          "rules": [
+                            { "required": true, "message": "请输入合同名称" },
+                            { "max": 100, "message": "不超过100个字符" }
+                          ]
+                        },
+                        "children": [
+                          {
+                            "id": "input-name",
+                            "component": "Input",
+                            "props": { "placeholder": "请输入合同名称", "allowClear": true }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "col-type",
+                    "component": "Col",
+                    "props": { "span": 12 },
+                    "children": [
+                      {
+                        "id": "item-type",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "contractType",
+                          "label": "合同类型",
+                          "rules": [{ "required": true, "message": "请选择合同类型" }]
+                        },
+                        "children": [
+                          {
+                            "id": "select-type",
+                            "component": "Select",
+                            "props": {
+                              "placeholder": "请选择合同类型",
+                              "allowClear": true,
+                              "options": [
+                                { "label": "采购合同", "value": "purchase" },
+                                { "label": "销售合同", "value": "sales" },
+                                { "label": "服务合同", "value": "service" },
+                                { "label": "租赁合同", "value": "lease" },
+                                { "label": "劳动合同", "value": "labor" },
+                                { "label": "其他", "value": "other" }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "col-date",
+                    "component": "Col",
+                    "props": { "span": 12 },
+                    "children": [
+                      {
+                        "id": "item-date",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "contractDate",
+                          "label": "合同期限",
+                          "rules": [{ "required": true, "message": "请选择合同期限" }]
+                        },
+                        "children": [
+                          {
+                            "id": "range-picker",
+                            "component": "DatePicker.RangePicker",
+                            "props": {
+                              "style": { "width": "100%" },
+                              "placeholder": ["开始日期", "结束日期"]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "col-party",
+                    "component": "Col",
+                    "props": { "span": 12 },
+                    "children": [
+                      {
+                        "id": "item-party",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "counterparty",
+                          "label": "合同对方",
+                          "rules": [{ "required": true, "message": "请输入合同对方" }]
+                        },
+                        "children": [
+                          {
+                            "id": "input-party",
+                            "component": "Input",
+                            "props": { "placeholder": "请输入对方公司/个人名称", "allowClear": true }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "col-remark",
+                    "component": "Col",
+                    "props": { "span": 24 },
+                    "children": [
+                      {
+                        "id": "item-remark",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "remark",
+                          "label": "备注"
+                        },
+                        "children": [
+                          {
+                            "id": "textarea-remark",
+                            "component": "Input.TextArea",
+                            "props": {
+                              "placeholder": "请输入备注信息（选填）",
+                              "rows": 3,
+                              "maxLength": 500,
+                              "showCount": true
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "section-clauses",
+                "component": "Divider",
+                "props": { "orientation": "left", "plain": true },
+                "children": "合同条款"
+              },
+              {
+                "id": "clauses-container",
+                "component": "Container",
+                "props": { "direction": "column", "gap": 8 },
+                "children": [
+                  {
+                    "id": "clause-row",
+                    "component": "Row",
+                    "loop": {
+                      "data": "{{state.clauses}}",
+                      "itemKey": "item",
+                      "indexKey": "index",
+                      "key": "{{item.id}}"
+                    },
+                    "props": { "gutter": [12, 0], "align": "middle" },
+                    "children": [
+                      {
+                        "id": "clause-index-col",
+                        "component": "Col",
+                        "props": { "span": 1 },
+                        "children": [
+                          {
+                            "id": "clause-index-tag",
+                            "component": "Tag",
+                            "props": { "color": "blue" },
+                            "children": "{{index + 1}}"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "clause-name-col",
+                        "component": "Col",
+                        "props": { "span": 13 },
+                        "children": [
+                          {
+                            "id": "clause-name-input",
+                            "component": "Input",
+                            "props": {
+                              "placeholder": "条款名称，如：货款、服务费、违约金...",
+                              "value": "{{item.name}}",
+                              "allowClear": true
+                            },
+                            "events": {
+                              "onChange": [
+                                {
+                                  "type": "callMethod",
+                                  "name": "updateClauseName",
+                                  "params": { "id": "{{item.id}}", "name": "{{event.target.value}}" }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "clause-amount-col",
+                        "component": "Col",
+                        "props": { "span": 8 },
+                        "children": [
+                          {
+                            "id": "clause-amount-input",
+                            "component": "InputNumber",
+                            "props": {
+                              "placeholder": "金额 (¥)",
+                              "value": "{{item.amount}}",
+                              "min": 0,
+                              "precision": 2,
+                              "style": { "width": "100%" },
+                              "prefix": "¥"
+                            },
+                            "events": {
+                              "onChange": [
+                                {
+                                  "type": "callMethod",
+                                  "name": "updateClauseAmount",
+                                  "params": { "id": "{{item.id}}", "amount": "{{event}}" }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "clause-del-col",
+                        "component": "Col",
+                        "props": { "span": 2 },
+                        "children": [
+                          {
+                            "id": "clause-del-btn",
+                            "component": "Button",
+                            "props": {
+                              "type": "text",
+                              "danger": true,
+                              "disabled": "{{state.clauses.length <= 1}}"
+                            },
+                            "children": "删除",
+                            "events": {
+                              "onClick": [
+                                {
+                                  "type": "callMethod",
+                                  "name": "removeClause",
+                                  "params": { "id": "{{item.id}}" }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "add-clause-btn",
+                    "component": "Button",
+                    "props": { "type": "dashed", "block": true },
+                    "children": "+ 添加条款",
+                    "events": {
+                      "onClick": [{ "type": "callMethod", "name": "addClause" }]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "section-attachment",
+                "component": "Divider",
+                "props": { "orientation": "left", "plain": true },
+                "children": "附件上传"
+              },
+              {
+                "id": "item-upload",
+                "component": "Form.Item",
+                "props": {
+                  "name": "attachments",
+                  "label": "合同附件",
+                  "valuePropName": "fileList"
+                },
+                "children": [
+                  {
+                    "id": "upload-dragger",
+                    "component": "Upload.Dragger",
+                    "props": {
+                      "name": "file",
+                      "action": "/api/upload",
+                      "multiple": true,
+                      "accept": ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png",
+                      "maxCount": 10,
+                      "fileList": "{{state.fileList}}",
+                      "listType": "text"
+                    },
+                    "events": {
+                      "onChange": [
+                        {
+                          "type": "setState",
+                          "key": "fileList",
+                          "value": "{{event.fileList}}"
+                        }
+                      ]
+                    },
+                    "children": [
+                      {
+                        "id": "upload-hint",
+                        "component": "Container",
+                        "props": { "direction": "column", "gap": 4 },
+                        "children": [
+                          {
+                            "id": "upload-icon-text",
+                            "component": "__fragment",
+                            "children": "点击或拖拽文件到此区域上传"
+                          },
+                          {
+                            "id": "upload-sub-text",
+                            "component": "__fragment",
+                            "children": "支持 PDF、Word、Excel、图片，最多上传 10 个文件"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "section-divider-bottom",
+                "component": "Divider"
+              },
+              {
+                "id": "form-actions",
+                "component": "Form.Item",
+                "children": [
+                  {
+                    "id": "actions-space",
+                    "component": "Space",
+                    "children": [
+                      {
+                        "id": "submit-btn",
+                        "component": "Button",
+                        "props": {
+                          "type": "primary",
+                          "loading": "{{state.submitting}}"
+                        },
+                        "children": "提交合同",
+                        "events": {
+                          "onClick": [{ "type": "callMethod", "name": "handleSubmit" }]
+                        }
+                      },
+                      {
+                        "id": "reset-btn",
+                        "component": "Button",
+                        "children": "重置",
+                        "events": {
+                          "onClick": [{ "type": "callMethod", "name": "handleReset" }]
+                        }
+                      },
+                      {
+                        "id": "cancel-btn",
+                        "component": "Button",
+                        "props": { "type": "text" },
+                        "children": "取消",
+                        "events": {
+                          "onClick": [{ "type": "navigate", "back": true }]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

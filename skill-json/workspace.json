@@ -1,0 +1,437 @@
+{
+  "id": "workspace",
+  "name": "个人工作台",
+  "state": {
+    "currentHour": { "default": 14 },
+    "user": {
+      "default": {
+        "name": "李明",
+        "avatar": "",
+        "role": "高级工程师",
+        "dept": "前端工程部"
+      }
+    },
+    "kpi": {
+      "default": {
+        "todo": 8,
+        "inProgress": 3,
+        "done": 12,
+        "overdue": 2
+      }
+    },
+    "tasks": {
+      "default": [
+        { "id": 1, "title": "完成商品管理页面前端开发",   "status": "in_progress", "priority": "high",   "dueDate": "2026-03-16", "assignee": "李明" },
+        { "id": 2, "title": "评审合同录入表单交互方案",   "status": "todo",        "priority": "high",   "dueDate": "2026-03-15", "assignee": "李明" },
+        { "id": 3, "title": "修复订单详情页 Tabs 渲染问题", "status": "done",      "priority": "medium", "dueDate": "2026-03-14", "assignee": "李明" },
+        { "id": 4, "title": "编写组件单元测试用例",        "status": "todo",        "priority": "medium", "dueDate": "2026-03-18", "assignee": "李明" },
+        { "id": 5, "title": "数据大屏性能优化",            "status": "overdue",     "priority": "high",   "dueDate": "2026-03-13", "assignee": "李明" },
+        { "id": 6, "title": "更新接口文档",                "status": "todo",        "priority": "low",    "dueDate": "2026-03-20", "assignee": "李明" },
+        { "id": 7, "title": "组织架构管理联调",            "status": "in_progress", "priority": "medium", "dueDate": "2026-03-17", "assignee": "李明" },
+        { "id": 8, "title": "Q1 技术复盘报告",             "status": "overdue",     "priority": "high",   "dueDate": "2026-03-10", "assignee": "李明" }
+      ]
+    },
+    "shortcuts": {
+      "default": [
+        { "id": 1, "title": "新增商品",   "icon": "📦", "color": "#e6f4ff", "path": "/products/new"   },
+        { "id": 2, "title": "创建订单",   "icon": "🛒", "color": "#f6ffed", "path": "/orders/new"     },
+        { "id": 3, "title": "录入合同",   "icon": "📄", "color": "#fff7e6", "path": "/contracts/new"  },
+        { "id": 4, "title": "数据看板",   "icon": "📊", "color": "#f9f0ff", "path": "/dashboard"      },
+        { "id": 5, "title": "组织架构",   "icon": "🏢", "color": "#fff0f6", "path": "/org"            },
+        { "id": 6, "title": "城市大屏",   "icon": "🌆", "color": "#e6fffb", "path": "/city-dashboard" },
+        { "id": 7, "title": "我的审批",   "icon": "✅", "color": "#fcffe6", "path": "/approvals"      },
+        { "id": 8, "title": "消息中心",   "icon": "💬", "color": "#fff1f0", "path": "/messages"       },
+        { "id": 9, "title": "系统设置",   "icon": "⚙️", "color": "#f0f0f0", "path": "/settings"       }
+      ]
+    },
+    "recentActivities": {
+      "default": [
+        { "color": "green", "label": "10:32", "children": "你完成了任务「修复订单详情页 Tabs 渲染问题」" },
+        { "color": "blue",  "label": "09:48", "children": "王芳 评论了你的任务「数据大屏性能优化」" },
+        { "color": "blue",  "label": "09:15", "children": "你创建了新任务「组织架构管理联调」" },
+        { "color": "orange","label": "昨天 17:30", "children": "任务「Q1 技术复盘报告」已逾期，请尽快处理" },
+        { "color": "gray",  "label": "昨天 16:00", "children": "张伟 将你添加为「合同录入表单」协作者" }
+      ]
+    }
+  },
+  "computed": {
+    "greeting": {
+      "deps": ["state.currentHour"],
+      "expr": "{{state.currentHour < 12 ? '早上好' : state.currentHour < 18 ? '下午好' : '晚上好'}}"
+    },
+    "todoBadgeCount": {
+      "deps": ["state.kpi.todo", "state.kpi.overdue"],
+      "expr": "{{state.kpi.todo + state.kpi.overdue}}"
+    }
+  },
+  "lifecycle": {
+    "onMount": [
+      {
+        "type": "script",
+        "code": "const h = new Date().getHours(); setState('currentHour', h);"
+      }
+    ]
+  },
+  "body": {
+    "id": "root",
+    "component": "Container",
+    "props": { "direction": "column", "gap": 16 },
+    "children": [
+      {
+        "id": "welcome-card",
+        "component": "Card",
+        "props": { "bordered": false },
+        "style": {
+          "background": "linear-gradient(135deg, #1677ff 0%, #4096ff 100%)",
+          "borderRadius": "12px"
+        },
+        "children": [
+          {
+            "id": "welcome-flex",
+            "component": "Flex",
+            "props": { "justify": "space-between", "align": "center" },
+            "children": [
+              {
+                "id": "welcome-left",
+                "component": "Space",
+                "props": { "size": "large" },
+                "children": [
+                  {
+                    "id": "user-avatar",
+                    "component": "Avatar",
+                    "props": {
+                      "size": 64,
+                      "style": { "background": "#fff", "color": "#1677ff", "fontSize": "24px", "fontWeight": "bold" }
+                    },
+                    "children": "{{state.user.name.charAt(0)}}"
+                  },
+                  {
+                    "id": "welcome-info",
+                    "component": "Container",
+                    "props": { "direction": "column", "gap": 4 },
+                    "children": [
+                      {
+                        "id": "greeting-text",
+                        "component": "__fragment",
+                        "style": { "fontSize": "20px", "fontWeight": "bold", "color": "#fff" },
+                        "children": "{{computed.greeting + '，' + state.user.name + ' 👋'}}"
+                      },
+                      {
+                        "id": "user-role-text",
+                        "component": "__fragment",
+                        "style": { "color": "rgba(255,255,255,0.8)", "fontSize": "14px" },
+                        "children": "{{state.user.dept + ' · ' + state.user.role}}"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "welcome-right",
+                "component": "Badge",
+                "props": {
+                  "count": "{{computed.todoBadgeCount}}",
+                  "overflowCount": 99,
+                  "offset": [4, 0]
+                },
+                "children": [
+                  {
+                    "id": "todo-badge-btn",
+                    "component": "Button",
+                    "props": {
+                      "style": { "background": "rgba(255,255,255,0.2)", "border": "1px solid rgba(255,255,255,0.4)", "color": "#fff" }
+                    },
+                    "children": "待处理事项"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "kpi-row",
+        "component": "Row",
+        "props": { "gutter": [16, 0] },
+        "children": [
+          {
+            "id": "kpi-todo-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "kpi-todo-card",
+                "component": "Card",
+                "props": { "hoverable": true, "bordered": false },
+                "children": [
+                  {
+                    "id": "kpi-todo-stat",
+                    "component": "Statistic",
+                    "props": {
+                      "title": "今日待办",
+                      "value": "{{state.kpi.todo}}",
+                      "suffix": "项",
+                      "valueStyle": { "color": "#1677ff" }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "kpi-progress-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "kpi-progress-card",
+                "component": "Card",
+                "props": { "hoverable": true, "bordered": false },
+                "children": [
+                  {
+                    "id": "kpi-progress-stat",
+                    "component": "Statistic",
+                    "props": {
+                      "title": "进行中",
+                      "value": "{{state.kpi.inProgress}}",
+                      "suffix": "项",
+                      "valueStyle": { "color": "#fa8c16" }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "kpi-done-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "kpi-done-card",
+                "component": "Card",
+                "props": { "hoverable": true, "bordered": false },
+                "children": [
+                  {
+                    "id": "kpi-done-stat",
+                    "component": "Statistic",
+                    "props": {
+                      "title": "已完成",
+                      "value": "{{state.kpi.done}}",
+                      "suffix": "项",
+                      "valueStyle": { "color": "#52c41a" }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "kpi-overdue-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "kpi-overdue-card",
+                "component": "Card",
+                "props": { "hoverable": true, "bordered": false },
+                "children": [
+                  {
+                    "id": "kpi-overdue-stat",
+                    "component": "Statistic",
+                    "props": {
+                      "title": "逾期",
+                      "value": "{{state.kpi.overdue}}",
+                      "suffix": "项",
+                      "valueStyle": { "color": "#ff4d4f" }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "middle-row",
+        "component": "Row",
+        "props": { "gutter": [16, 0] },
+        "children": [
+          {
+            "id": "task-col",
+            "component": "Col",
+            "props": { "span": 16 },
+            "children": [
+              {
+                "id": "task-card",
+                "component": "Card",
+                "props": { "title": "我的任务", "bordered": false },
+                "children": [
+                  {
+                    "id": "task-table",
+                    "component": "Table",
+                    "props": {
+                      "rowKey": "id",
+                      "dataSource": "{{state.tasks}}",
+                      "size": "middle",
+                      "pagination": false
+                    },
+                    "columns": [
+                      {
+                        "title": "任务名称",
+                        "dataIndex": "title"
+                      },
+                      {
+                        "title": "状态",
+                        "dataIndex": "status",
+                        "width": 90,
+                        "render": {
+                          "id": "task-status-tag",
+                          "component": "Tag",
+                          "props": {
+                            "color": "{{text === 'done' ? 'green' : text === 'in_progress' ? 'blue' : text === 'overdue' ? 'red' : 'default'}}"
+                          },
+                          "children": "{{text === 'done' ? '已完成' : text === 'in_progress' ? '进行中' : text === 'overdue' ? '已逾期' : '待处理'}}"
+                        }
+                      },
+                      {
+                        "title": "优先级",
+                        "dataIndex": "priority",
+                        "width": 80,
+                        "render": {
+                          "id": "task-priority-tag",
+                          "component": "Tag",
+                          "props": {
+                            "color": "{{text === 'high' ? 'red' : text === 'medium' ? 'orange' : 'default'}}"
+                          },
+                          "children": "{{text === 'high' ? '高' : text === 'medium' ? '中' : '低'}}"
+                        }
+                      },
+                      {
+                        "title": "截止日期",
+                        "dataIndex": "dueDate",
+                        "width": 110
+                      },
+                      {
+                        "title": "操作",
+                        "key": "actions",
+                        "width": 100,
+                        "render": {
+                          "id": "task-action-space",
+                          "component": "Space",
+                          "children": [
+                            {
+                              "id": "task-view-btn",
+                              "component": "Button",
+                              "props": { "type": "link", "size": "small" },
+                              "children": "查看"
+                            },
+                            {
+                              "id": "task-done-btn",
+                              "component": "Button",
+                              "props": {
+                                "type": "link",
+                                "size": "small",
+                                "disabled": "{{text === 'done'}}"
+                              },
+                              "children": "完成"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "shortcut-col",
+            "component": "Col",
+            "props": { "span": 8 },
+            "children": [
+              {
+                "id": "shortcut-card",
+                "component": "Card",
+                "props": { "title": "快捷入口", "bordered": false },
+                "children": [
+                  {
+                    "id": "shortcut-row",
+                    "component": "Row",
+                    "props": { "gutter": [8, 8] },
+                    "children": [
+                      {
+                        "id": "shortcut-col-item",
+                        "component": "Col",
+                        "props": { "span": 8 },
+                        "loop": {
+                          "data": "{{state.shortcuts}}",
+                          "itemKey": "item",
+                          "indexKey": "index",
+                          "key": "{{item.id}}"
+                        },
+                        "children": [
+                          {
+                            "id": "shortcut-item-card",
+                            "component": "Card",
+                            "props": {
+                              "hoverable": true,
+                              "size": "small",
+                              "style": { "textAlign": "center", "cursor": "pointer", "background": "{{item.color}}", "border": "none" }
+                            },
+                            "events": {
+                              "onClick": [
+                                { "type": "navigate", "to": "{{item.path}}" }
+                              ]
+                            },
+                            "children": [
+                              {
+                                "id": "shortcut-icon",
+                                "component": "Container",
+                                "props": { "direction": "column", "gap": 4 },
+                                "style": { "alignItems": "center" },
+                                "children": [
+                                  {
+                                    "id": "shortcut-emoji",
+                                    "component": "__fragment",
+                                    "style": { "fontSize": "24px", "lineHeight": "1" },
+                                    "children": "{{item.icon}}"
+                                  },
+                                  {
+                                    "id": "shortcut-title",
+                                    "component": "__fragment",
+                                    "style": { "fontSize": "12px", "color": "#333", "marginTop": "4px" },
+                                    "children": "{{item.title}}"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "activity-card",
+        "component": "Card",
+        "props": { "title": "最近动态", "bordered": false },
+        "children": [
+          {
+            "id": "activity-timeline",
+            "component": "Timeline",
+            "props": {
+              "mode": "left",
+              "items": "{{state.recentActivities}}"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

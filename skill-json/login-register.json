@@ -1,0 +1,714 @@
+{
+  "id": "login-register",
+  "name": "登录注册",
+  "state": {
+    "activeTab":       { "default": "login" },
+    "loginLoading":    { "default": false },
+    "registerLoading": { "default": false },
+    "resetLoading":    { "default": false },
+    "countdown":       { "default": 0 },
+    "countdownActive": { "default": false },
+    "rememberMe":      { "default": false },
+    "agreeTerms":      { "default": false }
+  },
+  "computed": {
+    "sendBtnText": {
+      "deps": ["state.countdown", "state.countdownActive"],
+      "expr": "{{state.countdownActive ? state.countdown + 's 后重发' : '发送验证码'}}"
+    }
+  },
+  "methods": {
+    "handleLogin": {
+      "body": [
+        {
+          "type": "validate",
+          "formRef": "login-form",
+          "onSuccess": [
+            { "type": "setState", "key": "loginLoading", "value": true },
+            {
+              "type": "fetch",
+              "method": "POST",
+              "url": "/api/auth/login",
+              "onSuccess": [
+                { "type": "message", "level": "success", "content": "登录成功" },
+                { "type": "navigate", "to": "/" }
+              ],
+              "onError": [
+                { "type": "message", "level": "error", "content": "用户名或密码错误" }
+              ],
+              "onFinally": [
+                { "type": "setState", "key": "loginLoading", "value": false }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "handleRegister": {
+      "body": [
+        {
+          "type": "condition",
+          "if": "{{!state.agreeTerms}}",
+          "then": [
+            { "type": "message", "level": "warning", "content": "请先同意用户协议" }
+          ],
+          "else": [
+            {
+              "type": "validate",
+              "formRef": "register-form",
+              "onSuccess": [
+                { "type": "setState", "key": "registerLoading", "value": true },
+                {
+                  "type": "fetch",
+                  "method": "POST",
+                  "url": "/api/auth/register",
+                  "onSuccess": [
+                    { "type": "message", "level": "success", "content": "注册成功，请登录" },
+                    { "type": "setState", "key": "activeTab", "value": "login" }
+                  ],
+                  "onError": [
+                    { "type": "message", "level": "error", "content": "注册失败，该用户名或邮箱已存在" }
+                  ],
+                  "onFinally": [
+                    { "type": "setState", "key": "registerLoading", "value": false }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "sendCode": {
+      "body": [
+        {
+          "type": "validate",
+          "formRef": "reset-form",
+          "onSuccess": [
+            { "type": "setState", "key": "countdownActive", "value": true },
+            { "type": "setState", "key": "countdown", "value": 60 },
+            {
+              "type": "fetch",
+              "method": "POST",
+              "url": "/api/auth/send-code",
+              "onSuccess": [
+                { "type": "message", "level": "success", "content": "验证码已发送，请查收邮件" }
+              ],
+              "onError": [
+                { "type": "message", "level": "error", "content": "发送失败，请检查邮箱地址" },
+                { "type": "setState", "key": "countdownActive", "value": false },
+                { "type": "setState", "key": "countdown", "value": 0 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "handleReset": {
+      "body": [
+        {
+          "type": "validate",
+          "formRef": "reset-form",
+          "onSuccess": [
+            { "type": "setState", "key": "resetLoading", "value": true },
+            {
+              "type": "fetch",
+              "method": "POST",
+              "url": "/api/auth/reset-password",
+              "onSuccess": [
+                { "type": "message", "level": "success", "content": "密码重置成功，请重新登录" },
+                { "type": "setState", "key": "activeTab", "value": "login" }
+              ],
+              "onError": [
+                { "type": "message", "level": "error", "content": "验证码错误或已过期" }
+              ],
+              "onFinally": [
+                { "type": "setState", "key": "resetLoading", "value": false }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "watchers": [
+    {
+      "watch": ["state.countdownActive"],
+      "handler": [
+        {
+          "type": "condition",
+          "if": "{{state.countdownActive}}",
+          "then": [
+            {
+              "type": "script",
+              "code": "const timer = setInterval(() => { const cur = getState('countdown'); if (cur <= 1) { clearInterval(timer); setState('countdownActive', false); setState('countdown', 0); } else { setState('countdown', cur - 1); } }, 1000);"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "body": {
+    "id": "root",
+    "component": "Flex",
+    "props": { "justify": "center", "align": "center" },
+    "style": {
+      "minHeight": "100vh",
+      "position": "relative",
+      "overflow": "hidden",
+      "backgroundImage": "url('/assets/water-bg.jpg'), linear-gradient(160deg, #003d6b 0%, #005f8e 40%, #0088b2 70%, #00b4d8 100%)",
+      "backgroundSize": "cover, cover",
+      "backgroundPosition": "center, center",
+      "backgroundBlendMode": "overlay"
+    },
+    "children": [
+      {
+        "id": "bg-overlay",
+        "component": "Container",
+        "style": {
+          "position": "absolute",
+          "inset": 0,
+          "background": "linear-gradient(160deg, rgba(0,30,60,0.55) 0%, rgba(0,80,120,0.35) 60%, rgba(0,160,200,0.2) 100%)",
+          "pointerEvents": "none"
+        }
+      },
+      {
+        "id": "wave-bottom",
+        "component": "Container",
+        "style": {
+          "position": "absolute",
+          "bottom": 0,
+          "left": 0,
+          "right": 0,
+          "height": "160px",
+          "background": "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 160'%3E%3Cpath fill='rgba(0,180,216,0.25)' d='M0,80 C360,160 1080,0 1440,80 L1440,160 L0,160 Z'/%3E%3Cpath fill='rgba(0,119,182,0.2)' d='M0,100 C480,20 960,160 1440,100 L1440,160 L0,160 Z'/%3E%3C/svg%3E\") no-repeat bottom",
+          "backgroundSize": "100% 100%",
+          "pointerEvents": "none"
+        }
+      },
+      {
+        "id": "bubble-1",
+        "component": "Container",
+        "style": {
+          "position": "absolute",
+          "top": "12%",
+          "left": "8%",
+          "width": "180px",
+          "height": "180px",
+          "borderRadius": "50%",
+          "background": "radial-gradient(circle, rgba(0,180,216,0.18) 0%, transparent 70%)",
+          "pointerEvents": "none"
+        }
+      },
+      {
+        "id": "bubble-2",
+        "component": "Container",
+        "style": {
+          "position": "absolute",
+          "bottom": "20%",
+          "right": "10%",
+          "width": "260px",
+          "height": "260px",
+          "borderRadius": "50%",
+          "background": "radial-gradient(circle, rgba(0,119,182,0.2) 0%, transparent 70%)",
+          "pointerEvents": "none"
+        }
+      },
+      {
+        "id": "login-card",
+        "component": "Card",
+        "props": { "bordered": false },
+        "style": {
+          "position": "relative",
+          "zIndex": 10,
+          "width": "400px",
+          "borderRadius": "20px",
+          "background": "rgba(255,255,255,0.18)",
+          "backdropFilter": "blur(32px)",
+          "WebkitBackdropFilter": "blur(32px)",
+          "boxShadow": "0 24px 64px rgba(0,40,100,0.4), inset 0 0 0 1px rgba(255,255,255,0.32)",
+          "color": "#fff"
+        },
+        "children": [
+          {
+            "id": "brand-header",
+            "component": "Container",
+            "props": { "direction": "column", "gap": 6 },
+            "style": {
+              "textAlign": "center",
+              "padding": "24px 0 16px",
+              "borderBottom": "1px solid rgba(255,255,255,0.12)",
+              "marginBottom": "8px"
+            },
+            "children": [
+              {
+                "id": "brand-header-icon",
+                "component": "__fragment",
+                "style": { "fontSize": "40px", "lineHeight": "1" },
+                "children": "💧"
+              },
+              {
+                "id": "brand-header-title",
+                "component": "__fragment",
+                "style": {
+                  "fontSize": "26px",
+                  "fontWeight": "800",
+                  "color": "#ffffff",
+                  "letterSpacing": "6px",
+                  "marginTop": "10px",
+                  "textShadow": "0 2px 16px rgba(0,180,216,0.6)"
+                },
+                "children": "智慧水务管理平台"
+              },
+              {
+                "id": "brand-header-en",
+                "component": "__fragment",
+                "style": {
+                  "fontSize": "10px",
+                  "color": "rgba(180,230,255,0.75)",
+                  "letterSpacing": "3px",
+                  "marginTop": "4px",
+                  "fontWeight": "300"
+                },
+                "children": "SMART WATER UTILITY MANAGEMENT"
+              },
+              {
+                "id": "brand-header-tags",
+                "component": "Flex",
+                "props": { "justify": "center", "gap": "small", "wrap": "wrap" },
+                "style": { "marginTop": "10px" },
+                "children": [
+                  {
+                    "id": "tag-dispatch",
+                    "component": "Tag",
+                    "props": { "color": "cyan" },
+                    "children": "统一调度"
+                  },
+                  {
+                    "id": "tag-monitor",
+                    "component": "Tag",
+                    "props": { "color": "blue" },
+                    "children": "实时监测"
+                  },
+                  {
+                    "id": "tag-alert",
+                    "component": "Tag",
+                    "props": { "color": "geekblue" },
+                    "children": "智能预警"
+                  },
+                  {
+                    "id": "tag-data",
+                    "component": "Tag",
+                    "props": { "color": "purple" },
+                    "children": "数据决策"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "auth-tabs",
+            "component": "Tabs",
+            "props": {
+              "activeKey": "{{state.activeTab}}",
+              "centered": true
+            },
+            "events": {
+              "onChange": [
+                { "type": "setState", "key": "activeTab", "value": "{{event}}" }
+              ]
+            },
+            "children": [
+              {
+                "id": "tab-login",
+                "component": "Tabs.TabPane",
+                "props": { "key": "login", "label": "登录" },
+                "children": [
+                  {
+                    "id": "login-form",
+                    "component": "Form",
+                    "props": { "layout": "vertical" },
+                    "children": [
+                      {
+                        "id": "login-username-item",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "username",
+                          "label": "用户名",
+                          "rules": [{ "required": true, "message": "请输入用户名" }]
+                        },
+                        "children": [
+                          {
+                            "id": "login-username-input",
+                            "component": "Input",
+                            "props": { "placeholder": "请输入用户名", "allowClear": true }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "login-password-item",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "password",
+                          "label": "密码",
+                          "rules": [{ "required": true, "message": "请输入密码" }]
+                        },
+                        "children": [
+                          {
+                            "id": "login-password-input",
+                            "component": "Input",
+                            "props": { "placeholder": "请输入密码", "type": "password" }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "login-remember-item",
+                        "component": "Form.Item",
+                        "props": { "name": "remember" },
+                        "children": [
+                          {
+                            "id": "login-remember-checkbox",
+                            "component": "Checkbox",
+                            "props": { "checked": "{{state.rememberMe}}" },
+                            "events": {
+                              "onChange": [
+                                { "type": "setState", "key": "rememberMe", "value": "{{event.target.checked}}" }
+                              ]
+                            },
+                            "children": "记住我"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "login-submit-item",
+                        "component": "Form.Item",
+                        "children": [
+                          {
+                            "id": "login-submit-btn",
+                            "component": "Button",
+                            "props": {
+                              "type": "primary",
+                              "block": true,
+                              "loading": "{{state.loginLoading}}",
+                              "style": {
+                                "background": "linear-gradient(90deg, #005f8e 0%, #00b4d8 100%)",
+                                "border": "none",
+                                "height": "42px",
+                                "fontSize": "15px",
+                                "letterSpacing": "4px",
+                                "borderRadius": "8px"
+                              }
+                            },
+                            "children": "登 录",
+                            "events": {
+                              "onClick": [{ "type": "callMethod", "name": "handleLogin" }]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "login-forgot-item",
+                        "component": "Form.Item",
+                        "children": [
+                          {
+                            "id": "login-forgot-btn",
+                            "component": "Button",
+                            "props": { "type": "link", "block": true },
+                            "children": "忘记密码？",
+                            "events": {
+                              "onClick": [
+                                { "type": "setState", "key": "activeTab", "value": "forgot" }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "tab-register",
+                "component": "Tabs.TabPane",
+                "props": { "key": "register", "label": "注册" },
+                "children": [
+                  {
+                    "id": "register-form",
+                    "component": "Form",
+                    "props": { "layout": "vertical" },
+                    "children": [
+                      {
+                        "id": "reg-username-item",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "username",
+                          "label": "用户名",
+                          "rules": [
+                            { "required": true, "message": "请输入用户名" },
+                            { "min": 3, "message": "用户名至少3个字符" },
+                            { "max": 20, "message": "用户名不超过20个字符" }
+                          ]
+                        },
+                        "children": [
+                          {
+                            "id": "reg-username-input",
+                            "component": "Input",
+                            "props": { "placeholder": "3-20个字符", "allowClear": true }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "reg-email-item",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "email",
+                          "label": "邮箱",
+                          "rules": [
+                            { "required": true, "message": "请输入邮箱" },
+                            { "type": "email", "message": "请输入有效的邮箱地址" }
+                          ]
+                        },
+                        "children": [
+                          {
+                            "id": "reg-email-input",
+                            "component": "Input",
+                            "props": { "placeholder": "请输入邮箱地址", "type": "email", "allowClear": true }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "reg-password-item",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "password",
+                          "label": "密码",
+                          "rules": [
+                            { "required": true, "message": "请输入密码" },
+                            { "min": 8, "message": "密码至少8个字符" }
+                          ]
+                        },
+                        "children": [
+                          {
+                            "id": "reg-password-input",
+                            "component": "Input",
+                            "props": { "placeholder": "至少8个字符", "type": "password" }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "reg-confirm-item",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "confirmPassword",
+                          "label": "确认密码",
+                          "dependencies": ["password"],
+                          "rules": [
+                            { "required": true, "message": "请再次输入密码" },
+                            {
+                              "validator": {
+                                "type": "JSFunction",
+                                "params": ["_, value", "getFieldValue"],
+                                "body": "if (!value || getFieldValue('password') === value) { return Promise.resolve(); } return Promise.reject(new Error('两次输入的密码不一致'));"
+                              }
+                            }
+                          ]
+                        },
+                        "children": [
+                          {
+                            "id": "reg-confirm-input",
+                            "component": "Input",
+                            "props": { "placeholder": "请再次输入密码", "type": "password" }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "reg-agree-item",
+                        "component": "Form.Item",
+                        "props": { "name": "agree" },
+                        "children": [
+                          {
+                            "id": "reg-agree-checkbox",
+                            "component": "Checkbox",
+                            "props": { "checked": "{{state.agreeTerms}}" },
+                            "events": {
+                              "onChange": [
+                                { "type": "setState", "key": "agreeTerms", "value": "{{event.target.checked}}" }
+                              ]
+                            },
+                            "children": "我已阅读并同意《用户协议》和《隐私政策》"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "reg-submit-item",
+                        "component": "Form.Item",
+                        "children": [
+                          {
+                            "id": "reg-submit-btn",
+                            "component": "Button",
+                            "props": {
+                              "type": "primary",
+                              "block": true,
+                              "loading": "{{state.registerLoading}}",
+                              "disabled": "{{!state.agreeTerms}}",
+                              "style": {
+                                "background": "linear-gradient(90deg, #005f8e 0%, #00b4d8 100%)",
+                                "border": "none",
+                                "height": "42px",
+                                "fontSize": "15px",
+                                "letterSpacing": "4px",
+                                "borderRadius": "8px"
+                              }
+                            },
+                            "children": "注 册",
+                            "events": {
+                              "onClick": [{ "type": "callMethod", "name": "handleRegister" }]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "tab-forgot",
+                "component": "Tabs.TabPane",
+                "props": { "key": "forgot", "label": "忘记密码" },
+                "children": [
+                  {
+                    "id": "reset-form",
+                    "component": "Form",
+                    "props": { "layout": "vertical" },
+                    "children": [
+                      {
+                        "id": "reset-email-item",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "email",
+                          "label": "注册邮箱",
+                          "rules": [
+                            { "required": true, "message": "请输入注册邮箱" },
+                            { "type": "email", "message": "请输入有效的邮箱地址" }
+                          ]
+                        },
+                        "children": [
+                          {
+                            "id": "reset-email-input",
+                            "component": "Input",
+                            "props": { "placeholder": "请输入注册时使用的邮箱", "type": "email", "allowClear": true }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "reset-code-item",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "code",
+                          "label": "验证码",
+                          "rules": [{ "required": true, "message": "请输入验证码" }]
+                        },
+                        "children": [
+                          {
+                            "id": "reset-code-row",
+                            "component": "Space",
+                            "props": { "style": { "width": "100%" } },
+                            "children": [
+                              {
+                                "id": "reset-code-input",
+                                "component": "Input",
+                                "props": {
+                                  "placeholder": "请输入验证码",
+                                  "maxLength": 6,
+                                  "style": { "flex": 1 }
+                                }
+                              },
+                              {
+                                "id": "send-code-btn",
+                                "component": "Button",
+                                "props": {
+                                  "disabled": "{{state.countdownActive}}"
+                                },
+                                "children": "{{computed.sendBtnText}}",
+                                "events": {
+                                  "onClick": [{ "type": "callMethod", "name": "sendCode" }]
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "id": "reset-newpwd-item",
+                        "component": "Form.Item",
+                        "props": {
+                          "name": "newPassword",
+                          "label": "新密码",
+                          "rules": [
+                            { "required": true, "message": "请输入新密码" },
+                            { "min": 8, "message": "密码至少8个字符" }
+                          ]
+                        },
+                        "children": [
+                          {
+                            "id": "reset-newpwd-input",
+                            "component": "Input",
+                            "props": { "placeholder": "至少8个字符", "type": "password" }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "reset-submit-item",
+                        "component": "Form.Item",
+                        "children": [
+                          {
+                            "id": "reset-submit-btn",
+                            "component": "Button",
+                            "props": {
+                              "type": "primary",
+                              "block": true,
+                              "loading": "{{state.resetLoading}}",
+                              "style": {
+                                "background": "linear-gradient(90deg, #005f8e 0%, #00b4d8 100%)",
+                                "border": "none",
+                                "height": "42px",
+                                "fontSize": "15px",
+                                "letterSpacing": "2px",
+                                "borderRadius": "8px"
+                              }
+                            },
+                            "children": "重置密码",
+                            "events": {
+                              "onClick": [{ "type": "callMethod", "name": "handleReset" }]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "reset-back-item",
+                        "component": "Form.Item",
+                        "children": [
+                          {
+                            "id": "reset-back-btn",
+                            "component": "Button",
+                            "props": { "type": "link", "block": true },
+                            "children": "返回登录",
+                            "events": {
+                              "onClick": [
+                                { "type": "setState", "key": "activeTab", "value": "login" }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

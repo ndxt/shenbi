@@ -1,0 +1,641 @@
+{
+  "id": "product-management",
+  "name": "商品管理",
+  "state": {
+    "productList": { "default": [] },
+    "total": { "default": 0 },
+    "loading": { "default": false },
+    "nameKeyword": { "default": "" },
+    "categoryFilter": { "default": null },
+    "priceRange": { "default": [null, null] },
+    "pagination": { "default": { "current": 1, "pageSize": 10 } },
+    "dialogMode": { "default": null },
+    "currentRecord": { "default": {} }
+  },
+  "computed": {
+    "dialogTitle": {
+      "deps": ["state.dialogMode"],
+      "expr": "{{state.dialogMode === \"edit\" ? \"编辑商品\" : \"新增商品\"}}"
+    }
+  },
+  "methods": {
+    "fetchProducts": {
+      "body": [
+        { "type": "setState", "key": "loading", "value": true },
+        {
+          "type": "fetch",
+          "datasource": "productList",
+          "onSuccess": [
+            { "type": "setState", "key": "productList", "value": "{{response.data.list}}" },
+            { "type": "setState", "key": "total", "value": "{{response.data.total}}" }
+          ],
+          "onError": [
+            { "type": "message", "level": "error", "content": "获取商品列表失败" }
+          ],
+          "onFinally": [
+            { "type": "setState", "key": "loading", "value": false }
+          ]
+        }
+      ]
+    },
+    "openAddDialog": {
+      "body": [
+        { "type": "setState", "key": "dialogMode", "value": "add" },
+        { "type": "setState", "key": "currentRecord", "value": {} },
+        { "type": "modal", "id": "productDialog", "open": true }
+      ]
+    },
+    "openEditDialog": {
+      "params": ["record"],
+      "body": [
+        { "type": "setState", "key": "dialogMode", "value": "edit" },
+        { "type": "setState", "key": "currentRecord", "value": "{{params.record}}" },
+        { "type": "modal", "id": "productDialog", "open": true }
+      ]
+    },
+    "closeDialog": {
+      "body": [
+        { "type": "modal", "id": "productDialog", "open": false },
+        { "type": "resetForm", "formRef": "product-form" },
+        { "type": "setState", "key": "dialogMode", "value": null },
+        { "type": "setState", "key": "currentRecord", "value": {} }
+      ]
+    },
+    "handleSearch": {
+      "body": [
+        { "type": "setState", "key": "pagination.current", "value": 1 },
+        { "type": "callMethod", "name": "fetchProducts" }
+      ]
+    },
+    "handleReset": {
+      "body": [
+        { "type": "setState", "key": "nameKeyword", "value": "" },
+        { "type": "setState", "key": "categoryFilter", "value": null },
+        { "type": "setState", "key": "priceRange", "value": [null, null] },
+        { "type": "setState", "key": "pagination.current", "value": 1 },
+        { "type": "callMethod", "name": "fetchProducts" }
+      ]
+    }
+  },
+  "dataSources": {
+    "productList": {
+      "api": {
+        "method": "GET",
+        "url": "/api/products",
+        "params": {
+          "name": "{{state.nameKeyword}}",
+          "category": "{{state.categoryFilter}}",
+          "priceMin": "{{state.priceRange[0]}}",
+          "priceMax": "{{state.priceRange[1]}}",
+          "page": "{{state.pagination.current}}",
+          "pageSize": "{{state.pagination.pageSize}}"
+        }
+      }
+    },
+    "createProduct": {
+      "api": {
+        "method": "POST",
+        "url": "/api/products",
+        "data": "{{state.currentRecord}}"
+      }
+    },
+    "updateProduct": {
+      "api": {
+        "method": "PUT",
+        "url": "{{'/api/products/' + state.currentRecord.id}}",
+        "data": "{{state.currentRecord}}"
+      }
+    }
+  },
+  "lifecycle": {
+    "onMount": [{ "type": "callMethod", "name": "fetchProducts" }]
+  },
+  "body": {
+    "id": "root",
+    "component": "Container",
+    "props": { "direction": "column", "gap": 16 },
+    "children": [
+      {
+        "id": "search-card",
+        "component": "Card",
+        "props": { "title": "搜索条件" },
+        "children": [
+          {
+            "id": "search-form",
+            "component": "Form",
+            "props": { "layout": "inline" },
+            "children": [
+              {
+                "id": "name-form-item",
+                "component": "Form.Item",
+                "props": { "label": "商品名称" },
+                "children": [
+                  {
+                    "id": "name-input",
+                    "component": "Input",
+                    "props": {
+                      "placeholder": "请输入商品名称",
+                      "value": "{{state.nameKeyword}}",
+                      "allowClear": true,
+                      "style": { "width": 200 }
+                    },
+                    "events": {
+                      "onChange": [
+                        { "type": "setState", "key": "nameKeyword", "value": "{{event.target.value}}" }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "category-form-item",
+                "component": "Form.Item",
+                "props": { "label": "分类" },
+                "children": [
+                  {
+                    "id": "category-select",
+                    "component": "Select",
+                    "props": {
+                      "placeholder": "请选择分类",
+                      "value": "{{state.categoryFilter}}",
+                      "allowClear": true,
+                      "style": { "width": 160 },
+                      "options": [
+                        { "label": "电子产品", "value": "electronics" },
+                        { "label": "服装", "value": "clothing" },
+                        { "label": "食品", "value": "food" },
+                        { "label": "家居", "value": "home" },
+                        { "label": "运动", "value": "sports" }
+                      ]
+                    },
+                    "events": {
+                      "onChange": [
+                        { "type": "setState", "key": "categoryFilter", "value": "{{event}}" }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "price-min-form-item",
+                "component": "Form.Item",
+                "props": { "label": "价格区间" },
+                "children": [
+                  {
+                    "id": "price-min-input",
+                    "component": "InputNumber",
+                    "props": {
+                      "placeholder": "最低价",
+                      "value": "{{state.priceRange[0]}}",
+                      "min": 0,
+                      "style": { "width": 110 }
+                    },
+                    "events": {
+                      "onChange": [
+                        { "type": "setState", "key": "priceRange", "value": "{{[event, state.priceRange[1]]}}" }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "price-sep",
+                "component": "Form.Item",
+                "children": [
+                  {
+                    "id": "price-sep-text",
+                    "component": "Container",
+                    "props": { "direction": "row" },
+                    "children": "~"
+                  }
+                ]
+              },
+              {
+                "id": "price-max-form-item",
+                "component": "Form.Item",
+                "children": [
+                  {
+                    "id": "price-max-input",
+                    "component": "InputNumber",
+                    "props": {
+                      "placeholder": "最高价",
+                      "value": "{{state.priceRange[1]}}",
+                      "min": 0,
+                      "style": { "width": 110 }
+                    },
+                    "events": {
+                      "onChange": [
+                        { "type": "setState", "key": "priceRange", "value": "{{[state.priceRange[0], event]}}" }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "search-actions-item",
+                "component": "Form.Item",
+                "children": [
+                  {
+                    "id": "search-actions-space",
+                    "component": "Space",
+                    "children": [
+                      {
+                        "id": "search-btn",
+                        "component": "Button",
+                        "props": { "type": "primary" },
+                        "children": "查询",
+                        "events": {
+                          "onClick": [{ "type": "callMethod", "name": "handleSearch" }]
+                        }
+                      },
+                      {
+                        "id": "reset-btn",
+                        "component": "Button",
+                        "children": "重置",
+                        "events": {
+                          "onClick": [{ "type": "callMethod", "name": "handleReset" }]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "table-card",
+        "component": "Card",
+        "slots": {
+          "title": {
+            "id": "table-card-title",
+            "component": "__fragment",
+            "children": "商品列表"
+          },
+          "extra": {
+            "id": "table-card-extra",
+            "component": "Button",
+            "props": { "type": "primary" },
+            "children": "新增商品",
+            "events": {
+              "onClick": [{ "type": "callMethod", "name": "openAddDialog" }]
+            }
+          }
+        },
+        "children": [
+          {
+            "id": "product-table",
+            "component": "Table",
+            "props": {
+              "rowKey": "id",
+              "dataSource": "{{state.productList}}",
+              "loading": "{{state.loading}}",
+              "pagination": {
+                "current": "{{state.pagination.current}}",
+                "pageSize": "{{state.pagination.pageSize}}",
+                "total": "{{state.total}}",
+                "showSizeChanger": true,
+                "showTotal": { "type": "JSFunction", "params": ["total"], "body": "return `共 ${total} 条`;" }
+              }
+            },
+            "events": {
+              "onChange": [
+                { "type": "setState", "key": "pagination.current", "value": "{{event[0]?.current}}" },
+                { "type": "setState", "key": "pagination.pageSize", "value": "{{event[0]?.pageSize}}" },
+                { "type": "callMethod", "name": "fetchProducts" }
+              ]
+            },
+            "columns": [
+              {
+                "title": "商品名称",
+                "dataIndex": "name",
+                "width": 200
+              },
+              {
+                "title": "分类",
+                "dataIndex": "category",
+                "width": 120
+              },
+              {
+                "title": "价格 (¥)",
+                "dataIndex": "price",
+                "width": 120,
+                "render": {
+                  "id": "price-text",
+                  "component": "__fragment",
+                  "children": "{{text != null ? text.toFixed(2) : '-'}}"
+                }
+              },
+              {
+                "title": "库存",
+                "dataIndex": "stock",
+                "width": 100
+              },
+              {
+                "title": "状态",
+                "dataIndex": "status",
+                "width": 100,
+                "render": {
+                  "id": "status-tag",
+                  "component": "Tag",
+                  "props": {
+                    "color": "{{text === \"on_sale\" ? \"green\" : text === \"off_sale\" ? \"default\" : \"orange\"}}"
+                  },
+                  "children": "{{text === \"on_sale\" ? \"在售\" : text === \"off_sale\" ? \"下架\" : \"待上架\"}}"
+                }
+              },
+              {
+                "title": "操作",
+                "key": "actions",
+                "width": 160,
+                "render": {
+                  "id": "action-col",
+                  "component": "Space",
+                  "children": [
+                    {
+                      "id": "edit-btn",
+                      "component": "Button",
+                      "props": { "type": "link", "size": "small" },
+                      "children": "编辑",
+                      "events": {
+                        "onClick": [
+                          {
+                            "type": "callMethod",
+                            "name": "openEditDialog",
+                            "params": { "record": "{{record}}" }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "delete-confirm",
+                      "component": "Popconfirm",
+                      "props": {
+                        "title": "确认删除该商品？",
+                        "okText": "确认",
+                        "cancelText": "取消"
+                      },
+                      "events": {
+                        "onConfirm": [
+                          {
+                            "type": "fetch",
+                            "method": "DELETE",
+                            "url": "{{'/api/products/' + record.id}}",
+                            "onSuccess": [
+                              { "type": "message", "level": "success", "content": "删除成功" },
+                              { "type": "callMethod", "name": "fetchProducts" }
+                            ],
+                            "onError": [
+                              { "type": "message", "level": "error", "content": "删除失败" }
+                            ]
+                          }
+                        ]
+                      },
+                      "children": [
+                        {
+                          "id": "delete-btn",
+                          "component": "Button",
+                          "props": { "type": "link", "size": "small", "danger": true },
+                          "children": "删除"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "dialogs": [
+    {
+      "id": "productDialog",
+      "component": "Modal",
+      "props": {
+        "open": true,
+        "destroyOnClose": true,
+        "title": "{{computed.dialogTitle}}",
+        "width": 560,
+        "okText": "保存",
+        "cancelText": "取消"
+      },
+      "events": {
+        "onCancel": [{ "type": "callMethod", "name": "closeDialog" }],
+        "onOk": [
+          {
+            "type": "validate",
+            "formRef": "product-form",
+            "onSuccess": [
+              {
+                "type": "condition",
+                "if": "{{state.dialogMode === \"edit\"}}",
+                "then": [
+                  {
+                    "type": "fetch",
+                    "datasource": "updateProduct",
+                    "onSuccess": [
+                      { "type": "message", "level": "success", "content": "编辑成功" },
+                      { "type": "callMethod", "name": "closeDialog" },
+                      { "type": "callMethod", "name": "fetchProducts" }
+                    ],
+                    "onError": [
+                      { "type": "message", "level": "error", "content": "编辑失败" }
+                    ]
+                  }
+                ],
+                "else": [
+                  {
+                    "type": "fetch",
+                    "datasource": "createProduct",
+                    "onSuccess": [
+                      { "type": "message", "level": "success", "content": "新增成功" },
+                      { "type": "callMethod", "name": "closeDialog" },
+                      { "type": "callMethod", "name": "fetchProducts" }
+                    ],
+                    "onError": [
+                      { "type": "message", "level": "error", "content": "新增失败" }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "onError": [
+              { "type": "message", "level": "warning", "content": "请检查表单填写是否完整" }
+            ]
+          }
+        ]
+      },
+      "children": [
+        {
+          "id": "product-form",
+          "component": "Form",
+          "props": {
+            "layout": "vertical",
+            "initialValues": "{{state.currentRecord}}"
+          },
+          "children": [
+            {
+              "id": "form-name-item",
+              "component": "Form.Item",
+              "props": {
+                "name": "name",
+                "label": "商品名称",
+                "rules": [
+                  { "required": true, "message": "请输入商品名称" },
+                  { "max": 100, "message": "名称不超过100个字符" }
+                ]
+              },
+              "children": [
+                {
+                  "id": "form-name-input",
+                  "component": "Input",
+                  "props": { "placeholder": "请输入商品名称" }
+                }
+              ]
+            },
+            {
+              "id": "form-category-item",
+              "component": "Form.Item",
+              "props": {
+                "name": "category",
+                "label": "分类",
+                "rules": [{ "required": true, "message": "请选择分类" }]
+              },
+              "children": [
+                {
+                  "id": "form-category-select",
+                  "component": "Select",
+                  "props": {
+                    "placeholder": "请选择分类",
+                    "options": [
+                      { "label": "电子产品", "value": "electronics" },
+                      { "label": "服装", "value": "clothing" },
+                      { "label": "食品", "value": "food" },
+                      { "label": "家居", "value": "home" },
+                      { "label": "运动", "value": "sports" }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "id": "form-row-price-stock",
+              "component": "Row",
+              "props": { "gutter": 16 },
+              "children": [
+                {
+                  "id": "form-price-col",
+                  "component": "Col",
+                  "props": { "span": 12 },
+                  "children": [
+                    {
+                      "id": "form-price-item",
+                      "component": "Form.Item",
+                      "props": {
+                        "name": "price",
+                        "label": "价格 (¥)",
+                        "rules": [
+                          { "required": true, "message": "请输入价格" },
+                          { "type": "number", "min": 0, "message": "价格不能为负数" }
+                        ]
+                      },
+                      "children": [
+                        {
+                          "id": "form-price-input",
+                          "component": "InputNumber",
+                          "props": {
+                            "placeholder": "请输入价格",
+                            "min": 0,
+                            "precision": 2,
+                            "style": { "width": "100%" }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "form-stock-col",
+                  "component": "Col",
+                  "props": { "span": 12 },
+                  "children": [
+                    {
+                      "id": "form-stock-item",
+                      "component": "Form.Item",
+                      "props": {
+                        "name": "stock",
+                        "label": "库存",
+                        "rules": [
+                          { "required": true, "message": "请输入库存" },
+                          { "type": "number", "min": 0, "message": "库存不能为负数" }
+                        ]
+                      },
+                      "children": [
+                        {
+                          "id": "form-stock-input",
+                          "component": "InputNumber",
+                          "props": {
+                            "placeholder": "请输入库存",
+                            "min": 0,
+                            "precision": 0,
+                            "style": { "width": "100%" }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "form-status-item",
+              "component": "Form.Item",
+              "props": {
+                "name": "status",
+                "label": "状态",
+                "rules": [{ "required": true, "message": "请选择状态" }]
+              },
+              "children": [
+                {
+                  "id": "form-status-select",
+                  "component": "Select",
+                  "props": {
+                    "placeholder": "请选择状态",
+                    "options": [
+                      { "label": "在售", "value": "on_sale" },
+                      { "label": "下架", "value": "off_sale" },
+                      { "label": "待上架", "value": "pending" }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "id": "form-desc-item",
+              "component": "Form.Item",
+              "props": {
+                "name": "description",
+                "label": "商品描述"
+              },
+              "children": [
+                {
+                  "id": "form-desc-textarea",
+                  "component": "Input.TextArea",
+                  "props": {
+                    "placeholder": "请输入商品描述（选填）",
+                    "rows": 3,
+                    "maxLength": 500,
+                    "showCount": true
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

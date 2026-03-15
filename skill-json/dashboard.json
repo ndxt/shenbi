@@ -1,0 +1,345 @@
+{
+  "id": "ops-dashboard",
+  "name": "运营数据看板",
+  "state": {
+    "kpiData": {
+      "default": {
+        "orders": { "value": 1286, "trend": "+12.4%" },
+        "revenue": { "value": 328600, "trend": "+8.7%" },
+        "newUsers": { "value": 432, "trend": "+5.2%" },
+        "conversion": { "value": 12.4, "trend": "-0.3%" }
+      }
+    },
+    "trendData": {
+      "default": [
+        { "date": "03-09", "orders": 980,  "revenue": 245000 },
+        { "date": "03-10", "orders": 1102, "revenue": 278000 },
+        { "date": "03-11", "orders": 1050, "revenue": 261000 },
+        { "date": "03-12", "orders": 1230, "revenue": 308000 },
+        { "date": "03-13", "orders": 1180, "revenue": 295000 },
+        { "date": "03-14", "orders": 1320, "revenue": 331000 },
+        { "date": "03-15", "orders": 1286, "revenue": 328600 }
+      ]
+    },
+    "channelData": {
+      "default": [
+        { "channel": "自然搜索", "value": 38 },
+        { "channel": "付费广告", "value": 25 },
+        { "channel": "社交媒体", "value": 18 },
+        { "channel": "邮件营销", "value": 10 },
+        { "channel": "直接访问", "value": 9 }
+      ]
+    },
+    "topProducts": {
+      "default": [
+        { "rank": 1,  "name": "无线蓝牙耳机 Pro",  "category": "电子产品", "sales": 3280, "revenue": 1312000 },
+        { "rank": 2,  "name": "运动跑步鞋 X9",     "category": "运动",     "sales": 2950, "revenue": 885000  },
+        { "rank": 3,  "name": "智能手表 S3",        "category": "电子产品", "sales": 2640, "revenue": 1320000 },
+        { "rank": 4,  "name": "瑜伽垫专业版",       "category": "运动",     "sales": 2410, "revenue": 241000  },
+        { "rank": 5,  "name": "保温杯 500ml",       "category": "家居",     "sales": 2200, "revenue": 176000  },
+        { "rank": 6,  "name": "机械键盘 TKL",       "category": "电子产品", "sales": 1980, "revenue": 990000  },
+        { "rank": 7,  "name": "棉麻休闲衬衫",       "category": "服装",     "sales": 1860, "revenue": 279000  },
+        { "rank": 8,  "name": "空气炸锅 4.5L",      "category": "家居",     "sales": 1720, "revenue": 688000  },
+        { "rank": 9,  "name": "蛋白粉 1kg",         "category": "食品",     "sales": 1650, "revenue": 330000  },
+        { "rank": 10, "name": "降噪耳机 Q30",       "category": "电子产品", "sales": 1540, "revenue": 616000  }
+      ]
+    },
+    "trendMetric": { "default": "orders" }
+  },
+  "body": {
+    "id": "root",
+    "component": "Container",
+    "props": { "direction": "column", "gap": 16 },
+    "children": [
+      {
+        "id": "page-header",
+        "component": "Flex",
+        "props": { "justify": "space-between", "align": "center" },
+        "children": [
+          {
+            "id": "page-title-text",
+            "component": "Container",
+            "props": { "direction": "column", "gap": 2 },
+            "children": "运营数据看板"
+          },
+          {
+            "id": "header-date",
+            "component": "Tag",
+            "props": { "color": "blue" },
+            "children": "数据截至：2026-03-15"
+          }
+        ]
+      },
+      {
+        "id": "kpi-row",
+        "component": "Row",
+        "props": { "gutter": [16, 16] },
+        "children": [
+          {
+            "id": "kpi-orders-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "kpi-orders-card",
+                "component": "Card",
+                "props": { "hoverable": true },
+                "children": [
+                  {
+                    "id": "kpi-orders-stat",
+                    "component": "Statistic",
+                    "props": {
+                      "title": "今日订单",
+                      "value": "{{state.kpiData.orders.value}}",
+                      "suffix": "单",
+                      "valueStyle": { "color": "#1677ff" }
+                    }
+                  },
+                  {
+                    "id": "kpi-orders-trend",
+                    "component": "Tag",
+                    "props": { "color": "green", "style": { "marginTop": 8 } },
+                    "children": "{{state.kpiData.orders.trend}}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "kpi-revenue-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "kpi-revenue-card",
+                "component": "Card",
+                "props": { "hoverable": true },
+                "children": [
+                  {
+                    "id": "kpi-revenue-stat",
+                    "component": "Statistic",
+                    "props": {
+                      "title": "今日营收",
+                      "value": "{{state.kpiData.revenue.value}}",
+                      "prefix": "¥",
+                      "precision": 0,
+                      "valueStyle": { "color": "#52c41a" }
+                    }
+                  },
+                  {
+                    "id": "kpi-revenue-trend",
+                    "component": "Tag",
+                    "props": { "color": "green", "style": { "marginTop": 8 } },
+                    "children": "{{state.kpiData.revenue.trend}}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "kpi-users-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "kpi-users-card",
+                "component": "Card",
+                "props": { "hoverable": true },
+                "children": [
+                  {
+                    "id": "kpi-users-stat",
+                    "component": "Statistic",
+                    "props": {
+                      "title": "新增用户",
+                      "value": "{{state.kpiData.newUsers.value}}",
+                      "suffix": "人",
+                      "valueStyle": { "color": "#722ed1" }
+                    }
+                  },
+                  {
+                    "id": "kpi-users-trend",
+                    "component": "Tag",
+                    "props": { "color": "green", "style": { "marginTop": 8 } },
+                    "children": "{{state.kpiData.newUsers.trend}}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "kpi-conversion-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "kpi-conversion-card",
+                "component": "Card",
+                "props": { "hoverable": true },
+                "children": [
+                  {
+                    "id": "kpi-conversion-stat",
+                    "component": "Statistic",
+                    "props": {
+                      "title": "转化率",
+                      "value": "{{state.kpiData.conversion.value}}",
+                      "suffix": "%",
+                      "precision": 1,
+                      "valueStyle": { "color": "#fa8c16" }
+                    }
+                  },
+                  {
+                    "id": "kpi-conversion-trend",
+                    "component": "Tag",
+                    "props": { "color": "red", "style": { "marginTop": 8 } },
+                    "children": "{{state.kpiData.conversion.trend}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "trend-card",
+        "component": "Card",
+        "props": { "title": "近7天趋势" },
+        "slots": {
+          "extra": {
+            "id": "trend-metric-switch",
+            "component": "Segmented",
+            "props": {
+              "value": "{{state.trendMetric}}",
+              "options": [
+                { "label": "订单量", "value": "orders" },
+                { "label": "营收", "value": "revenue" }
+              ]
+            },
+            "events": {
+              "onChange": [
+                { "type": "setState", "key": "trendMetric", "value": "{{event}}" }
+              ]
+            }
+          }
+        },
+        "children": [
+          {
+            "id": "trend-line-chart",
+            "component": "Chart.Line",
+            "props": {
+              "data": "{{state.trendData}}",
+              "xField": "date",
+              "yField": "{{state.trendMetric}}",
+              "height": 280,
+              "autoFit": true,
+              "smooth": true,
+              "point": { "size": 4, "shape": "circle" },
+              "tooltip": { "showMarkers": true }
+            }
+          }
+        ]
+      },
+      {
+        "id": "bottom-row",
+        "component": "Row",
+        "props": { "gutter": [16, 16] },
+        "children": [
+          {
+            "id": "channel-col",
+            "component": "Col",
+            "props": { "span": 10 },
+            "children": [
+              {
+                "id": "channel-card",
+                "component": "Card",
+                "props": { "title": "渠道分布" },
+                "children": [
+                  {
+                    "id": "channel-pie-chart",
+                    "component": "Chart.Pie",
+                    "props": {
+                      "data": "{{state.channelData}}",
+                      "angleField": "value",
+                      "colorField": "channel",
+                      "innerRadius": 0.5,
+                      "height": 300,
+                      "autoFit": true,
+                      "label": {
+                        "text": "channel",
+                        "style": { "fontWeight": "bold" }
+                      },
+                      "legend": { "position": "bottom" },
+                      "tooltip": {
+                        "items": [{ "field": "value", "name": "占比", "valueFormatter": { "type": "JSFunction", "params": ["v"], "body": "return v + '%';" } }]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "top-products-col",
+            "component": "Col",
+            "props": { "span": 14 },
+            "children": [
+              {
+                "id": "top-products-card",
+                "component": "Card",
+                "props": { "title": "Top 10 商品" },
+                "children": [
+                  {
+                    "id": "top-products-table",
+                    "component": "Table",
+                    "props": {
+                      "rowKey": "rank",
+                      "dataSource": "{{state.topProducts}}",
+                      "size": "small",
+                      "pagination": false
+                    },
+                    "columns": [
+                      {
+                        "title": "排名",
+                        "dataIndex": "rank",
+                        "width": 60,
+                        "render": {
+                          "id": "rank-tag",
+                          "component": "Tag",
+                          "props": {
+                            "color": "{{text <= 3 ? (text === 1 ? 'gold' : text === 2 ? 'silver' : 'bronze') : 'default'}}"
+                          },
+                          "children": "{{text}}"
+                        }
+                      },
+                      { "title": "商品名称", "dataIndex": "name" },
+                      {
+                        "title": "分类",
+                        "dataIndex": "category",
+                        "width": 90,
+                        "render": {
+                          "id": "category-tag",
+                          "component": "Tag",
+                          "children": "{{text}}"
+                        }
+                      },
+                      { "title": "销量", "dataIndex": "sales", "width": 80 },
+                      {
+                        "title": "营收 (¥)",
+                        "dataIndex": "revenue",
+                        "width": 110,
+                        "render": {
+                          "id": "revenue-text",
+                          "component": "__fragment",
+                          "children": "{{(text / 10000).toFixed(1) + '万'}}"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

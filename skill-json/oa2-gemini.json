@@ -1,0 +1,1526 @@
+{
+    "id": "oa-attendance",
+    "name": "考勤管理系统",
+    "state": {
+        "currentYear": {
+            "default": 2026
+        },
+        "currentMonth": {
+            "default": 3
+        },
+        "selectedDate": {
+            "default": "2026-03-14"
+        },
+        "searchEmployee": {
+            "default": "张凯"
+        },
+        "siderMenuKey": {
+            "default": "calendar"
+        },
+        "currentEmployee": {
+            "default": {
+                "name": "张凯",
+                "role": "普通员工",
+                "dept": "技术管理中心",
+                "org": "南大元腾"
+            }
+        },
+        "attendanceSummary": {
+            "default": {
+                "leaveCount": 1,
+                "leaveDays": 0.0,
+                "lateCount": 2,
+                "missCardCount": 4,
+                "absentHours": 0.00
+            }
+        },
+        "calendarData": {
+            "default": {
+                "2026-03-02": {
+                    "type": "work",
+                    "arriveTime": "08:28",
+                    "leaveTime": "17:38",
+                    "tags": []
+                },
+                "2026-03-03": {
+                    "type": "work",
+                    "arriveTime": "13:20",
+                    "leaveTime": "16:11",
+                    "tags": [
+                        {
+                            "label": "补打卡",
+                            "color": "orange"
+                        },
+                        {
+                            "label": "早退",
+                            "color": "orange"
+                        }
+                    ]
+                },
+                "2026-03-04": {
+                    "type": "work",
+                    "arriveTime": "08:28",
+                    "leaveTime": "18:32",
+                    "tags": []
+                },
+                "2026-03-05": {
+                    "type": "work",
+                    "arriveTime": "08:27",
+                    "leaveTime": "18:57",
+                    "tags": []
+                },
+                "2026-03-06": {
+                    "type": "work",
+                    "arriveTime": "17:45",
+                    "leaveTime": "17:45",
+                    "tags": [
+                        {
+                            "label": "未刷卡",
+                            "color": "red"
+                        }
+                    ]
+                },
+                "2026-03-09": {
+                    "type": "work",
+                    "arriveTime": "08:28",
+                    "leaveTime": "19:04",
+                    "tags": [
+                        {
+                            "label": "出勤",
+                            "color": "green"
+                        }
+                    ]
+                },
+                "2026-03-10": {
+                    "type": "work",
+                    "arriveTime": "13:38",
+                    "leaveTime": "18:20",
+                    "tags": [
+                        {
+                            "label": "未刷卡",
+                            "color": "red"
+                        }
+                    ]
+                },
+                "2026-03-11": {
+                    "type": "work",
+                    "arriveTime": "09:40",
+                    "leaveTime": "19:19",
+                    "tags": [
+                        {
+                            "label": "迟到",
+                            "color": "orange"
+                        },
+                        {
+                            "label": "出勤",
+                            "color": "green"
+                        }
+                    ]
+                },
+                "2026-03-12": {
+                    "type": "work",
+                    "arriveTime": "08:26",
+                    "leaveTime": "18:39",
+                    "tags": []
+                },
+                "2026-03-13": {
+                    "type": "work",
+                    "arriveTime": "17:44",
+                    "leaveTime": "17:44",
+                    "tags": [
+                        {
+                            "label": "未刷卡",
+                            "color": "red"
+                        }
+                    ]
+                },
+                "2026-03-14": {
+                    "type": "rest",
+                    "arriveTime": "08:10",
+                    "leaveTime": "13:56",
+                    "tags": [
+                        {
+                            "label": "出勤",
+                            "color": "green"
+                        },
+                        {
+                            "label": "出勤",
+                            "color": "green"
+                        }
+                    ]
+                }
+            }
+        },
+        "cardRecords": {
+            "default": [
+                {
+                    "id": 1,
+                    "name": "张凯",
+                    "time": "2026-03-14 08:30:17",
+                    "type": "门禁"
+                },
+                {
+                    "id": 2,
+                    "name": "张凯",
+                    "time": "2026-03-14 13:56:50",
+                    "type": "门禁"
+                },
+                {
+                    "id": 3,
+                    "name": "张凯",
+                    "time": "2026-03-14 13:56:51",
+                    "type": "门禁"
+                }
+            ]
+        },
+        "weekDays": {
+            "default": [
+                {
+                    "key": "mon",
+                    "label": "一"
+                },
+                {
+                    "key": "tue",
+                    "label": "二"
+                },
+                {
+                    "key": "wed",
+                    "label": "三"
+                },
+                {
+                    "key": "thu",
+                    "label": "四"
+                },
+                {
+                    "key": "fri",
+                    "label": "五"
+                },
+                {
+                    "key": "sat",
+                    "label": "六"
+                },
+                {
+                    "key": "sun",
+                    "label": "日"
+                }
+            ]
+        },
+        "calendarGrid": {
+            "default": [
+                [
+                    {
+                        "day": null,
+                        "dayNum": 23,
+                        "month": "prev",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-02-24",
+                        "dayNum": 24,
+                        "month": "prev",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-02-25",
+                        "dayNum": 25,
+                        "month": "prev",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-02-26",
+                        "dayNum": 26,
+                        "month": "prev",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-02-27",
+                        "dayNum": 27,
+                        "month": "prev",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-02-28",
+                        "dayNum": 28,
+                        "month": "prev",
+                        "type": "rest"
+                    },
+                    {
+                        "day": null,
+                        "dayNum": 1,
+                        "month": "current",
+                        "type": "rest"
+                    }
+                ],
+                [
+                    {
+                        "day": "2026-03-02",
+                        "dayNum": 2,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-03",
+                        "dayNum": 3,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-04",
+                        "dayNum": 4,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-05",
+                        "dayNum": 5,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-06",
+                        "dayNum": 6,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-07",
+                        "dayNum": 7,
+                        "month": "current",
+                        "type": "rest"
+                    },
+                    {
+                        "day": "2026-03-08",
+                        "dayNum": 8,
+                        "month": "current",
+                        "type": "rest"
+                    }
+                ],
+                [
+                    {
+                        "day": "2026-03-09",
+                        "dayNum": 9,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-10",
+                        "dayNum": 10,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-11",
+                        "dayNum": 11,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-12",
+                        "dayNum": 12,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-13",
+                        "dayNum": 13,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-14",
+                        "dayNum": 14,
+                        "month": "current",
+                        "type": "rest"
+                    },
+                    {
+                        "day": "2026-03-15",
+                        "dayNum": 15,
+                        "month": "current",
+                        "type": "rest"
+                    }
+                ],
+                [
+                    {
+                        "day": "2026-03-16",
+                        "dayNum": 16,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-17",
+                        "dayNum": 17,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-18",
+                        "dayNum": 18,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-19",
+                        "dayNum": 19,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-20",
+                        "dayNum": 20,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-21",
+                        "dayNum": 21,
+                        "month": "current",
+                        "type": "rest"
+                    },
+                    {
+                        "day": "2026-03-22",
+                        "dayNum": 22,
+                        "month": "current",
+                        "type": "rest"
+                    }
+                ],
+                [
+                    {
+                        "day": "2026-03-23",
+                        "dayNum": 23,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-24",
+                        "dayNum": 24,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-25",
+                        "dayNum": 25,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-26",
+                        "dayNum": 26,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-27",
+                        "dayNum": 27,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-28",
+                        "dayNum": 28,
+                        "month": "current",
+                        "type": "rest"
+                    },
+                    {
+                        "day": "2026-03-29",
+                        "dayNum": 29,
+                        "month": "current",
+                        "type": "rest"
+                    }
+                ],
+                [
+                    {
+                        "day": "2026-03-30",
+                        "dayNum": 30,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-03-31",
+                        "dayNum": 31,
+                        "month": "current",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-04-01",
+                        "dayNum": 1,
+                        "month": "next",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-04-02",
+                        "dayNum": 2,
+                        "month": "next",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-04-03",
+                        "dayNum": 3,
+                        "month": "next",
+                        "type": "work"
+                    },
+                    {
+                        "day": "2026-04-04",
+                        "dayNum": 4,
+                        "month": "next",
+                        "type": "rest"
+                    },
+                    {
+                        "day": "2026-04-05",
+                        "dayNum": 5,
+                        "month": "next",
+                        "type": "rest"
+                    }
+                ]
+            ]
+        }
+    },
+    "computed": {
+        "monthDisplay": {
+            "deps": [
+                "state.currentYear",
+                "state.currentMonth"
+            ],
+            "expr": "{{state.currentYear + '年' + state.currentMonth + '月'}}"
+        },
+        "employeeBreadcrumb": {
+            "deps": [
+                "state.currentEmployee"
+            ],
+            "expr": "{{state.currentEmployee.org + ' / ' + state.currentEmployee.dept + ' / ' + state.currentEmployee.name + '（' + state.currentEmployee.role + '）'}}"
+        }
+    },
+    "methods": {
+        "prevMonth": {
+            "body": [
+                {
+                    "type": "condition",
+                    "if": "{{state.currentMonth === 1}}",
+                    "then": [
+                        {
+                            "type": "setState",
+                            "key": "currentMonth",
+                            "value": 12
+                        },
+                        {
+                            "type": "setState",
+                            "key": "currentYear",
+                            "value": "{{state.currentYear - 1}}"
+                        }
+                    ],
+                    "else": [
+                        {
+                            "type": "setState",
+                            "key": "currentMonth",
+                            "value": "{{state.currentMonth - 1}}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "nextMonth": {
+            "body": [
+                {
+                    "type": "condition",
+                    "if": "{{state.currentMonth === 12}}",
+                    "then": [
+                        {
+                            "type": "setState",
+                            "key": "currentMonth",
+                            "value": 1
+                        },
+                        {
+                            "type": "setState",
+                            "key": "currentYear",
+                            "value": "{{state.currentYear + 1}}"
+                        }
+                    ],
+                    "else": [
+                        {
+                            "type": "setState",
+                            "key": "currentMonth",
+                            "value": "{{state.currentMonth + 1}}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "refreshRecords": {
+            "body": [
+                {
+                    "type": "message",
+                    "level": "info",
+                    "content": "刷新打卡记录..."
+                }
+            ]
+        }
+    },
+    "body": {
+        "id": "root",
+        "component": "Layout",
+        "style": {
+            "minHeight": "100vh"
+        },
+        "children": [
+            {
+                "id": "top-header",
+                "component": "Layout.Header",
+                "style": {
+                    "background": "#000000",
+                    "padding": "0 24px",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "space-between",
+                    "height": "48px",
+                    "lineHeight": "48px"
+                },
+                "children": [
+                    {
+                        "id": "header-left",
+                        "component": "Space",
+                        "props": {
+                            "size": "large"
+                        },
+                        "children": [
+                            {
+                                "id": "logo-area",
+                                "component": "Space",
+                                "props": {
+                                    "size": "small"
+                                },
+                                "style": {
+                                    "background": "#fff",
+                                    "padding": "0 8px",
+                                    "borderRadius": "12px 0 12px 0"
+                                },
+                                "children": [
+                                    {
+                                        "id": "logo-icon",
+                                        "component": "__fragment",
+                                        "style": {
+                                            "fontSize": "20px",
+                                            "color": "#1677ff",
+                                            "fontWeight": "bold"
+                                        },
+                                        "children": "C"
+                                    },
+                                    {
+                                        "id": "logo-text",
+                                        "component": "__fragment",
+                                        "style": {
+                                            "fontSize": "14px",
+                                            "color": "#000",
+                                            "fontWeight": "bold",
+                                            "fontStyle": "italic"
+                                        },
+                                        "children": "南大元腾"
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "system-title",
+                                "component": "__fragment",
+                                "style": {
+                                    "fontSize": "16px",
+                                    "color": "#fff",
+                                    "fontWeight": "500"
+                                },
+                                "children": "考勤管理系统"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "header-right",
+                        "component": "Space",
+                        "props": {
+                            "size": "middle"
+                        },
+                        "children": [
+                            {
+                                "id": "user-tag-bg",
+                                "component": "Container",
+                                "props": {
+                                    "direction": "row",
+                                    "gap": 8
+                                },
+                                "style": {
+                                    "background": "#6b2c91",
+                                    "borderRadius": "16px",
+                                    "padding": "0 12px",
+                                    "color": "#fff",
+                                    "fontSize": "12px",
+                                    "alignItems": "center",
+                                    "height": "24px"
+                                },
+                                "children": [
+                                    {
+                                        "id": "breadcrumb-text",
+                                        "component": "__fragment",
+                                        "children": "{{computed.employeeBreadcrumb}}"
+                                    },
+                                    {
+                                        "id": "breadcrumb-transfer",
+                                        "component": "__fragment",
+                                        "style": {
+                                            "cursor": "pointer"
+                                        },
+                                        "children": "⇆"
+                                    },
+                                    {
+                                        "id": "breadcrumb-user",
+                                        "component": "__fragment",
+                                        "children": "{{\"张凯\"}}"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "id": "main-layout",
+                "component": "Layout",
+                "children": [
+                    {
+                        "id": "left-sider",
+                        "component": "Layout.Sider",
+                        "props": {
+                            "width": 160,
+                            "theme": "dark"
+                        },
+                        "style": {
+                            "background": "#0f172a"
+                        },
+                        "children": [
+                            {
+                                "id": "sider-menu",
+                                "component": "Container",
+                                "props": {
+                                    "direction": "column",
+                                    "gap": 0
+                                },
+                                "style": {
+                                    "paddingTop": "8px"
+                                },
+                                "children": [
+                                    {
+                                        "id": "menu-calendar",
+                                        "component": "Container",
+                                        "props": {
+                                            "direction": "row",
+                                            "gap": 8
+                                        },
+                                        "style": {
+                                            "padding": "12px 16px",
+                                            "cursor": "pointer",
+                                            "background": "#1677ff",
+                                            "color": "#fff",
+                                            "fontSize": "13px",
+                                            "alignItems": "center",
+                                            "borderRadius": "4px",
+                                            "margin": "0 8px 4px 8px"
+                                        },
+                                        "children": [
+                                            {
+                                                "id": "menu-cal-icon",
+                                                "component": "__fragment",
+                                                "children": "📅"
+                                            },
+                                            {
+                                                "id": "menu-cal-label",
+                                                "component": "__fragment",
+                                                "children": "我的日历"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "menu-leave",
+                                        "component": "Container",
+                                        "props": {
+                                            "direction": "row",
+                                            "gap": 8
+                                        },
+                                        "style": {
+                                            "padding": "12px 16px",
+                                            "cursor": "pointer",
+                                            "color": "rgba(255,255,255,0.65)",
+                                            "fontSize": "13px",
+                                            "alignItems": "center"
+                                        },
+                                        "children": [
+                                            {
+                                                "id": "menu-leave-icon",
+                                                "component": "__fragment",
+                                                "children": "📋"
+                                            },
+                                            {
+                                                "id": "menu-leave-label",
+                                                "component": "__fragment",
+                                                "children": "请假/加班"
+                                            },
+                                            {
+                                                "id": "menu-leave-arrow",
+                                                "component": "__fragment",
+                                                "style": {
+                                                    "marginLeft": "auto"
+                                                },
+                                                "children": "∨"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "menu-hr",
+                                        "component": "Container",
+                                        "props": {
+                                            "direction": "row",
+                                            "gap": 8
+                                        },
+                                        "style": {
+                                            "padding": "12px 16px",
+                                            "cursor": "pointer",
+                                            "color": "rgba(255,255,255,0.65)",
+                                            "fontSize": "13px",
+                                            "alignItems": "center"
+                                        },
+                                        "children": [
+                                            {
+                                                "id": "menu-hr-icon",
+                                                "component": "__fragment",
+                                                "children": "👤"
+                                            },
+                                            {
+                                                "id": "menu-hr-label",
+                                                "component": "__fragment",
+                                                "children": "人事相关"
+                                            },
+                                            {
+                                                "id": "menu-hr-arrow",
+                                                "component": "__fragment",
+                                                "style": {
+                                                    "marginLeft": "auto"
+                                                },
+                                                "children": "∨"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "id": "content-area",
+                        "component": "Layout.Content",
+                        "style": {
+                            "background": "#fff",
+                            "padding": "0"
+                        },
+                        "children": [
+                            {
+                                "id": "content-row",
+                                "component": "Row",
+                                "props": {
+                                    "gutter": [
+                                        0,
+                                        0
+                                    ]
+                                },
+                                "style": {
+                                    "height": "100%"
+                                },
+                                "children": [
+                                    {
+                                        "id": "calendar-col",
+                                        "component": "Col",
+                                        "props": {
+                                            "flex": "1"
+                                        },
+                                        "children": [
+                                            {
+                                                "id": "calendar-wrapper",
+                                                "component": "Container",
+                                                "props": {
+                                                    "direction": "column",
+                                                    "gap": 0
+                                                },
+                                                "style": {
+                                                    "background": "#fff",
+                                                    "height": "100%"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "id": "calendar-header",
+                                                        "component": "Container",
+                                                        "props": {
+                                                            "direction": "row",
+                                                            "gap": 16
+                                                        },
+                                                        "style": {
+                                                            "padding": "12px 20px",
+                                                            "alignItems": "center",
+                                                            "borderBottom": "1px solid #f0f0f0",
+                                                            "flexWrap": "wrap"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "id": "month-nav",
+                                                                "component": "Space",
+                                                                "props": {
+                                                                    "size": "small"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "id": "prev-month-btn",
+                                                                        "component": "Button",
+                                                                        "props": {
+                                                                            "type": "text",
+                                                                            "size": "small"
+                                                                        },
+                                                                        "style": {
+                                                                            "fontSize": "18px",
+                                                                            "fontWeight": "lighter"
+                                                                        },
+                                                                        "children": "＜",
+                                                                        "events": {
+                                                                            "onClick": [
+                                                                                {
+                                                                                    "type": "callMethod",
+                                                                                    "name": "prevMonth"
+                                                                                }
+                                                                            ]
+                                                                        }
+                                                                    },
+                                                                    {
+                                                                        "id": "month-label",
+                                                                        "component": "__fragment",
+                                                                        "style": {
+                                                                            "fontSize": "18px",
+                                                                            "fontWeight": "bold",
+                                                                            "minWidth": "100px",
+                                                                            "textAlign": "center"
+                                                                        },
+                                                                        "children": "{{computed.monthDisplay}}"
+                                                                    },
+                                                                    {
+                                                                        "id": "next-month-btn",
+                                                                        "component": "Button",
+                                                                        "props": {
+                                                                            "type": "text",
+                                                                            "size": "small"
+                                                                        },
+                                                                        "style": {
+                                                                            "fontSize": "18px",
+                                                                            "fontWeight": "lighter"
+                                                                        },
+                                                                        "children": "＞",
+                                                                        "events": {
+                                                                            "onClick": [
+                                                                                {
+                                                                                    "type": "callMethod",
+                                                                                    "name": "nextMonth"
+                                                                                }
+                                                                            ]
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "id": "summary-tags",
+                                                                "component": "Space",
+                                                                "props": {
+                                                                    "size": "middle"
+                                                                },
+                                                                "style": {
+                                                                    "marginLeft": "24px"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "id": "leave-tag",
+                                                                        "component": "Container",
+                                                                        "props": {
+                                                                            "direction": "column",
+                                                                            "gap": 0
+                                                                        },
+                                                                        "style": {
+                                                                            "border": "1px solid #e8e8e8",
+                                                                            "padding": "4px 16px",
+                                                                            "textAlign": "center",
+                                                                            "minWidth": "80px"
+                                                                        },
+                                                                        "children": [
+                                                                            {
+                                                                                "id": "leave-tag-label",
+                                                                                "component": "__fragment",
+                                                                                "style": {
+                                                                                    "fontSize": "12px",
+                                                                                    "color": "#8c8c8c"
+                                                                                },
+                                                                                "children": "请假"
+                                                                            },
+                                                                            {
+                                                                                "id": "leave-tag-value",
+                                                                                "component": "Space",
+                                                                                "props": {
+                                                                                    "size": "small"
+                                                                                },
+                                                                                "children": [
+                                                                                    {
+                                                                                        "id": "leave-tag-count",
+                                                                                        "component": "__fragment",
+                                                                                        "style": {
+                                                                                            "fontSize": "16px",
+                                                                                            "color": "#52c41a"
+                                                                                        },
+                                                                                        "children": "{{state.attendanceSummary.leaveCount + '次'}}"
+                                                                                    },
+                                                                                    {
+                                                                                        "id": "leave-tag-days",
+                                                                                        "component": "__fragment",
+                                                                                        "style": {
+                                                                                            "fontSize": "16px",
+                                                                                            "color": "#52c41a"
+                                                                                        },
+                                                                                        "children": "{{state.attendanceSummary.leaveDays + '天'}}"
+                                                                                    }
+                                                                                ]
+                                                                            }
+                                                                        ]
+                                                                    },
+                                                                    {
+                                                                        "id": "late-tag",
+                                                                        "component": "Container",
+                                                                        "props": {
+                                                                            "direction": "column",
+                                                                            "gap": 0
+                                                                        },
+                                                                        "style": {
+                                                                            "border": "1px solid #e8e8e8",
+                                                                            "padding": "4px 16px",
+                                                                            "textAlign": "center",
+                                                                            "minWidth": "80px"
+                                                                        },
+                                                                        "children": [
+                                                                            {
+                                                                                "id": "late-tag-label",
+                                                                                "component": "__fragment",
+                                                                                "style": {
+                                                                                    "fontSize": "12px",
+                                                                                    "color": "#8c8c8c"
+                                                                                },
+                                                                                "children": "迟到、早退"
+                                                                            },
+                                                                            {
+                                                                                "id": "late-tag-value",
+                                                                                "component": "__fragment",
+                                                                                "style": {
+                                                                                    "fontSize": "16px",
+                                                                                    "color": "#fa8c16"
+                                                                                },
+                                                                                "children": "{{state.attendanceSummary.lateCount + '次'}}"
+                                                                            }
+                                                                        ]
+                                                                    },
+                                                                    {
+                                                                        "id": "misscard-tag",
+                                                                        "component": "Container",
+                                                                        "props": {
+                                                                            "direction": "column",
+                                                                            "gap": 0
+                                                                        },
+                                                                        "style": {
+                                                                            "border": "1px solid #e8e8e8",
+                                                                            "padding": "4px 16px",
+                                                                            "textAlign": "center",
+                                                                            "minWidth": "80px"
+                                                                        },
+                                                                        "children": [
+                                                                            {
+                                                                                "id": "misscard-tag-label",
+                                                                                "component": "__fragment",
+                                                                                "style": {
+                                                                                    "fontSize": "12px",
+                                                                                    "color": "#8c8c8c"
+                                                                                },
+                                                                                "children": "未刷卡"
+                                                                            },
+                                                                            {
+                                                                                "id": "misscard-tag-value",
+                                                                                "component": "__fragment",
+                                                                                "style": {
+                                                                                    "fontSize": "16px",
+                                                                                    "color": "#ff4d4f"
+                                                                                },
+                                                                                "children": "{{state.attendanceSummary.missCardCount + '次'}}"
+                                                                            }
+                                                                        ]
+                                                                    },
+                                                                    {
+                                                                        "id": "absent-tag",
+                                                                        "component": "Container",
+                                                                        "props": {
+                                                                            "direction": "column",
+                                                                            "gap": 0
+                                                                        },
+                                                                        "style": {
+                                                                            "border": "1px solid #e8e8e8",
+                                                                            "padding": "4px 16px",
+                                                                            "textAlign": "center",
+                                                                            "minWidth": "80px"
+                                                                        },
+                                                                        "children": [
+                                                                            {
+                                                                                "id": "absent-tag-label",
+                                                                                "component": "__fragment",
+                                                                                "style": {
+                                                                                    "fontSize": "12px",
+                                                                                    "color": "#8c8c8c"
+                                                                                },
+                                                                                "children": "缺勤"
+                                                                            },
+                                                                            {
+                                                                                "id": "absent-tag-value",
+                                                                                "component": "__fragment",
+                                                                                "style": {
+                                                                                    "fontSize": "16px",
+                                                                                    "color": "#eb2f96"
+                                                                                },
+                                                                                "children": "{{state.attendanceSummary.absentHours + '时'}}"
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "id": "search-area",
+                                                                "component": "Space",
+                                                                "props": {
+                                                                    "size": "small"
+                                                                },
+                                                                "style": {
+                                                                    "marginLeft": "auto"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "id": "refresh-icon-btn",
+                                                                        "component": "Button",
+                                                                        "props": {
+                                                                            "type": "text",
+                                                                            "icon": "🔄"
+                                                                        },
+                                                                        "style": {
+                                                                            "color": "#666"
+                                                                        }
+                                                                    },
+                                                                    {
+                                                                        "id": "search-input",
+                                                                        "component": "Input",
+                                                                        "props": {
+                                                                            "value": "{{state.searchEmployee}}",
+                                                                            "allowClear": true,
+                                                                            "suffix": "∨"
+                                                                        },
+                                                                        "style": {
+                                                                            "width": "120px"
+                                                                        },
+                                                                        "events": {
+                                                                            "onChange": [
+                                                                                {
+                                                                                    "type": "setState",
+                                                                                    "key": "searchEmployee",
+                                                                                    "value": "{{event.target.value}}"
+                                                                                }
+                                                                            ]
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "id": "weekday-header",
+                                                        "component": "Row",
+                                                        "props": {
+                                                            "gutter": [
+                                                                0,
+                                                                0
+                                                            ]
+                                                        },
+                                                        "style": {
+                                                            "borderBottom": "1px solid #f0f0f0"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "id": "weekday-col",
+                                                                "component": "Col",
+                                                                "props": {
+                                                                    "span": 3
+                                                                },
+                                                                "loop": {
+                                                                    "data": "{{state.weekDays}}",
+                                                                    "key": "{{item.key}}"
+                                                                },
+                                                                "style": {
+                                                                    "textAlign": "center",
+                                                                    "padding": "12px 0",
+                                                                    "fontSize": "14px",
+                                                                    "color": "#333"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "id": "weekday-label",
+                                                                        "component": "__fragment",
+                                                                        "children": "{{item.label}}"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "id": "weekday-extra-col",
+                                                                "component": "Col",
+                                                                "props": {
+                                                                    "span": 3
+                                                                },
+                                                                "style": {
+                                                                    "textAlign": "center",
+                                                                    "padding": "8px 0"
+                                                                },
+                                                                "children": []
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "id": "calendar-body",
+                                                        "component": "Container",
+                                                        "props": {
+                                                            "direction": "column",
+                                                            "gap": 0
+                                                        },
+                                                        "style": {
+                                                            "flex": 1,
+                                                            "margin": "0 12px 12px 12px"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "id": "calendar-week-row",
+                                                                "component": "Row",
+                                                                "props": {
+                                                                    "gutter": [
+                                                                        0,
+                                                                        0
+                                                                    ]
+                                                                },
+                                                                "loop": {
+                                                                    "data": "{{state.calendarGrid}}",
+                                                                    "key": "{{index}}"
+                                                                },
+                                                                "style": {
+                                                                    "minHeight": "100px",
+                                                                    "borderLeft": "1px solid #f0f0f0"
+                                                                },
+                                                                "children": [
+                                                                    {
+                                                                        "id": "calendar-day-cell",
+                                                                        "component": "Col",
+                                                                        "props": {
+                                                                            "span": 3
+                                                                        },
+                                                                        "loop": {
+                                                                            "data": "{{item}}",
+                                                                            "itemKey": "cell",
+                                                                            "indexKey": "cellIndex",
+                                                                            "key": "{{cell.dayNum + '-' + cellIndex}}"
+                                                                        },
+                                                                        "style": {
+                                                                            "padding": "4px 8px",
+                                                                            "borderBottom": "1px solid #f0f0f0",
+                                                                            "borderRight": "1px solid #f0f0f0",
+                                                                            "position": "relative",
+                                                                            "background": "{{cell.day === state.selectedDate ? '#e6f4ff' : cell.month !== 'current' ? '#fafafa' : '#fff'}}",
+                                                                            "cursor": "pointer"
+                                                                        },
+                                                                        "events": {
+                                                                            "onClick": [
+                                                                                {
+                                                                                    "type": "setState",
+                                                                                    "key": "selectedDate",
+                                                                                    "value": "{{cell.day}}"
+                                                                                }
+                                                                            ]
+                                                                        },
+                                                                        "children": [
+                                                                            {
+                                                                                "id": "day-watermark",
+                                                                                "component": "__fragment",
+                                                                                "style": {
+                                                                                    "position": "absolute",
+                                                                                    "top": "50%",
+                                                                                    "left": "50%",
+                                                                                    "transform": "translate(-50%, -50%)",
+                                                                                    "fontSize": "80px",
+                                                                                    "color": "#f8f8f8",
+                                                                                    "fontWeight": "bold",
+                                                                                    "pointerEvents": "none",
+                                                                                    "zIndex": 0
+                                                                                },
+                                                                                "children": "{{cell.dayNum}}"
+                                                                            },
+                                                                            {
+                                                                                "id": "day-content-wrapper",
+                                                                                "component": "Container",
+                                                                                "props": {
+                                                                                    "direction": "column",
+                                                                                    "gap": 4
+                                                                                },
+                                                                                "style": {
+                                                                                    "position": "relative",
+                                                                                    "zIndex": 1,
+                                                                                    "height": "100%"
+                                                                                },
+                                                                                "children": [
+                                                                                    {
+                                                                                        "id": "day-header-info",
+                                                                                        "component": "Container",
+                                                                                        "props": {
+                                                                                            "direction": "row",
+                                                                                            "gap": 4
+                                                                                        },
+                                                                                        "style": {
+                                                                                            "alignItems": "center",
+                                                                                            "justifyContent": "flex-end",
+                                                                                            "marginBottom": "8px"
+                                                                                        },
+                                                                                        "children": [
+                                                                                            {
+                                                                                                "id": "day-type-dot",
+                                                                                                "component": "__fragment",
+                                                                                                "style": {
+                                                                                                    "fontSize": "10px",
+                                                                                                    "color": "{{cell.type === 'rest' ? '#52c41a' : '#fa8c16'}}"
+                                                                                                },
+                                                                                                "children": "●"
+                                                                                            },
+                                                                                            {
+                                                                                                "id": "day-type-label",
+                                                                                                "component": "__fragment",
+                                                                                                "style": {
+                                                                                                    "fontSize": "12px",
+                                                                                                    "color": "#333",
+                                                                                                    "marginRight": "4px"
+                                                                                                },
+                                                                                                "children": "{{cell.type === 'rest' ? '休' : '班'}}"
+                                                                                            },
+                                                                                            {
+                                                                                                "id": "day-number",
+                                                                                                "component": "__fragment",
+                                                                                                "style": {
+                                                                                                    "fontSize": "14px",
+                                                                                                    "color": "{{cell.month !== 'current' ? '#ccc' : '#333'}}",
+                                                                                                    "fontWeight": "{{cell.day === state.selectedDate ? 'bold' : 'normal'}}"
+                                                                                                },
+                                                                                                "children": "{{cell.dayNum}}"
+                                                                                            }
+                                                                                        ]
+                                                                                    },
+                                                                                    {
+                                                                                        "id": "day-attendance-info",
+                                                                                        "component": "Container",
+                                                                                        "props": {
+                                                                                            "direction": "row",
+                                                                                            "gap": 4
+                                                                                        },
+                                                                                        "style": {
+                                                                                            "alignItems": "center",
+                                                                                            "flexWrap": "wrap"
+                                                                                        },
+                                                                                        "if": "{{state.calendarData[cell.day]}}",
+                                                                                        "children": [
+                                                                                            {
+                                                                                                "id": "arrive-badge-icon",
+                                                                                                "component": "__fragment",
+                                                                                                "if": "{{state.calendarData[cell.day]?.arriveTime}}",
+                                                                                                "style": {
+                                                                                                    "fontSize": "10px",
+                                                                                                    "background": "#d3adf7",
+                                                                                                    "color": "#fff",
+                                                                                                    "borderRadius": "4px",
+                                                                                                    "padding": "0 4px"
+                                                                                                },
+                                                                                                "children": "打卡"
+                                                                                            },
+                                                                                            {
+                                                                                                "id": "arrive-time-text",
+                                                                                                "component": "__fragment",
+                                                                                                "if": "{{state.calendarData[cell.day]?.arriveTime}}",
+                                                                                                "style": {
+                                                                                                    "fontSize": "11px",
+                                                                                                    "color": "#1677ff",
+                                                                                                    "marginRight": "8px"
+                                                                                                },
+                                                                                                "children": "{{state.calendarData[cell.day]?.arriveTime}}"
+                                                                                            },
+                                                                                            {
+                                                                                                "id": "leave-time-text",
+                                                                                                "component": "__fragment",
+                                                                                                "if": "{{state.calendarData[cell.day]?.leaveTime}}",
+                                                                                                "style": {
+                                                                                                    "fontSize": "11px",
+                                                                                                    "color": "#8c8c8c"
+                                                                                                },
+                                                                                                "children": "{{state.calendarData[cell.day]?.leaveTime}}"
+                                                                                            }
+                                                                                        ]
+                                                                                    },
+                                                                                    {
+                                                                                        "id": "day-tags-row",
+                                                                                        "component": "Container",
+                                                                                        "props": {
+                                                                                            "direction": "row",
+                                                                                            "gap": 4
+                                                                                        },
+                                                                                        "style": {
+                                                                                            "flexWrap": "wrap",
+                                                                                            "marginTop": "auto"
+                                                                                        },
+                                                                                        "if": "{{state.calendarData[cell.day]?.tags?.length > 0}}",
+                                                                                        "children": [
+                                                                                            {
+                                                                                                "id": "attendance-tag",
+                                                                                                "component": "__fragment",
+                                                                                                "loop": {
+                                                                                                    "data": "{{state.calendarData[cell.day]?.tags}}",
+                                                                                                    "itemKey": "tagItem",
+                                                                                                    "indexKey": "tagIndex",
+                                                                                                    "key": "{{tagItem.label + tagIndex}}"
+                                                                                                },
+                                                                                                "style": {
+                                                                                                    "fontSize": "11px",
+                                                                                                    "color": "{{tagItem.color}}",
+                                                                                                    "border": "{{\"1px solid \" + tagItem.color}}",
+                                                                                                    "borderRadius": "2px",
+                                                                                                    "padding": "0 4px"
+                                                                                                },
+                                                                                                "children": "{{tagItem.label}}"
+                                                                                            }
+                                                                                        ]
+                                                                                    }
+                                                                                ]
+                                                                            }
+                                                                        ]
+                                                                    },
+                                                                    {
+                                                                        "id": "week-extra-col",
+                                                                        "component": "Col",
+                                                                        "props": {
+                                                                            "span": 3
+                                                                        },
+                                                                        "style": {
+                                                                            "minHeight": "100px",
+                                                                            "borderBottom": "1px solid #f0f0f0"
+                                                                        },
+                                                                        "children": []
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "right-panel-col",
+                                        "component": "Col",
+                                        "props": {
+                                            "flex": "300px"
+                                        },
+                                        "children": [
+                                            {
+                                                "id": "right-panel",
+                                                "component": "Container",
+                                                "props": {
+                                                    "direction": "column",
+                                                    "gap": 0
+                                                },
+                                                "style": {
+                                                    "background": "#fff",
+                                                    "height": "100%",
+                                                    "borderLeft": "2px solid #f0f0f0"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "id": "right-header",
+                                                        "component": "Container",
+                                                        "props": {
+                                                            "direction": "row",
+                                                            "gap": 8
+                                                        },
+                                                        "style": {
+                                                            "padding": "12px 16px",
+                                                            "borderBottom": "1px solid #f0f0f0",
+                                                            "alignItems": "center",
+                                                            "justifyContent": "space-between"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "id": "right-title",
+                                                                "component": "Button",
+                                                                "props": {
+                                                                    "type": "text"
+                                                                },
+                                                                "children": "刷新"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "id": "right-table-wrapper",
+                                                        "component": "Container",
+                                                        "props": {
+                                                            "direction": "column"
+                                                        },
+                                                        "style": {
+                                                            "padding": "16px"
+                                                        },
+                                                        "children": [
+                                                            {
+                                                                "id": "card-records-table",
+                                                                "component": "Table",
+                                                                "props": {
+                                                                    "dataSource": "{{state.cardRecords}}",
+                                                                    "rowKey": "id",
+                                                                    "size": "small",
+                                                                    "pagination": false,
+                                                                    "bordered": false
+                                                                },
+                                                                "columns": [
+                                                                    {
+                                                                        "title": "用户名",
+                                                                        "dataIndex": "name",
+                                                                        "width": 60,
+                                                                        "align": "center"
+                                                                    },
+                                                                    {
+                                                                        "title": "刷卡时间",
+                                                                        "dataIndex": "time",
+                                                                        "width": 140,
+                                                                        "align": "center"
+                                                                    },
+                                                                    {
+                                                                        "title": "刷卡类型",
+                                                                        "dataIndex": "type",
+                                                                        "width": 80,
+                                                                        "align": "center"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}

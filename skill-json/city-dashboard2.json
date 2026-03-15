@@ -1,0 +1,303 @@
+{
+  "id": "city-dashboard2",
+  "name": "智慧城市数据大屏",
+  "state": {
+    "alarms": [
+      { "color": "red", "label": "14:32", "children": "【严重】南区主干道交通拥堵，拥堵指数 9.2" },
+      { "color": "orange", "label": "14:18", "children": "【警告】东区空气质量 AQI 超标，当前值 156" },
+      { "color": "blue", "label": "13:55", "children": "【提示】北区智能路灯设备离线 3 台" },
+      { "color": "orange", "label": "13:40", "children": "【警告】西区污水处理站水位异常" },
+      { "color": "green", "label": "13:22", "children": "【正常】中心广场人流量恢复正常水平" },
+      { "color": "red", "label": "12:58", "children": "【严重】市政供水管网压力异常，已派单处理" }
+    ],
+    "deviceOnlineRate": 87.5,
+    "deviceTotal": 12480,
+    "deviceOnline": 10920,
+    "kpis": [
+      { "id": "k1", "title": "今日人流量", "value": 284650, "suffix": "人次", "color": "#22C55E" },
+      { "id": "k2", "title": "在线设备", "value": 10920, "suffix": "台", "color": "#38BDF8" },
+      { "id": "k3", "title": "告警事件", "value": 23, "suffix": "条", "color": "#F97316" },
+      { "id": "k4", "title": "处理完成率", "value": 94.2, "suffix": "%", "color": "#A78BFA" }
+    ],
+    "trendData": [
+      {"hour":"00:00","value":1200,"series":"人流量"},{"hour":"01:00","value":800,"series":"人流量"},
+      {"hour":"02:00","value":600,"series":"人流量"},{"hour":"03:00","value":500,"series":"人流量"},
+      {"hour":"04:00","value":550,"series":"人流量"},{"hour":"05:00","value":900,"series":"人流量"},
+      {"hour":"06:00","value":2100,"series":"人流量"},{"hour":"07:00","value":4500,"series":"人流量"},
+      {"hour":"08:00","value":8200,"series":"人流量"},{"hour":"09:00","value":9800,"series":"人流量"},
+      {"hour":"10:00","value":11200,"series":"人流量"},{"hour":"11:00","value":12500,"series":"人流量"},
+      {"hour":"12:00","value":13800,"series":"人流量"},{"hour":"13:00","value":12900,"series":"人流量"},
+      {"hour":"14:00","value":11600,"series":"人流量"},{"hour":"15:00","value":10800,"series":"人流量"},
+      {"hour":"16:00","value":11200,"series":"人流量"},{"hour":"17:00","value":13500,"series":"人流量"},
+      {"hour":"18:00","value":15200,"series":"人流量"},{"hour":"19:00","value":14800,"series":"人流量"},
+      {"hour":"20:00","value":12600,"series":"人流量"},{"hour":"21:00","value":9800,"series":"人流量"},
+      {"hour":"22:00","value":6500,"series":"人流量"},{"hour":"23:00","value":3200,"series":"人流量"},
+      {"hour":"00:00","value":85,"series":"告警数"},{"hour":"01:00","value":72,"series":"告警数"},
+      {"hour":"02:00","value":68,"series":"告警数"},{"hour":"03:00","value":65,"series":"告警数"},
+      {"hour":"04:00","value":70,"series":"告警数"},{"hour":"05:00","value":78,"series":"告警数"},
+      {"hour":"06:00","value":92,"series":"告警数"},{"hour":"07:00","value":115,"series":"告警数"},
+      {"hour":"08:00","value":145,"series":"告警数"},{"hour":"09:00","value":168,"series":"告警数"},
+      {"hour":"10:00","value":182,"series":"告警数"},{"hour":"11:00","value":195,"series":"告警数"},
+      {"hour":"12:00","value":210,"series":"告警数"},{"hour":"13:00","value":198,"series":"告警数"},
+      {"hour":"14:00","value":185,"series":"告警数"},{"hour":"15:00","value":172,"series":"告警数"},
+      {"hour":"16:00","value":168,"series":"告警数"},{"hour":"17:00","value":178,"series":"告警数"},
+      {"hour":"18:00","value":195,"series":"告警数"},{"hour":"19:00","value":188,"series":"告警数"},
+      {"hour":"20:00","value":175,"series":"告警数"},{"hour":"21:00","value":155,"series":"告警数"},
+      {"hour":"22:00","value":128,"series":"告警数"},{"hour":"23:00","value":98,"series":"告警数"}
+    ],
+    "regionData": [
+      { "region": "东区", "value": 28 },
+      { "region": "西区", "value": 22 },
+      { "region": "南区", "value": 25 },
+      { "region": "北区", "value": 15 },
+      { "region": "中心区", "value": 10 }
+    ],
+    "topEvents": [
+      { "rank": 1, "event": "交通拥堵预警", "count": 156, "trend": "↑" },
+      { "rank": 2, "event": "空气质量超标", "count": 89, "trend": "↑" },
+      { "rank": 3, "event": "设备离线告警", "count": 67, "trend": "↓" },
+      { "rank": 4, "event": "人流密度预警", "count": 45, "trend": "→" },
+      { "rank": 5, "event": "水务异常告警", "count": 32, "trend": "↓" }
+    ]
+  },
+  "body": {
+    "id": "page-root",
+    "component": "Container",
+    "style": {
+      "minHeight": "100vh",
+      "background": "#0F172A",
+      "padding": "16px",
+      "fontFamily": "'Fira Code', 'Fira Sans', monospace"
+    },
+    "children": [
+      {
+        "id": "page-header",
+        "component": "Flex",
+        "props": { "justify": "space-between", "align": "center" },
+        "style": { "marginBottom": "16px", "padding": "12px 16px", "background": "#1E293B", "borderRadius": "12px", "border": "1px solid #334155" },
+        "children": [
+          {
+            "id": "header-left",
+            "component": "Space",
+            "props": { "size": 12 },
+            "children": [
+              {
+                "id": "header-dot",
+                "component": "Container",
+                "style": { "width": "10px", "height": "10px", "borderRadius": "50%", "background": "#22C55E", "boxShadow": "0 0 8px #22C55E", "display": "inline-block" }
+              },
+              {
+                "id": "header-title",
+                "component": "Container",
+                "style": { "fontSize": "20px", "fontWeight": "700", "color": "#F8FAFC", "letterSpacing": "2px" },
+                "children": "智慧城市数据大屏"
+              },
+              {
+                "id": "header-badge",
+                "component": "Tag",
+                "props": { "color": "green" },
+                "children": "实时监控"
+              }
+            ]
+          },
+          {
+            "id": "header-right",
+            "component": "Space",
+            "props": { "size": 16 },
+            "children": [
+              {
+                "id": "header-time",
+                "component": "Container",
+                "style": { "color": "#94A3B8", "fontSize": "13px", "fontFamily": "'Fira Code', monospace" },
+                "children": "2026-03-16  14:35:22"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "main-row",
+        "component": "Row",
+        "props": { "gutter": [16, 16] },
+        "children": [
+          {
+            "id": "left-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "alarm-card",
+                "component": "Card",
+                "props": { "title": "实时告警", "size": "small", "bordered": false },
+                "style": { "background": "#1E293B", "borderRadius": "12px", "border": "1px solid #334155", "marginBottom": "16px" },
+                "children": [
+                  {
+                    "id": "alarm-timeline",
+                    "component": "Timeline",
+                    "props": { "items": "{{state.alarms}}" },
+                    "style": { "marginTop": "8px" }
+                  }
+                ]
+              },
+              {
+                "id": "device-card",
+                "component": "Card",
+                "props": { "title": "设备在线率", "size": "small", "bordered": false },
+                "style": { "background": "#1E293B", "borderRadius": "12px", "border": "1px solid #334155" },
+                "children": [
+                  {
+                    "id": "device-statistic",
+                    "component": "Statistic",
+                    "props": {
+                      "title": "在线设备 / 总设备",
+                      "value": "{{state.deviceOnline}}",
+                      "suffix": "{{' / ' + state.deviceTotal + ' 台'}}",
+                      "valueStyle": { "color": "#22C55E", "fontSize": "22px" }
+                    },
+                    "style": { "marginBottom": "12px" }
+                  },
+                  {
+                    "id": "device-progress",
+                    "component": "Progress",
+                    "props": {
+                      "percent": "{{state.deviceOnlineRate}}",
+                      "strokeColor": "#22C55E",
+                      "trailColor": "#334155",
+                      "format": { "type": "JSFunction", "params": ["p"], "body": "return p + '%';" }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "center-col",
+            "component": "Col",
+            "props": { "span": 12 },
+            "children": [
+              {
+                "id": "kpi-row",
+                "component": "Row",
+                "props": { "gutter": [12, 12] },
+                "style": { "marginBottom": "16px" },
+                "children": [
+                  {
+                    "id": "kpi-col-loop",
+                    "component": "Col",
+                    "props": { "span": 12 },
+                    "loop": { "data": "{{state.kpis}}", "key": "{{item.id}}" },
+                    "children": [
+                      {
+                        "id": "kpi-card",
+                        "component": "Card",
+                        "props": { "size": "small", "bordered": false },
+                        "style": { "background": "#1E293B", "borderRadius": "10px", "border": "1px solid #334155" },
+                        "children": [
+                          {
+                            "id": "kpi-statistic",
+                            "component": "Statistic",
+                            "props": {
+                              "title": "{{item.title}}",
+                              "value": "{{item.value}}",
+                              "suffix": "{{item.suffix}}",
+                              "valueStyle": { "color": "{{item.color}}", "fontSize": "24px", "fontFamily": "'Fira Code', monospace" }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "trend-card",
+                "component": "Card",
+                "props": { "title": "近 24 小时城市运行趋势", "size": "small", "bordered": false },
+                "style": { "background": "#1E293B", "borderRadius": "12px", "border": "1px solid #334155" },
+                "children": [
+                  {
+                    "id": "trend-chart",
+                    "component": "Chart.Line",
+                    "props": {
+                      "data": "{{state.trendData}}",
+                      "xField": "hour",
+                      "yField": "value",
+                      "colorField": "series",
+                      "theme": "classicDark",
+                      "height": 260,
+                      "smooth": true,
+                      "legend": { "position": "top-right" },
+                      "axis": {
+                        "x": { "label": { "style": { "fill": "#94A3B8", "fontSize": 11 } } },
+                        "y": { "label": { "style": { "fill": "#94A3B8", "fontSize": 11 } } }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "right-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "region-card",
+                "component": "Card",
+                "props": { "title": "区域事件分布", "size": "small", "bordered": false },
+                "style": { "background": "#1E293B", "borderRadius": "12px", "border": "1px solid #334155", "marginBottom": "16px" },
+                "children": [
+                  {
+                    "id": "region-pie",
+                    "component": "Chart.Pie",
+                    "props": {
+                      "data": "{{state.regionData}}",
+                      "angleField": "value",
+                      "colorField": "region",
+                      "innerRadius": 0.5,
+                      "theme": "classicDark",
+                      "height": 220,
+                      "legend": { "position": "bottom" },
+                      "label": { "text": "region", "style": { "fill": "#F8FAFC", "fontSize": 11 } }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "events-card",
+                "component": "Card",
+                "props": { "title": "热门事件 Top 5", "size": "small", "bordered": false },
+                "style": { "background": "#1E293B", "borderRadius": "12px", "border": "1px solid #334155" },
+                "children": [
+                  {
+                    "id": "events-table",
+                    "component": "Table",
+                    "props": {
+                      "dataSource": "{{state.topEvents}}",
+                      "rowKey": "rank",
+                      "pagination": false,
+                      "size": "small"
+                    },
+                    "columns": [
+                      { "title": "#", "dataIndex": "rank", "width": 36,
+                        "render": { "component": "Tag", "props": { "color": "{{text === 1 ? 'gold' : text === 2 ? 'silver' : 'default'}}" }, "children": "{{text}}" }
+                      },
+                      { "title": "事件类型", "dataIndex": "event" },
+                      { "title": "次数", "dataIndex": "count", "width": 56,
+                        "render": { "component": "Container", "style": { "color": "#F97316", "fontFamily": "'Fira Code', monospace", "fontWeight": "600" }, "children": "{{text}}" }
+                      },
+                      { "title": "趋势", "dataIndex": "trend", "width": 44,
+                        "render": { "component": "Container", "style": { "color": "{{text === '↑' ? '#F97316' : text === '↓' ? '#22C55E' : '#94A3B8'}}", "fontSize": "16px", "textAlign": "center" }, "children": "{{text}}" }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

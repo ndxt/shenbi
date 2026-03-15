@@ -1,0 +1,491 @@
+{
+  "id": "city-dashboard",
+  "name": "智慧城市数据大屏",
+  "state": {
+    "alarms": {
+      "default": [
+        { "id": 1, "time": "14:32", "level": "critical", "content": "浦东新区交通拥堵指数超阈值（92）", "color": "red" },
+        { "id": 2, "time": "14:28", "level": "warning",  "content": "徐汇区空气质量 AQI 达到 156（轻度污染）", "color": "orange" },
+        { "id": 3, "time": "14:21", "level": "warning",  "content": "黄浦区地下管网压力异常，已派单处理", "color": "orange" },
+        { "id": 4, "time": "14:15", "level": "info",     "content": "静安区智能路灯系统完成例行巡检", "color": "blue" },
+        { "id": 5, "time": "14:08", "level": "critical", "content": "虹桥枢纽客流量超预警线（12.4万/小时）", "color": "red" },
+        { "id": 6, "time": "13:55", "level": "info",     "content": "长宁区垃圾分类回收率本周达 94.2%", "color": "green" },
+        { "id": 7, "time": "13:40", "level": "warning",  "content": "闵行区供水管网检测到微量泄漏，已定位", "color": "orange" }
+      ]
+    },
+    "deviceStats": {
+      "default": {
+        "total": 48620,
+        "online": 46190,
+        "rate": 95.0
+      }
+    },
+    "kpi": {
+      "default": {
+        "population": 2489,
+        "vehicles": 528,
+        "incidents": 37,
+        "satisfaction": 92.4
+      }
+    },
+    "trendData": {
+      "default": [
+        { "hour": "00:00", "series": "交通流量(万辆)", "value": 12.3 },
+        { "hour": "01:00", "series": "交通流量(万辆)", "value": 8.1 },
+        { "hour": "02:00", "series": "交通流量(万辆)", "value": 5.6 },
+        { "hour": "03:00", "series": "交通流量(万辆)", "value": 4.2 },
+        { "hour": "04:00", "series": "交通流量(万辆)", "value": 5.8 },
+        { "hour": "05:00", "series": "交通流量(万辆)", "value": 9.4 },
+        { "hour": "06:00", "series": "交通流量(万辆)", "value": 18.7 },
+        { "hour": "07:00", "series": "交通流量(万辆)", "value": 32.5 },
+        { "hour": "08:00", "series": "交通流量(万辆)", "value": 45.2 },
+        { "hour": "09:00", "series": "交通流量(万辆)", "value": 38.6 },
+        { "hour": "10:00", "series": "交通流量(万辆)", "value": 34.1 },
+        { "hour": "11:00", "series": "交通流量(万辆)", "value": 36.8 },
+        { "hour": "12:00", "series": "交通流量(万辆)", "value": 40.3 },
+        { "hour": "13:00", "series": "交通流量(万辆)", "value": 37.9 },
+        { "hour": "14:00", "series": "交通流量(万辆)", "value": 35.4 },
+        { "hour": "15:00", "series": "交通流量(万辆)", "value": 36.2 },
+        { "hour": "16:00", "series": "交通流量(万辆)", "value": 39.8 },
+        { "hour": "17:00", "series": "交通流量(万辆)", "value": 48.6 },
+        { "hour": "18:00", "series": "交通流量(万辆)", "value": 52.1 },
+        { "hour": "19:00", "series": "交通流量(万辆)", "value": 44.3 },
+        { "hour": "20:00", "series": "交通流量(万辆)", "value": 38.7 },
+        { "hour": "21:00", "series": "交通流量(万辆)", "value": 30.2 },
+        { "hour": "22:00", "series": "交通流量(万辆)", "value": 22.4 },
+        { "hour": "23:00", "series": "交通流量(万辆)", "value": 15.8 },
+        { "hour": "00:00", "series": "能耗指数(GWh)", "value": 8.2 },
+        { "hour": "01:00", "series": "能耗指数(GWh)", "value": 6.4 },
+        { "hour": "02:00", "series": "能耗指数(GWh)", "value": 5.8 },
+        { "hour": "03:00", "series": "能耗指数(GWh)", "value": 5.5 },
+        { "hour": "04:00", "series": "能耗指数(GWh)", "value": 5.9 },
+        { "hour": "05:00", "series": "能耗指数(GWh)", "value": 7.1 },
+        { "hour": "06:00", "series": "能耗指数(GWh)", "value": 9.8 },
+        { "hour": "07:00", "series": "能耗指数(GWh)", "value": 13.2 },
+        { "hour": "08:00", "series": "能耗指数(GWh)", "value": 16.5 },
+        { "hour": "09:00", "series": "能耗指数(GWh)", "value": 18.3 },
+        { "hour": "10:00", "series": "能耗指数(GWh)", "value": 19.1 },
+        { "hour": "11:00", "series": "能耗指数(GWh)", "value": 20.4 },
+        { "hour": "12:00", "series": "能耗指数(GWh)", "value": 21.2 },
+        { "hour": "13:00", "series": "能耗指数(GWh)", "value": 20.8 },
+        { "hour": "14:00", "series": "能耗指数(GWh)", "value": 20.1 },
+        { "hour": "15:00", "series": "能耗指数(GWh)", "value": 19.6 },
+        { "hour": "16:00", "series": "能耗指数(GWh)", "value": 20.3 },
+        { "hour": "17:00", "series": "能耗指数(GWh)", "value": 22.1 },
+        { "hour": "18:00", "series": "能耗指数(GWh)", "value": 23.4 },
+        { "hour": "19:00", "series": "能耗指数(GWh)", "value": 21.8 },
+        { "hour": "20:00", "series": "能耗指数(GWh)", "value": 19.2 },
+        { "hour": "21:00", "series": "能耗指数(GWh)", "value": 16.4 },
+        { "hour": "22:00", "series": "能耗指数(GWh)", "value": 13.1 },
+        { "hour": "23:00", "series": "能耗指数(GWh)", "value": 10.2 }
+      ]
+    },
+    "districtData": {
+      "default": [
+        { "district": "浦东新区", "value": 28 },
+        { "district": "黄浦区",   "value": 12 },
+        { "district": "徐汇区",   "value": 11 },
+        { "district": "静安区",   "value": 10 },
+        { "district": "长宁区",   "value": 9  },
+        { "district": "虹桥枢纽", "value": 8  },
+        { "district": "闵行区",   "value": 13 },
+        { "district": "其他",     "value": 9  }
+      ]
+    },
+    "hotEvents": {
+      "default": [
+        { "rank": 1, "event": "世博文化公园开放首日客流创新高", "district": "浦东新区", "heat": 98 },
+        { "rank": 2, "event": "G60 科创走廊新增 12 家独角兽企业",  "district": "松江区",   "heat": 94 },
+        { "rank": 3, "event": "黄浦江两岸贯通工程南延段竣工",      "district": "黄浦区",   "heat": 89 },
+        { "rank": 4, "event": "虹桥国际开放枢纽扩容方案公示",      "district": "长宁区",   "heat": 85 },
+        { "rank": 5, "event": "全市新能源汽车保有量突破 100 万辆", "district": "全市",     "heat": 82 }
+      ]
+    }
+  },
+  "body": {
+    "id": "root",
+    "component": "Container",
+    "props": { "direction": "column", "gap": 12 },
+    "style": {
+      "minHeight": "100vh",
+      "background": "#0a0e1a",
+      "padding": "16px",
+      "color": "#e8f4ff"
+    },
+    "children": [
+      {
+        "id": "header",
+        "component": "Flex",
+        "props": { "justify": "space-between", "align": "center" },
+        "style": {
+          "padding": "12px 24px",
+          "background": "linear-gradient(90deg, #0d1b3e 0%, #1a2d5a 50%, #0d1b3e 100%)",
+          "borderRadius": "8px",
+          "border": "1px solid #1e3a6e"
+        },
+        "children": [
+          {
+            "id": "header-title",
+            "component": "__fragment",
+            "style": { "fontSize": "22px", "fontWeight": "bold", "color": "#4fc3f7", "letterSpacing": "4px" },
+            "children": "智 慧 城 市 综 合 管 理 平 台"
+          },
+          {
+            "id": "header-time",
+            "component": "Tag",
+            "props": { "color": "blue" },
+            "children": "2026-03-15  14:32:08"
+          }
+        ]
+      },
+      {
+        "id": "main-row",
+        "component": "Row",
+        "props": { "gutter": [12, 0] },
+        "children": [
+          {
+            "id": "left-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "left-container",
+                "component": "Container",
+                "props": { "direction": "column", "gap": 12 },
+                "children": [
+                  {
+                    "id": "alarm-card",
+                    "component": "Card",
+                    "props": { "title": "实时告警", "size": "small", "bordered": false },
+                    "style": {
+                      "background": "#0d1b3e",
+                      "border": "1px solid #1e3a6e",
+                      "borderRadius": "8px"
+                    },
+                    "children": [
+                      {
+                        "id": "alarm-timeline",
+                        "component": "Timeline",
+                        "props": {
+                          "items": "{{state.alarms.map(a => ({ color: a.color, label: a.time, children: a.content, dot: undefined }))}}",
+                          "mode": "left"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "device-card",
+                    "component": "Card",
+                    "props": { "title": "设备在线率", "size": "small", "bordered": false },
+                    "style": {
+                      "background": "#0d1b3e",
+                      "border": "1px solid #1e3a6e",
+                      "borderRadius": "8px"
+                    },
+                    "children": [
+                      {
+                        "id": "device-stat-row",
+                        "component": "Row",
+                        "props": { "gutter": [8, 0] },
+                        "children": [
+                          {
+                            "id": "device-total-col",
+                            "component": "Col",
+                            "props": { "span": 12 },
+                            "children": [
+                              {
+                                "id": "device-total-stat",
+                                "component": "Statistic",
+                                "props": {
+                                  "title": "设备总数",
+                                  "value": "{{state.deviceStats.total}}",
+                                  "valueStyle": { "color": "#4fc3f7", "fontSize": "20px" }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "id": "device-online-col",
+                            "component": "Col",
+                            "props": { "span": 12 },
+                            "children": [
+                              {
+                                "id": "device-online-stat",
+                                "component": "Statistic",
+                                "props": {
+                                  "title": "在线设备",
+                                  "value": "{{state.deviceStats.online}}",
+                                  "valueStyle": { "color": "#52c41a", "fontSize": "20px" }
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "id": "device-rate-label",
+                        "component": "Flex",
+                        "props": { "justify": "space-between", "align": "center" },
+                        "style": { "marginTop": "12px", "marginBottom": "4px" },
+                        "children": [
+                          {
+                            "id": "device-rate-text",
+                            "component": "__fragment",
+                            "style": { "color": "#8bacc8", "fontSize": "13px" },
+                            "children": "在线率"
+                          },
+                          {
+                            "id": "device-rate-val",
+                            "component": "__fragment",
+                            "style": { "color": "#52c41a", "fontWeight": "bold" },
+                            "children": "{{state.deviceStats.rate + '%'}}"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "device-progress",
+                        "component": "Progress",
+                        "props": {
+                          "percent": "{{state.deviceStats.rate}}",
+                          "strokeColor": "#52c41a",
+                          "trailColor": "#1e3a6e",
+                          "showInfo": false,
+                          "strokeWidth": 10
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "center-col",
+            "component": "Col",
+            "props": { "span": 12 },
+            "children": [
+              {
+                "id": "center-container",
+                "component": "Container",
+                "props": { "direction": "column", "gap": 12 },
+                "children": [
+                  {
+                    "id": "kpi-card",
+                    "component": "Card",
+                    "props": { "size": "small", "bordered": false },
+                    "style": {
+                      "background": "#0d1b3e",
+                      "border": "1px solid #1e3a6e",
+                      "borderRadius": "8px"
+                    },
+                    "children": [
+                      {
+                        "id": "kpi-row",
+                        "component": "Row",
+                        "props": { "gutter": [16, 0] },
+                        "children": [
+                          {
+                            "id": "kpi-population-col",
+                            "component": "Col",
+                            "props": { "span": 6 },
+                            "children": [
+                              {
+                                "id": "kpi-population",
+                                "component": "Statistic",
+                                "props": {
+                                  "title": "常住人口 (万)",
+                                  "value": "{{state.kpi.population}}",
+                                  "valueStyle": { "color": "#4fc3f7", "fontSize": "24px" }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "id": "kpi-vehicles-col",
+                            "component": "Col",
+                            "props": { "span": 6 },
+                            "children": [
+                              {
+                                "id": "kpi-vehicles",
+                                "component": "Statistic",
+                                "props": {
+                                  "title": "机动车辆 (万辆)",
+                                  "value": "{{state.kpi.vehicles}}",
+                                  "valueStyle": { "color": "#ffd666", "fontSize": "24px" }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "id": "kpi-incidents-col",
+                            "component": "Col",
+                            "props": { "span": 6 },
+                            "children": [
+                              {
+                                "id": "kpi-incidents",
+                                "component": "Statistic",
+                                "props": {
+                                  "title": "今日事件",
+                                  "value": "{{state.kpi.incidents}}",
+                                  "suffix": "起",
+                                  "valueStyle": { "color": "#ff7875", "fontSize": "24px" }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "id": "kpi-satisfaction-col",
+                            "component": "Col",
+                            "props": { "span": 6 },
+                            "children": [
+                              {
+                                "id": "kpi-satisfaction",
+                                "component": "Statistic",
+                                "props": {
+                                  "title": "市民满意度",
+                                  "value": "{{state.kpi.satisfaction}}",
+                                  "suffix": "%",
+                                  "precision": 1,
+                                  "valueStyle": { "color": "#95de64", "fontSize": "24px" }
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "trend-card",
+                    "component": "Card",
+                    "props": { "title": "近24小时城市运行趋势", "size": "small", "bordered": false },
+                    "style": {
+                      "background": "#0d1b3e",
+                      "border": "1px solid #1e3a6e",
+                      "borderRadius": "8px"
+                    },
+                    "children": [
+                      {
+                        "id": "trend-chart",
+                        "component": "Chart.Line",
+                        "props": {
+                          "data": "{{state.trendData}}",
+                          "xField": "hour",
+                          "yField": "value",
+                          "colorField": "series",
+                          "height": 280,
+                          "autoFit": true,
+                          "smooth": true,
+                          "theme": "classicDark",
+                          "legend": { "position": "top-right" },
+                          "axis": {
+                            "x": { "labelFill": "#8bacc8" },
+                            "y": { "labelFill": "#8bacc8" }
+                          },
+                          "tooltip": { "showMarkers": true }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "right-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "right-container",
+                "component": "Container",
+                "props": { "direction": "column", "gap": 12 },
+                "children": [
+                  {
+                    "id": "district-card",
+                    "component": "Card",
+                    "props": { "title": "区域事件分布", "size": "small", "bordered": false },
+                    "style": {
+                      "background": "#0d1b3e",
+                      "border": "1px solid #1e3a6e",
+                      "borderRadius": "8px"
+                    },
+                    "children": [
+                      {
+                        "id": "district-pie",
+                        "component": "Chart.Pie",
+                        "props": {
+                          "data": "{{state.districtData}}",
+                          "angleField": "value",
+                          "colorField": "district",
+                          "innerRadius": 0.5,
+                          "height": 240,
+                          "autoFit": true,
+                          "theme": "classicDark",
+                          "legend": { "position": "bottom", "layout": "horizontal" },
+                          "label": false
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "hot-events-card",
+                    "component": "Card",
+                    "props": { "title": "热门事件 Top 5", "size": "small", "bordered": false },
+                    "style": {
+                      "background": "#0d1b3e",
+                      "border": "1px solid #1e3a6e",
+                      "borderRadius": "8px"
+                    },
+                    "children": [
+                      {
+                        "id": "hot-events-table",
+                        "component": "Table",
+                        "props": {
+                          "rowKey": "rank",
+                          "dataSource": "{{state.hotEvents}}",
+                          "size": "small",
+                          "pagination": false,
+                          "showHeader": false
+                        },
+                        "columns": [
+                          {
+                            "title": "排名",
+                            "dataIndex": "rank",
+                            "width": 36,
+                            "render": {
+                              "id": "hot-rank-tag",
+                              "component": "Tag",
+                              "props": {
+                                "color": "{{text === 1 ? 'red' : text === 2 ? 'orange' : text === 3 ? 'gold' : 'default'}}"
+                              },
+                              "children": "{{text}}"
+                            }
+                          },
+                          {
+                            "title": "事件",
+                            "dataIndex": "event"
+                          },
+                          {
+                            "title": "热度",
+                            "dataIndex": "heat",
+                            "width": 60,
+                            "render": {
+                              "id": "hot-heat-text",
+                              "component": "__fragment",
+                              "children": "{{text}}"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

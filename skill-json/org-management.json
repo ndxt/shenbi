@@ -1,0 +1,465 @@
+{
+  "id": "org-management",
+  "name": "组织架构管理",
+  "state": {
+    "treeData": {
+      "default": [
+        {
+          "key": "dept-1", "title": "总公司",
+          "children": [
+            {
+              "key": "dept-1-1", "title": "产品中心",
+              "children": [
+                { "key": "dept-1-1-1", "title": "产品研发部" },
+                { "key": "dept-1-1-2", "title": "用户体验部" }
+              ]
+            },
+            {
+              "key": "dept-1-2", "title": "技术中心",
+              "children": [
+                { "key": "dept-1-2-1", "title": "前端工程部" },
+                { "key": "dept-1-2-2", "title": "后端工程部" },
+                { "key": "dept-1-2-3", "title": "测试质量部" }
+              ]
+            },
+            {
+              "key": "dept-1-3", "title": "商业中心",
+              "children": [
+                { "key": "dept-1-3-1", "title": "销售部" },
+                { "key": "dept-1-3-2", "title": "市场部" }
+              ]
+            },
+            { "key": "dept-1-4", "title": "人力资源部" },
+            { "key": "dept-1-5", "title": "财务部" }
+          ]
+        }
+      ]
+    },
+    "expandedKeys": { "default": ["dept-1", "dept-1-1", "dept-1-2", "dept-1-3"] },
+    "selectedKeys": { "default": ["dept-1-2-1"] },
+    "selectedDept": {
+      "default": {
+        "key": "dept-1-2-1",
+        "name": "前端工程部",
+        "parent": "技术中心",
+        "manager": "李明",
+        "headcount": 12,
+        "established": "2019-03-01",
+        "description": "负责公司所有产品的前端研发工作，包括 Web、移动端 H5 及小程序。"
+      }
+    },
+    "memberList": {
+      "default": [
+        { "id": 1, "name": "李明",   "title": "部门负责人", "level": "P7", "joinDate": "2019-03-01", "status": "active" },
+        { "id": 2, "name": "王芳",   "title": "高级工程师", "level": "P6", "joinDate": "2020-06-15", "status": "active" },
+        { "id": 3, "name": "张伟",   "title": "高级工程师", "level": "P6", "joinDate": "2020-09-01", "status": "active" },
+        { "id": 4, "name": "刘洋",   "title": "工程师",     "level": "P5", "joinDate": "2021-03-10", "status": "active" },
+        { "id": 5, "name": "陈静",   "title": "工程师",     "level": "P5", "joinDate": "2021-07-20", "status": "active" },
+        { "id": 6, "name": "赵磊",   "title": "工程师",     "level": "P4", "joinDate": "2022-04-01", "status": "active" },
+        { "id": 7, "name": "孙晓燕", "title": "初级工程师", "level": "P3", "joinDate": "2023-07-01", "status": "probation" }
+      ]
+    },
+    "deptMap": {
+      "default": {
+        "dept-1":     { "key": "dept-1",     "name": "总公司",     "parent": "-",    "manager": "王总",  "headcount": 86, "established": "2015-01-01", "description": "集团总部，统筹管理各业务中心。" },
+        "dept-1-1":   { "key": "dept-1-1",   "name": "产品中心",   "parent": "总公司", "manager": "陈总监", "headcount": 18, "established": "2016-05-01", "description": "负责产品规划、设计与用户研究。" },
+        "dept-1-1-1": { "key": "dept-1-1-1", "name": "产品研发部", "parent": "产品中心", "manager": "周经理", "headcount": 10, "established": "2016-05-01", "description": "负责产品需求分析与功能规划。" },
+        "dept-1-1-2": { "key": "dept-1-1-2", "name": "用户体验部", "parent": "产品中心", "manager": "吴经理", "headcount": 8,  "established": "2018-01-01", "description": "负责产品交互设计与用户体验优化。" },
+        "dept-1-2":   { "key": "dept-1-2",   "name": "技术中心",   "parent": "总公司", "manager": "张总监", "headcount": 35, "established": "2015-01-01", "description": "负责公司全线产品的技术研发与架构。" },
+        "dept-1-2-1": { "key": "dept-1-2-1", "name": "前端工程部", "parent": "技术中心", "manager": "李明",  "headcount": 12, "established": "2019-03-01", "description": "负责公司所有产品的前端研发工作，包括 Web、移动端 H5 及小程序。" },
+        "dept-1-2-2": { "key": "dept-1-2-2", "name": "后端工程部", "parent": "技术中心", "manager": "刘总",  "headcount": 15, "established": "2015-01-01", "description": "负责服务端架构设计与核心业务系统研发。" },
+        "dept-1-2-3": { "key": "dept-1-2-3", "name": "测试质量部", "parent": "技术中心", "manager": "赵经理", "headcount": 8,  "established": "2017-06-01", "description": "负责产品质量保障、自动化测试体系建设。" },
+        "dept-1-3":   { "key": "dept-1-3",   "name": "商业中心",   "parent": "总公司", "manager": "孙总监", "headcount": 22, "established": "2015-01-01", "description": "负责市场拓展与销售业务。" },
+        "dept-1-3-1": { "key": "dept-1-3-1", "name": "销售部",     "parent": "商业中心", "manager": "钱经理", "headcount": 14, "established": "2015-01-01", "description": "负责客户开发与销售业绩达成。" },
+        "dept-1-3-2": { "key": "dept-1-3-2", "name": "市场部",     "parent": "商业中心", "manager": "冯经理", "headcount": 8,  "established": "2016-03-01", "description": "负责品牌推广与市场活动策划。" },
+        "dept-1-4":   { "key": "dept-1-4",   "name": "人力资源部", "parent": "总公司", "manager": "郑经理", "headcount": 6,  "established": "2015-01-01", "description": "负责招聘、培训、绩效与员工关系管理。" },
+        "dept-1-5":   { "key": "dept-1-5",   "name": "财务部",     "parent": "总公司", "manager": "王经理", "headcount": 5,  "established": "2015-01-01", "description": "负责公司财务核算、预算管理与资金运营。" }
+      }
+    }
+  },
+  "methods": {
+    "selectDept": {
+      "params": ["selectedKeys", "info"],
+      "body": [
+        {
+          "type": "condition",
+          "if": "{{params.selectedKeys.length > 0}}",
+          "then": [
+            { "type": "setState", "key": "selectedKeys", "value": "{{params.selectedKeys}}" },
+            { "type": "setState", "key": "selectedDept", "value": "{{state.deptMap[params.selectedKeys[0]] || null}}" }
+          ]
+        }
+      ]
+    },
+    "deleteDept": {
+      "body": [
+        {
+          "type": "fetch",
+          "method": "DELETE",
+          "url": "{{'/api/departments/' + state.selectedDept.key}}",
+          "onSuccess": [
+            { "type": "message", "level": "success", "content": "部门已删除" },
+            { "type": "setState", "key": "selectedKeys", "value": [] },
+            { "type": "setState", "key": "selectedDept", "value": null }
+          ],
+          "onError": [
+            { "type": "message", "level": "error", "content": "删除失败，请重试" }
+          ]
+        }
+      ]
+    }
+  },
+  "body": {
+    "id": "root",
+    "component": "Container",
+    "props": { "direction": "column", "gap": 16 },
+    "children": [
+      {
+        "id": "toolbar",
+        "component": "Card",
+        "props": { "bordered": false, "size": "small" },
+        "children": [
+          {
+            "id": "toolbar-flex",
+            "component": "Flex",
+            "props": { "justify": "space-between", "align": "center" },
+            "children": [
+              {
+                "id": "toolbar-title",
+                "component": "__fragment",
+                "children": "组织架构管理"
+              },
+              {
+                "id": "toolbar-actions",
+                "component": "Space",
+                "children": [
+                  {
+                    "id": "add-dept-btn",
+                    "component": "Button",
+                    "props": { "type": "primary" },
+                    "children": "新增部门",
+                    "events": {
+                      "onClick": [
+                        { "type": "modal", "id": "addDeptDialog", "open": true }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "delete-dept-popconfirm",
+                    "component": "Popconfirm",
+                    "props": {
+                      "title": "{{\"确认删除部门「\" + (state.selectedDept ? state.selectedDept.name : '') + \"」？\"}}",
+                      "okText": "确认删除",
+                      "cancelText": "取消",
+                      "okButtonProps": { "danger": true },
+                      "disabled": "{{!state.selectedDept}}"
+                    },
+                    "events": {
+                      "onConfirm": [{ "type": "callMethod", "name": "deleteDept" }]
+                    },
+                    "children": [
+                      {
+                        "id": "delete-dept-btn",
+                        "component": "Button",
+                        "props": {
+                          "danger": true,
+                          "disabled": "{{!state.selectedDept}}"
+                        },
+                        "children": "删除部门"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "main-row",
+        "component": "Row",
+        "props": { "gutter": [16, 0] },
+        "children": [
+          {
+            "id": "tree-col",
+            "component": "Col",
+            "props": { "span": 6 },
+            "children": [
+              {
+                "id": "tree-card",
+                "component": "Card",
+                "props": { "title": "部门树", "bordered": false },
+                "children": [
+                  {
+                    "id": "dept-tree",
+                    "component": "Tree",
+                    "props": {
+                      "treeData": "{{state.treeData}}",
+                      "selectedKeys": "{{state.selectedKeys}}",
+                      "expandedKeys": "{{state.expandedKeys}}",
+                      "showLine": true,
+                      "blockNode": true,
+                      "autoExpandParent": true
+                    },
+                    "events": {
+                      "onSelect": [
+                        {
+                          "type": "callMethod",
+                          "name": "selectDept",
+                          "params": { "selectedKeys": "{{event[0]}}", "info": "{{event[1]}}" }
+                        }
+                      ],
+                      "onExpand": [
+                        { "type": "setState", "key": "expandedKeys", "value": "{{event[0]}}" }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "detail-col",
+            "component": "Col",
+            "props": { "span": 18 },
+            "children": [
+              {
+                "id": "empty-hint",
+                "component": "Card",
+                "props": { "bordered": false },
+                "if": "{{!state.selectedDept}}",
+                "children": [
+                  {
+                    "id": "empty-comp",
+                    "component": "Empty",
+                    "props": { "description": "请在左侧选择部门" }
+                  }
+                ]
+              },
+              {
+                "id": "detail-container",
+                "component": "Container",
+                "props": { "direction": "column", "gap": 16 },
+                "if": "{{!!state.selectedDept}}",
+                "children": [
+                  {
+                    "id": "dept-detail-card",
+                    "component": "Card",
+                    "props": { "title": "部门详情", "bordered": false },
+                    "children": [
+                      {
+                        "id": "dept-descriptions",
+                        "component": "Descriptions",
+                        "props": { "bordered": true, "column": 3, "size": "middle" },
+                        "children": [
+                          {
+                            "id": "desc-dept-name",
+                            "component": "Descriptions.Item",
+                            "props": { "label": "部门名称", "span": 1 },
+                            "children": "{{state.selectedDept.name}}"
+                          },
+                          {
+                            "id": "desc-dept-parent",
+                            "component": "Descriptions.Item",
+                            "props": { "label": "上级部门", "span": 1 },
+                            "children": "{{state.selectedDept.parent}}"
+                          },
+                          {
+                            "id": "desc-dept-manager",
+                            "component": "Descriptions.Item",
+                            "props": { "label": "负责人", "span": 1 },
+                            "children": "{{state.selectedDept.manager}}"
+                          },
+                          {
+                            "id": "desc-dept-headcount",
+                            "component": "Descriptions.Item",
+                            "props": { "label": "在编人数", "span": 1 },
+                            "children": "{{state.selectedDept.headcount + ' 人'}}"
+                          },
+                          {
+                            "id": "desc-dept-established",
+                            "component": "Descriptions.Item",
+                            "props": { "label": "成立日期", "span": 1 },
+                            "children": "{{state.selectedDept.established}}"
+                          },
+                          {
+                            "id": "desc-dept-desc",
+                            "component": "Descriptions.Item",
+                            "props": { "label": "部门职责", "span": 3 },
+                            "children": "{{state.selectedDept.description}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "member-card",
+                    "component": "Card",
+                    "props": { "title": "部门成员", "bordered": false },
+                    "children": [
+                      {
+                        "id": "member-table",
+                        "component": "Table",
+                        "props": {
+                          "rowKey": "id",
+                          "dataSource": "{{state.memberList}}",
+                          "size": "middle",
+                          "pagination": false
+                        },
+                        "columns": [
+                          { "title": "姓名", "dataIndex": "name", "width": 90 },
+                          { "title": "职位", "dataIndex": "title" },
+                          {
+                            "title": "级别",
+                            "dataIndex": "level",
+                            "width": 80,
+                            "render": {
+                              "id": "level-tag",
+                              "component": "Tag",
+                              "props": {
+                                "color": "{{text >= 'P6' ? 'blue' : text === 'P5' ? 'cyan' : 'default'}}"
+                              },
+                              "children": "{{text}}"
+                            }
+                          },
+                          { "title": "入职日期", "dataIndex": "joinDate", "width": 120 },
+                          {
+                            "title": "状态",
+                            "dataIndex": "status",
+                            "width": 90,
+                            "render": {
+                              "id": "member-status-tag",
+                              "component": "Tag",
+                              "props": {
+                                "color": "{{text === 'active' ? 'green' : 'orange'}}"
+                              },
+                              "children": "{{text === 'active' ? '在职' : '试用期'}}"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "dialogs": [
+    {
+      "id": "addDeptDialog",
+      "component": "Modal",
+      "props": {
+        "open": true,
+        "title": "新增部门",
+        "width": 480,
+        "okText": "确认新增",
+        "cancelText": "取消",
+        "destroyOnClose": true
+      },
+      "events": {
+        "onCancel": [{ "type": "modal", "id": "addDeptDialog", "open": false }],
+        "onOk": [
+          {
+            "type": "validate",
+            "formRef": "add-dept-form",
+            "onSuccess": [
+              {
+                "type": "fetch",
+                "method": "POST",
+                "url": "/api/departments",
+                "onSuccess": [
+                  { "type": "message", "level": "success", "content": "部门新增成功" },
+                  { "type": "modal", "id": "addDeptDialog", "open": false }
+                ],
+                "onError": [
+                  { "type": "message", "level": "error", "content": "新增失败，请重试" }
+                ]
+              }
+            ],
+            "onError": [
+              { "type": "message", "level": "warning", "content": "请检查表单填写是否完整" }
+            ]
+          }
+        ]
+      },
+      "children": [
+        {
+          "id": "add-dept-form",
+          "component": "Form",
+          "props": { "layout": "vertical" },
+          "children": [
+            {
+              "id": "add-dept-name-item",
+              "component": "Form.Item",
+              "props": {
+                "name": "name",
+                "label": "部门名称",
+                "rules": [{ "required": true, "message": "请输入部门名称" }]
+              },
+              "children": [
+                {
+                  "id": "add-dept-name-input",
+                  "component": "Input",
+                  "props": { "placeholder": "请输入部门名称" }
+                }
+              ]
+            },
+            {
+              "id": "add-dept-parent-item",
+              "component": "Form.Item",
+              "props": {
+                "name": "parentKey",
+                "label": "上级部门",
+                "rules": [{ "required": true, "message": "请选择上级部门" }]
+              },
+              "children": [
+                {
+                  "id": "add-dept-parent-select",
+                  "component": "TreeSelect",
+                  "props": {
+                    "placeholder": "请选择上级部门",
+                    "treeData": "{{state.treeData}}",
+                    "treeDefaultExpandAll": true,
+                    "style": { "width": "100%" }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "add-dept-manager-item",
+              "component": "Form.Item",
+              "props": {
+                "name": "manager",
+                "label": "负责人",
+                "rules": [{ "required": true, "message": "请输入负责人姓名" }]
+              },
+              "children": [
+                {
+                  "id": "add-dept-manager-input",
+                  "component": "Input",
+                  "props": { "placeholder": "请输入负责人姓名" }
+                }
+              ]
+            },
+            {
+              "id": "add-dept-desc-item",
+              "component": "Form.Item",
+              "props": { "name": "description", "label": "部门职责" },
+              "children": [
+                {
+                  "id": "add-dept-desc-textarea",
+                  "component": "Input.TextArea",
+                  "props": { "placeholder": "请输入部门职责描述（选填）", "rows": 3 }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,625 @@
+{
+  "id": "system-home2",
+  "name": "系统管理控制台首页",
+  "state": {
+    "modules": {
+      "default": [
+        {
+          "key": "users",
+          "name": "用户管理",
+          "desc": "账号创建、权限分配、状态管理",
+          "abbr": "U",
+          "color": "#6366f1",
+          "bgLight": "#eef2ff",
+          "count": 12,
+          "path": "/system/users"
+        },
+        {
+          "key": "roles",
+          "name": "角色权限",
+          "abbr": "R",
+          "desc": "角色定义、菜单授权、数据权限",
+          "color": "#8b5cf6",
+          "bgLight": "#f5f3ff",
+          "count": 6,
+          "path": "/system/roles"
+        },
+        {
+          "key": "org",
+          "name": "机构管理",
+          "abbr": "O",
+          "desc": "组织架构、部门层级、人员归属",
+          "color": "#0ea5e9",
+          "bgLight": "#e0f2fe",
+          "count": 8,
+          "path": "/system/org"
+        },
+        {
+          "key": "menus",
+          "name": "菜单管理",
+          "abbr": "M",
+          "desc": "系统菜单、路由配置、图标设置",
+          "color": "#10b981",
+          "bgLight": "#d1fae5",
+          "count": 34,
+          "path": "/system/menus"
+        },
+        {
+          "key": "audit",
+          "name": "日志审计",
+          "abbr": "A",
+          "desc": "操作日志、登录记录、安全审计",
+          "color": "#f59e0b",
+          "bgLight": "#fef3c7",
+          "count": 0,
+          "path": "/system/audit"
+        },
+        {
+          "key": "config",
+          "name": "系统配置",
+          "abbr": "C",
+          "desc": "基础参数、邮件通知、存储设置",
+          "color": "#ef4444",
+          "bgLight": "#fee2e2",
+          "count": 5,
+          "path": "/system/config"
+        }
+      ]
+    },
+    "stats": {
+      "default": {
+        "userTotal": 128,
+        "roleCount": 6,
+        "onlineCount": 23,
+        "todayLogin": 47
+      }
+    },
+    "recentLogs": {
+      "default": [
+        { "id": 1, "operator": "张三",  "action": "修改用户权限",      "time": "2024-12-20 14:32:10", "ip": "192.168.1.101" },
+        { "id": 2, "operator": "李四",  "action": "新增角色「审计员」",  "time": "2024-12-20 13:18:45", "ip": "192.168.1.88"  },
+        { "id": 3, "operator": "王五",  "action": "删除菜单节点",       "time": "2024-12-20 11:05:22", "ip": "10.0.0.55"     },
+        { "id": 4, "operator": "admin", "action": "修改系统参数",       "time": "2024-12-20 09:47:03", "ip": "127.0.0.1"     },
+        { "id": 5, "operator": "赵六",  "action": "导出用户列表",       "time": "2024-12-19 17:30:58", "ip": "192.168.2.200" }
+      ]
+    }
+  },
+  "body": {
+    "id": "page-root",
+    "component": "Container",
+    "props": { "direction": "column", "gap": 20 },
+    "style": {
+      "padding": "24px",
+      "background": "#f5f3ff",
+      "minHeight": "100vh",
+      "fontFamily": "'Fira Sans', 'PingFang SC', sans-serif"
+    },
+    "children": [
+      {
+        "id": "page-header-card",
+        "component": "Card",
+        "props": {
+          "bordered": false,
+          "bodyStyle": { "padding": "20px 24px" }
+        },
+        "style": {
+          "borderRadius": "12px",
+          "background": "linear-gradient(135deg, #6366f1 0%, #818cf8 100%)",
+          "boxShadow": "0 4px 24px rgba(99,102,241,0.25)"
+        },
+        "children": [
+          {
+            "id": "header-breadcrumb",
+            "component": "Breadcrumb",
+            "props": {
+              "items": [
+                { "title": "首页", "href": "/" },
+                { "title": "系统管理" }
+              ],
+              "separator": "/"
+            },
+            "style": { "marginBottom": "10px" }
+          },
+          {
+            "id": "header-main-row",
+            "component": "Flex",
+            "props": { "justify": "space-between", "align": "center" },
+            "children": [
+              {
+                "id": "header-text-group",
+                "component": "Container",
+                "props": { "direction": "column", "gap": 4 },
+                "children": [
+                  {
+                    "id": "header-title",
+                    "component": "Typography.Title",
+                    "props": { "level": 3 },
+                    "style": { "margin": 0, "color": "#ffffff", "fontWeight": 700 },
+                    "children": "系统管理控制台"
+                  },
+                  {
+                    "id": "header-desc",
+                    "component": "Typography.Text",
+                    "style": { "color": "rgba(255,255,255,0.75)", "fontSize": "13px" },
+                    "children": "统一管理系统用户、角色权限、机构架构及系统配置"
+                  }
+                ]
+              },
+              {
+                "id": "header-right",
+                "component": "Flex",
+                "props": { "align": "center", "gap": 12 },
+                "children": [
+                  {
+                    "id": "online-badge",
+                    "component": "Badge",
+                    "props": {
+                      "status": "processing",
+                      "color": "#10b981",
+                      "text": "{{\"在线 \" + state.stats.onlineCount + \" 人\"}}"
+                    },
+                    "style": { "color": "#ffffff" }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "modules-section",
+        "component": "Container",
+        "props": { "direction": "column", "gap": 12 },
+        "children": [
+          {
+            "id": "modules-section-title",
+            "component": "Flex",
+            "props": { "align": "center", "gap": 8 },
+            "children": [
+              {
+                "id": "modules-title-bar",
+                "component": "Container",
+                "style": {
+                  "width": "4px",
+                  "height": "18px",
+                  "background": "#6366f1",
+                  "borderRadius": "2px"
+                },
+                "children": []
+              },
+              {
+                "id": "modules-title-text",
+                "component": "Typography.Title",
+                "props": { "level": 5 },
+                "style": { "margin": 0, "color": "#1e1b4b" },
+                "children": "功能模块"
+              }
+            ]
+          },
+          {
+            "id": "modules-row",
+            "component": "Row",
+            "props": { "gutter": [16, 16] },
+            "children": [
+              {
+                "id": "module-col",
+                "component": "Col",
+                "props": { "span": 8 },
+                "loop": { "data": "{{state.modules}}", "key": "{{item.key}}" },
+                "children": [
+                  {
+                    "id": "module-card",
+                    "component": "Card",
+                    "props": {
+                      "bordered": false,
+                      "hoverable": true,
+                      "bodyStyle": { "padding": "20px 20px 16px" }
+                    },
+                    "style": {
+                      "borderRadius": "12px",
+                      "cursor": "pointer",
+                      "transition": "box-shadow 200ms ease, transform 200ms ease",
+                      "boxShadow": "0 1px 4px rgba(99,102,241,0.08)"
+                    },
+                    "children": [
+                      {
+                        "id": "module-card-body",
+                        "component": "Container",
+                        "props": { "direction": "column", "gap": 14 },
+                        "children": [
+                          {
+                            "id": "module-top",
+                            "component": "Flex",
+                            "props": { "justify": "space-between", "align": "flex-start" },
+                            "children": [
+                              {
+                                "id": "module-avatar",
+                                "component": "Avatar",
+                                "props": {
+                                  "size": 52,
+                                  "shape": "square",
+                                  "style": {
+                                    "background": "{{item.bgLight}}",
+                                    "color": "{{item.color}}",
+                                    "fontSize": "20px",
+                                    "fontWeight": 700,
+                                    "borderRadius": "12px",
+                                    "flexShrink": 0
+                                  }
+                                },
+                                "children": "{{item.abbr}}"
+                              },
+                              {
+                                "id": "module-badge-wrap",
+                                "component": "Badge",
+                                "props": {
+                                  "count": "{{item.count}}",
+                                  "showZero": false,
+                                  "overflowCount": 99,
+                                  "color": "#6366f1"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "id": "module-info",
+                            "component": "Container",
+                            "props": { "direction": "column", "gap": 4 },
+                            "children": [
+                              {
+                                "id": "module-name",
+                                "component": "Typography.Text",
+                                "props": { "strong": true },
+                                "style": { "fontSize": "15px", "color": "#1e1b4b" },
+                                "children": "{{item.name}}"
+                              },
+                              {
+                                "id": "module-desc",
+                                "component": "Typography.Text",
+                                "props": { "type": "secondary" },
+                                "style": { "fontSize": "12px", "lineHeight": "1.6" },
+                                "children": "{{item.desc}}"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "module-divider",
+                            "component": "Divider",
+                            "style": { "margin": "0" }
+                          },
+                          {
+                            "id": "module-enter-btn",
+                            "component": "Button",
+                            "props": {
+                              "type": "link",
+                              "size": "small",
+                              "block": true,
+                              "style": {
+                                "color": "{{item.color}}",
+                                "fontWeight": 500,
+                                "padding": 0,
+                                "height": "auto"
+                              }
+                            },
+                            "events": {
+                              "onClick": [
+                                { "type": "navigate", "to": "{{item.path}}" }
+                              ]
+                            },
+                            "children": "进入模块 →"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "status-section",
+        "component": "Container",
+        "props": { "direction": "column", "gap": 12 },
+        "children": [
+          {
+            "id": "status-section-title",
+            "component": "Flex",
+            "props": { "align": "center", "gap": 8 },
+            "children": [
+              {
+                "id": "status-title-bar",
+                "component": "Container",
+                "style": {
+                  "width": "4px",
+                  "height": "18px",
+                  "background": "#10b981",
+                  "borderRadius": "2px"
+                },
+                "children": []
+              },
+              {
+                "id": "status-title-text",
+                "component": "Typography.Title",
+                "props": { "level": 5 },
+                "style": { "margin": 0, "color": "#1e1b4b" },
+                "children": "系统状态"
+              }
+            ]
+          },
+          {
+            "id": "status-row",
+            "component": "Row",
+            "props": { "gutter": [16, 16] },
+            "children": [
+              {
+                "id": "stats-col",
+                "component": "Col",
+                "props": { "span": 9 },
+                "children": [
+                  {
+                    "id": "stats-card",
+                    "component": "Card",
+                    "props": {
+                      "title": "数据统计",
+                      "bordered": false,
+                      "bodyStyle": { "padding": "16px 20px 20px" },
+                      "headStyle": {
+                        "borderBottom": "1px solid #ede9fe",
+                        "color": "#1e1b4b",
+                        "fontWeight": 600
+                      }
+                    },
+                    "style": {
+                      "borderRadius": "12px",
+                      "height": "100%",
+                      "boxShadow": "0 1px 4px rgba(99,102,241,0.08)"
+                    },
+                    "children": [
+                      {
+                        "id": "stats-kpi-row",
+                        "component": "Row",
+                        "props": { "gutter": [12, 16] },
+                        "children": [
+                          {
+                            "id": "kpi-user-col",
+                            "component": "Col",
+                            "props": { "span": 12 },
+                            "children": [
+                              {
+                                "id": "kpi-user-card",
+                                "component": "Container",
+                                "style": {
+                                  "background": "#eef2ff",
+                                  "borderRadius": "10px",
+                                  "padding": "14px 16px"
+                                },
+                                "children": [
+                                  {
+                                    "id": "kpi-user-stat",
+                                    "component": "Statistic",
+                                    "props": {
+                                      "title": "用户总数",
+                                      "value": "{{state.stats.userTotal}}",
+                                      "suffix": "人",
+                                      "valueStyle": { "fontSize": "24px", "fontWeight": 700, "color": "#6366f1" }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "id": "kpi-role-col",
+                            "component": "Col",
+                            "props": { "span": 12 },
+                            "children": [
+                              {
+                                "id": "kpi-role-card",
+                                "component": "Container",
+                                "style": {
+                                  "background": "#f5f3ff",
+                                  "borderRadius": "10px",
+                                  "padding": "14px 16px"
+                                },
+                                "children": [
+                                  {
+                                    "id": "kpi-role-stat",
+                                    "component": "Statistic",
+                                    "props": {
+                                      "title": "角色数",
+                                      "value": "{{state.stats.roleCount}}",
+                                      "suffix": "个",
+                                      "valueStyle": { "fontSize": "24px", "fontWeight": 700, "color": "#8b5cf6" }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "id": "kpi-online-col",
+                            "component": "Col",
+                            "props": { "span": 12 },
+                            "children": [
+                              {
+                                "id": "kpi-online-card",
+                                "component": "Container",
+                                "style": {
+                                  "background": "#d1fae5",
+                                  "borderRadius": "10px",
+                                  "padding": "14px 16px"
+                                },
+                                "children": [
+                                  {
+                                    "id": "kpi-online-stat",
+                                    "component": "Statistic",
+                                    "props": {
+                                      "title": "在线人数",
+                                      "value": "{{state.stats.onlineCount}}",
+                                      "suffix": "人",
+                                      "valueStyle": { "fontSize": "24px", "fontWeight": 700, "color": "#10b981" }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "id": "kpi-login-col",
+                            "component": "Col",
+                            "props": { "span": 12 },
+                            "children": [
+                              {
+                                "id": "kpi-login-card",
+                                "component": "Container",
+                                "style": {
+                                  "background": "#fef3c7",
+                                  "borderRadius": "10px",
+                                  "padding": "14px 16px"
+                                },
+                                "children": [
+                                  {
+                                    "id": "kpi-login-stat",
+                                    "component": "Statistic",
+                                    "props": {
+                                      "title": "今日登录",
+                                      "value": "{{state.stats.todayLogin}}",
+                                      "suffix": "次",
+                                      "valueStyle": { "fontSize": "24px", "fontWeight": 700, "color": "#f59e0b" }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "logs-col",
+                "component": "Col",
+                "props": { "span": 15 },
+                "children": [
+                  {
+                    "id": "logs-card",
+                    "component": "Card",
+                    "props": {
+                      "title": "近期操作日志",
+                      "bordered": false,
+                      "extra": {
+                        "id": "logs-more-link",
+                        "component": "Button",
+                        "props": {
+                          "type": "link",
+                          "size": "small",
+                          "style": { "color": "#6366f1", "padding": 0 }
+                        },
+                        "events": {
+                          "onClick": [{ "type": "navigate", "to": "/system/audit" }]
+                        },
+                        "children": "查看全部 →"
+                      },
+                      "bodyStyle": { "padding": "0 0 4px" },
+                      "headStyle": {
+                        "borderBottom": "1px solid #ede9fe",
+                        "color": "#1e1b4b",
+                        "fontWeight": 600
+                      }
+                    },
+                    "style": {
+                      "borderRadius": "12px",
+                      "boxShadow": "0 1px 4px rgba(99,102,241,0.08)"
+                    },
+                    "children": [
+                      {
+                        "id": "logs-table",
+                        "component": "Table",
+                        "props": {
+                          "dataSource": "{{state.recentLogs}}",
+                          "rowKey": "id",
+                          "size": "small",
+                          "pagination": false,
+                          "rowClassName": "log-table-row"
+                        },
+                        "columns": [
+                          {
+                            "title": "操作人",
+                            "dataIndex": "operator",
+                            "width": 100,
+                            "render": {
+                              "component": "Flex",
+                              "props": { "align": "center", "gap": 8 },
+                              "children": [
+                                {
+                                  "id": "log-avatar",
+                                  "component": "Avatar",
+                                  "props": {
+                                    "size": 26,
+                                    "style": {
+                                      "background": "#6366f1",
+                                      "fontSize": "11px",
+                                      "fontWeight": 600,
+                                      "flexShrink": 0
+                                    }
+                                  },
+                                  "children": "{{text.charAt(0)}}"
+                                },
+                                {
+                                  "id": "log-op-name",
+                                  "component": "Typography.Text",
+                                  "props": { "strong": true },
+                                  "style": { "fontSize": "13px", "color": "#1e1b4b" },
+                                  "children": "{{text}}"
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "title": "操作内容",
+                            "dataIndex": "action",
+                            "render": {
+                              "component": "Typography.Text",
+                              "style": { "fontSize": "13px" },
+                              "children": "{{text}}"
+                            }
+                          },
+                          {
+                            "title": "操作时间",
+                            "dataIndex": "time",
+                            "width": 165,
+                            "render": {
+                              "component": "Typography.Text",
+                              "props": { "type": "secondary" },
+                              "style": { "fontSize": "12px", "fontFamily": "'Fira Code', monospace" },
+                              "children": "{{text}}"
+                            }
+                          },
+                          {
+                            "title": "IP 地址",
+                            "dataIndex": "ip",
+                            "width": 140,
+                            "render": {
+                              "component": "Tag",
+                              "props": { "color": "geekblue", "bordered": true },
+                              "style": { "fontFamily": "'Fira Code', monospace", "fontSize": "11px" },
+                              "children": "{{text}}"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

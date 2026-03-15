@@ -1,0 +1,377 @@
+{
+  "id": "order-detail",
+  "name": "订单详情",
+  "state": {
+    "activeTab": { "default": "items" },
+    "order": {
+      "default": {
+        "id": "ORD-20260315-00842",
+        "customer": "深圳科技有限公司",
+        "contact": "张伟",
+        "phone": "138****8888",
+        "amount": 28600.00,
+        "paidAmount": 28600.00,
+        "status": "pending_review",
+        "channel": "线上商城",
+        "createdAt": "2026-03-15 09:32:11",
+        "remark": "请尽快发货，客户有急需"
+      }
+    },
+    "orderItems": {
+      "default": [
+        { "id": 1, "name": "无线蓝牙耳机 Pro", "sku": "SKU-BT-001", "category": "电子产品", "price": 400.00, "qty": 20, "subtotal": 8000.00 },
+        { "id": 2, "name": "智能手表 S3",       "sku": "SKU-SW-003", "category": "电子产品", "price": 500.00, "qty": 12, "subtotal": 6000.00 },
+        { "id": 3, "name": "机械键盘 TKL",       "sku": "SKU-KB-007", "category": "电子产品", "price": 500.00, "qty": 10, "subtotal": 5000.00 },
+        { "id": 4, "name": "运动跑步鞋 X9",      "sku": "SKU-SH-012", "category": "运动",     "price": 300.00, "qty": 32, "subtotal": 9600.00 }
+      ]
+    },
+    "logistics": {
+      "default": [
+        { "color": "blue",  "label": "2026-03-15 14:20", "children": "包裹已由【深圳转运中心】发出，预计明日送达" },
+        { "color": "blue",  "label": "2026-03-15 11:05", "children": "商品已完成打包，等待揽收" },
+        { "color": "green", "label": "2026-03-15 10:18", "children": "订单已审核通过，仓库开始备货" },
+        { "color": "gray",  "label": "2026-03-15 09:32", "children": "订单创建成功，等待审核" }
+      ]
+    },
+    "operationLogs": {
+      "default": [
+        { "color": "green", "label": "2026-03-15 10:18", "children": "【审核通过】李明（审核员）：订单信息核实无误，已通知仓库备货" },
+        { "color": "blue",  "label": "2026-03-15 09:45", "children": "【自动校验】系统：库存充足，支付金额与订单金额一致" },
+        { "color": "gray",  "label": "2026-03-15 09:32", "children": "【创建订单】王芳（销售）：客户深圳科技有限公司下单，金额 ¥28,600" }
+      ]
+    },
+    "approving": { "default": false },
+    "rejecting": { "default": false }
+  },
+  "computed": {
+    "statusColor": {
+      "deps": ["state.order.status"],
+      "expr": "{{state.order.status === 'pending_review' ? 'orange' : state.order.status === 'approved' ? 'green' : state.order.status === 'rejected' ? 'red' : 'default'}}"
+    },
+    "statusLabel": {
+      "deps": ["state.order.status"],
+      "expr": "{{state.order.status === 'pending_review' ? '待审核' : state.order.status === 'approved' ? '已通过' : state.order.status === 'rejected' ? '已驳回' : '未知'}}"
+    }
+  },
+  "methods": {
+    "handleApprove": {
+      "body": [
+        { "type": "setState", "key": "approving", "value": true },
+        {
+          "type": "fetch",
+          "method": "POST",
+          "url": "{{'/api/orders/' + state.order.id + '/approve'}}",
+          "onSuccess": [
+            { "type": "setState", "key": "order.status", "value": "approved" },
+            { "type": "message", "level": "success", "content": "审核通过" }
+          ],
+          "onError": [
+            { "type": "message", "level": "error", "content": "操作失败，请重试" }
+          ],
+          "onFinally": [
+            { "type": "setState", "key": "approving", "value": false }
+          ]
+        }
+      ]
+    },
+    "handleReject": {
+      "body": [
+        { "type": "setState", "key": "rejecting", "value": true },
+        {
+          "type": "fetch",
+          "method": "POST",
+          "url": "{{'/api/orders/' + state.order.id + '/reject'}}",
+          "onSuccess": [
+            { "type": "setState", "key": "order.status", "value": "rejected" },
+            { "type": "message", "level": "warning", "content": "订单已驳回" }
+          ],
+          "onError": [
+            { "type": "message", "level": "error", "content": "操作失败，请重试" }
+          ],
+          "onFinally": [
+            { "type": "setState", "key": "rejecting", "value": false }
+          ]
+        }
+      ]
+    }
+  },
+  "body": {
+    "id": "root",
+    "component": "Container",
+    "props": { "direction": "column", "gap": 16 },
+    "children": [
+      {
+        "id": "breadcrumb",
+        "component": "Breadcrumb",
+        "props": {
+          "items": [
+            { "title": "首页" },
+            { "title": "订单管理" },
+            { "title": "订单详情" }
+          ]
+        }
+      },
+      {
+        "id": "basic-info-card",
+        "component": "Card",
+        "props": { "title": "基本信息", "bordered": false },
+        "children": [
+          {
+            "id": "order-descriptions",
+            "component": "Descriptions",
+            "props": { "bordered": true, "column": 3, "size": "middle" },
+            "children": [
+              {
+                "id": "desc-order-id",
+                "component": "Descriptions.Item",
+                "props": { "label": "订单号", "span": 1 },
+                "children": "{{state.order.id}}"
+              },
+              {
+                "id": "desc-status",
+                "component": "Descriptions.Item",
+                "props": { "label": "订单状态", "span": 1 },
+                "children": [
+                  {
+                    "id": "status-tag",
+                    "component": "Tag",
+                    "props": { "color": "{{computed.statusColor}}" },
+                    "children": "{{computed.statusLabel}}"
+                  }
+                ]
+              },
+              {
+                "id": "desc-channel",
+                "component": "Descriptions.Item",
+                "props": { "label": "下单渠道", "span": 1 },
+                "children": "{{state.order.channel}}"
+              },
+              {
+                "id": "desc-customer",
+                "component": "Descriptions.Item",
+                "props": { "label": "客户名称", "span": 1 },
+                "children": "{{state.order.customer}}"
+              },
+              {
+                "id": "desc-contact",
+                "component": "Descriptions.Item",
+                "props": { "label": "联系人", "span": 1 },
+                "children": "{{state.order.contact}}"
+              },
+              {
+                "id": "desc-phone",
+                "component": "Descriptions.Item",
+                "props": { "label": "联系电话", "span": 1 },
+                "children": "{{state.order.phone}}"
+              },
+              {
+                "id": "desc-amount",
+                "component": "Descriptions.Item",
+                "props": { "label": "订单金额", "span": 1 },
+                "children": [
+                  {
+                    "id": "amount-text",
+                    "component": "__fragment",
+                    "children": "{{\"¥\" + state.order.amount.toFixed(2)}}"
+                  }
+                ]
+              },
+              {
+                "id": "desc-paid",
+                "component": "Descriptions.Item",
+                "props": { "label": "实付金额", "span": 1 },
+                "children": [
+                  {
+                    "id": "paid-text",
+                    "component": "__fragment",
+                    "children": "{{\"¥\" + state.order.paidAmount.toFixed(2)}}"
+                  }
+                ]
+              },
+              {
+                "id": "desc-created",
+                "component": "Descriptions.Item",
+                "props": { "label": "下单时间", "span": 1 },
+                "children": "{{state.order.createdAt}}"
+              },
+              {
+                "id": "desc-remark",
+                "component": "Descriptions.Item",
+                "props": { "label": "备注", "span": 3 },
+                "children": "{{state.order.remark || '-'}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "tabs-card",
+        "component": "Card",
+        "props": { "bordered": false },
+        "children": [
+          {
+            "id": "detail-tabs",
+            "component": "Tabs",
+            "props": {
+              "activeKey": "{{state.activeTab}}"
+            },
+            "events": {
+              "onChange": [
+                { "type": "setState", "key": "activeTab", "value": "{{event}}" }
+              ]
+            },
+            "children": [
+              {
+                "id": "tab-items",
+                "component": "Tabs.TabPane",
+                "props": { "key": "items", "label": "商品明细" },
+                "children": [
+                  {
+                    "id": "items-table",
+                    "component": "Table",
+                    "props": {
+                      "rowKey": "id",
+                      "dataSource": "{{state.orderItems}}",
+                      "pagination": false,
+                      "size": "middle",
+                      "summary": {
+                        "type": "JSFunction",
+                        "params": [],
+                        "body": "return null;"
+                      }
+                    },
+                    "columns": [
+                      { "title": "商品名称", "dataIndex": "name" },
+                      { "title": "SKU", "dataIndex": "sku", "width": 140 },
+                      {
+                        "title": "分类",
+                        "dataIndex": "category",
+                        "width": 100,
+                        "render": {
+                          "id": "item-category-tag",
+                          "component": "Tag",
+                          "children": "{{text}}"
+                        }
+                      },
+                      {
+                        "title": "单价 (¥)",
+                        "dataIndex": "price",
+                        "width": 110,
+                        "render": {
+                          "id": "item-price-text",
+                          "component": "__fragment",
+                          "children": "{{text.toFixed(2)}}"
+                        }
+                      },
+                      { "title": "数量", "dataIndex": "qty", "width": 80 },
+                      {
+                        "title": "小计 (¥)",
+                        "dataIndex": "subtotal",
+                        "width": 120,
+                        "render": {
+                          "id": "item-subtotal-text",
+                          "component": "__fragment",
+                          "children": "{{text.toFixed(2)}}"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "tab-logistics",
+                "component": "Tabs.TabPane",
+                "props": { "key": "logistics", "label": "物流信息" },
+                "children": [
+                  {
+                    "id": "logistics-timeline",
+                    "component": "Timeline",
+                    "props": {
+                      "mode": "left",
+                      "items": "{{state.logistics}}"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tab-logs",
+                "component": "Tabs.TabPane",
+                "props": { "key": "logs", "label": "操作日志" },
+                "children": [
+                  {
+                    "id": "logs-timeline",
+                    "component": "Timeline",
+                    "props": {
+                      "mode": "left",
+                      "items": "{{state.operationLogs}}"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "action-bar",
+        "component": "Card",
+        "props": { "bordered": false },
+        "children": [
+          {
+            "id": "action-space",
+            "component": "Space",
+            "children": [
+              {
+                "id": "approve-btn",
+                "component": "Button",
+                "props": {
+                  "type": "primary",
+                  "loading": "{{state.approving}}",
+                  "disabled": "{{state.order.status !== 'pending_review'}}"
+                },
+                "children": "审核通过",
+                "events": {
+                  "onClick": [{ "type": "callMethod", "name": "handleApprove" }]
+                }
+              },
+              {
+                "id": "reject-popconfirm",
+                "component": "Popconfirm",
+                "props": {
+                  "title": "确认驳回该订单？",
+                  "okText": "确认驳回",
+                  "cancelText": "取消",
+                  "okButtonProps": { "danger": true },
+                  "disabled": "{{state.order.status !== 'pending_review'}}"
+                },
+                "events": {
+                  "onConfirm": [{ "type": "callMethod", "name": "handleReject" }]
+                },
+                "children": [
+                  {
+                    "id": "reject-btn",
+                    "component": "Button",
+                    "props": {
+                      "danger": true,
+                      "loading": "{{state.rejecting}}",
+                      "disabled": "{{state.order.status !== 'pending_review'}}"
+                    },
+                    "children": "驳回"
+                  }
+                ]
+              },
+              {
+                "id": "back-btn",
+                "component": "Button",
+                "children": "返回列表",
+                "events": {
+                  "onClick": [{ "type": "navigate", "back": true }]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

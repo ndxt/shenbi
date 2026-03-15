@@ -1,0 +1,439 @@
+{
+  "id": "system-home",
+  "name": "系统管理控制台",
+  "state": {
+    "modules": {
+      "default": [
+        {
+          "id": "user-mgmt",
+          "name": "用户管理",
+          "desc": "管理系统用户账号、密码及基本信息",
+          "icon": "👤",
+          "color": "#e6f4ff",
+          "avatarColor": "#1677ff",
+          "badgeCount": 3,
+          "path": "/system/users"
+        },
+        {
+          "id": "role-perm",
+          "name": "角色权限",
+          "desc": "配置角色及功能权限，控制访问范围",
+          "icon": "🔐",
+          "color": "#fff7e6",
+          "avatarColor": "#fa8c16",
+          "badgeCount": 2,
+          "path": "/system/roles"
+        },
+        {
+          "id": "org-mgmt",
+          "name": "机构管理",
+          "desc": "维护组织架构、部门层级与归属关系",
+          "icon": "🏢",
+          "color": "#f6ffed",
+          "avatarColor": "#52c41a",
+          "badgeCount": 0,
+          "path": "/system/org"
+        },
+        {
+          "id": "menu-mgmt",
+          "name": "菜单管理",
+          "desc": "配置系统导航菜单、路由及显示顺序",
+          "icon": "📋",
+          "color": "#f9f0ff",
+          "avatarColor": "#722ed1",
+          "badgeCount": 1,
+          "path": "/system/menus"
+        },
+        {
+          "id": "log-audit",
+          "name": "日志审计",
+          "desc": "查看操作日志、登录记录及安全事件",
+          "icon": "📝",
+          "color": "#fff0f6",
+          "avatarColor": "#eb2f96",
+          "badgeCount": 12,
+          "path": "/system/logs"
+        },
+        {
+          "id": "sys-config",
+          "name": "系统配置",
+          "desc": "管理全局参数、邮件、存储等系统设置",
+          "icon": "⚙️",
+          "color": "#e6fffb",
+          "avatarColor": "#13c2c2",
+          "badgeCount": 0,
+          "path": "/system/config"
+        }
+      ]
+    },
+    "stats": {
+      "default": {
+        "totalUsers": 1284,
+        "totalRoles": 18,
+        "onlineUsers": 47,
+        "todayLogins": 312
+      }
+    },
+    "recentLogs": {
+      "default": [
+        { "id": 1, "operator": "admin",    "action": "修改用户权限",   "time": "2026-03-16 14:32:08", "ip": "192.168.1.101", "status": "success" },
+        { "id": 2, "operator": "李明",     "action": "新增角色「审计员」", "time": "2026-03-16 13:58:44", "ip": "192.168.1.45",  "status": "success" },
+        { "id": 3, "operator": "王芳",     "action": "导出用户列表",    "time": "2026-03-16 11:20:17", "ip": "10.0.0.23",     "status": "success" },
+        { "id": 4, "operator": "unknown",  "action": "登录失败（密码错误）", "time": "2026-03-16 10:05:33", "ip": "203.0.113.42",  "status": "fail" },
+        { "id": 5, "operator": "张伟",     "action": "更新系统配置",    "time": "2026-03-16 09:41:02", "ip": "192.168.1.88",  "status": "success" }
+      ]
+    }
+  },
+  "body": {
+    "id": "root",
+    "component": "Container",
+    "props": { "direction": "column", "gap": 20 },
+    "children": [
+      {
+        "id": "page-header",
+        "component": "Container",
+        "props": { "direction": "column", "gap": 8 },
+        "children": [
+          {
+            "id": "breadcrumb",
+            "component": "Breadcrumb",
+            "props": {
+              "items": [
+                { "title": "首页" },
+                { "title": "系统管理" }
+              ]
+            }
+          },
+          {
+            "id": "header-title-row",
+            "component": "Flex",
+            "props": { "justify": "space-between", "align": "flex-end" },
+            "children": [
+              {
+                "id": "header-title-block",
+                "component": "Container",
+                "props": { "direction": "column", "gap": 4 },
+                "children": [
+                  {
+                    "id": "page-title",
+                    "component": "__fragment",
+                    "style": { "fontSize": "22px", "fontWeight": "700", "color": "#1a1a1a" },
+                    "children": "系统管理控制台"
+                  },
+                  {
+                    "id": "page-desc",
+                    "component": "__fragment",
+                    "style": { "fontSize": "13px", "color": "#8c8c8c" },
+                    "children": "统一管理系统用户、权限、配置及运行状态，保障平台安全稳定运行"
+                  }
+                ]
+              },
+              {
+                "id": "header-meta",
+                "component": "Space",
+                "children": [
+                  {
+                    "id": "online-badge",
+                    "component": "Badge",
+                    "props": { "status": "processing", "text": "{{state.stats.onlineUsers + ' 人在线'}}" }
+                  },
+                  {
+                    "id": "header-date-tag",
+                    "component": "Tag",
+                    "props": { "color": "blue" },
+                    "children": "2026-03-16"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "header-divider",
+            "component": "Divider",
+            "props": { "style": { "margin": "4px 0" } }
+          }
+        ]
+      },
+      {
+        "id": "modules-section",
+        "component": "Container",
+        "props": { "direction": "column", "gap": 12 },
+        "children": [
+          {
+            "id": "modules-section-title",
+            "component": "__fragment",
+            "style": { "fontSize": "15px", "fontWeight": "600", "color": "#262626" },
+            "children": "功能模块"
+          },
+          {
+            "id": "modules-row",
+            "component": "Row",
+            "props": { "gutter": [16, 16] },
+            "children": [
+              {
+                "id": "module-col",
+                "component": "Col",
+                "props": { "span": 8 },
+                "loop": {
+                  "data": "{{state.modules}}",
+                  "itemKey": "item",
+                  "indexKey": "index",
+                  "key": "{{item.id}}"
+                },
+                "children": [
+                  {
+                    "id": "module-card",
+                    "component": "Card",
+                    "props": {
+                      "hoverable": true,
+                      "bordered": false,
+                      "style": { "borderRadius": "12px", "border": "1px solid #f0f0f0" }
+                    },
+                    "children": [
+                      {
+                        "id": "module-card-body",
+                        "component": "Flex",
+                        "props": { "justify": "space-between", "align": "flex-start" },
+                        "children": [
+                          {
+                            "id": "module-left",
+                            "component": "Space",
+                            "props": { "align": "flex-start" },
+                            "children": [
+                              {
+                                "id": "module-avatar",
+                                "component": "Avatar",
+                                "props": {
+                                  "size": 48,
+                                  "style": {
+                                    "background": "{{item.color}}",
+                                    "fontSize": "22px",
+                                    "flexShrink": 0
+                                  }
+                                },
+                                "children": "{{item.icon}}"
+                              },
+                              {
+                                "id": "module-info",
+                                "component": "Container",
+                                "props": { "direction": "column", "gap": 4 },
+                                "children": [
+                                  {
+                                    "id": "module-name",
+                                    "component": "__fragment",
+                                    "style": { "fontSize": "15px", "fontWeight": "600", "color": "#262626" },
+                                    "children": "{{item.name}}"
+                                  },
+                                  {
+                                    "id": "module-desc",
+                                    "component": "__fragment",
+                                    "style": { "fontSize": "12px", "color": "#8c8c8c", "lineHeight": "1.6" },
+                                    "children": "{{item.desc}}"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "id": "module-badge",
+                            "component": "Badge",
+                            "props": {
+                              "count": "{{item.badgeCount}}",
+                              "showZero": false,
+                              "overflowCount": 99
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "module-footer",
+                        "component": "Flex",
+                        "props": { "justify": "flex-end" },
+                        "style": { "marginTop": "16px" },
+                        "children": [
+                          {
+                            "id": "module-enter-btn",
+                            "component": "Button",
+                            "props": { "type": "primary", "size": "small" },
+                            "children": "进入管理",
+                            "events": {
+                              "onClick": [
+                                { "type": "navigate", "to": "{{item.path}}" }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "status-section",
+        "component": "Container",
+        "props": { "direction": "column", "gap": 12 },
+        "children": [
+          {
+            "id": "status-section-title",
+            "component": "__fragment",
+            "style": { "fontSize": "15px", "fontWeight": "600", "color": "#262626" },
+            "children": "系统状态"
+          },
+          {
+            "id": "status-row",
+            "component": "Row",
+            "props": { "gutter": [16, 0] },
+            "children": [
+              {
+                "id": "stats-col",
+                "component": "Col",
+                "props": { "span": 10 },
+                "children": [
+                  {
+                    "id": "stats-card",
+                    "component": "Card",
+                    "props": { "title": "数据统计", "bordered": false, "style": { "borderRadius": "12px", "border": "1px solid #f0f0f0" } },
+                    "children": [
+                      {
+                        "id": "stats-descriptions",
+                        "component": "Descriptions",
+                        "props": { "layout": "horizontal", "column": 1, "bordered": true, "size": "middle" },
+                        "children": [
+                          {
+                            "id": "desc-total-users",
+                            "component": "Descriptions.Item",
+                            "props": { "label": "用户总数" },
+                            "children": [
+                              {
+                                "id": "total-users-val",
+                                "component": "Tag",
+                                "props": { "color": "blue" },
+                                "children": "{{state.stats.totalUsers + ' 人'}}"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "desc-total-roles",
+                            "component": "Descriptions.Item",
+                            "props": { "label": "角色数" },
+                            "children": [
+                              {
+                                "id": "total-roles-val",
+                                "component": "Tag",
+                                "props": { "color": "purple" },
+                                "children": "{{state.stats.totalRoles + ' 个'}}"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "desc-online",
+                            "component": "Descriptions.Item",
+                            "props": { "label": "在线人数" },
+                            "children": [
+                              {
+                                "id": "online-val",
+                                "component": "Tag",
+                                "props": { "color": "green" },
+                                "children": "{{state.stats.onlineUsers + ' 人'}}"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "desc-today-logins",
+                            "component": "Descriptions.Item",
+                            "props": { "label": "今日登录" },
+                            "children": [
+                              {
+                                "id": "today-logins-val",
+                                "component": "Tag",
+                                "props": { "color": "orange" },
+                                "children": "{{state.stats.todayLogins + ' 次'}}"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "logs-col",
+                "component": "Col",
+                "props": { "span": 14 },
+                "children": [
+                  {
+                    "id": "logs-card",
+                    "component": "Card",
+                    "props": { "title": "近期操作日志", "bordered": false, "style": { "borderRadius": "12px", "border": "1px solid #f0f0f0" } },
+                    "slots": {
+                      "extra": {
+                        "id": "logs-more-btn",
+                        "component": "Button",
+                        "props": { "type": "link", "size": "small" },
+                        "children": "查看全部",
+                        "events": {
+                          "onClick": [{ "type": "navigate", "to": "/system/logs" }]
+                        }
+                      }
+                    },
+                    "children": [
+                      {
+                        "id": "logs-table",
+                        "component": "Table",
+                        "props": {
+                          "rowKey": "id",
+                          "dataSource": "{{state.recentLogs}}",
+                          "size": "small",
+                          "pagination": false
+                        },
+                        "columns": [
+                          {
+                            "title": "操作人",
+                            "dataIndex": "operator",
+                            "width": 80
+                          },
+                          {
+                            "title": "操作内容",
+                            "dataIndex": "action"
+                          },
+                          {
+                            "title": "时间",
+                            "dataIndex": "time",
+                            "width": 150
+                          },
+                          {
+                            "title": "IP",
+                            "dataIndex": "ip",
+                            "width": 120
+                          },
+                          {
+                            "title": "状态",
+                            "dataIndex": "status",
+                            "width": 70,
+                            "render": {
+                              "id": "log-status-tag",
+                              "component": "Tag",
+                              "props": {
+                                "color": "{{text === 'success' ? 'green' : 'red'}}"
+                              },
+                              "children": "{{text === 'success' ? '成功' : '失败'}}"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
