@@ -59,6 +59,24 @@ function extractJSONObject(source: string): Record<string, unknown> | undefined 
   return undefined;
 }
 
+function extractJSONString(source: string): string | undefined {
+  const candidates = [source, stripCodeFence(source)];
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      if (typeof parsed === 'string' && parsed.trim().length > 0) {
+        return parsed.trim();
+      }
+    } catch {
+      // Ignore and continue with other fallbacks.
+    }
+  }
+  return undefined;
+}
+
 function extractWrappedText(source: string): string | undefined {
   const object = extractJSONObject(source);
   if (!object) {
@@ -221,6 +239,11 @@ export function parseReActResponse(source: string): ParsedReActResponse {
   const fromJson = extractFromJSONObject(normalized);
   if (fromJson) {
     return fromJson;
+  }
+
+  const fromJsonString = extractJSONString(normalized);
+  if (fromJsonString && fromJsonString !== normalized) {
+    return parseReActResponse(fromJsonString);
   }
 
   const wrappedText = extractWrappedText(normalized);

@@ -157,6 +157,24 @@ describe('parseReActResponse', () => {
       actionInput: {},
       rawActionInput: '{}',
     });
+
+    expect(parseReActResponse(JSON.stringify(
+      'Action: proposeProjectPlan\nAction Input: {"projectName":"订单管理后台","pages":[{"pageId":"order-list","pageName":"订单列表页","action":"create","description":"展示订单列表、筛选和分页"}]}',
+    ))).toEqual({
+      action: 'proposeProjectPlan',
+      actionInput: {
+        projectName: '订单管理后台',
+        pages: [
+          {
+            pageId: 'order-list',
+            pageName: '订单列表页',
+            action: 'create',
+            description: '展示订单列表、筛选和分页',
+          },
+        ],
+      },
+      rawActionInput: '{"projectName":"订单管理后台","pages":[{"pageId":"order-list","pageName":"订单列表页","action":"create","description":"展示订单列表、筛选和分页"}]}',
+    });
   });
 
   it('throws when action or action input is missing', () => {
