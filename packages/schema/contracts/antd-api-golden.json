@@ -1,0 +1,3311 @@
+{
+  "Button": {
+    "props": {
+      "type": {
+        "type": "enum",
+        "values": ["default", "primary", "dashed", "link", "text"],
+        "default": "default",
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "loading": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "href": {
+        "type": "string",
+        "deprecated": false
+      },
+      "htmlType": {
+        "type": "enum",
+        "values": ["button", "submit", "reset"],
+        "deprecated": false
+      },
+      "ghost": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "danger": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "block": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "icon": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onClick": {
+        "params": ["MouseEvent"]
+      }
+    }
+  },
+  "Input": {
+    "props": {
+      "type": {
+        "type": "enum",
+        "values": ["text", "password", "number", "email", "tel", "url"],
+        "default": "text",
+        "deprecated": false
+      },
+      "value": {
+        "type": "string",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "string",
+        "deprecated": false
+      },
+      "placeholder": {
+        "type": "string",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "readOnly": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "maxLength": {
+        "type": "number",
+        "deprecated": false
+      },
+      "allowClear": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "showCount": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "prefix": {
+        "type": "any",
+        "deprecated": false
+      },
+      "suffix": {
+        "type": "any",
+        "deprecated": false
+      },
+      "addonBefore": {
+        "type": "any",
+        "deprecated": false
+      },
+      "addonAfter": {
+        "type": "any",
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "status": {
+        "type": "enum",
+        "values": ["success", "warning", "error"],
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["ChangeEvent"]
+      },
+      "onFocus": {
+        "params": ["FocusEvent"]
+      },
+      "onBlur": {
+        "params": ["FocusEvent"]
+      }
+    }
+  },
+  "Select": {
+    "props": {
+      "mode": {
+        "type": "enum",
+        "values": ["multiple", "tags"],
+        "deprecated": false
+      },
+      "value": {
+        "type": "any",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "any",
+        "deprecated": false
+      },
+      "placeholder": {
+        "type": "string",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "allowClear": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "showSearch": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "showArrow": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "loading": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "options": {
+        "type": "array",
+        "deprecated": false
+      },
+      "optionLabelProp": {
+        "type": "string",
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "status": {
+        "type": "enum",
+        "values": ["success", "warning", "error"],
+        "deprecated": false
+      },
+      "maxTagCount": {
+        "type": "number",
+        "deprecated": false
+      },
+      "maxTagPlaceholder": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["value", "option"]
+      },
+      "onSearch": {
+        "params": ["string"]
+      },
+      "onFocus": {
+        "params": ["FocusEvent"]
+      },
+      "onBlur": {
+        "params": ["FocusEvent"]
+      },
+      "onDropdownVisibleChange": {
+        "params": ["boolean"]
+      }
+    }
+  },
+  "Radio": {
+    "props": {
+      "checked": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "defaultChecked": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "value": {
+        "type": "any",
+        "deprecated": false
+      },
+      "name": {
+        "type": "string",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["ChangeEvent"]
+      }
+    }
+  },
+  "Radio.Group": {
+    "props": {
+      "value": {
+        "type": "any",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "any",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "name": {
+        "type": "string",
+        "deprecated": false
+      },
+      "options": {
+        "type": "array",
+        "deprecated": false
+      },
+      "optionType": {
+        "type": "enum",
+        "values": ["default", "button"],
+        "deprecated": false
+      },
+      "buttonStyle": {
+        "type": "enum",
+        "values": ["outline", "solid"],
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "block": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["ChangeEvent"]
+      }
+    }
+  },
+  "Checkbox": {
+    "props": {
+      "checked": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "defaultChecked": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "value": {
+        "type": "any",
+        "deprecated": false
+      },
+      "name": {
+        "type": "string",
+        "deprecated": false
+      },
+      "indeterminate": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["ChangeEvent"]
+      }
+    }
+  },
+  "Checkbox.Group": {
+    "props": {
+      "value": {
+        "type": "array",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "array",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "name": {
+        "type": "string",
+        "deprecated": false
+      },
+      "options": {
+        "type": "array",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["string[]"]
+      }
+    }
+  },
+  "Form": {
+    "props": {
+      "layout": {
+        "type": "enum",
+        "values": ["horizontal", "vertical", "inline"],
+        "default": "horizontal",
+        "deprecated": false
+      },
+      "labelCol": {
+        "type": "object",
+        "deprecated": false
+      },
+      "wrapperCol": {
+        "type": "object",
+        "deprecated": false
+      },
+      "labelAlign": {
+        "type": "enum",
+        "values": ["left", "right"],
+        "deprecated": false
+      },
+      "colon": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "requiredMark": {
+        "type": "enum",
+        "values": ["optional", "asterisk", "hidden"],
+        "deprecated": false
+      },
+      "labelWrap": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "name": {
+        "type": "string",
+        "deprecated": false
+      },
+      "validateMessages": {
+        "type": "object",
+        "deprecated": false
+      },
+      "preserve": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "scrollToFirstError": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onValuesChange": {
+        "params": ["changedValues", "values"]
+      },
+      "onFinish": {
+        "params": ["values"]
+      },
+      "onFinishFailed": {
+        "params": ["errorInfo"]
+      }
+    }
+  },
+  "Form.Item": {
+    "props": {
+      "name": {
+        "type": "string",
+        "deprecated": false
+      },
+      "label": {
+        "type": "any",
+        "deprecated": false
+      },
+      "labelCol": {
+        "type": "object",
+        "deprecated": false
+      },
+      "wrapperCol": {
+        "type": "object",
+        "deprecated": false
+      },
+      "labelAlign": {
+        "type": "enum",
+        "values": ["left", "right"],
+        "deprecated": false
+      },
+      "required": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "rules": {
+        "type": "array",
+        "deprecated": false
+      },
+      "validateStatus": {
+        "type": "enum",
+        "values": ["success", "warning", "error", "validating"],
+        "deprecated": false
+      },
+      "hasFeedback": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "help": {
+        "type": "any",
+        "deprecated": false
+      },
+      "extra": {
+        "type": "string",
+        "deprecated": false
+      },
+      "colon": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "dependencies": {
+        "type": "array",
+        "deprecated": false
+      },
+      "noStyle": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "shouldUpdate": {
+        "type": "function",
+        "deprecated": false
+      },
+      "validateFirst": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "validateTrigger": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Table": {
+    "props": {
+      "columns": {
+        "type": "array",
+        "deprecated": false
+      },
+      "dataSource": {
+        "type": "array",
+        "deprecated": false
+      },
+      "rowKey": {
+        "type": "any",
+        "default": "key",
+        "deprecated": false
+      },
+      "pagination": {
+        "type": "object",
+        "deprecated": false
+      },
+      "loading": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "bordered": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "showHeader": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "scroll": {
+        "type": "object",
+        "deprecated": false
+      },
+      "rowSelection": {
+        "type": "object",
+        "deprecated": false
+      },
+      "sorter": {
+        "type": "any",
+        "deprecated": false
+      },
+      "sortDirections": {
+        "type": "array",
+        "deprecated": false
+      },
+      "defaultSortOrder": {
+        "type": "string",
+        "deprecated": false
+      },
+      "filteredValue": {
+        "type": "array",
+        "deprecated": false
+      },
+      "filters": {
+        "type": "array",
+        "deprecated": false
+      },
+      "filterMultiple": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "footer": {
+        "type": "any",
+        "deprecated": false
+      },
+      "indentSize": {
+        "type": "number",
+        "deprecated": false
+      },
+      "expandable": {
+        "type": "object",
+        "deprecated": false
+      },
+      "expandedRowKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "defaultExpandedRowKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "expandRowByClick": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "expandIcon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "ellipsis": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "sticky": {
+        "type": "any",
+        "deprecated": false
+      },
+      "summary": {
+        "type": "function",
+        "deprecated": false
+      },
+      "virtual": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["pagination", "filters", "sorter", "extra"]
+      },
+      "onRow": {
+        "params": ["record", "index"]
+      },
+      "onHeaderRow": {
+        "params": ["columns", "index"]
+      },
+      "onExpand": {
+        "params": ["expanded", "record"]
+      },
+      "onExpandedRowsChange": {
+        "params": ["keys"]
+      }
+    }
+  },
+  "Card": {
+    "props": {
+      "title": {
+        "type": "any",
+        "deprecated": false
+      },
+      "extra": {
+        "type": "any",
+        "deprecated": false
+      },
+      "type": {
+        "type": "enum",
+        "values": ["inner"],
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "default"],
+        "deprecated": false
+      },
+      "loading": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "bordered": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": true,
+        "deprecatedMessage": "Use variant instead"
+      },
+      "variant": {
+        "type": "enum",
+        "values": ["outlined", "borderless", "shadow"],
+        "deprecated": false
+      },
+      "hoverable": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "cover": {
+        "type": "any",
+        "deprecated": false
+      },
+      "actions": {
+        "type": "array",
+        "deprecated": false
+      },
+      "tabList": {
+        "type": "array",
+        "deprecated": false
+      },
+      "activeTabKey": {
+        "type": "string",
+        "deprecated": false
+      },
+      "defaultActiveTabKey": {
+        "type": "string",
+        "deprecated": false
+      },
+      "onTabChange": {
+        "type": "function",
+        "deprecated": false
+      },
+      "bodyStyle": {
+        "type": "object",
+        "deprecated": false
+      },
+      "headStyle": {
+        "type": "object",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Alert": {
+    "props": {
+      "type": {
+        "type": "enum",
+        "values": ["success", "info", "warning", "error"],
+        "deprecated": false
+      },
+      "message": {
+        "type": "any",
+        "deprecated": false
+      },
+      "description": {
+        "type": "any",
+        "deprecated": false
+      },
+      "showIcon": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "icon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "closable": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "closeText": {
+        "type": "any",
+        "deprecated": false
+      },
+      "closeIcon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "afterClose": {
+        "type": "function",
+        "deprecated": false
+      },
+      "banner": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "role": {
+        "type": "string",
+        "deprecated": false
+      },
+      "action": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onClose": {
+        "params": ["MouseEvent"]
+      }
+    }
+  },
+  "Modal": {
+    "props": {
+      "open": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "title": {
+        "type": "any",
+        "deprecated": false
+      },
+      "visible": {
+        "type": "boolean",
+        "deprecated": true,
+        "deprecatedMessage": "Use open instead"
+      },
+      "confirmLoading": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "loading": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "okText": {
+        "type": "string",
+        "deprecated": false
+      },
+      "cancelText": {
+        "type": "string",
+        "deprecated": false
+      },
+      "okButtonProps": {
+        "type": "object",
+        "deprecated": false
+      },
+      "cancelButtonProps": {
+        "type": "object",
+        "deprecated": false
+      },
+      "maskClosable": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "closable": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "closeIcon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "width": {
+        "type": "any",
+        "deprecated": false
+      },
+      "footer": {
+        "type": "any",
+        "deprecated": false
+      },
+      "mask": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "centered": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "wrapClassName": {
+        "type": "string",
+        "deprecated": false
+      },
+      "destroyOnClose": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "zIndex": {
+        "type": "number",
+        "deprecated": false
+      },
+      "bodyStyle": {
+        "type": "object",
+        "deprecated": false
+      },
+      "maskStyle": {
+        "type": "object",
+        "deprecated": false
+      },
+      "modalRender": {
+        "type": "function",
+        "deprecated": false
+      },
+      "focusTriggerAfterClose": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onOk": {
+        "params": ["MouseEvent"]
+      },
+      "onCancel": {
+        "params": ["MouseEvent"]
+      },
+      "afterClose": {
+        "params": []
+      }
+    }
+  },
+  "Tabs": {
+    "props": {
+      "activeKey": {
+        "type": "string",
+        "deprecated": false
+      },
+      "defaultActiveKey": {
+        "type": "string",
+        "deprecated": false
+      },
+      "type": {
+        "type": "enum",
+        "values": ["line", "card", "editable-card", "card-editable"],
+        "deprecated": false
+      },
+      "hideAdd": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "tabPosition": {
+        "type": "enum",
+        "values": ["top", "bottom", "left", "right"],
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "animated": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "tabBarGutter": {
+        "type": "number",
+        "deprecated": false
+      },
+      "tabBarStyle": {
+        "type": "object",
+        "deprecated": false
+      },
+      "tabBarExtraContent": {
+        "type": "any",
+        "deprecated": false
+      },
+      "moreIcon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "destroyInactiveTabPane": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "keyboard": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "scrollable": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "centered": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "items": {
+        "type": "array",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["string"]
+      },
+      "onEdit": {
+        "params": ["string", "add | remove"]
+      },
+      "onTabClick": {
+        "params": ["string"]
+      },
+      "onNextClick": {
+        "params": []
+      },
+      "onPrevClick": {
+        "params": []
+      },
+      "onTabScroll": {
+        "params": ["Event"]
+      }
+    }
+  },
+  "Tabs.TabPane": {
+    "props": {
+      "key": {
+        "type": "string",
+        "deprecated": false
+      },
+      "label": {
+        "type": "any",
+        "deprecated": false
+      },
+      "tab": {
+        "type": "any",
+        "deprecated": true,
+        "deprecatedMessage": "Use label instead"
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "closable": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "forceRender": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "DatePicker": {
+    "props": {
+      "value": {
+        "type": "any",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "any",
+        "deprecated": false
+      },
+      "placeholder": {
+        "type": "string",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "format": {
+        "type": "any",
+        "deprecated": false
+      },
+      "showTime": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "showToday": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "allowClear": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "clearIcon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "picker": {
+        "type": "enum",
+        "values": ["date", "week", "month", "quarter", "year"],
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "inputReadOnly": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "bordered": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "status": {
+        "type": "enum",
+        "values": ["success", "warning", "error"],
+        "deprecated": false
+      },
+      "disabledDate": {
+        "type": "function",
+        "deprecated": false
+      },
+      "disabledTime": {
+        "type": "function",
+        "deprecated": false
+      },
+      "dateRender": {
+        "type": "function",
+        "deprecated": false
+      },
+      "renderExtraFooter": {
+        "type": "function",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["date", "dateString"]
+      },
+      "onOk": {
+        "params": ["date"]
+      },
+      "onPanelChange": {
+        "params": ["date", "mode"]
+      },
+      "onCalendarChange": {
+        "params": ["dates"]
+      }
+    }
+  },
+  "DatePicker.RangePicker": {
+    "props": {
+      "value": {
+        "type": "array",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "array",
+        "deprecated": false
+      },
+      "placeholder": {
+        "type": "array",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "any",
+        "deprecated": false
+      },
+      "format": {
+        "type": "any",
+        "deprecated": false
+      },
+      "showTime": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "picker": {
+        "type": "enum",
+        "values": ["date", "week", "month", "quarter", "year"],
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["dates", "dateStrings"]
+      }
+    }
+  },
+  "TimePicker": {
+    "props": {
+      "value": {
+        "type": "any",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "any",
+        "deprecated": false
+      },
+      "placeholder": {
+        "type": "string",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "format": {
+        "type": "string",
+        "deprecated": false
+      },
+      "showTime": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "allowClear": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "clearIcon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "inputReadOnly": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "bordered": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "status": {
+        "type": "enum",
+        "values": ["success", "warning", "error"],
+        "deprecated": false
+      },
+      "disabledHours": {
+        "type": "function",
+        "deprecated": false
+      },
+      "disabledMinutes": {
+        "type": "function",
+        "deprecated": false
+      },
+      "disabledSeconds": {
+        "type": "function",
+        "deprecated": false
+      },
+      "hideDisabledOptions": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "hourStep": {
+        "type": "number",
+        "default": 1,
+        "deprecated": false
+      },
+      "minuteStep": {
+        "type": "number",
+        "default": 1,
+        "deprecated": false
+      },
+      "secondStep": {
+        "type": "number",
+        "default": 1,
+        "deprecated": false
+      },
+      "use12Hours": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["time", "timeString"]
+      }
+    }
+  },
+  "Typography.Text": {
+    "props": {
+      "code": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "copyable": {
+        "type": "any",
+        "deprecated": false
+      },
+      "delete": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "editable": {
+        "type": "any",
+        "deprecated": false
+      },
+      "ellipsis": {
+        "type": "any",
+        "deprecated": false
+      },
+      "italic": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "keyboard": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "mark": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "onClick": {
+        "type": "function",
+        "deprecated": false
+      },
+      "strong": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "underline": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "type": {
+        "type": "enum",
+        "values": ["secondary", "success", "warning", "danger"],
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onClick": {
+        "params": ["MouseEvent"]
+      },
+      "onCopy": {
+        "params": []
+      },
+      "onEdit": {
+        "params": []
+      },
+      "onChange": {
+        "params": ["string"]
+      }
+    }
+  },
+  "Typography.Title": {
+    "props": {
+      "level": {
+        "type": "enum",
+        "values": [1, 2, 3, 4, 5],
+        "deprecated": false
+      },
+      "code": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "copyable": {
+        "type": "any",
+        "deprecated": false
+      },
+      "delete": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "editable": {
+        "type": "any",
+        "deprecated": false
+      },
+      "ellipsis": {
+        "type": "any",
+        "deprecated": false
+      },
+      "italic": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "keyboard": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "mark": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "type": {
+        "type": "enum",
+        "values": ["secondary", "success", "warning", "danger"],
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Typography.Paragraph": {
+    "props": {
+      "code": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "copyable": {
+        "type": "any",
+        "deprecated": false
+      },
+      "delete": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "editable": {
+        "type": "any",
+        "deprecated": false
+      },
+      "ellipsis": {
+        "type": "any",
+        "deprecated": false
+      },
+      "italic": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "keyboard": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "mark": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "strong": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "type": {
+        "type": "enum",
+        "values": ["secondary", "success", "warning", "danger"],
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Avatar": {
+    "props": {
+      "icon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "shape": {
+        "type": "enum",
+        "values": ["circle", "square"],
+        "deprecated": false
+      },
+      "size": {
+        "type": "any",
+        "deprecated": false
+      },
+      "src": {
+        "type": "string",
+        "deprecated": false
+      },
+      "srcSet": {
+        "type": "string",
+        "deprecated": false
+      },
+      "alt": {
+        "type": "string",
+        "deprecated": false
+      },
+      "crossOrigin": {
+        "type": "enum",
+        "values": ["anonymous", "use-credentials"],
+        "deprecated": false
+      },
+      "draggable": {
+        "type": "boolean",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onClick": {
+        "params": ["MouseEvent"]
+      },
+      "onError": {
+        "params": ["Event"]
+      }
+    }
+  },
+  "Avatar.Group": {
+    "props": {
+      "max": {
+        "type": "number",
+        "deprecated": false
+      },
+      "maxCount": {
+        "type": "number",
+        "deprecated": false
+      },
+      "maxPopoverTrigger": {
+        "type": "enum",
+        "values": ["hover", "click"],
+        "deprecated": false
+      },
+      "maxStyle": {
+        "type": "object",
+        "deprecated": false
+      },
+      "size": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Badge": {
+    "props": {
+      "color": {
+        "type": "string",
+        "deprecated": false
+      },
+      "count": {
+        "type": "any",
+        "deprecated": false
+      },
+      "numberStyle": {
+        "type": "object",
+        "deprecated": false
+      },
+      "offset": {
+        "type": "array",
+        "deprecated": false
+      },
+      "overflowCount": {
+        "type": "number",
+        "default": 99,
+        "deprecated": false
+      },
+      "dot": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "showZero": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["default", "small"],
+        "deprecated": false
+      },
+      "status": {
+        "type": "enum",
+        "values": ["success", "processing", "default", "error", "warning"],
+        "deprecated": false
+      },
+      "text": {
+        "type": "any",
+        "deprecated": false
+      },
+      "title": {
+        "type": "string",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Tag": {
+    "props": {
+      "color": {
+        "type": "string",
+        "deprecated": false
+      },
+      "closable": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "closeIcon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "bordered": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onClose": {
+        "params": ["MouseEvent"]
+      }
+    }
+  },
+  "Progress": {
+    "props": {
+      "type": {
+        "type": "enum",
+        "values": ["line", "circle", "dashboard"],
+        "deprecated": false
+      },
+      "percent": {
+        "type": "number",
+        "deprecated": false
+      },
+      "status": {
+        "type": "enum",
+        "values": ["success", "exception", "active", "normal"],
+        "deprecated": false
+      },
+      "strokeWidth": {
+        "type": "any",
+        "deprecated": false
+      },
+      "showInfo": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "trailColor": {
+        "type": "string",
+        "deprecated": false
+      },
+      "success": {
+        "type": "object",
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "default"],
+        "deprecated": false
+      },
+      "format": {
+        "type": "function",
+        "deprecated": false
+      },
+      "gapDegree": {
+        "type": "number",
+        "deprecated": false
+      },
+      "gapPosition": {
+        "type": "enum",
+        "values": ["top", "bottom", "left", "right"],
+        "deprecated": false
+      },
+      "strokeLinecap": {
+        "type": "enum",
+        "values": ["round", "square"],
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Divider": {
+    "props": {
+      "dashed": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "orientation": {
+        "type": "enum",
+        "values": ["left", "right", "center"],
+        "deprecated": false
+      },
+      "orientationMargin": {
+        "type": "string",
+        "deprecated": false
+      },
+      "plain": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "type": {
+        "type": "enum",
+        "values": ["horizontal", "vertical"],
+        "deprecated": false
+      },
+      "variant": {
+        "type": "enum",
+        "values": ["solid", "dashed", "dotted"],
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Breadcrumb": {
+    "props": {
+      "separator": {
+        "type": "any",
+        "deprecated": false
+      },
+      "separatorMargin": {
+        "type": "number",
+        "deprecated": false
+      },
+      "itemRender": {
+        "type": "function",
+        "deprecated": false
+      },
+      "routes": {
+        "type": "object",
+        "deprecated": false
+      },
+      "params": {
+        "type": "object",
+        "deprecated": false
+      },
+      "items": {
+        "type": "array",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Steps": {
+    "props": {
+      "current": {
+        "type": "number",
+        "deprecated": false
+      },
+      "status": {
+        "type": "enum",
+        "values": ["wait", "process", "finish", "error"],
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "default"],
+        "deprecated": false
+      },
+      "direction": {
+        "type": "enum",
+        "values": ["horizontal", "vertical"],
+        "deprecated": false
+      },
+      "labelPlacement": {
+        "type": "enum",
+        "values": ["horizontal", "vertical"],
+        "deprecated": false
+      },
+      "progressDot": {
+        "type": "any",
+        "deprecated": false
+      },
+      "items": {
+        "type": "array",
+        "deprecated": false
+      },
+      "responsive": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "type": {
+        "type": "enum",
+        "values": ["default", "navigation", "inline"],
+        "deprecated": false
+      },
+      "percent": {
+        "type": "number",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["number"]
+      }
+    }
+  },
+  "Empty": {
+    "props": {
+      "description": {
+        "type": "any",
+        "deprecated": false
+      },
+      "image": {
+        "type": "any",
+        "deprecated": false
+      },
+      "imageStyle": {
+        "type": "object",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Result": {
+    "props": {
+      "title": {
+        "type": "any",
+        "deprecated": false
+      },
+      "subTitle": {
+        "type": "any",
+        "deprecated": false
+      },
+      "status": {
+        "type": "enum",
+        "values": ["success", "error", "info", "warning", "404", "403", "500"],
+        "deprecated": false
+      },
+      "extra": {
+        "type": "any",
+        "deprecated": false
+      },
+      "icon": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Tooltip": {
+    "props": {
+      "title": {
+        "type": "any",
+        "deprecated": false
+      },
+      "placement": {
+        "type": "enum",
+        "values": ["top", "left", "right", "bottom", "topLeft", "topRight", "bottomLeft", "bottomRight", "leftTop", "leftBottom", "rightTop", "rightBottom"],
+        "deprecated": false
+      },
+      "trigger": {
+        "type": "enum",
+        "values": ["hover", "focus", "click", "contextMenu"],
+        "deprecated": false
+      },
+      "mouseEnterDelay": {
+        "type": "number",
+        "default": 0.1,
+        "deprecated": false
+      },
+      "mouseLeaveDelay": {
+        "type": "number",
+        "default": 0.1,
+        "deprecated": false
+      },
+      "open": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "defaultOpen": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "visible": {
+        "type": "boolean",
+        "deprecated": true,
+        "deprecatedMessage": "Use open instead"
+      },
+      "color": {
+        "type": "string",
+        "deprecated": false
+      },
+      "overlayStyle": {
+        "type": "object",
+        "deprecated": false
+      },
+      "overlayClassName": {
+        "type": "string",
+        "deprecated": false
+      },
+      "arrow": {
+        "type": "any",
+        "deprecated": false
+      },
+      "autoAdjustOverflow": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "destroyTooltipOnHide": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "getPopupContainer": {
+        "type": "function",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onOpenChange": {
+        "params": ["boolean"]
+      },
+      "onVisibleChange": {
+        "params": ["boolean"]
+      }
+    }
+  },
+  "Popover": {
+    "props": {
+      "content": {
+        "type": "any",
+        "deprecated": false
+      },
+      "title": {
+        "type": "any",
+        "deprecated": false
+      },
+      "placement": {
+        "type": "enum",
+        "values": ["top", "left", "right", "bottom", "topLeft", "topRight", "bottomLeft", "bottomRight", "leftTop", "leftBottom", "rightTop", "rightBottom"],
+        "deprecated": false
+      },
+      "trigger": {
+        "type": "enum",
+        "values": ["hover", "focus", "click"],
+        "deprecated": false
+      },
+      "mouseEnterDelay": {
+        "type": "number",
+        "default": 0.1,
+        "deprecated": false
+      },
+      "mouseLeaveDelay": {
+        "type": "number",
+        "default": 0.1,
+        "deprecated": false
+      },
+      "open": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "defaultOpen": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "overlayStyle": {
+        "type": "object",
+        "deprecated": false
+      },
+      "overlayClassName": {
+        "type": "string",
+        "deprecated": false
+      },
+      "arrow": {
+        "type": "any",
+        "deprecated": false
+      },
+      "autoAdjustOverflow": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onOpenChange": {
+        "params": ["boolean"]
+      }
+    }
+  },
+  "Popconfirm": {
+    "props": {
+      "title": {
+        "type": "any",
+        "deprecated": false
+      },
+      "content": {
+        "type": "any",
+        "deprecated": false
+      },
+      "okText": {
+        "type": "string",
+        "deprecated": false
+      },
+      "cancelText": {
+        "type": "string",
+        "deprecated": false
+      },
+      "okType": {
+        "type": "enum",
+        "values": ["primary", "danger", "dashed", "link", "text", "default"],
+        "deprecated": false
+      },
+      "okButtonProps": {
+        "type": "object",
+        "deprecated": false
+      },
+      "cancelButtonProps": {
+        "type": "object",
+        "deprecated": false
+      },
+      "placement": {
+        "type": "enum",
+        "values": ["top", "left", "right", "bottom", "topLeft", "topRight", "bottomLeft", "bottomRight", "leftTop", "leftBottom", "rightTop", "rightBottom"],
+        "deprecated": false
+      },
+      "trigger": {
+        "type": "enum",
+        "values": ["hover", "focus", "click"],
+        "deprecated": false
+      },
+      "mouseEnterDelay": {
+        "type": "number",
+        "default": 0.1,
+        "deprecated": false
+      },
+      "mouseLeaveDelay": {
+        "type": "number",
+        "default": 0.1,
+        "deprecated": false
+      },
+      "open": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "defaultOpen": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "icon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "okIcon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "cancelIcon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "showCancel": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "enterButton": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "arrow": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onConfirm": {
+        "params": []
+      },
+      "onCancel": {
+        "params": []
+      },
+      "onOpenChange": {
+        "params": ["boolean"]
+      },
+      "onVisibleChange": {
+        "params": ["boolean"]
+      }
+    }
+  },
+  "Tree": {
+    "props": {
+      "treeData": {
+        "type": "array",
+        "deprecated": false
+      },
+      "expandedKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "autoExpandParent": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "checkedKeys": {
+        "type": "any",
+        "deprecated": false
+      },
+      "selectedKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "checkable": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "selectable": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "showIcon": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "showLine": {
+        "type": "any",
+        "deprecated": false
+      },
+      "multiple": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "checkStrictly": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "blockNode": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "defaultExpandAll": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "defaultExpandedKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "defaultCheckedKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "defaultSelectedKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "draggable": {
+        "type": "any",
+        "deprecated": false
+      },
+      "allowDrop": {
+        "type": "function",
+        "deprecated": false
+      },
+      "height": {
+        "type": "number",
+        "deprecated": false
+      },
+      "itemHeight": {
+        "type": "number",
+        "deprecated": false
+      },
+      "supportCSS": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "virtual": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "fieldNames": {
+        "type": "object",
+        "deprecated": false
+      },
+      "loadData": {
+        "type": "function",
+        "deprecated": false
+      },
+      "loadedKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "expandedKeys": {
+        "type": "array",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onSelect": {
+        "params": ["selectedKeys", "info"]
+      },
+      "onCheck": {
+        "params": ["checkedKeys", "info"]
+      },
+      "onExpand": {
+        "params": ["expanded", "info"]
+      },
+      "onLoad": {
+        "params": ["loadedKeys", "info"]
+      },
+      "onRightClick": {
+        "params": ["info"]
+      },
+      "onDragStart": {
+        "params": ["info"]
+      },
+      "onDragEnter": {
+        "params": ["info"]
+      },
+      "onDragOver": {
+        "params": ["info"]
+      },
+      "onDragLeave": {
+        "params": ["info"]
+      },
+      "onDrop": {
+        "params": ["info"]
+      },
+      "onDragEnd": {
+        "params": ["info"]
+      }
+    }
+  },
+  "Menu": {
+    "props": {
+      "items": {
+        "type": "array",
+        "deprecated": false
+      },
+      "mode": {
+        "type": "enum",
+        "values": ["vertical", "horizontal", "inline"],
+        "deprecated": false
+      },
+      "selectedKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "defaultSelectedKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "openKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "defaultOpenKeys": {
+        "type": "array",
+        "deprecated": false
+      },
+      "inlineCollapsed": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "inlineIndent": {
+        "type": "number",
+        "default": 24,
+        "deprecated": false
+      },
+      "subMenuCloseDelay": {
+        "type": "number",
+        "default": 0.1,
+        "deprecated": false
+      },
+      "subMenuOpenDelay": {
+        "type": "number",
+        "default": 0,
+        "deprecated": false
+      },
+      "multiple": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "theme": {
+        "type": "enum",
+        "values": ["light", "dark"],
+        "deprecated": false
+      },
+      "selectable": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "expandIcon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "triggerSubMenuAction": {
+        "type": "enum",
+        "values": ["hover", "click"],
+        "deprecated": false
+      },
+      "overflowedIndicator": {
+        "type": "any",
+        "deprecated": false
+      },
+      "overflowedIndicatorPopupClassName": {
+        "type": "string",
+        "deprecated": false
+      },
+      "rootClassName": {
+        "type": "string",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onClick": {
+        "params": ["info"]
+      },
+      "onSelect": {
+        "params": ["info"]
+      },
+      "onDeselect": {
+        "params": ["info"]
+      },
+      "onOpenChange": {
+        "params": ["openKeys"]
+      }
+    }
+  },
+  "Dropdown": {
+    "props": {
+      "menu": {
+        "type": "object",
+        "deprecated": false
+      },
+      "trigger": {
+        "type": "array",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "placement": {
+        "type": "enum",
+        "values": ["bottomLeft", "bottomCenter", "bottomRight", "topLeft", "topCenter", "topRight"],
+        "deprecated": false
+      },
+      "open": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "defaultOpen": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "visible": {
+        "type": "boolean",
+        "deprecated": true,
+        "deprecatedMessage": "Use open instead"
+      },
+      "overlayClassName": {
+        "type": "string",
+        "deprecated": false
+      },
+      "overlayStyle": {
+        "type": "object",
+        "deprecated": false
+      },
+      "mouseEnterDelay": {
+        "type": "number",
+        "default": 0.15,
+        "deprecated": false
+      },
+      "mouseLeaveDelay": {
+        "type": "number",
+        "default": 0.1,
+        "deprecated": false
+      },
+      "getPopupContainer": {
+        "type": "function",
+        "deprecated": false
+      },
+      "arrow": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onOpenChange": {
+        "params": ["boolean", "info"]
+      },
+      "onVisibleChange": {
+        "params": ["boolean"]
+      }
+    }
+  },
+  "Upload": {
+    "props": {
+      "action": {
+        "type": "string",
+        "deprecated": false
+      },
+      "directory": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "multiple": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "method": {
+        "type": "string",
+        "default": "post",
+        "deprecated": false
+      },
+      "name": {
+        "type": "string",
+        "default": "file",
+        "deprecated": false
+      },
+      "data": {
+        "type": "any",
+        "deprecated": false
+      },
+      "headers": {
+        "type": "object",
+        "deprecated": false
+      },
+      "listType": {
+        "type": "enum",
+        "values": ["text", "picture", "picture-card"],
+        "deprecated": false
+      },
+      "fileList": {
+        "type": "array",
+        "deprecated": false
+      },
+      "defaultFileList": {
+        "type": "array",
+        "deprecated": false
+      },
+      "accept": {
+        "type": "string",
+        "deprecated": false
+      },
+      "beforeUpload": {
+        "type": "function",
+        "deprecated": false
+      },
+      "customRequest": {
+        "type": "function",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "maxCount": {
+        "type": "number",
+        "deprecated": false
+      },
+      "showUploadList": {
+        "type": "any",
+        "deprecated": false
+      },
+      "withCredentials": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "progress": {
+        "type": "object",
+        "deprecated": false
+      },
+      "itemRender": {
+        "type": "function",
+        "deprecated": false
+      },
+      "iconRender": {
+        "type": "function",
+        "deprecated": false
+      },
+      "isImage": {
+        "type": "function",
+        "deprecated": false
+      },
+      "previewFile": {
+        "type": "function",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["info"]
+      },
+      "onDrop": {
+        "params": ["Event"]
+      },
+      "onDownload": {
+        "params": ["file"]
+      },
+      "onReject": {
+        "params": ["fileList"]
+      },
+      "onPreview": {
+        "params": ["file"]
+      },
+      "onRemove": {
+        "params": ["file"]
+      }
+    }
+  },
+  "Slider": {
+    "props": {
+      "value": {
+        "type": "any",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "any",
+        "deprecated": false
+      },
+      "min": {
+        "type": "number",
+        "default": 0,
+        "deprecated": false
+      },
+      "max": {
+        "type": "number",
+        "default": 100,
+        "deprecated": false
+      },
+      "step": {
+        "type": "number",
+        "default": 1,
+        "deprecated": false
+      },
+      "range": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "reverse": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "keyboard": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "dots": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "vertical": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "included": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "marks": {
+        "type": "object",
+        "deprecated": false
+      },
+      "tooltip": {
+        "type": "any",
+        "deprecated": false
+      },
+      "tipFormatter": {
+        "type": "function",
+        "deprecated": false
+      },
+      "trackStyle": {
+        "type": "any",
+        "deprecated": false
+      },
+      "handleStyle": {
+        "type": "any",
+        "deprecated": false
+      },
+      "railStyle": {
+        "type": "object",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["value"]
+      },
+      "onAfterChange": {
+        "params": ["value"]
+      }
+    }
+  },
+  "Switch": {
+    "props": {
+      "checked": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "defaultChecked": {
+        "type": "boolean",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "loading": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["default", "small"],
+        "deprecated": false
+      },
+      "checkedChildren": {
+        "type": "any",
+        "deprecated": false
+      },
+      "unCheckedChildren": {
+        "type": "any",
+        "deprecated": false
+      },
+      "checkedValue": {
+        "type": "any",
+        "deprecated": false
+      },
+      "unCheckedValue": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["checked", "event"]
+      }
+    }
+  },
+  "Rate": {
+    "props": {
+      "value": {
+        "type": "number",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "number",
+        "deprecated": false
+      },
+      "count": {
+        "type": "number",
+        "default": 5,
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "allowHalf": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "tooltips": {
+        "type": "array",
+        "deprecated": false
+      },
+      "character": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["number"]
+      }
+    }
+  },
+  "Row": {
+    "props": {
+      "gutter": {
+        "type": "any",
+        "deprecated": false
+      },
+      "align": {
+        "type": "enum",
+        "values": ["top", "middle", "bottom", "stretch"],
+        "deprecated": false
+      },
+      "justify": {
+        "type": "enum",
+        "values": ["start", "end", "center", "space-around", "space-between", "space-evenly"],
+        "deprecated": false
+      },
+      "wrap": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Col": {
+    "props": {
+      "span": {
+        "type": "number",
+        "deprecated": false
+      },
+      "order": {
+        "type": "number",
+        "deprecated": false
+      },
+      "offset": {
+        "type": "number",
+        "deprecated": false
+      },
+      "push": {
+        "type": "number",
+        "deprecated": false
+      },
+      "pull": {
+        "type": "number",
+        "deprecated": false
+      },
+      "xs": {
+        "type": "any",
+        "deprecated": false
+      },
+      "sm": {
+        "type": "any",
+        "deprecated": false
+      },
+      "md": {
+        "type": "any",
+        "deprecated": false
+      },
+      "lg": {
+        "type": "any",
+        "deprecated": false
+      },
+      "xl": {
+        "type": "any",
+        "deprecated": false
+      },
+      "xxl": {
+        "type": "any",
+        "deprecated": false
+      },
+      "flex": {
+        "type": "any",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Space": {
+    "props": {
+      "direction": {
+        "type": "enum",
+        "values": ["horizontal", "vertical"],
+        "deprecated": false
+      },
+      "size": {
+        "type": "any",
+        "deprecated": false
+      },
+      "align": {
+        "type": "enum",
+        "values": ["start", "end", "center", "baseline"],
+        "deprecated": false
+      },
+      "split": {
+        "type": "any",
+        "deprecated": false
+      },
+      "wrap": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Flex": {
+    "props": {
+      "vertical": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "justify": {
+        "type": "enum",
+        "values": ["start", "end", "center", "space-around", "space-between", "space-evenly"],
+        "deprecated": false
+      },
+      "align": {
+        "type": "enum",
+        "values": ["start", "end", "center", "baseline", "stretch"],
+        "deprecated": false
+      },
+      "wrap": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "gap": {
+        "type": "any",
+        "deprecated": false
+      },
+      "flex": {
+        "type": "any",
+        "deprecated": false
+      },
+      "block": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Container": {
+    "props": {},
+    "events": {}
+  },
+  "Statistic": {
+    "props": {
+      "title": {
+        "type": "any",
+        "deprecated": false
+      },
+      "value": {
+        "type": "any",
+        "deprecated": false
+      },
+      "prefix": {
+        "type": "any",
+        "deprecated": false
+      },
+      "suffix": {
+        "type": "any",
+        "deprecated": false
+      },
+      "valueStyle": {
+        "type": "object",
+        "deprecated": true,
+        "deprecatedMessage": "Use styles.content instead"
+      },
+      "styles": {
+        "type": "object",
+        "deprecated": false
+      },
+      "loading": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "precision": {
+        "type": "number",
+        "deprecated": false
+      },
+      "decimalSeparator": {
+        "type": "string",
+        "deprecated": false
+      },
+      "groupSeparator": {
+        "type": "string",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Descriptions": {
+    "props": {
+      "title": {
+        "type": "any",
+        "deprecated": false
+      },
+      "extra": {
+        "type": "any",
+        "deprecated": false
+      },
+      "colon": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "column": {
+        "type": "any",
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "default"],
+        "deprecated": false
+      },
+      "layout": {
+        "type": "enum",
+        "values": ["horizontal", "vertical"],
+        "deprecated": false
+      },
+      "bordered": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "labelStyle": {
+        "type": "object",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Descriptions.Item": {
+    "props": {
+      "label": {
+        "type": "any",
+        "deprecated": false
+      },
+      "span": {
+        "type": "number",
+        "deprecated": false
+      }
+    },
+    "events": {}
+  },
+  "Cascader": {
+    "props": {
+      "options": {
+        "type": "array",
+        "deprecated": false
+      },
+      "value": {
+        "type": "array",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "array",
+        "deprecated": false
+      },
+      "placeholder": {
+        "type": "string",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "allowClear": {
+        "type": "boolean",
+        "default": true,
+        "deprecated": false
+      },
+      "showSearch": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "loading": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "displayRender": {
+        "type": "function",
+        "deprecated": false
+      },
+      "fieldNames": {
+        "type": "object",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["value", "selectedOptions"]
+      },
+      "onSearch": {
+        "params": ["string"]
+      },
+      "onPopupVisibleChange": {
+        "params": ["boolean"]
+      }
+    }
+  },
+  "TreeSelect": {
+    "props": {
+      "treeData": {
+        "type": "array",
+        "deprecated": false
+      },
+      "value": {
+        "type": "any",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "any",
+        "deprecated": false
+      },
+      "placeholder": {
+        "type": "string",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "allowClear": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "showSearch": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "loading": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      },
+      "multiple": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "treeCheckable": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "treeDefaultExpandAll": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "showCheckedStrategy": {
+        "type": "enum",
+        "values": ["SHOW_ALL", "SHOW_CHILD", "SHOW_PARENT"],
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["value", "label", "extra"]
+      },
+      "onSelect": {
+        "params": ["value", "node", "extra"]
+      },
+      "onSearch": {
+        "params": ["string"]
+      },
+      "onPopupVisibleChange": {
+        "params": ["boolean"]
+      }
+    }
+  },
+  "Mentions": {
+    "props": {
+      "value": {
+        "type": "string",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "string",
+        "deprecated": false
+      },
+      "prefix": {
+        "type": "any",
+        "deprecated": false
+      },
+      "placeholder": {
+        "type": "string",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "autoSize": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "options": {
+        "type": "array",
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["string"]
+      },
+      "onSearch": {
+        "params": ["string", "prefix"]
+      },
+      "onFocus": {
+        "params": ["FocusEvent"]
+      },
+      "onBlur": {
+        "params": ["FocusEvent"]
+      },
+      "onSelect": {
+        "params": ["option", "prefix"]
+      }
+    }
+  },
+  "AutoComplete": {
+    "props": {
+      "value": {
+        "type": "string",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "string",
+        "deprecated": false
+      },
+      "placeholder": {
+        "type": "string",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "options": {
+        "type": "array",
+        "deprecated": false
+      },
+      "allowClear": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "size": {
+        "type": "enum",
+        "values": ["small", "middle", "large"],
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["string"]
+      },
+      "onSearch": {
+        "params": ["string"]
+      },
+      "onSelect": {
+        "params": ["string", "option"]
+      },
+      "onFocus": {
+        "params": ["FocusEvent"]
+      },
+      "onBlur": {
+        "params": ["FocusEvent"]
+      }
+    }
+  },
+  "ColorPicker": {
+    "props": {
+      "value": {
+        "type": "any",
+        "deprecated": false
+      },
+      "defaultValue": {
+        "type": "any",
+        "deprecated": false
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "allowClear": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "showText": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "placement": {
+        "type": "enum",
+        "values": ["top", "left", "right", "bottom"],
+        "deprecated": false
+      },
+      "presets": {
+        "type": "array",
+        "deprecated": false
+      },
+      "disabledAlpha": {
+        "type": "boolean",
+        "default": false,
+        "deprecated": false
+      },
+      "format": {
+        "type": "enum",
+        "values": ["hex", "rgb", "hsl", "hsb"],
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onChange": {
+        "params": ["value", "hex"]
+      },
+      "onChangeComplete": {
+        "params": ["value"]
+      }
+    }
+  },
+  "FloatButton": {
+    "props": {
+      "icon": {
+        "type": "any",
+        "deprecated": false
+      },
+      "description": {
+        "type": "any",
+        "deprecated": false
+      },
+      "badge": {
+        "type": "object",
+        "deprecated": false
+      },
+      "href": {
+        "type": "string",
+        "deprecated": false
+      },
+      "target": {
+        "type": "string",
+        "deprecated": false
+      },
+      "type": {
+        "type": "enum",
+        "values": ["default", "primary"],
+        "deprecated": false
+      },
+      "shape": {
+        "type": "enum",
+        "values": ["circle", "square"],
+        "deprecated": false
+      }
+    },
+    "events": {
+      "onClick": {
+        "params": ["MouseEvent"]
+      }
+    }
+  }
+}
