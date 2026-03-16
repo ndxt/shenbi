@@ -57,6 +57,24 @@ function extractJSONObject(source: string): Record<string, unknown> | undefined 
   return undefined;
 }
 
+function extractWrappedText(source: string): string | undefined {
+  const object = extractJSONObject(source);
+  if (!object) {
+    return undefined;
+  }
+  const wrapped = [
+    object.answer,
+    object.Answer,
+    object.content,
+    object.Content,
+    object.output,
+    object.Output,
+    object.text,
+    object.Text,
+  ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  return wrapped?.trim();
+}
+
 function getObjectString(value: unknown): string | undefined {
   if (typeof value === 'string') {
     return value.trim() || undefined;
@@ -150,6 +168,11 @@ export function parseReActResponse(source: string): ParsedReActResponse {
   const fromJson = extractFromJSONObject(normalized);
   if (fromJson) {
     return fromJson;
+  }
+
+  const wrappedText = extractWrappedText(normalized);
+  if (wrappedText && wrappedText !== normalized) {
+    return parseReActResponse(wrappedText);
   }
 
   const action = extractActionFromLabels(normalized);

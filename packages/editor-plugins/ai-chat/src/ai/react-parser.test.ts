@@ -106,6 +106,16 @@ describe('parseReActResponse', () => {
       rawActionInput: '{}',
     });
 
+    expect(parseReActResponse(JSON.stringify({
+      reasoning: '先检查现有文件',
+      answer: 'Status: 正在查看当前工作空间文件\nAction: listWorkspaceFiles\nAction Input: {}',
+    }))).toEqual({
+      status: '正在查看当前工作空间文件',
+      action: 'listWorkspaceFiles',
+      actionInput: {},
+      rawActionInput: '{}',
+    });
+
     expect(parseReActResponse([
       'Status: 正在检查现有页面',
       'Action: getAvailableComponents',
