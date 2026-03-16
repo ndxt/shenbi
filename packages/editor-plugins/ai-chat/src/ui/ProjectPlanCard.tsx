@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, ClipboardList, PencilLine } from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
 import type { ProjectPlan } from '../ai/api-types';
 import type { AgentLoopPageProgress, UIPhase } from '../ai/agent-loop-types';
@@ -169,18 +169,16 @@ export function ProjectPlanCard({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="h-7 px-2.5 rounded-md bg-blue-500 text-white text-[11px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap shadow-sm"
+                  className="h-7 min-w-[76px] px-3 rounded-md bg-blue-500 text-white text-[11px] font-semibold inline-flex items-center justify-center whitespace-nowrap transition-colors hover:bg-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400/60"
                   onClick={onConfirm}
                 >
-                  <CheckCircle2 size={10} />
                   <span className="leading-none">{t('loop.confirmPlan')}</span>
                 </button>
                 <button
                   type="button"
-                  className="h-7 px-2.5 rounded-md border border-border-ide text-text-secondary text-[11px] inline-flex items-center justify-center gap-1 whitespace-nowrap"
+                  className="h-7 min-w-[76px] px-3 rounded-md border border-border-ide bg-bg-canvas/70 text-text-secondary text-[11px] font-medium inline-flex items-center justify-center whitespace-nowrap transition-colors hover:border-blue-500/40 hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-blue-400/40"
                   onClick={onRequestRevision}
                 >
-                  <PencilLine size={10} />
                   <span className="leading-none">{t('loop.requestRevision')}</span>
                 </button>
               </div>
