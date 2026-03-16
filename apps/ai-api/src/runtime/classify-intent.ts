@@ -122,7 +122,8 @@ function normalizeClassification(value: unknown): IntentClassification {
   const confidence = Number.isFinite(confidenceCandidate)
     ? Math.max(0, Math.min(1, confidenceCandidate))
     : 0.5;
-  return { intent, confidence };
+  const scope = value['scope'] === 'multi-page' ? 'multi-page' as const : 'single-page' as const;
+  return { intent, confidence, scope };
 }
 
 function createMessages(input: ClassifyIntentInput): OpenAICompatibleMessage[] {
@@ -137,6 +138,7 @@ function createMessages(input: ClassifyIntentInput): OpenAICompatibleMessage[] {
       content: [
         'You classify low-code assistant user intent.',
         'Choose exactly one intent from: schema.create, schema.modify, chat.',
+        'Also choose exactly one scope from: single-page, multi-page.',
         'Rules:',
         '- schema.create: the user wants to generate a new page or regenerate the current page from scratch.',
         '- schema.modify: the user wants to change an existing element — including any visual, style, layout, or structural change.',
@@ -145,8 +147,17 @@ function createMessages(input: ClassifyIntentInput): OpenAICompatibleMessage[] {
         '- When a node is selected (Selected Node ≠ none), default to schema.modify UNLESS the prompt is clearly a question (ends with ? or contains 吗/呢/是什么/怎么).',
         '- If the prompt contains both create and modify signals, prefer schema.create only when the user explicitly asks for a new page.',
         '- Existing document context is a prerequisite for schema.modify; without one, prefer schema.create or chat.',
+        '',
+        'Scope rules:',
+        '- single-page: the user is requesting one page, modifying one page, or chatting.',
+        '- multi-page: the user describes a system, project, or platform with multiple pages or modules,',
+        '  OR the attached document describes multiple distinct page-level features (e.g. dashboards, list pages, form pages, detail pages, different functional modules).',
+        '- When an attached document describes multiple distinct functional areas or page-level features, choose multi-page.',
+        '- When the prompt explicitly mentions 项目/系统/工程/平台/多页面/多个页面/workspace/project, choose multi-page.',
+        '- For schema.modify and chat intents, scope should always be single-page.',
+        '',
         'Return JSON only with this exact shape:',
-        '{"intent":"schema.create|schema.modify|chat","confidence":0.0}',
+        '{"intent":"schema.create|schema.modify|chat","scope":"single-page|multi-page","confidence":0.0}',
       ].join('\n'),
 
     },

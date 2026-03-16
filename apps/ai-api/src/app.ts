@@ -15,6 +15,7 @@ import { createFinalizeRoute } from './routes/finalize.ts';
 import { createChatRoute } from './routes/chat.ts';
 import { createDebugRoute } from './routes/debug.ts';
 import { createModelsRoute } from './routes/models.ts';
+import { createClassifyRouteRoute } from './routes/classify-route.ts';
 import { loadEnv } from './adapters/env.ts';
 import { agentRuntime } from './runtime/agent-runtime.ts';
 import type { AgentRuntime } from './runtime/types.ts';
@@ -45,11 +46,13 @@ export function createApp(options: AppOptions = {}): Hono {
   app.use('/api/ai/run/stream', rateLimitMiddleware);
   app.use('/api/ai/run/finalize', rateLimitMiddleware);
   app.use('/api/ai/chat', rateLimitMiddleware);
+  app.use('/api/ai/classify-route', rateLimitMiddleware);
 
   app.route('/api/ai/run/stream', createRunStreamRoute(runtime));
   app.route('/api/ai/run', createRunRoute(runtime));
   app.route('/api/ai/run/finalize', createFinalizeRoute(runtime));
   app.route('/api/ai/chat', createChatRoute(runtime));
+  app.route('/api/ai/classify-route', createClassifyRouteRoute());
   app.route('/api/ai/debug', createDebugRoute());
   app.route('/api/ai/models', createModelsRoute());
 

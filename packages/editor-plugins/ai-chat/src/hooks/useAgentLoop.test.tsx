@@ -10,6 +10,8 @@ import type {
   AgentEvent,
   ChatRequest,
   ChatResponse,
+  ClassifyRouteRequest,
+  ClassifyRouteResponse,
   FinalizeRequest,
   FinalizeResult,
   ProjectPlan,
@@ -26,6 +28,7 @@ function createSchema(id: string, name = id): PageSchema {
     body: [],
   };
 }
+
 
 function createMemoryVFS(initialFiles: Record<string, PageSchema>): VirtualFileSystemAdapter & { files: Map<string, PageSchema> } {
   const files = new Map<string, PageSchema>(Object.entries(initialFiles));
@@ -202,6 +205,10 @@ class LoopScenarioAIClient implements AIClient {
   async finalize(request: FinalizeRequest): Promise<FinalizeResult> {
     this.finalizeRequests.push(request);
     return {};
+  }
+
+  async classifyRoute(_request: ClassifyRouteRequest): Promise<ClassifyRouteResponse> {
+    return { scope: 'multi-page', intent: 'schema.create', confidence: 0.95 };
   }
 }
 

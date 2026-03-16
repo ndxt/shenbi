@@ -56,14 +56,8 @@ function isResumePrompt(prompt: string): boolean {
   return /^(继续|continue)$/i.test(prompt.trim());
 }
 
-function isProjectPrompt(prompt: string, attachments: RunAttachmentInput[]): boolean {
-  if (isResumePrompt(prompt)) {
-    return true;
-  }
-  if (attachments.length > 0 && /(系统|项目|工程|平台|workspace|project)/i.test(prompt)) {
-    return true;
-  }
-  return /(系统|项目|工程|平台|多页面|多个页面|workspace|project)/i.test(prompt);
+function isResumeWithPersistedState(prompt: string): boolean {
+  return isResumePrompt(prompt);
 }
 
 function createLoopState(conversationId: string): LoopSessionState {
@@ -1000,7 +994,17 @@ export function useAgentLoop(
     setPhase('executing');
     setProgressText('正在执行项目规划');
     void persistLoopState();
-    confirmResolverRef.current?.('用户已确认项目规划');
+    const plan = loopStateRef.current?.approvedPlan;
+    const confirmationMessage = plan && plan.pages.length > 0
+      ? (() => {
+          const actionablePages = plan.pages.filter((p) => p.action !== 'skip');
+          const pageList = actionablePages
+            .map((p, i) => `${i + 1}. pageId=${p.pageId} pageName=${p.pageName}`)
+            .join('\n');
+          return `用户已确认项目规划，共 ${actionablePages.length} 个页面，请按顺序依次创建：\n${pageList}`;
+        })()
+      : '用户已确认项目规划';
+    confirmResolverRef.current?.(confirmationMessage);
     confirmResolverRef.current = null;
   }, [persistLoopState]);
 
@@ -1043,27 +1047,75 @@ export function useAgentLoop(
       return;
     }
 
-    if (!isProjectPrompt(prompt, attachments)) {
-      setMode('legacy');
-      setPhase('idle');
-      await legacy.runAgent(
-        prompt,
-        plannerModel,
-        blockModel,
-        thinkingEnabled,
-        conversationId,
-        onMessageStart,
-        onMessageDelta,
-        onDone,
-        onError,
-        blockConcurrency,
-        (result) => {
-          setLastRunResult(result);
-          onRunComplete?.(result);
-        },
-        attachments,
-      );
-      return;
+    // Store the prepared prompt (with doc text) for use in the loop user message
+    let loopUserPrompt = prompt;
+
+    if (isResumeWithPersistedState(prompt) && persistedRef.current) {
+      // fall through to loop mode below — use persisted messages
+    } else {
+      // Let the LLM decide: single-page or multi-page?
+      setProgressText('正在分析请求类型...');
+      try {
+        const currentSchema = bridge.getSchema();
+        const classification = await aiClient.classifyRoute({
+          prompt,
+          ...(attachments.length > 0 ? { attachments } : {}),
+          ...(plannerModel ? { plannerModel } : {}),
+          thinking: { type: thinkingEnabled ? 'enabled' : 'disabled' },
+          context: {
+            schemaSummary: summarizeSchema(currentSchema),
+          },
+        });
+        // Use the server-prepared prompt (with embedded document text) if available
+        if (classification.preparedPrompt) {
+          loopUserPrompt = classification.preparedPrompt;
+        }
+        if (classification.scope !== 'multi-page') {
+          setMode('legacy');
+          setPhase('idle');
+          await legacy.runAgent(
+            prompt,
+            plannerModel,
+            blockModel,
+            thinkingEnabled,
+            conversationId,
+            onMessageStart,
+            onMessageDelta,
+            onDone,
+            onError,
+            blockConcurrency,
+            (result) => {
+              setLastRunResult(result);
+              onRunComplete?.(result);
+            },
+            attachments,
+          );
+          return;
+        }
+      } catch (classifyError) {
+        // Classification failed — fallback to legacy single-page path
+        console.warn('[agent-loop] classifyRoute failed, falling back to legacy:', classifyError);
+        setMode('legacy');
+        setPhase('idle');
+        await legacy.runAgent(
+          prompt,
+          plannerModel,
+          blockModel,
+          thinkingEnabled,
+          conversationId,
+          onMessageStart,
+          onMessageDelta,
+          onDone,
+          onError,
+          blockConcurrency,
+          (result) => {
+            setLastRunResult(result);
+            onRunComplete?.(result);
+          },
+          attachments,
+        );
+        return;
+      }
     }
 
     const ensureTabResult = await bridge.execute('shell.ensureCurrentTab');
@@ -1099,12 +1151,15 @@ export function useAgentLoop(
       pageLookupRef.current = new Map(persistedRef.current.pages.map((page) => [page.pageId, page]));
       setProgressText('从上次中断位置继续执行');
     } else {
-      const attachmentHint = attachments.length > 0
+      // loopUserPrompt already contains embedded document text if docs were attached.
+      // Only append the attachment hint (file names) when doc text was NOT embedded.
+      const hasEmbeddedDocText = loopUserPrompt !== prompt;
+      const attachmentHint = !hasEmbeddedDocText && attachments.length > 0
         ? `\n\n附件：${attachments.map((attachment) => attachment.name).join(', ')}`
         : '';
       loopMessagesRef.current = [
         { role: 'system', content: buildAgentLoopSystemPrompt() },
-        { role: 'user', content: `${prompt}${attachmentHint}` },
+        { role: 'user', content: `${loopUserPrompt}${attachmentHint}` },
       ];
       loopStateRef.current = createLoopState(currentConversationId);
       projectPlanRef.current = null;
@@ -1217,7 +1272,7 @@ export function useAgentLoop(
           executeCreatePage,
           executeModifyPage,
         }, parsed.action, parsed.actionInput, pageLookupRef.current);
-        const observation = typeof observationValue === 'string'
+        let observation = typeof observationValue === 'string'
           ? observationValue
           : JSON.stringify(observationValue, null, 2);
         tracerRef.current?.updateLastObservation(observation, Date.now() - toolStartedAt);
@@ -1234,6 +1289,23 @@ export function useAgentLoop(
             loopStateRef.current.createdFileIds = [...loopStateRef.current.createdFileIds, fileId];
             loopStateRef.current.completedPageIds = [...loopStateRef.current.completedPageIds, pageId];
             delete loopStateRef.current.currentPageId;
+
+            // Append progress hint so LLM knows exactly how many pages remain.
+            // observation is a `let` — mutating it here gets picked up by the
+            // loopMessages.push at the bottom of the loop iteration.
+            const approvedPlan = loopStateRef.current.approvedPlan;
+            if (approvedPlan) {
+              const actionablePageIds = approvedPlan.pages
+                .filter((p) => p.action !== 'skip')
+                .map((p) => p.pageId);
+              const completedSet = new Set(loopStateRef.current.completedPageIds);
+              const remainingPages = approvedPlan.pages
+                .filter((p) => p.action !== 'skip' && !completedSet.has(p.pageId));
+              const progressHint = remainingPages.length > 0
+                ? `\n\n进度: 已完成 ${completedSet.size}/${actionablePageIds.length} 个页面。剩余待创建：${remainingPages.map((p) => `${p.pageId}(${p.pageName})`).join(', ')}`
+                : `\n\n进度: 全部 ${actionablePageIds.length} 个页面已完成，请调用 finish。`;
+              observation = observation + progressHint;
+            }
           }
         }
 

@@ -1,8 +1,9 @@
-import type { AIClient, AgentEvent, ChatRequest, ChatResponse, FinalizeRequest, FinalizeResult, RunRequest, RunStreamOptions } from './api-types';
+import type { AIClient, AgentEvent, ChatRequest, ChatResponse, ClassifyRouteRequest, ClassifyRouteResponse, FinalizeRequest, FinalizeResult, RunRequest, RunStreamOptions } from './api-types';
 
 const DEFAULT_STREAM_ENDPOINT = '/api/ai/run/stream';
 const DEFAULT_FINALIZE_ENDPOINT = '/api/ai/run/finalize';
 const DEFAULT_CHAT_ENDPOINT = '/api/ai/chat';
+const DEFAULT_CLASSIFY_ROUTE_ENDPOINT = '/api/ai/classify-route';
 const TEXT_DECODER = new TextDecoder();
 
 function createRequestInit(request: RunRequest, signal?: AbortSignal): RequestInit {
@@ -100,6 +101,7 @@ export interface FetchAIClientOptions {
   endpoint?: string;
   finalizeEndpoint?: string;
   chatEndpoint?: string;
+  classifyRouteEndpoint?: string;
   fetchImplementation?: typeof fetch;
 }
 
@@ -107,12 +109,14 @@ export class FetchAIClient implements AIClient {
   private readonly endpoint: string;
   private readonly finalizeEndpoint: string;
   private readonly chatEndpoint: string;
+  private readonly classifyRouteEndpoint: string;
   private readonly fetchImplementation: typeof fetch;
 
     constructor(options: FetchAIClientOptions = {}) {
     this.endpoint = options.endpoint ?? DEFAULT_STREAM_ENDPOINT;
     this.finalizeEndpoint = options.finalizeEndpoint ?? DEFAULT_FINALIZE_ENDPOINT;
     this.chatEndpoint = options.chatEndpoint ?? DEFAULT_CHAT_ENDPOINT;
+    this.classifyRouteEndpoint = options.classifyRouteEndpoint ?? DEFAULT_CLASSIFY_ROUTE_ENDPOINT;
     this.fetchImplementation = options.fetchImplementation ?? globalThis.fetch.bind(globalThis);
   }
 
@@ -222,6 +226,22 @@ export class FetchAIClient implements AIClient {
     } finally {
       reader.releaseLock();
     }
+  }
+
+  async classifyRoute(request: ClassifyRouteRequest): Promise<ClassifyRouteResponse> {
+    const response = await this.fetchImplementation(this.classifyRouteEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readResponseError(response));
+    }
+    const payload = await response.json() as { success?: boolean; data?: ClassifyRouteResponse };
+    return payload.data ?? { scope: 'single-page', intent: 'schema.create', confidence: 0 };
   }
 }
 

@@ -1,7 +1,7 @@
 /**
  * Mock AI client for tests only — NOT exported from the package public API.
  */
-import type { AIClient, AgentEvent, ChatRequest, ChatResponse, FinalizeRequest, RunRequest, RunStreamOptions } from './api-types';
+import type { AIClient, AgentEvent, ChatRequest, ChatResponse, ClassifyRouteRequest, ClassifyRouteResponse, FinalizeRequest, RunRequest, RunStreamOptions } from './api-types';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
 
 const MODIFY_PROMPT_PATTERN = /修改|调整|删除|添加|增加|替换|移动|隐藏|显示|改成|换成|update|change|remove|delete|insert|add|replace|move|hide|show/i;
@@ -385,5 +385,9 @@ export class MockAIClient implements AIClient {
         for (const chunk of response.content.match(/.{1,24}/g) ?? []) {
             yield { delta: chunk };
         }
+    }
+
+    async classifyRoute(_request: ClassifyRouteRequest): Promise<ClassifyRouteResponse> {
+        return { scope: 'single-page', intent: 'schema.create', confidence: 0.9 };
     }
 }

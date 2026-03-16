@@ -1,9 +1,12 @@
 import type {
   AgentEvent,
   AgentIntent,
+  AgentScope,
   AgentOperation,
   ChatRequest,
   ChatResponse,
+  ClassifyRouteRequest,
+  ClassifyRouteResponse,
   FinalizeRequest,
   FinalizeResult,
   LoopSessionState,
@@ -18,9 +21,12 @@ import type {
 export type {
   AgentEvent,
   AgentIntent,
+  AgentScope,
   AgentOperation,
   ChatRequest,
   ChatResponse,
+  ClassifyRouteRequest,
+  ClassifyRouteResponse,
   FinalizeRequest,
   FinalizeResult,
   LoopSessionState,
@@ -42,4 +48,5 @@ export interface AIClient {
   chat(request: ChatRequest): Promise<ChatResponse>;
   chatStream(request: ChatRequest, options?: RunStreamOptions): AsyncIterable<{ delta: string }>;
   finalize(request: FinalizeRequest): Promise<FinalizeResult>;
+  classifyRoute(request: ClassifyRouteRequest): Promise<ClassifyRouteResponse>;
 }

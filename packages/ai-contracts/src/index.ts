@@ -88,6 +88,8 @@ export type AgentIntent =
   | 'schema.modify'
   | 'chat';
 
+export type AgentScope = 'single-page' | 'multi-page';
+
 export interface AgentOperationMetrics {
   durationMs?: number;
   inputTokens?: number;
@@ -128,6 +130,24 @@ export interface RunRequest {
     schemaJson?: PageSchema;
     workspaceFileIds?: string[];
   };
+}
+
+export interface ClassifyRouteRequest {
+  prompt: string;
+  attachments?: RunAttachmentInput[];
+  plannerModel?: string;
+  thinking?: ThinkingConfig;
+  context: {
+    schemaSummary: string;
+  };
+}
+
+export interface ClassifyRouteResponse {
+  scope: AgentScope;
+  intent: AgentIntent;
+  confidence: number;
+  /** 提取附件文档内容后的完整 prompt，供 Agent Loop 的 user message 使用 */
+  preparedPrompt?: string;
 }
 
 export interface RunMetadata {
@@ -175,7 +195,7 @@ export interface ModifyResult {
 
 export type AgentEvent =
   | { type: 'run:start'; data: { sessionId: string; conversationId?: string } }
-  | { type: 'intent'; data: { intent: AgentIntent; confidence: number } }
+  | { type: 'intent'; data: { intent: AgentIntent; confidence: number; scope?: AgentScope } }
   | { type: 'message:start'; data: { role: 'assistant' } }
   | { type: 'message:delta'; data: { text: string } }
   | { type: 'tool:start'; data: { tool: string; label?: string } }
