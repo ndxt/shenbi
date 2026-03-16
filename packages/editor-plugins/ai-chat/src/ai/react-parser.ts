@@ -12,6 +12,8 @@ const ACTIONS_WITH_OPTIONAL_INPUT = new Set([
   'getAvailableComponents',
 ]);
 
+const OPTIONAL_INPUT_ACTIONS_INFERENCE_ORDER = Array.from(ACTIONS_WITH_OPTIONAL_INPUT);
+
 function stripCodeFence(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   return (fenced?.[1] ?? text).trim();
@@ -95,6 +97,14 @@ function extractNestedActionObject(object: Record<string, unknown>): Record<stri
   return nested;
 }
 
+function inferOptionalInputActionFromText(source: string): string | undefined {
+  const positions = OPTIONAL_INPUT_ACTIONS_INFERENCE_ORDER
+    .map((action) => ({ action, index: source.indexOf(action) }))
+    .filter((entry) => entry.index >= 0)
+    .sort((left, right) => left.index - right.index);
+  return positions[0]?.action;
+}
+
 function extractFromJSONObject(source: string): ParsedReActResponse | undefined {
   const object = extractJSONObject(source);
   if (!object) {
@@ -133,7 +143,30 @@ function extractFromJSONObject(source: string): ParsedReActResponse | undefined 
     object['动作'],
   ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
   if (!action) {
-    return undefined;
+    const reasoningText = [
+      object.reasoning,
+      object.Reasoning,
+      object.reasoningSummary,
+      object.reasoning_summary,
+      object['Reasoning Summary'],
+      object.status,
+      object.Status,
+      object.content,
+      object.Content,
+      object.text,
+      object.Text,
+    ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0).join('\n');
+    const inferredAction = inferOptionalInputActionFromText(reasoningText);
+    if (!inferredAction) {
+      return undefined;
+    }
+    return {
+      ...(status ? { status } : {}),
+      ...(reasoningSummary ? { reasoningSummary } : {}),
+      action: inferredAction,
+      actionInput: {},
+      rawActionInput: '{}',
+    };
   }
 
   const actionInputValue = [
@@ -197,6 +230,14 @@ export function parseReActResponse(source: string): ParsedReActResponse {
 
   const action = extractActionFromLabels(normalized);
   if (!action) {
+    const inferredAction = inferOptionalInputActionFromText(normalized);
+    if (inferredAction) {
+      return {
+        action: inferredAction,
+        actionInput: {},
+        rawActionInput: '{}',
+      };
+    }
     throw new Error('Missing Action field in ReAct response');
   }
 

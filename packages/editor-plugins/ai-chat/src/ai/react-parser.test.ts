@@ -141,6 +141,22 @@ describe('parseReActResponse', () => {
       actionInput: {},
       rawActionInput: '{}',
     });
+
+    expect(parseReActResponse(JSON.stringify({
+      reasoning: '用户需要创建项目。首先调用 listWorkspaceFiles 查看当前工作区状态。',
+    }))).toEqual({
+      action: 'listWorkspaceFiles',
+      actionInput: {},
+      rawActionInput: '{}',
+    });
+
+    expect(parseReActResponse(
+      '我需要先调用 getAvailableComponents 查看当前组件列表，再继续后续分析。',
+    )).toEqual({
+      action: 'getAvailableComponents',
+      actionInput: {},
+      rawActionInput: '{}',
+    });
   });
 
   it('throws when action or action input is missing', () => {
