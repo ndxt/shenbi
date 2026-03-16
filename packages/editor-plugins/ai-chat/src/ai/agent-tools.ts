@@ -52,6 +52,74 @@ function toProjectPlan(value: Record<string, unknown>): ProjectPlan {
   };
 }
 
+function buildCreatePagePrompt(actionInput: Record<string, unknown>, pageName: string): string {
+  if (typeof actionInput.prompt === 'string' && actionInput.prompt.trim()) {
+    return actionInput.prompt.trim();
+  }
+
+  const promptParts = [
+    `${pageName} 页面`,
+  ];
+  const description = typeof actionInput.description === 'string' && actionInput.description.trim()
+    ? actionInput.description.trim()
+    : undefined;
+  const layout = typeof actionInput.layout === 'string' && actionInput.layout.trim()
+    ? actionInput.layout.trim()
+    : undefined;
+  const components = typeof actionInput.components === 'string' && actionInput.components.trim()
+    ? actionInput.components.trim()
+    : undefined;
+  const fields = typeof actionInput.fields === 'string' && actionInput.fields.trim()
+    ? actionInput.fields.trim()
+    : undefined;
+  const interactions = typeof actionInput.interactions === 'string' && actionInput.interactions.trim()
+    ? actionInput.interactions.trim()
+    : undefined;
+  const targetUser = typeof actionInput.targetUser === 'string' && actionInput.targetUser.trim()
+    ? actionInput.targetUser.trim()
+    : undefined;
+
+  if (description) {
+    promptParts.push(`目标: ${description}`);
+  }
+  if (layout) {
+    promptParts.push(`布局: ${layout}`);
+  }
+  if (components) {
+    promptParts.push(`组件: ${components}`);
+  }
+  if (fields) {
+    promptParts.push(`字段: ${fields}`);
+  }
+  if (interactions) {
+    promptParts.push(`交互: ${interactions}`);
+  }
+  if (targetUser) {
+    promptParts.push(`用户: ${targetUser}`);
+  }
+
+  return promptParts.join('\n');
+}
+
+function buildModifyPagePrompt(actionInput: Record<string, unknown>): string {
+  if (typeof actionInput.prompt === 'string' && actionInput.prompt.trim()) {
+    return actionInput.prompt.trim();
+  }
+
+  const parts = [
+    typeof actionInput.description === 'string' && actionInput.description.trim()
+      ? actionInput.description.trim()
+      : '请按当前需求修改页面',
+  ];
+  if (typeof actionInput.fields === 'string' && actionInput.fields.trim()) {
+    parts.push(`字段调整: ${actionInput.fields.trim()}`);
+  }
+  if (typeof actionInput.interactions === 'string' && actionInput.interactions.trim()) {
+    parts.push(`交互调整: ${actionInput.interactions.trim()}`);
+  }
+  return parts.join('\n');
+}
+
 function createEphemeralBridge(schema: PageSchema): EditorAIBridge {
   const editor = createEditor({ initialSchema: schema });
   return {
@@ -130,6 +198,9 @@ export function buildAgentLoopSystemPrompt(): string {
     '3. 不要输出 Markdown 代码块，不要输出 ```json。',
     '4. 如果工具没有参数，也必须输出 Action Input: {}。',
     '5. 如果需要向用户解释，只能使用一行 Status 或一行 Reasoning Summary；不要输出其他解释文本。',
+    '6. proposeProjectPlan 的 Action Input 必须包含 projectName 和 pages，pages 不能为空。',
+    '7. 多页面需求必须先 proposeProjectPlan，等待确认后再逐页 createPage / modifyPage。',
+    '8. createPage 的 Action Input 必须至少包含 pageId 或 fileId、pageName，以及足够具体的 prompt 或 description/layout/components/fields/interactions。',
     '',
     '## 正确示例',
     'Status: 正在检查当前工作区页面',
@@ -191,11 +262,16 @@ export async function executeAgentTool(
       };
     case 'proposeProjectPlan': {
       const plan = toProjectPlan(actionInput);
+      if (plan.pages.length === 0) {
+        throw new Error('proposeProjectPlan requires a non-empty pages array');
+      }
       return context.proposeProjectPlan(plan);
     }
     case 'createPage': {
       const pageId = typeof actionInput.pageId === 'string' && actionInput.pageId.trim()
         ? actionInput.pageId.trim()
+        : typeof actionInput.fileId === 'string' && actionInput.fileId.trim()
+          ? actionInput.fileId.trim()
         : typeof actionInput.name === 'string' && actionInput.name.trim()
           ? actionInput.name.trim()
           : `page-${pageLookup.size + 1}`;
@@ -204,9 +280,7 @@ export async function executeAgentTool(
         : typeof actionInput.name === 'string' && actionInput.name.trim()
           ? actionInput.name.trim()
           : pageId;
-      const prompt = typeof actionInput.prompt === 'string' && actionInput.prompt.trim()
-        ? actionInput.prompt.trim()
-        : `${pageName} 页面`;
+      const prompt = buildCreatePagePrompt(actionInput, pageName);
       const page = pageLookup.get(pageId) ?? {
         pageId,
         pageName,
@@ -222,9 +296,7 @@ export async function executeAgentTool(
       if (!fileId) {
         throw new Error('modifyPage requires fileId');
       }
-      const prompt = typeof actionInput.prompt === 'string' && actionInput.prompt.trim()
-        ? actionInput.prompt.trim()
-        : '请按当前需求修改页面';
+      const prompt = buildModifyPagePrompt(actionInput);
       const page = pageLookup.get(fileId) ?? {
         pageId: fileId,
         pageName: typeof actionInput.pageName === 'string' && actionInput.pageName.trim() ? actionInput.pageName.trim() : fileId,

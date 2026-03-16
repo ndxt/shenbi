@@ -19,6 +19,7 @@ import { useAgentRun, type LastRunResult } from './useAgentRun';
 const PERSISTENCE_NAMESPACE = 'ai-chat';
 const AGENT_LOOP_PERSISTENCE_KEY = 'agent-loop-state';
 const MAX_LOOP_ITERATIONS = 30;
+const TOOL_IDLE_TIMEOUT_MS = 90_000;
 
 function summarizeSchema(schema: PageSchema): string {
   const bodyCount = Array.isArray(schema.body) ? schema.body.length : schema.body ? 1 : 0;
@@ -66,6 +67,53 @@ function createLoopState(conversationId: string): LoopSessionState {
     completedPageIds: [],
     failedPageIds: [],
     updatedAt: new Date().toISOString(),
+  };
+}
+
+function createIdleTimeoutSignal(parentSignal?: AbortSignal, timeoutMs = TOOL_IDLE_TIMEOUT_MS) {
+  const controller = new AbortController();
+  let timedOut = false;
+  let timeoutId: number | undefined;
+
+  const clearTimer = () => {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+      timeoutId = undefined;
+    }
+  };
+
+  const armTimer = () => {
+    clearTimer();
+    timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+  };
+
+  const handleParentAbort = () => {
+    controller.abort();
+  };
+
+  if (parentSignal) {
+    if (parentSignal.aborted) {
+      controller.abort();
+    } else {
+      parentSignal.addEventListener('abort', handleParentAbort);
+    }
+  }
+
+  armTimer();
+
+  return {
+    signal: controller.signal,
+    refresh: armTimer,
+    didTimeout: () => timedOut,
+    dispose: () => {
+      clearTimer();
+      if (parentSignal) {
+        parentSignal.removeEventListener('abort', handleParentAbort);
+      }
+    },
   };
 }
 
@@ -160,6 +208,8 @@ export function useAgentLoop(
   const pagesRef = useRef<AgentLoopPageProgress[]>([]);
   const pageLookupRef = useRef<Map<string, AgentLoopPageProgress>>(new Map());
   const confirmResolverRef = useRef<((observation: string) => void) | null>(null);
+  const activePlannerModelRef = useRef<string>('');
+  const activeBlockModelRef = useRef<string>('');
 
   useEffect(() => {
     if (!persistence) {
@@ -239,6 +289,8 @@ export function useAgentLoop(
     loopStateRef.current = undefined;
     pageLookupRef.current = new Map();
     confirmResolverRef.current = null;
+    activePlannerModelRef.current = '';
+    activeBlockModelRef.current = '';
     setMode(null);
     setPhase('idle');
     setProgressText('');
@@ -335,7 +387,8 @@ export function useAgentLoop(
     if (!bridge) {
       throw new Error('editor bridge unavailable');
     }
-    const signal = abortControllerRef.current?.signal;
+    const parentSignal = abortControllerRef.current?.signal;
+    const timeoutController = createIdleTimeoutSignal(parentSignal);
     const fileId = await ensureUniqueFileId(input.pageId);
     updatePage(page.pageId, (current) => ({
       ...(() => {
@@ -346,9 +399,12 @@ export function useAgentLoop(
       status: 'running',
       blocks: [],
     }));
+    setProgressText(`正在创建页面 ${input.pageName}`);
     const request: RunRequest = {
       prompt: input.prompt,
       intent: 'schema.create',
+      ...(activePlannerModelRef.current ? { plannerModel: activePlannerModelRef.current } : {}),
+      ...(activeBlockModelRef.current ? { blockModel: activeBlockModelRef.current } : {}),
       thinking: { type: 'disabled' },
       context: {
         schemaSummary: 'pageId=empty; pageName=empty; nodeCount=0',
@@ -364,46 +420,65 @@ export function useAgentLoop(
     let finalSchema: PageSchema | undefined;
     let metadata: RunMetadata | undefined;
     const startedAt = Date.now();
-
-    for await (const event of aiClient.runStream(request, signal ? { signal } : undefined)) {
-      if (event.type === 'plan') {
-        updatePage(page.pageId, (current) => ({
-          ...current,
-          blocks: event.data.blocks.map((block) => ({
-            id: block.id,
-            label: block.description,
-            status: 'waiting',
-          })),
-        }));
-      } else if (event.type === 'schema:block:start') {
-        updatePage(page.pageId, (current) => ({
-          ...current,
-          blocks: current.blocks.map((block) => block.id === event.data.blockId ? { ...block, status: 'generating' } : block),
-        }));
-      } else if (event.type === 'schema:block') {
-        updatePage(page.pageId, (current) => ({
-          ...current,
-          blocks: current.blocks.map((block) => block.id === event.data.blockId
-            ? {
-                ...block,
-                status: 'done',
-                ...(event.data.durationMs !== undefined ? { durationMs: event.data.durationMs } : {}),
-                ...(event.data.inputTokens !== undefined ? { inputTokens: event.data.inputTokens } : {}),
-                ...(event.data.outputTokens !== undefined ? { outputTokens: event.data.outputTokens } : {}),
-              }
-            : block),
-        }));
-      } else if (event.type === 'schema:done') {
-        finalSchema = {
-          ...event.data.schema,
-          id: fileId,
-          name: input.pageName,
-        };
-      } else if (event.type === 'done') {
-        metadata = event.data.metadata;
-      } else if (event.type === 'error') {
-        throw new Error(event.data.message);
+    try {
+      for await (const event of aiClient.runStream(request, { signal: timeoutController.signal })) {
+        timeoutController.refresh();
+        if (event.type === 'plan') {
+          setProgressText(`正在规划 ${input.pageName} 的页面区块`);
+          updatePage(page.pageId, (current) => ({
+            ...current,
+            blocks: event.data.blocks.map((block) => ({
+              id: block.id,
+              label: block.description,
+              status: 'waiting',
+            })),
+          }));
+        } else if (event.type === 'schema:block:start') {
+          setProgressText(`正在生成 ${input.pageName} · ${event.data.description}`);
+          updatePage(page.pageId, (current) => ({
+            ...current,
+            blocks: current.blocks.map((block) => block.id === event.data.blockId ? { ...block, status: 'generating' } : block),
+          }));
+        } else if (event.type === 'schema:block') {
+          updatePage(page.pageId, (current) => ({
+            ...current,
+            blocks: current.blocks.map((block) => block.id === event.data.blockId
+              ? {
+                  ...block,
+                  status: 'done',
+                  ...(event.data.durationMs !== undefined ? { durationMs: event.data.durationMs } : {}),
+                  ...(event.data.inputTokens !== undefined ? { inputTokens: event.data.inputTokens } : {}),
+                  ...(event.data.outputTokens !== undefined ? { outputTokens: event.data.outputTokens } : {}),
+                }
+              : block),
+          }));
+        } else if (event.type === 'schema:done') {
+          setProgressText(`${input.pageName} 已生成，正在写入工作区`);
+          finalSchema = {
+            ...event.data.schema,
+            id: fileId,
+            name: input.pageName,
+          };
+        } else if (event.type === 'done') {
+          metadata = event.data.metadata;
+        } else if (event.type === 'error') {
+          throw new Error(event.data.message);
+        }
       }
+    } catch (error) {
+      const message = timeoutController.didTimeout()
+        ? `createPage timed out after ${Math.round(TOOL_IDLE_TIMEOUT_MS / 1000)}s for ${input.pageName}`
+        : error instanceof Error
+          ? error.message
+          : String(error);
+      updatePage(page.pageId, (current) => ({
+        ...current,
+        status: 'failed',
+        error: message,
+      }));
+      throw new Error(message);
+    } finally {
+      timeoutController.dispose();
     }
 
     if (!finalSchema) {
@@ -411,6 +486,7 @@ export function useAgentLoop(
     }
 
     await writePageSchema(fileId, finalSchema);
+    setProgressText(`${input.pageName} 已写入工作区`);
     updatePage(page.pageId, (current) => ({
       ...current,
       fileId,
@@ -431,7 +507,8 @@ export function useAgentLoop(
     if (!bridge) {
       throw new Error('editor bridge unavailable');
     }
-    const signal = abortControllerRef.current?.signal;
+    const parentSignal = abortControllerRef.current?.signal;
+    const timeoutController = createIdleTimeoutSignal(parentSignal);
     const existingSchema = await readPageSchema(input.fileId);
     updatePage(page.pageId, (current) => ({
       ...(() => {
@@ -441,10 +518,13 @@ export function useAgentLoop(
       status: 'running',
       blocks: [],
     }));
+    setProgressText(`正在修改页面 ${page.pageName}`);
 
     const request: RunRequest = {
       prompt: input.prompt,
       intent: 'schema.modify',
+      ...(activePlannerModelRef.current ? { plannerModel: activePlannerModelRef.current } : {}),
+      ...(activeBlockModelRef.current ? { blockModel: activeBlockModelRef.current } : {}),
       thinking: { type: 'disabled' },
       context: {
         schemaSummary: summarizeSchema(existingSchema),
@@ -456,33 +536,51 @@ export function useAgentLoop(
     const operations: AgentEvent[] = [];
     let metadata: RunMetadata | undefined;
     const startedAt = Date.now();
-
-    for await (const event of aiClient.runStream(request, signal ? { signal } : undefined)) {
-      operations.push(event);
-      if (event.type === 'modify:start') {
-        updatePage(page.pageId, (current) => ({
-          ...current,
-          blocks: (event.data.operations ?? []).map((operation, index) => ({
-            id: String(index),
-            label: operation.label ?? operation.op,
-            status: 'waiting',
-          })),
-        }));
-      } else if (event.type === 'modify:op:pending') {
-        updatePage(page.pageId, (current) => ({
-          ...current,
-          blocks: current.blocks.map((block, index) => index === event.data.index ? { ...block, status: 'generating' } : block),
-        }));
-      } else if (event.type === 'modify:op') {
-        updatePage(page.pageId, (current) => ({
-          ...current,
-          blocks: current.blocks.map((block, index) => index === event.data.index ? { ...block, status: 'done' } : block),
-        }));
-      } else if (event.type === 'done') {
-        metadata = event.data.metadata;
-      } else if (event.type === 'error') {
-        throw new Error(event.data.message);
+    try {
+      for await (const event of aiClient.runStream(request, { signal: timeoutController.signal })) {
+        timeoutController.refresh();
+        operations.push(event);
+        if (event.type === 'modify:start') {
+          setProgressText(`正在规划 ${page.pageName} 的修改操作`);
+          updatePage(page.pageId, (current) => ({
+            ...current,
+            blocks: (event.data.operations ?? []).map((operation, index) => ({
+              id: String(index),
+              label: operation.label ?? operation.op,
+              status: 'waiting',
+            })),
+          }));
+        } else if (event.type === 'modify:op:pending') {
+          setProgressText(`正在修改 ${page.pageName} · 步骤 ${event.data.index + 1}`);
+          updatePage(page.pageId, (current) => ({
+            ...current,
+            blocks: current.blocks.map((block, index) => index === event.data.index ? { ...block, status: 'generating' } : block),
+          }));
+        } else if (event.type === 'modify:op') {
+          updatePage(page.pageId, (current) => ({
+            ...current,
+            blocks: current.blocks.map((block, index) => index === event.data.index ? { ...block, status: 'done' } : block),
+          }));
+        } else if (event.type === 'done') {
+          metadata = event.data.metadata;
+        } else if (event.type === 'error') {
+          throw new Error(event.data.message);
+        }
       }
+    } catch (error) {
+      const message = timeoutController.didTimeout()
+        ? `modifyPage timed out after ${Math.round(TOOL_IDLE_TIMEOUT_MS / 1000)}s for ${page.pageName}`
+        : error instanceof Error
+          ? error.message
+          : String(error);
+      updatePage(page.pageId, (current) => ({
+        ...current,
+        status: 'failed',
+        error: message,
+      }));
+      throw new Error(message);
+    } finally {
+      timeoutController.dispose();
     }
 
     const nextSchema = await applyModifyOperationsToSchema(
@@ -492,6 +590,7 @@ export function useAgentLoop(
         .map((event) => event.data.operation),
     );
     await writePageSchema(input.fileId, nextSchema);
+    setProgressText(`${page.pageName} 修改完成`);
     updatePage(page.pageId, (current) => ({
       ...current,
       status: 'done',
@@ -660,6 +759,8 @@ export function useAgentLoop(
     startTimeRef.current = Date.now();
     abortControllerRef.current = new AbortController();
     tracerRef.current = new AgentLoopTracer();
+    activePlannerModelRef.current = plannerModel;
+    activeBlockModelRef.current = blockModel;
 
     if (isResumePrompt(prompt) && persistedRef.current) {
       loopMessagesRef.current = persistedRef.current.reactMessages;

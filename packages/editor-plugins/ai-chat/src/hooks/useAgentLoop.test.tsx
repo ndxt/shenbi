@@ -308,6 +308,11 @@ describe('useAgentLoop', () => {
         fileId: 'dashboard',
       },
     ]);
+    expect(client.runRequests[0]).toMatchObject({
+      plannerModel: 'planner-model',
+      blockModel: 'block-model',
+      intent: 'schema.create',
+    });
     expect(fileStorage.files.get('dashboard')).toMatchObject({
       name: '客服看板',
     });
