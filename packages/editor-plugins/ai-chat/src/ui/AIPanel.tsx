@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import { Sparkles, LoaderCircle, Trash2, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Trash2, CheckCircle2, LoaderCircle } from 'lucide-react';
 import {
   executePluginCommand,
   type PluginContext,
@@ -155,6 +155,7 @@ export function AIPanel({
   const modelsReady = plannerModels.length > 0 && blockModels.length > 0;
   const modelSelectionBlocked = isLoadingModels || Boolean(modelsError) || !modelsReady;
   const loopAwaitingConfirmation = mode === 'loop' && phase === 'awaiting_confirmation';
+  const showInlineLoopPlan = mode === 'loop' && phase !== 'done';
 
   useEffect(() => {
     let cancelled = false;
@@ -487,40 +488,20 @@ export function AIPanel({
             </div>
           )}
 
-          {mode === 'loop' && (
-            <>
-              {!loopAwaitingConfirmation && (
-                <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col shadow-sm relative overflow-hidden">
-                  <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-400 to-blue-500 animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
-                  <div className="flex items-center gap-2 text-text-primary">
-                    <LoaderCircle size={12} className={`text-blue-500 shrink-0 ${isRunning ? 'animate-spin' : ''}`} style={isRunning ? { animation: 'spin 1s linear infinite' } : undefined} />
-                    <span className="font-semibold text-blue-500 shrink-0" style={{ fontSize: '11px' }}>
-                      {phase === 'done' ? t('loop.loopDone') : phase === 'error' ? t('loop.loopError') : t('loop.loopRunning')}
-                    </span>
-                    <span className="opacity-70 ml-1 truncate flex-1" style={{ fontSize: '11px' }}>{progressText}</span>
-                    <span className="text-text-secondary font-mono shrink-0 tabular-nums" style={{ fontSize: '10px' }}>
-                      {Math.floor(elapsedMs / 1000)}s
-                    </span>
-                  </div>
-                  {errorMessage && (
-                    <div className="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-red-400" style={{ fontSize: '11px' }}>
-                      {errorMessage}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <ProjectPlanCard
-                projectPlan={projectPlan}
-                pages={pages}
-                phase={phase}
-                planRevisionRequested={planRevisionRequested}
-                onConfirm={confirmProjectPlan}
-                onRequestRevision={requestProjectPlanRevision}
-                onCancelRevision={cancelProjectPlanRevision}
-                onSubmitRevision={submitProjectPlanRevision}
-              />
-            </>
+          {showInlineLoopPlan && (
+            <ProjectPlanCard
+              projectPlan={projectPlan}
+              pages={pages}
+              phase={phase}
+              progressText={progressText}
+              elapsedMs={elapsedMs}
+              errorMessage={errorMessage}
+              planRevisionRequested={planRevisionRequested}
+              onConfirm={confirmProjectPlan}
+              onRequestRevision={requestProjectPlanRevision}
+              onCancelRevision={cancelProjectPlanRevision}
+              onSubmitRevision={submitProjectPlanRevision}
+            />
           )}
 
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ClipboardList } from 'lucide-react';
+import { CheckCircle2, CircleDashed, ClipboardList, TriangleAlert } from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
 import type { ProjectPlan } from '../ai/api-types';
 import type { AgentLoopPageProgress, UIPhase } from '../ai/agent-loop-types';
@@ -8,6 +8,10 @@ export interface ProjectPlanCardProps {
   projectPlan: ProjectPlan | null;
   pages?: AgentLoopPageProgress[] | undefined;
   phase: UIPhase;
+  embedded?: boolean | undefined;
+  progressText?: string | undefined;
+  elapsedMs?: number | undefined;
+  errorMessage?: string | undefined;
   planRevisionRequested: boolean;
   onConfirm: () => void;
   onRequestRevision: () => void;
@@ -41,10 +45,27 @@ function getProgressClass(status: AgentLoopPageProgress['status']): string {
   }
 }
 
+function blockStatusLabel(status: 'waiting' | 'generating' | 'done' | 'failed') {
+  switch (status) {
+    case 'generating':
+      return '...';
+    case 'done':
+      return 'done';
+    case 'failed':
+      return 'failed';
+    default:
+      return 'wait';
+  }
+}
+
 export function ProjectPlanCard({
   projectPlan,
   pages,
   phase,
+  embedded = false,
+  progressText,
+  elapsedMs = 0,
+  errorMessage,
   planRevisionRequested,
   onConfirm,
   onRequestRevision,
@@ -65,29 +86,57 @@ export function ProjectPlanCard({
   }
 
   const awaitingConfirmation = phase === 'awaiting_confirmation';
+  const showInlineStatus = !embedded && !awaitingConfirmation && phase !== 'done';
   const pageProgressMap = new Map((pages ?? []).map((page) => [page.pageId, page]));
+  const wrapperClassName = embedded
+    ? 'flex flex-col gap-2'
+    : 'bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-3 shadow-sm';
 
   return (
-    <section className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2 px-1">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className="flex items-center gap-2 shrink-0">
-            <ClipboardList size={14} className="text-blue-500" />
-            <span className="font-semibold text-text-primary" style={{ fontSize: '12px' }}>{t('loop.planTitle')}</span>
+    <section className={wrapperClassName}>
+      {!embedded && (
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1">
+            <div className="flex items-center gap-2 shrink-0">
+              <ClipboardList size={14} className="text-blue-500" />
+              <span className="font-semibold text-text-primary" style={{ fontSize: '12px' }}>{t('loop.planTitle')}</span>
+            </div>
+            <span className="text-text-primary font-medium truncate shrink-0" style={{ fontSize: '12px' }}>
+              {projectPlan.projectName}
+            </span>
+            {!awaitingConfirmation && !showInlineStatus && (
+              <span className="text-text-secondary shrink-0" style={{ fontSize: '11px' }}>
+                ({t('loop.planConfirmed')})
+              </span>
+            )}
+            {showInlineStatus && (
+              <>
+                <span className={`shrink-0 ${phase === 'error' ? 'text-red-400' : 'text-blue-500'}`} style={{ fontSize: '11px' }}>
+                  {phase === 'error' ? t('loop.loopError') : t('loop.loopRunning')}
+                </span>
+                <span className="text-text-secondary truncate min-w-0" style={{ fontSize: '11px' }}>
+                  {progressText}
+                </span>
+              </>
+            )}
           </div>
-          <span className="text-text-primary font-medium truncate shrink-0" style={{ fontSize: '12px' }}>
-            {projectPlan.projectName}
-          </span>
-          {!awaitingConfirmation && (
-            <span className="text-text-secondary shrink-0" style={{ fontSize: '11px' }}>
-              ({t('loop.planConfirmed')})
+          {showInlineStatus ? (
+            <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '10px' }}>
+              {Math.floor(elapsedMs / 1000)}s
+            </span>
+          ) : (
+            <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '10px' }}>
+              {t('loop.pageCount', { count: projectPlan.pages.length })}
             </span>
           )}
         </div>
-        <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '10px' }}>
-          {t('loop.pageCount', { count: projectPlan.pages.length })}
-        </span>
-      </div>
+      )}
+
+      {showInlineStatus && errorMessage && (
+        <div className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-red-400" style={{ fontSize: '11px' }}>
+          {errorMessage}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {projectPlan.pages.map((page) => {
@@ -116,6 +165,27 @@ export function ProjectPlanCard({
             {page.reason && (
               <div className="text-text-secondary/80" style={{ fontSize: '10px' }}>
                 {t('loop.reasonLabel')}: {page.reason}
+              </div>
+            )}
+            {!awaitingConfirmation && pageProgress && pageProgress.blocks.length > 0 && (
+              <div className="grid grid-cols-1 gap-1 pt-1">
+                {pageProgress.blocks.map((block) => (
+                  <div key={block.id} className="rounded bg-bg-canvas px-2 py-1.5 flex items-center gap-2">
+                    {block.status === 'done' ? (
+                      <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
+                    ) : block.status === 'failed' ? (
+                      <TriangleAlert size={11} className="text-red-400 shrink-0" />
+                    ) : (
+                      <CircleDashed size={11} className={`shrink-0 ${block.status === 'generating' ? 'text-blue-500 animate-spin' : 'text-text-secondary'}`} />
+                    )}
+                    <span className="text-text-primary flex-1 truncate" style={{ fontSize: '11px' }} title={block.label}>
+                      {block.label}
+                    </span>
+                    <span className="text-text-secondary font-mono uppercase" style={{ fontSize: '10px' }}>
+                      {blockStatusLabel(block.status)}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
             {!awaitingConfirmation && pageProgress?.error && (

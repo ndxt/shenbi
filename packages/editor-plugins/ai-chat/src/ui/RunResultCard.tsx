@@ -87,6 +87,7 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
           projectPlan={loopSummary.projectPlan ?? null}
           pages={loopSummary.pages}
           phase="done"
+          embedded
           planRevisionRequested={false}
           onConfirm={() => undefined}
           onRequestRevision={() => undefined}

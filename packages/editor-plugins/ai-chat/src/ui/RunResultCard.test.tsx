@@ -50,7 +50,13 @@ describe('RunResultCard', () => {
             description: '订单列表页',
             status: 'done',
             fileId: '订单列表页',
-            blocks: [],
+            blocks: [
+              {
+                id: 'header-block',
+                label: '页面标题和操作按钮区域',
+                status: 'done',
+              },
+            ],
           },
         ],
         createdFileIds: ['订单列表页'],
@@ -61,6 +67,8 @@ describe('RunResultCard', () => {
     render(<RunResultCard result={result} />);
 
     expect(screen.getByText('Trace File: .ai-debug/traces/2026-03-16T00-00-00-000Z-success.json')).toBeInTheDocument();
+    expect(screen.getByText('页面标题和操作按钮区域')).toBeInTheDocument();
+    expect(screen.queryByText('项目规划')).not.toBeInTheDocument();
     expect(screen.queryByText('ReAct 步骤')).not.toBeInTheDocument();
     expect(screen.queryByText(/listWorkspaceFiles/)).not.toBeInTheDocument();
   });
