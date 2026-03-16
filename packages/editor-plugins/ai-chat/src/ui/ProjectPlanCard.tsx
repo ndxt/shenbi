@@ -2,10 +2,11 @@ import React from 'react';
 import { CheckCircle2, ClipboardList, PencilLine } from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
 import type { ProjectPlan } from '../ai/api-types';
-import type { UIPhase } from '../ai/agent-loop-types';
+import type { AgentLoopPageProgress, UIPhase } from '../ai/agent-loop-types';
 
 export interface ProjectPlanCardProps {
   projectPlan: ProjectPlan | null;
+  pages?: AgentLoopPageProgress[] | undefined;
   phase: UIPhase;
   planRevisionRequested: boolean;
   onConfirm: () => void;
@@ -25,8 +26,24 @@ function getActionClass(action: 'create' | 'modify' | 'skip'): string {
   }
 }
 
+function getProgressClass(status: AgentLoopPageProgress['status']): string {
+  switch (status) {
+    case 'done':
+      return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
+    case 'running':
+      return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
+    case 'failed':
+      return 'text-red-400 bg-red-400/10 border-red-400/20';
+    case 'skipped':
+      return 'text-text-secondary bg-bg-panel border-border-ide';
+    default:
+      return 'text-text-secondary bg-bg-panel border-border-ide';
+  }
+}
+
 export function ProjectPlanCard({
   projectPlan,
+  pages,
   phase,
   planRevisionRequested,
   onConfirm,
@@ -48,6 +65,7 @@ export function ProjectPlanCard({
   }
 
   const awaitingConfirmation = phase === 'awaiting_confirmation';
+  const pageProgressMap = new Map((pages ?? []).map((page) => [page.pageId, page]));
 
   return (
     <section className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-3 shadow-sm">
@@ -71,14 +89,27 @@ export function ProjectPlanCard({
       </div>
 
       <div className="flex flex-col gap-2">
-        {projectPlan.pages.map((page) => (
+        {projectPlan.pages.map((page) => {
+          const pageProgress = pageProgressMap.get(page.pageId);
+          return (
           <div key={page.pageId} className="rounded-md border border-border-ide bg-bg-panel/70 px-3 py-2 flex flex-col gap-1.5">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-text-primary" style={{ fontSize: '12px' }}>{page.pageName}</span>
-              <span className={`px-1.5 py-0.5 rounded border uppercase tracking-wider ${getActionClass(page.action)}`} style={{ fontSize: '10px' }}>
-                {page.action}
-              </span>
+              {awaitingConfirmation ? (
+                <span className={`px-1.5 py-0.5 rounded border uppercase tracking-wider ${getActionClass(page.action)}`} style={{ fontSize: '10px' }}>
+                  {page.action}
+                </span>
+              ) : pageProgress ? (
+                <span className={`px-1.5 py-0.5 rounded border uppercase tracking-wider ${getProgressClass(pageProgress.status)}`} style={{ fontSize: '10px' }}>
+                  {pageProgress.status}
+                </span>
+              ) : null}
               <code className="text-text-secondary" style={{ fontSize: '10px' }}>{page.pageId}</code>
+              {!awaitingConfirmation && pageProgress?.fileId && (
+                <span className="text-text-secondary" style={{ fontSize: '10px' }}>
+                  {t('loop.fileIdLabel')}: <code>{pageProgress.fileId}</code>
+                </span>
+              )}
             </div>
             <div className="text-text-secondary whitespace-pre-wrap" style={{ fontSize: '11px' }}>{page.description}</div>
             {page.reason && (
@@ -86,8 +117,13 @@ export function ProjectPlanCard({
                 {t('loop.reasonLabel')}: {page.reason}
               </div>
             )}
+            {!awaitingConfirmation && pageProgress?.error && (
+              <div className="rounded bg-red-500/10 border border-red-500/20 px-2 py-1.5 text-red-400" style={{ fontSize: '11px' }}>
+                {pageProgress.error}
+              </div>
+            )}
           </div>
-        ))}
+        )})}
       </div>
 
       {awaitingConfirmation && (
@@ -127,7 +163,7 @@ export function ProjectPlanCard({
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
-                className="px-3 py-1.5 rounded-md bg-emerald-500 text-white text-[11px] font-semibold inline-flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-md bg-blue-500 text-white text-[11px] font-semibold inline-flex items-center gap-1.5 shadow-sm"
                 onClick={onConfirm}
               >
                 <CheckCircle2 size={12} />

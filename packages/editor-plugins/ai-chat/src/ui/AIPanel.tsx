@@ -14,7 +14,6 @@ import { ChatMessageList } from './ChatMessageList';
 import { ChatInput, type PromptOption } from './ChatInput';
 import { ModelSelector } from './ModelSelector';
 import { ProjectPlanCard } from './ProjectPlanCard';
-import { ProjectProgressCard } from './ProjectProgressCard';
 
 export interface AIPanelProps {
   bridge?: EditorAIBridge;
@@ -510,6 +509,7 @@ export function AIPanel({
 
               <ProjectPlanCard
                 projectPlan={projectPlan}
+                pages={pages}
                 phase={phase}
                 planRevisionRequested={planRevisionRequested}
                 onConfirm={confirmProjectPlan}
@@ -517,8 +517,6 @@ export function AIPanel({
                 onCancelRevision={cancelProjectPlanRevision}
                 onSubmitRevision={submitProjectPlanRevision}
               />
-
-              <ProjectProgressCard pages={pages} />
             </>
           )}
 

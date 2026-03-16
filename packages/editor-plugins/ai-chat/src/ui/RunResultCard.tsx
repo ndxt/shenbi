@@ -4,7 +4,6 @@ import { useTranslation } from '@shenbi/i18n';
 import type { LastRunResult } from '../hooks/useAgentRun';
 import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
 import { ProjectPlanCard } from './ProjectPlanCard';
-import { ProjectProgressCard } from './ProjectProgressCard';
 
 const MetricsBadge = ({ durationMs, inputTokens, outputTokens }: { durationMs: number | undefined; inputTokens: number | undefined; outputTokens: number | undefined }) => {
   const parts: string[] = [];
@@ -86,6 +85,7 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
 
         <ProjectPlanCard
           projectPlan={loopSummary.projectPlan ?? null}
+          pages={loopSummary.pages}
           phase="done"
           planRevisionRequested={false}
           onConfirm={() => undefined}
@@ -93,7 +93,6 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
           onCancelRevision={() => undefined}
           onSubmitRevision={() => undefined}
         />
-        <ProjectProgressCard pages={loopSummary.pages} />
 
         {(typeof result.durationMs === 'number' || result.debugFile || result.memoryDebugFile) && (
           <div className="text-text-secondary flex flex-col items-center gap-1 opacity-50 pt-1" style={{ fontSize: '10px' }}>
