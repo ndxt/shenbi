@@ -163,18 +163,18 @@ export function ProjectPlanCard({
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
-                className="px-3 py-1.5 rounded-md bg-blue-500 text-white text-[11px] font-semibold inline-flex items-center gap-1.5 shadow-sm"
+                className="h-8 px-3 rounded-md bg-blue-500 text-white text-[12px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm"
                 onClick={onConfirm}
               >
-                <CheckCircle2 size={12} />
+                <CheckCircle2 size={11} />
                 {t('loop.confirmPlan')}
               </button>
               <button
                 type="button"
-                className="px-3 py-1.5 rounded-md border border-border-ide text-text-secondary text-[11px] inline-flex items-center gap-1.5"
+                className="h-8 px-3 rounded-md border border-border-ide text-text-secondary text-[12px] inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
                 onClick={onRequestRevision}
               >
-                <PencilLine size={12} />
+                <PencilLine size={11} />
                 {t('loop.requestRevision')}
               </button>
             </div>
