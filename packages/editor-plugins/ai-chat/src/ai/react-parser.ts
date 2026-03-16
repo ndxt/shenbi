@@ -6,6 +6,12 @@ export interface ParsedReActResponse {
   rawActionInput: string;
 }
 
+const ACTIONS_WITH_OPTIONAL_INPUT = new Set([
+  'listWorkspaceFiles',
+  'getCurrentPageSchema',
+  'getAvailableComponents',
+]);
+
 function stripCodeFence(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   return (fenced?.[1] ?? text).trim();
@@ -67,9 +73,23 @@ function extractFromJSONObject(source: string): ParsedReActResponse | undefined 
     return undefined;
   }
 
+  const status = [
+    object.status,
+    object.Status,
+    object['状态'],
+  ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  const reasoningSummary = [
+    object.reasoningSummary,
+    object.reasoning_summary,
+    object['Reasoning Summary'],
+    object['原因摘要'],
+  ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
   const action = [
     object.action,
     object.Action,
+    object.type,
+    object.Type,
     object.actionName,
     object.action_name,
     object['动作'],
@@ -83,28 +103,31 @@ function extractFromJSONObject(source: string): ParsedReActResponse | undefined 
     object.action_input,
     object.ActionInput,
     object['Action Input'],
+    object.input,
+    object.Input,
+    object.params,
+    object.Params,
+    object.arguments,
+    object.Arguments,
     object['动作输入'],
   ].find((value) => value !== undefined);
   if (actionInputValue === undefined) {
-    return undefined;
+    if (!ACTIONS_WITH_OPTIONAL_INPUT.has(action.trim())) {
+      return undefined;
+    }
+    return {
+      ...(status ? { status } : {}),
+      ...(reasoningSummary ? { reasoningSummary } : {}),
+      action: action.trim(),
+      actionInput: {},
+      rawActionInput: '{}',
+    };
   }
 
   const rawActionInput = getObjectString(actionInputValue);
   if (!rawActionInput) {
     return undefined;
   }
-
-  const status = [
-    object.status,
-    object.Status,
-    object['状态'],
-  ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
-  const reasoningSummary = [
-    object.reasoningSummary,
-    object.reasoning_summary,
-    object['Reasoning Summary'],
-    object['原因摘要'],
-  ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
 
   let actionInput: Record<string, unknown>;
   try {
@@ -134,13 +157,21 @@ export function parseReActResponse(source: string): ParsedReActResponse {
     throw new Error('Missing Action field in ReAct response');
   }
 
-  const rawActionInput = extractActionInputTextFromLabels(normalized);
-  if (!rawActionInput) {
-    throw new Error('Missing Action Input field in ReAct response');
-  }
-
   const status = extractOptionalField(normalized, ['Status', '状态']);
   const reasoningSummary = extractOptionalField(normalized, ['Reasoning Summary', '原因摘要']);
+  const rawActionInput = extractActionInputTextFromLabels(normalized);
+  if (!rawActionInput) {
+    if (ACTIONS_WITH_OPTIONAL_INPUT.has(action.trim())) {
+      return {
+        ...(status ? { status } : {}),
+        ...(reasoningSummary ? { reasoningSummary } : {}),
+        action,
+        actionInput: {},
+        rawActionInput: '{}',
+      };
+    }
+    throw new Error('Missing Action Input field in ReAct response');
+  }
   let actionInput: Record<string, unknown>;
 
   try {

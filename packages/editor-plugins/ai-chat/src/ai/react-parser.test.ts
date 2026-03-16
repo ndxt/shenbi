@@ -97,6 +97,24 @@ describe('parseReActResponse', () => {
       },
       rawActionInput: '{"projectName":"订单管理后台","pages":[{"pageId":"order-detail","pageName":"订单详情","action":"create","description":"订单详情页"}]}',
     });
+
+    expect(parseReActResponse(JSON.stringify({
+      type: 'listWorkspaceFiles',
+    }))).toEqual({
+      action: 'listWorkspaceFiles',
+      actionInput: {},
+      rawActionInput: '{}',
+    });
+
+    expect(parseReActResponse([
+      'Status: 正在检查现有页面',
+      'Action: getAvailableComponents',
+    ].join('\n'))).toEqual({
+      status: '正在检查现有页面',
+      action: 'getAvailableComponents',
+      actionInput: {},
+      rawActionInput: '{}',
+    });
   });
 
   it('throws when action or action input is missing', () => {
