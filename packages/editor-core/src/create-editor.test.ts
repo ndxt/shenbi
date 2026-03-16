@@ -385,6 +385,34 @@ describe('createEditor', () => {
     expect(editor.commands.has('tab.save')).toBe(true);
   });
 
+  it('uses VFS-backed file commands when VFS is configured', async () => {
+    const vfs = createMemoryVFS(createSchema('page-a'));
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      vfs,
+      projectId: 'project-1',
+    });
+
+    const created = await editor.commands.execute('fs.createFile', {
+      parentId: null,
+      name: '订单列表页',
+      fileType: 'page',
+      content: createSchema('订单列表页'),
+    }) as { id: string };
+
+    const files = await editor.commands.execute('file.listSchemas') as FileMetadata[];
+    expect(files.map((file) => file.name)).toContain('订单列表页');
+
+    await editor.commands.execute('file.writeSchema', {
+      fileId: created.id,
+      schema: createSchema('订单列表页-v2'),
+    });
+
+    await expect(editor.commands.execute('file.readSchema', { fileId: created.id })).resolves.toMatchObject({
+      name: '订单列表页-v2',
+    });
+  });
+
   it('tab.save writes VFS content and clears dirty state', async () => {
     const initial = createSchema('vfs-loaded');
     const vfs = createMemoryVFS(initial);

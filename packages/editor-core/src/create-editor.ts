@@ -172,6 +172,45 @@ function extractWriteSchemaArgs(args: unknown): { fileId: string; schema: PageSc
   };
 }
 
+function createVFSFileStorageAdapter(
+  vfs: VirtualFileSystemAdapter,
+  projectId: string,
+): FileStorageAdapter {
+  return {
+    async list() {
+      const nodes = await vfs.listTree(projectId);
+      return nodes
+        .filter((node) => node.type === 'file')
+        .map((node) => ({
+          id: node.id,
+          name: node.name,
+          updatedAt: node.updatedAt,
+          ...(node.size !== undefined ? { size: node.size } : {}),
+        }));
+    },
+    async read(fileId) {
+      return await vfs.readFile(projectId, fileId) as PageSchema;
+    },
+    async write(fileId, schema) {
+      const existingNode = await vfs.getNode(projectId, fileId);
+      if (!existingNode || existingNode.type !== 'file') {
+        throw new Error(`File not found: ${fileId}`);
+      }
+      await vfs.writeFile(projectId, fileId, schema);
+    },
+    async saveAs(name, schema) {
+      const node = await vfs.createFile(projectId, null, name, 'page', {
+        ...schema,
+        name,
+      });
+      return node.id;
+    },
+    async delete(fileId) {
+      await vfs.deleteFile(projectId, fileId);
+    },
+  };
+}
+
 function extractTreeIdFromArgs(args: unknown, commandId: string): string {
   if (!isRecord(args) || typeof args.treeId !== 'string' || args.treeId.trim().length === 0) {
     throw new Error(`${commandId} expects args: { treeId: string, ... }`);
@@ -1046,7 +1085,9 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
   );
   const eventBus = new EventBus<EditorEventMap>();
   const commands = new CommandManager(state, history, eventBus);
-  const fileStorage = options.fileStorage ?? new LocalFileStorageAdapter();
+  const fileStorage = options.vfs && options.projectId
+    ? createVFSFileStorageAdapter(options.vfs, options.projectId)
+    : options.fileStorage ?? new LocalFileStorageAdapter();
 
   registerBuiltinCommands(state, history, commands, eventBus, fileStorage);
 

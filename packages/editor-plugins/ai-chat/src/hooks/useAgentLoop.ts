@@ -415,7 +415,8 @@ export function useAgentLoop(
     }
     const parentSignal = abortControllerRef.current?.signal;
     const timeoutController = createIdleTimeoutSignal(parentSignal);
-    const fileId = await ensureUniqueFileId(input.fileId ?? input.pageId);
+    let fileId = await ensureUniqueFileId(input.fileId ?? input.pageId);
+    let placeholderCreated = false;
     updatePage(page.pageId, (current) => ({
       ...(() => {
         const { error: _error, ...rest } = current;
@@ -447,6 +448,21 @@ export function useAgentLoop(
     let metadata: RunMetadata | undefined;
     const startedAt = Date.now();
     try {
+      const createFileResult = await bridge.execute('fs.createFile', {
+        parentId: null,
+        name: input.pageName,
+        fileType: 'page',
+        content: {
+          id: fileId,
+          name: input.pageName,
+          body: [],
+        },
+      });
+      if (createFileResult.success && createFileResult.data && typeof (createFileResult.data as { id?: unknown }).id === 'string') {
+        fileId = String((createFileResult.data as { id: unknown }).id);
+        placeholderCreated = true;
+      }
+
       for await (const event of aiClient.runStream(request, { signal: timeoutController.signal })) {
         timeoutController.refresh();
         if (event.type === 'plan') {
@@ -497,6 +513,9 @@ export function useAgentLoop(
         : error instanceof Error
           ? error.message
           : String(error);
+      if (placeholderCreated) {
+        await deletePageSchema(fileId).catch(() => undefined);
+      }
       updatePage(page.pageId, (current) => ({
         ...current,
         status: 'failed',
@@ -508,6 +527,9 @@ export function useAgentLoop(
     }
 
     if (!finalSchema) {
+      if (placeholderCreated) {
+        await deletePageSchema(fileId).catch(() => undefined);
+      }
       throw new Error(`createPage did not produce a final schema for ${input.pageName}`);
     }
 
