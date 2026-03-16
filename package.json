@@ -19,9 +19,15 @@
     "test:e2e:preview:crud": "pnpm --filter @shenbi/preview test:e2e:crud",
     "test:e2e:preview:report": "pnpm --filter @shenbi/preview test:e2e:report",
     "test:e2e:preview:install": "pnpm --filter @shenbi/preview test:e2e:install",
-    "demo:ai-agents": "pnpm dlx tsx scripts/ai-agents-demo.ts"
+    "demo:ai-agents": "pnpm dlx tsx scripts/ai-agents-demo.ts",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "test:visual:report": "playwright show-report",
+    "test:visual:install": "playwright install chromium",
+    "dev:visual-preview": "pnpm --filter @shenbi/visual-preview dev"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^22.10.2"
   }
 }

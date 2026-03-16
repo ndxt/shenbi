@@ -1,0 +1,1082 @@
+{
+  "Button": {
+    "props": {
+      "type": { "type": "enum", "enum": ["primary", "default", "dashed", "text", "link"], "default": "default" },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "danger": { "type": "boolean", "default": false },
+      "loading": { "type": "boolean", "default": false },
+      "disabled": { "type": "boolean", "default": false },
+      "block": { "type": "boolean", "default": false },
+      "shape": { "type": "enum", "enum": ["default", "circle", "round"] },
+      "htmlType": { "type": "enum", "enum": ["button", "submit", "reset"], "default": "button" },
+      "icon": { "type": "ReactNode" },
+      "ghost": { "type": "boolean", "default": false },
+      "href": { "type": "string" },
+      "target": { "type": "string" },
+      "title": { "type": "string" }
+    },
+    "events": {
+      "onClick": { "params": [{ "name": "event", "type": "MouseEvent" }] }
+    }
+  },
+  "Input": {
+    "props": {
+      "value": { "type": "string" },
+      "defaultValue": { "type": "string" },
+      "placeholder": { "type": "string" },
+      "allowClear": { "type": "boolean", "default": false },
+      "disabled": { "type": "boolean", "default": false },
+      "maxLength": { "type": "number" },
+      "type": { "type": "enum", "enum": ["text", "password", "search", "email", "number", "url"], "default": "text" },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "prefix": { "type": "ReactNode" },
+      "suffix": { "type": "ReactNode" },
+      "addonBefore": { "type": "ReactNode" },
+      "addonAfter": { "type": "ReactNode" },
+      "showCount": { "type": "boolean", "default": false },
+      "bordered": { "type": "boolean", "default": true }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "event", "type": "ChangeEvent<HTMLInputElement>" }] },
+      "onPressEnter": { "params": [{ "name": "event", "type": "KeyboardEvent" }] },
+      "onFocus": { "params": [{ "name": "event", "type": "FocusEvent" }] },
+      "onBlur": { "params": [{ "name": "event", "type": "FocusEvent" }] }
+    }
+  },
+  "Input.TextArea": {
+    "props": {
+      "value": { "type": "string" },
+      "defaultValue": { "type": "string" },
+      "placeholder": { "type": "string" },
+      "allowClear": { "type": "boolean", "default": false },
+      "disabled": { "type": "boolean", "default": false },
+      "maxLength": { "type": "number" },
+      "autoSize": { "type": "union", "types": ["boolean", "object"] },
+      "showCount": { "type": "boolean", "default": false },
+      "bordered": { "type": "boolean", "default": true }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "event", "type": "ChangeEvent<HTMLTextAreaElement>" }] }
+    }
+  },
+  "InputNumber": {
+    "props": {
+      "value": { "type": "number" },
+      "defaultValue": { "type": "number" },
+      "placeholder": { "type": "string" },
+      "disabled": { "type": "boolean", "default": false },
+      "min": { "type": "number" },
+      "max": { "type": "number" },
+      "step": { "type": "number", "default": 1 },
+      "precision": { "type": "number" },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "bordered": { "type": "boolean", "default": true },
+      "controls": { "type": "boolean", "default": true }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "value", "type": "number" }] }
+    }
+  },
+  "Select": {
+    "props": {
+      "value": { "type": "any" },
+      "defaultValue": { "type": "any" },
+      "placeholder": { "type": "string" },
+      "disabled": { "type": "boolean", "default": false },
+      "mode": { "type": "enum", "enum": ["multiple", "tags"] },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "allowClear": { "type": "boolean", "default": false },
+      "showSearch": { "type": "boolean", "default": false },
+      "filterOption": { "type": "union", "types": ["boolean", "function"] },
+      "options": { "type": "array" },
+      "loading": { "type": "boolean", "default": false },
+      "maxTagCount": { "type": "number" },
+      "bordered": { "type": "boolean", "default": true },
+      "virtual": { "type": "boolean", "default": true }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "value", "type": "any" }] },
+      "onSearch": { "params": [{ "name": "search", "type": "string" }] },
+      "onSelect": { "params": [{ "name": "value", "type": "any" }, { "name": "option", "type": "OptionType" }] },
+      "onDeselect": { "params": [{ "name": "value", "type": "any" }] }
+    }
+  },
+  "Radio": {
+    "props": {
+      "value": { "type": "any" },
+      "checked": { "type": "boolean" },
+      "defaultChecked": { "type": "boolean" },
+      "disabled": { "type": "boolean", "default": false },
+      "name": { "type": "string" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "event", "type": "ChangeEvent" }] }
+    }
+  },
+  "Radio.Group": {
+    "props": {
+      "value": { "type": "any" },
+      "defaultValue": { "type": "any" },
+      "disabled": { "type": "boolean", "default": false },
+      "name": { "type": "string" },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "block": { "type": "boolean", "default": false },
+      "optionType": { "type": "enum", "enum": ["default", "button"] },
+      "buttonStyle": { "type": "enum", "enum": ["outline", "solid"] }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "event", "type": "ChangeEvent" }] }
+    }
+  },
+  "Checkbox": {
+    "props": {
+      "value": { "type": "any" },
+      "checked": { "type": "boolean" },
+      "defaultChecked": { "type": "boolean" },
+      "disabled": { "type": "boolean", "default": false },
+      "indeterminate": { "type": "boolean", "default": false },
+      "name": { "type": "string" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "event", "type": "ChangeEvent" }] }
+    }
+  },
+  "Checkbox.Group": {
+    "props": {
+      "value": { "type": "array" },
+      "defaultValue": { "type": "array" },
+      "disabled": { "type": "boolean", "default": false },
+      "name": { "type": "string" },
+      "options": { "type": "array" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "checkedValues", "type": "array" }] }
+    }
+  },
+  "Switch": {
+    "props": {
+      "checked": { "type": "boolean" },
+      "defaultChecked": { "type": "boolean" },
+      "disabled": { "type": "boolean", "default": false },
+      "size": { "type": "enum", "enum": ["default", "small"] },
+      "loading": { "type": "boolean", "default": false },
+      "checkedChildren": { "type": "ReactNode" },
+      "unCheckedChildren": { "type": "ReactNode" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "checked", "type": "boolean" }] },
+      "onClick": { "params": [{ "name": "checked", "type": "boolean" }] }
+    }
+  },
+  "Slider": {
+    "props": {
+      "value": { "type": "union", "types": ["number", "array"] },
+      "defaultValue": { "type": "union", "types": ["number", "array"] },
+      "min": { "type": "number", "default": 0 },
+      "max": { "type": "number", "default": 100 },
+      "step": { "type": "number", "default": 1 },
+      "disabled": { "type": "boolean", "default": false },
+      "range": { "type": "boolean", "default": false },
+      "vertical": { "type": "boolean", "default": false },
+      "marks": { "type": "object" },
+      "dots": { "type": "boolean", "default": false },
+      "reverse": { "type": "boolean", "default": false },
+      "tooltip": { "type": "object" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "value", "type": "number" }] },
+      "onAfterChange": { "params": [{ "name": "value", "type": "number" }] }
+    }
+  },
+  "Rate": {
+    "props": {
+      "value": { "type": "number" },
+      "defaultValue": { "type": "number" },
+      "disabled": { "type": "boolean", "default": false },
+      "count": { "type": "number", "default": 5 },
+      "allowHalf": { "type": "boolean", "default": false },
+      "allowClear": { "type": "boolean", "default": true },
+      "character": { "type": "ReactNode" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "value", "type": "number" }] }
+    }
+  },
+  "Cascader": {
+    "props": {
+      "value": { "type": "array" },
+      "defaultValue": { "type": "array" },
+      "placeholder": { "type": "string" },
+      "disabled": { "type": "boolean", "default": false },
+      "options": { "type": "array" },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "allowClear": { "type": "boolean", "default": true },
+      "changeOnSelect": { "type": "boolean", "default": false },
+      "showSearch": { "type": "boolean", "default": false },
+      "loading": { "type": "boolean", "default": false },
+      "maxTagCount": { "type": "number" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "value", "type": "array" }] }
+    }
+  },
+  "TreeSelect": {
+    "props": {
+      "value": { "type": "any" },
+      "defaultValue": { "type": "any" },
+      "placeholder": { "type": "string" },
+      "disabled": { "type": "boolean", "default": false },
+      "treeData": { "type": "array" },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "allowClear": { "type": "boolean", "default": false },
+      "showSearch": { "type": "boolean", "default": false },
+      "multiple": { "type": "boolean", "default": false },
+      "loading": { "type": "boolean", "default": false },
+      "treeCheckable": { "type": "boolean", "default": false },
+      "treeDefaultExpandAll": { "type": "boolean", "default": false }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "value", "type": "any" }] }
+    }
+  },
+  "DatePicker": {
+    "props": {
+      "value": { "type": "dayjs.Dayjs" },
+      "defaultValue": { "type": "dayjs.Dayjs" },
+      "placeholder": { "type": "string" },
+      "disabled": { "type": "boolean", "default": false },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "format": { "type": "string" },
+      "showTime": { "type": "boolean", "default": false },
+      "disabledDate": { "type": "function" },
+      "disabledTime": { "type": "function" },
+      "open": { "type": "boolean" },
+      "defaultOpen": { "type": "boolean", "default": false },
+      "bordered": { "type": "boolean", "default": true },
+      "allowClear": { "type": "boolean", "default": true }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "date", "type": "dayjs.Dayjs" }, { "name": "dateString", "type": "string" }] },
+      "onOpenChange": { "params": [{ "name": "open", "type": "boolean" }] }
+    }
+  },
+  "RangePicker": {
+    "props": {
+      "value": { "type": "array" },
+      "defaultValue": { "type": "array" },
+      "placeholder": { "type": "array" },
+      "disabled": { "type": "union", "types": ["boolean", "array"] },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "format": { "type": "string" },
+      "showTime": { "type": "boolean", "default": false },
+      "disabledDate": { "type": "function" },
+      "bordered": { "type": "boolean", "default": true },
+      "allowClear": { "type": "boolean", "default": true }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "dates", "type": "array" }, { "name": "dateStrings", "type": "array" }] }
+    }
+  },
+  "TimePicker": {
+    "props": {
+      "value": { "type": "dayjs.Dayjs" },
+      "defaultValue": { "type": "dayjs.Dayjs" },
+      "placeholder": { "type": "string" },
+      "disabled": { "type": "boolean", "default": false },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "format": { "type": "string" },
+      "disabledTime": { "type": "function" },
+      "bordered": { "type": "boolean", "default": true },
+      "allowClear": { "type": "boolean", "default": true }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "time", "type": "dayjs.Dayjs" }] }
+    }
+  },
+  "Upload": {
+    "props": {
+      "value": { "type": "array" },
+      "defaultFileList": { "type": "array" },
+      "disabled": { "type": "boolean", "default": false },
+      "multiple": { "type": "boolean", "default": false },
+      "maxCount": { "type": "number" },
+      "accept": { "type": "string" },
+      "showUploadList": { "type": "union", "types": ["boolean", "object"] },
+      "listType": { "type": "enum", "enum": ["text", "picture", "picture-card"], "default": "text" },
+      "action": { "type": "string" },
+      "headers": { "type": "object" },
+      "data": { "type": "object" },
+      "withCredentials": { "type": "boolean", "default": false },
+      "beforeUpload": { "type": "function" },
+      "customRequest": { "type": "function" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "info", "type": "UploadChangeParam" }] },
+      "onPreview": { "params": [{ "name": "file", "type": "UploadFile" }] },
+      "onRemove": { "params": [{ "name": "file", "type": "UploadFile" }] }
+    }
+  },
+  "Mentions": {
+    "props": {
+      "value": { "type": "string" },
+      "defaultValue": { "type": "string" },
+      "placeholder": { "type": "string" },
+      "disabled": { "type": "boolean", "default": false },
+      "options": { "type": "array" },
+      "prefix": { "type": "union", "types": ["string", "array"], "default": "@" },
+      "loading": { "type": "boolean", "default": false },
+      "autoSize": { "type": "union", "types": ["boolean", "object"] }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "value", "type": "string" }] },
+      "onSearch": { "params": [{ "name": "search", "type": "string" }] },
+      "onSelect": { "params": [{ "name": "option", "type": "MentionOption" }] }
+    }
+  },
+  "Form": {
+    "props": {
+      "form": { "type": "FormInstance" },
+      "name": { "type": "string" },
+      "layout": { "type": "enum", "enum": ["horizontal", "vertical", "inline"], "default": "horizontal" },
+      "labelCol": { "type": "object" },
+      "wrapperCol": { "type": "object" },
+      "labelAlign": { "type": "enum", "enum": ["left", "right"], "default": "right" },
+      "labelWrap": { "type": "boolean", "default": false },
+      "wrapperAlign": { "type": "enum", "enum": ["left", "right"] },
+      "wrapperWrap": { "type": "boolean", "default": false },
+      "colon": { "type": "boolean", "default": true },
+      "requiredMark": { "type": "union", "types": ["boolean", "enum"], "enum": ["optional", "asterisk"] },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "scrollToFirstError": { "type": "union", "types": ["boolean", "object"] },
+      "validateMessages": { "type": "object" },
+      "variant": { "type": "enum", "enum": ["outlined", "borderless", "filled"], "default": "outlined" },
+      "disabled": { "type": "boolean", "default": false }
+    },
+    "events": {
+      "onFinish": { "params": [{ "name": "values", "type": "object" }] },
+      "onFinishFailed": { "params": [{ "name": "errorInfo", "type": "object" }] },
+      "onValuesChange": { "params": [{ "name": "changedValues", "type": "object" }, { "name": "values", "type": "object" }] }
+    }
+  },
+  "Form.Item": {
+    "props": {
+      "name": { "type": "string" },
+      "label": { "type": "ReactNode" },
+      "labelCol": { "type": "object" },
+      "wrapperCol": { "type": "object" },
+      "labelAlign": { "type": "enum", "enum": ["left", "right"] },
+      "rules": { "type": "array" },
+      "hasFeedback": { "type": "boolean", "default": false },
+      "help": { "type": "ReactNode" },
+      "extra": { "type": "ReactNode" },
+      "validateStatus": { "type": "enum", "enum": ["success", "warning", "error", "validating"] },
+      "colon": { "type": "boolean" },
+      "required": { "type": "boolean", "default": false },
+      "hidden": { "type": "boolean", "default": false },
+      "noStyle": { "type": "boolean", "default": false },
+      "shouldUpdate": { "type": "union", "types": ["boolean", "function"] },
+      "getValueFromEvent": { "type": "function" },
+      "getValueProps": { "type": "function" },
+      "preserve": { "type": "boolean", "default": false },
+      "normalize": { "type": "function" },
+      "trigger": { "type": "string", "default": "onChange" },
+      "valuePropName": { "type": "string", "default": "value" },
+      "messageVariables": { "type": "object" },
+      "id": { "type": "string" },
+      "htmlFor": { "type": "string" }
+    },
+    "events": {}
+  },
+  "Table": {
+    "props": {
+      "dataSource": { "type": "array" },
+      "columns": { "type": "array" },
+      "loading": { "type": "boolean", "default": false },
+      "pagination": { "type": "union", "types": ["boolean", "object"] },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "bordered": { "type": "boolean", "default": false },
+      "rowKey": { "type": "union", "types": ["string", "function"] },
+      "rowSelection": { "type": "object" },
+      "scroll": { "type": "object" },
+      "showHeader": { "type": "boolean", "default": true },
+      "footer": { "type": "function" },
+      "summary": { "type": "function" },
+      "indentSize": { "type": "number" },
+      "expandable": { "type": "object" },
+      "sticky": { "type": "union", "types": ["boolean", "object"] }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "pagination", "type": "TablePaginationConfig" }, { "name": "filters", "type": "Record<string, any>" }, { "name": "sorter", "type": "SorterResult" }] },
+      "onRow": { "params": [{ "name": "record", "type": "any" }, { "name": "index", "type": "number" }] },
+      "onHeaderRow": { "params": [{ "name": "columns", "type": "array" }] }
+    }
+  },
+  "Card": {
+    "props": {
+      "title": { "type": "ReactNode" },
+      "extra": { "type": "ReactNode" },
+      "type": { "type": "enum", "enum": ["inner"] },
+      "size": { "type": "enum", "enum": ["default", "small"] },
+      "loading": { "type": "boolean", "default": false },
+      "bordered": { "type": "boolean", "default": true },
+      "hoverable": { "type": "boolean", "default": false },
+      "cover": { "type": "ReactNode" },
+      "actions": { "type": "array" },
+      "tabList": { "type": "array" },
+      "activeTabKey": { "type": "string" },
+      "defaultActiveTabKey": { "type": "string" }
+    },
+    "events": {
+      "onTabChange": { "params": [{ "name": "activeKey", "type": "string" }] }
+    }
+  },
+  "Modal": {
+    "props": {
+      "open": { "type": "boolean" },
+      "title": { "type": "ReactNode" },
+      "footer": { "type": "ReactNode" },
+      "onOk": { "type": "function" },
+      "onCancel": { "type": "function" },
+      "afterClose": { "type": "function" },
+      "closable": { "type": "boolean", "default": true },
+      "closeIcon": { "type": "ReactNode" },
+      "confirmLoading": { "type": "boolean", "default": false },
+      "centered": { "type": "boolean", "default": false },
+      "width": { "type": "union", "types": ["number", "string"] },
+      "mask": { "type": "boolean", "default": true },
+      "maskClosable": { "type": "boolean", "default": true },
+      "okText": { "type": "string" },
+      "cancelText": { "type": "string" },
+      "okType": { "type": "enum", "enum": ["primary", "danger", "default", "dashed", "text", "link"], "default": "primary" },
+      "okButtonProps": { "type": "object" },
+      "cancelButtonProps": { "type": "object" },
+      "destroyOnClose": { "type": "boolean", "default": false },
+      "forceRender": { "type": "boolean", "default": false },
+      "wrapClassName": { "type": "string" },
+      "maskStyle": { "type": "object" },
+      "bodyStyle": { "type": "object" },
+      "styles": { "type": "object" },
+      "classNames": { "type": "object" }
+    },
+    "events": {}
+  },
+  "Drawer": {
+    "props": {
+      "open": { "type": "boolean" },
+      "title": { "type": "ReactNode" },
+      "onOk": { "type": "function" },
+      "onCancel": { "type": "function" },
+      "afterOpenChange": { "type": "function" },
+      "closable": { "type": "boolean", "default": true },
+      "closeIcon": { "type": "ReactNode" },
+      "width": { "type": "union", "types": ["number", "string"] },
+      "height": { "type": "union", "types": ["number", "string"] },
+      "placement": { "type": "enum", "enum": ["top", "right", "bottom", "left"], "default": "right" },
+      "mask": { "type": "boolean", "default": true },
+      "maskClosable": { "type": "boolean", "default": true },
+      "destroyOnClose": { "type": "boolean", "default": false },
+      "extra": { "type": "ReactNode" },
+      "footer": { "type": "ReactNode" }
+    },
+    "events": {}
+  },
+  "Alert": {
+    "props": {
+      "type": { "type": "enum", "enum": ["success", "info", "warning", "error"], "default": "info" },
+      "message": { "type": "ReactNode" },
+      "description": { "type": "ReactNode" },
+      "showIcon": { "type": "boolean", "default": false },
+      "closable": { "type": "boolean", "default": false },
+      "closeText": { "type": "ReactNode" },
+      "action": { "type": "ReactNode" },
+      "banner": { "type": "boolean", "default": false }
+    },
+    "events": {
+      "onClose": { "params": [{ "name": "event", "type": "MouseEvent" }] }
+    }
+  },
+  "Tabs": {
+    "props": {
+      "activeKey": { "type": "string" },
+      "defaultActiveKey": { "type": "string" },
+      "type": { "type": "enum", "enum": ["line", "card", "editable-card"], "default": "line" },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "animated": { "type": "union", "types": ["boolean", "object"] },
+      "tabPosition": { "type": "enum", "enum": ["top", "right", "bottom", "left"], "default": "top" },
+      "hideAdd": { "type": "boolean", "default": false },
+      "centered": { "type": "boolean", "default": false },
+      "destroyInactiveTabPane": { "type": "boolean", "default": false }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "activeKey", "type": "string" }] },
+      "onEdit": { "params": [{ "name": "targetKey", "type": "string" }, { "name": "action", "type": "string" }] }
+    }
+  },
+  "Tabs.TabPane": {
+    "props": {
+      "tab": { "type": "ReactNode" },
+      "key": { "type": "string" },
+      "disabled": { "type": "boolean", "default": false },
+      "closable": { "type": "boolean" },
+      "forceRender": { "type": "boolean", "default": false }
+    },
+    "events": {}
+  },
+  "Collapse": {
+    "props": {
+      "activeKey": { "type": "union", "types": ["string", "array"] },
+      "defaultActiveKey": { "type": "union", "types": ["string", "array"] },
+      "accordion": { "type": "boolean", "default": false },
+      "bordered": { "type": "boolean", "default": true },
+      "ghost": { "type": "boolean", "default": false },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "expandIcon": { "type": "ReactNode" },
+      "expandIconPosition": { "type": "enum", "enum": ["left", "right"], "default": "left" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "key", "type": "union" }] }
+    }
+  },
+  "Collapse.Panel": {
+    "props": {
+      "key": { "type": "string" },
+      "header": { "type": "ReactNode" },
+      "extra": { "type": "ReactNode" },
+      "disabled": { "type": "boolean", "default": false },
+      "collapsible": { "type": "enum", "enum": ["header", "disabled", "icon", false] },
+      "showArrow": { "type": "boolean", "default": true },
+      "forceRender": { "type": "boolean", "default": false }
+    },
+    "events": {}
+  },
+  "Avatar": {
+    "props": {
+      "src": { "type": "union", "types": ["string", "object"] },
+      "alt": { "type": "string" },
+      "srcSet": { "type": "string" },
+      "icon": { "type": "ReactNode" },
+      "shape": { "type": "enum", "enum": ["circle", "square"], "default": "circle" },
+      "size": { "type": "union", "types": ["enum", "number"], "enum": ["large", "middle", "small"] },
+      "gap": { "type": "number", "default": 4 }
+    },
+    "events": {
+      "onError": { "params": [] }
+    }
+  },
+  "Badge": {
+    "props": {
+      "count": { "type": "union", "types": ["number", "ReactNode"] },
+      "dot": { "type": "boolean", "default": false },
+      "showZero": { "type": "boolean", "default": false },
+      "overflowCount": { "type": "number", "default": 99 },
+      "numberStyle": { "type": "object" },
+      "status": { "type": "enum", "enum": ["success", "processing", "default", "error", "warning"] },
+      "text": { "type": "ReactNode" },
+      "color": { "type": "string" }
+    },
+    "events": {}
+  },
+  "Tag": {
+    "props": {
+      "color": { "type": "string" },
+      "bordered": { "type": "boolean", "default": true },
+      "closable": { "type": "boolean", "default": false },
+      "icon": { "type": "ReactNode" },
+      "size": { "type": "enum", "enum": ["default", "small"] }
+    },
+    "events": {
+      "onClose": { "params": [{ "name": "event", "type": "MouseEvent" }] }
+    }
+  },
+  "CheckableTag": {
+    "props": {
+      "checked": { "type": "boolean" },
+      "onChange": { "type": "function" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "checked", "type": "boolean" }] }
+    }
+  },
+  "Timeline": {
+    "props": {
+      "items": { "type": "array" },
+      "mode": { "type": "enum", "enum": ["left", "alternate", "right"] },
+      "pending": { "type": "ReactNode" },
+      "pendingDot": { "type": "ReactNode" },
+      "reverse": { "type": "boolean", "default": false },
+      "role": { "type": "string", "default": "list" }
+    },
+    "events": {}
+  },
+  "Timeline.Item": {
+    "props": {
+      "color": { "type": "string" },
+      "dot": { "type": "ReactNode" },
+      "position": { "type": "enum", "enum": ["left", "right"] },
+      "label": { "type": "ReactNode" }
+    },
+    "events": {}
+  },
+  "Steps": {
+    "props": {
+      "current": { "type": "number" },
+      "initial": { "type": "number", "default": 0 },
+      "status": { "type": "enum", "enum": ["wait", "process", "finish", "error"], "default": "process" },
+      "size": { "type": "enum", "enum": ["default", "small"] },
+      "direction": { "type": "enum", "enum": ["horizontal", "vertical"], "default": "horizontal" },
+      "labelPlacement": { "type": "enum", "enum": ["horizontal", "vertical"], "default": "horizontal" },
+      "progressDot": { "type": "union", "types": ["boolean", "function"] },
+      "responsive": { "type": "boolean", "default": false }
+    },
+    "events": {}
+  },
+  "Steps.Step": {
+    "props": {
+      "title": { "type": "ReactNode" },
+      "description": { "type": "ReactNode" },
+      "icon": { "type": "ReactNode" },
+      "status": { "type": "enum", "enum": ["wait", "process", "finish", "error"] }
+    },
+    "events": {}
+  },
+  "Breadcrumb": {
+    "props": {
+      "items": { "type": "array" },
+      "separator": { "type": "ReactNode", "default": "/" },
+      "separatorMargin": { "type": "number" },
+      "itemRender": { "type": "function" }
+    },
+    "events": {}
+  },
+  "Breadcrumb.Item": {
+    "props": {
+      "href": { "type": "string" },
+      "overlay": { "type": "Menu" },
+      "disabled": { "type": "boolean", "default": false }
+    },
+    "events": {}
+  },
+  "Dropdown": {
+    "props": {
+      "menu": { "type": "Menu" },
+      "trigger": { "type": "enum", "enum": ["click", "hover", "contextMenu"], "default": "hover" },
+      "placement": { "type": "enum", "enum": ["top", "topLeft", "topRight", "bottom", "bottomLeft", "bottomRight"] },
+      "disabled": { "type": "boolean", "default": false },
+      "overlayClassName": { "type": "string" },
+      "overlayStyle": { "type": "object" },
+      "open": { "type": "boolean" },
+      "defaultOpen": { "type": "boolean" }
+    },
+    "events": {
+      "onOpenChange": { "params": [{ "name": "open", "type": "boolean" }] }
+    }
+  },
+  "Menu": {
+    "props": {
+      "items": { "type": "array" },
+      "mode": { "type": "enum", "enum": ["vertical", "vertical-left", "vertical-right", "horizontal", "inline"], "default": "vertical" },
+      "selectedKeys": { "type": "array" },
+      "defaultSelectedKeys": { "type": "array" },
+      "openKeys": { "type": "array" },
+      "defaultOpenKeys": { "type": "array" },
+      "theme": { "type": "enum", "enum": ["light", "dark"], "default": "light" },
+      "inlineCollapsed": { "type": "boolean" },
+      "inlineIndent": { "type": "number", "default": 24 },
+      "multiple": { "type": "boolean", "default": false },
+      "selectable": { "type": "boolean", "default": true },
+      "disabled": { "type": "boolean", "default": false },
+      "triggerSubMenuAction": { "type": "enum", "enum": ["hover", "click"], "default": "hover" }
+    },
+    "events": {
+      "onClick": { "params": [{ "name": "item", "type": "MenuItemType" }] },
+      "onSelect": { "params": [{ "name": "selectedKeys", "type": "array" }] },
+      "onDeselect": { "params": [{ "name": "selectedKeys", "type": "array" }] },
+      "onOpenChange": { "params": [{ "name": "openKeys", "type": "array" }] }
+    }
+  },
+  "Pagination": {
+    "props": {
+      "current": { "type": "number" },
+      "defaultCurrent": { "type": "number" },
+      "pageSize": { "type": "number" },
+      "defaultPageSize": { "type": "number" },
+      "total": { "type": "number" },
+      "showTotal": { "type": "function" },
+      "showSizeChanger": { "type": "boolean", "default": false },
+      "showQuickJumper": { "type": "boolean", "default": false },
+      "pageSizeOptions": { "type": "array" },
+      "simple": { "type": "boolean", "default": false },
+      "size": { "type": "enum", "enum": ["small", "default"] },
+      "responsive": { "type": "boolean", "default": false },
+      "disabled": { "type": "boolean", "default": false }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "page", "type": "number" }, { "name": "pageSize", "type": "number" }] },
+      "onShowSizeChange": { "params": [{ "name": "current", "type": "number" }, { "name": "size", "type": "number" }] }
+    }
+  },
+  "Anchor": {
+    "props": {
+      "items": { "type": "array" },
+      "affix": { "type": "boolean", "default": true },
+      "bounds": { "type": "number", "default": 0 },
+      "getContainer": { "type": "function" },
+      "offsetTop": { "type": "number" },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "targetOffset": { "type": "number" },
+      "showInkInFixed": { "type": "boolean", "default": false }
+    },
+    "events": {
+      "onClick": { "params": [{ "name": "event", "type": "MouseEvent" }, { "name": "link", "type": "LinkType" }] },
+      "onChange": { "params": [{ "name": "currentActiveLink", "type": "string" }] }
+    }
+  },
+  "Tree": {
+    "props": {
+      "treeData": { "type": "array" },
+      "expandedKeys": { "type": "array" },
+      "selectedKeys": { "type": "array" },
+      "checkedKeys": { "type": "union", "types": ["array", "object"] },
+      "autoExpandParent": { "type": "boolean", "default": true },
+      "checkable": { "type": "boolean", "default": false },
+      "checkStrictly": { "type": "boolean", "default": false },
+      "defaultExpandAll": { "type": "boolean", "default": false },
+      "defaultExpandedKeys": { "type": "array" },
+      "defaultExpandParent": { "type": "boolean", "default": true },
+      "defaultSelectedKeys": { "type": "array" },
+      "defaultCheckedKeys": { "type": "array" },
+      "disabled": { "type": "boolean", "default": false },
+      "draggable": { "type": "union", "types": ["boolean", "function"] },
+      "icon": { "type": "ReactNode" },
+      "loadData": { "type": "function" },
+      "multiple": { "type": "boolean", "default": false },
+      "selectable": { "type": "union", "types": ["boolean", "function"] },
+      "showIcon": { "type": "boolean", "default": true },
+      "showLine": { "type": "union", "types": ["boolean", "object"] },
+      "virtual": { "type": "boolean", "default": true },
+      "height": { "type": "number" }
+    },
+    "events": {
+      "onCheck": { "params": [{ "name": "checked", "type": "union" }] },
+      "onExpand": { "params": [{ "name": "expanded", "type": "array" }] },
+      "onSelect": { "params": [{ "name": "selected", "type": "array" }] },
+      "onRightClick": { "params": [{ "name": "event", "type": "MouseEvent" }] },
+      "onDragStart": { "params": [{ "name": "event", "type": "DragEvent" }] },
+      "onDrop": { "params": [{ "name": "event", "type": "DragEvent" }] }
+    }
+  },
+  "TreeSelect": {
+    "props": {
+      "value": { "type": "any" },
+      "defaultValue": { "type": "any" },
+      "placeholder": { "type": "string" },
+      "disabled": { "type": "boolean", "default": false },
+      "treeData": { "type": "array" },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "allowClear": { "type": "boolean", "default": false },
+      "showSearch": { "type": "boolean", "default": false },
+      "multiple": { "type": "boolean", "default": false },
+      "loading": { "type": "boolean", "default": false },
+      "treeCheckable": { "type": "boolean", "default": false },
+      "treeDefaultExpandAll": { "type": "boolean", "default": false }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "value", "type": "any" }] }
+    }
+  },
+  "Carousel": {
+    "props": {
+      "activeSlideKey": { "type": "string" },
+      "afterChange": { "type": "function" },
+      "autoplay": { "type": "boolean", "default": false },
+      "autoplaySpeed": { "type": "number", "default": 3000 },
+      "beforeChange": { "type": "function" },
+      "dots": { "type": "boolean", "default": true },
+      "dotPosition": { "type": "enum", "enum": ["top", "bottom", "left", "right"], "default": "bottom" },
+      "draggable": { "type": "boolean", "default": false },
+      "easing": { "type": "string", "default": "linear" },
+      "effect": { "type": "enum", "enum": ["scrollx", "fade"], "default": "scrollx" },
+      "infinite": { "type": "boolean", "default": true },
+      "nextArrow": { "type": "ReactNode" },
+      "prevArrow": { "type": "ReactNode" },
+      "pauseOnHover": { "type": "boolean", "default": true },
+      "slidesToScroll": { "type": "number", "default": 1 },
+      "speed": { "type": "number", "default": 500 },
+      "vertical": { "type": "boolean", "default": false }
+    },
+    "events": {}
+  },
+  "Calendar": {
+    "props": {
+      "value": { "type": "dayjs.Dayjs" },
+      "defaultValue": { "type": "dayjs.Dayjs" },
+      "mode": { "type": "enum", "enum": ["month", "year"], "default": "month" },
+      "fullscreen": { "type": "boolean", "default": true },
+      "disabledDate": { "type": "function" },
+      "dateCellRender": { "type": "function" },
+      "monthCellRender": { "type": "function" }
+    },
+    "events": {
+      "onPanelChange": { "params": [{ "name": "date", "type": "dayjs.Dayjs" }, { "name": "mode", "type": "string" }] },
+      "onSelect": { "params": [{ "name": "date", "type": "dayjs.Dayjs" }] },
+      "onChange": { "params": [{ "name": "date", "type": "dayjs.Dayjs" }] }
+    }
+  },
+  "Image": {
+    "props": {
+      "src": { "type": "string" },
+      "alt": { "type": "string" },
+      "fallback": { "type": "string" },
+      "placeholder": { "type": "union", "types": ["string", "ReactNode"] },
+      "height": { "type": "union", "types": ["number", "string"] },
+      "width": { "type": "union", "types": ["number", "string"] },
+      "preview": { "type": "union", "types": ["boolean", "object"] }
+    },
+    "events": {}
+  },
+  "Empty": {
+    "props": {
+      "description": { "type": "ReactNode" },
+      "image": { "type": "union", "types": ["ReactNode", "enum"], "enum": ["EMPTY", "SIMPLE"] },
+      "imageStyle": { "type": "object" }
+    },
+    "events": {}
+  },
+  "Spin": {
+    "props": {
+      "spinning": { "type": "boolean", "default": true },
+      "size": { "type": "enum", "enum": ["small", "default", "large"] },
+      "delay": { "type": "number", "default": 0 },
+      "indicator": { "type": "ReactNode" },
+      "fullscreen": { "type": "boolean", "default": false },
+      "tip": { "type": "string" }
+    },
+    "events": {}
+  },
+  "Skeleton": {
+    "props": {
+      "active": { "type": "boolean", "default": false },
+      "avatar": { "type": "union", "types": ["boolean", "object"] },
+      "title": { "type": "union", "types": ["boolean", "object"] },
+      "paragraph": { "type": "union", "types": ["boolean", "object"] },
+      "loading": { "type": "boolean", "default": true },
+      "block": { "type": "boolean", "default": false }
+    },
+    "events": {}
+  },
+  "Result": {
+    "props": {
+      "status": { "type": "enum", "enum": ["success", "error", "info", "warning", "404", "403", "500"], "default": "info" },
+      "title": { "type": "ReactNode" },
+      "subTitle": { "type": "ReactNode" },
+      "extra": { "type": "ReactNode" },
+      "icon": { "type": "ReactNode" }
+    },
+    "events": {}
+  },
+  "Statistic": {
+    "props": {
+      "value": { "type": "union", "types": ["number", "string"] },
+      "title": { "type": "ReactNode" },
+      "prefix": { "type": "ReactNode" },
+      "suffix": { "type": "ReactNode" },
+      "precision": { "type": "number" },
+      "formatter": { "type": "function" },
+      "decimalSeparator": { "type": "string", "default": "." },
+      "groupSeparator": { "type": "string", "default": "," },
+      "loading": { "type": "boolean", "default": false },
+      "valueStyle": { "type": "object" }
+    },
+    "events": {}
+  },
+  "Progress": {
+    "props": {
+      "type": { "type": "enum", "enum": ["line", "circle", "dashboard"], "default": "line" },
+      "percent": { "type": "number", "default": 0 },
+      "status": { "type": "enum", "enum": ["success", "exception", "normal", "active"], "default": "normal" },
+      "strokeWidth": { "type": "union", "types": ["number", "object"] },
+      "showInfo": { "type": "boolean", "default": true },
+      "strokeColor": { "type": "union", "types": ["string", "object"] },
+      "trailColor": { "type": "string" },
+      "success": { "type": "object" },
+      "successPercent": { "type": "number", "default": 0 },
+      "format": { "type": "function" },
+      "gapDegree": { "type": "number", "default": 75 },
+      "gapPosition": { "type": "enum", "enum": ["top", "right", "bottom", "left"], "default": "top" },
+      "width": { "type": "number", "default": 120 },
+      "steps": { "type": "number" },
+      "size": { "type": "enum", "enum": ["small", "default"] }
+    },
+    "events": {}
+  },
+  "Divider": {
+    "props": {
+      "dashed": { "type": "boolean", "default": false },
+      "orientation": { "type": "enum", "enum": ["left", "right", "center"], "default": "center" },
+      "orientationMargin": { "type": "string" },
+      "plain": { "type": "boolean", "default": false },
+      "type": { "type": "enum", "enum": ["horizontal", "vertical"], "default": "horizontal" },
+      "variant": { "type": "enum", "enum": ["solid", "dashed", "dotted"], "default": "solid" }
+    },
+    "events": {}
+  },
+  "Space": {
+    "props": {
+      "size": { "type": "union", "types": ["enum", "number", "array"], "enum": ["small", "middle", "large"] },
+      "direction": { "type": "enum", "enum": ["vertical", "horizontal"], "default": "horizontal" },
+      "align": { "type": "enum", "enum": ["start", "end", "center", "baseline"] },
+      "wrap": { "type": "boolean", "default": false },
+      "split": { "type": "ReactNode" }
+    },
+    "events": {}
+  },
+  "Row": {
+    "props": {
+      "gutter": { "type": "union", "types": ["number", "object", "array"] },
+      "align": { "type": "enum", "enum": ["top", "middle", "bottom"], "default": "top" },
+      "justify": { "type": "enum", "enum": ["start", "end", "center", "space-around", "space-between", "space-evenly"], "default": "start" },
+      "wrap": { "type": "boolean", "default": true }
+    },
+    "events": {}
+  },
+  "Col": {
+    "props": {
+      "span": { "type": "number", "default": 24 },
+      "order": { "type": "number", "default": 0 },
+      "offset": { "type": "number", "default": 0 },
+      "push": { "type": "number", "default": 0 },
+      "pull": { "type": "number", "default": 0 },
+      "flex": { "type": "union", "types": ["number", "string"] },
+      "xs": { "type": "union", "types": ["number", "object"] },
+      "sm": { "type": "union", "types": ["number", "object"] },
+      "md": { "type": "union", "types": ["number", "object"] },
+      "lg": { "type": "union", "types": ["number", "object"] },
+      "xl": { "type": "union", "types": ["number", "object"] },
+      "xxl": { "type": "union", "types": ["number", "object"] }
+    },
+    "events": {}
+  },
+  "Popconfirm": {
+    "props": {
+      "title": { "type": "ReactNode" },
+      "description": { "type": "ReactNode" },
+      "okText": { "type": "string" },
+      "cancelText": { "type": "string" },
+      "okType": { "type": "enum", "enum": ["primary", "danger", "default", "dashed", "text", "link"], "default": "primary" },
+      "icon": { "type": "ReactNode" },
+      "onConfirm": { "type": "function" },
+      "onCancel": { "type": "function" },
+      "okButtonProps": { "type": "object" },
+      "cancelButtonProps": { "type": "object" },
+      "showCancel": { "type": "boolean", "default": true },
+      "okCancel": { "type": "boolean", "default": true },
+      "disabled": { "type": "boolean", "default": false },
+      "mouseEnterDelay": { "type": "number", "default": 0.1 },
+      "mouseLeaveDelay": { "type": "number", "default": 0.1 }
+    },
+    "events": {}
+  },
+  "Tooltip": {
+    "props": {
+      "title": { "type": "union", "types": ["string", "ReactNode"] },
+      "open": { "type": "boolean" },
+      "defaultOpen": { "type": "boolean" },
+      "placement": { "type": "enum", "enum": ["top", "left", "right", "bottom", "topLeft", "topRight", "bottomLeft", "bottomRight", "leftTop", "leftBottom", "rightTop", "rightBottom"] },
+      "color": { "type": "string" },
+      "trigger": { "type": "enum", "enum": ["hover", "focus", "click", "contextMenu"], "default": "hover" },
+      "mouseEnterDelay": { "type": "number", "default": 0.1 },
+      "mouseLeaveDelay": { "type": "number", "default": 0.1 },
+      "overlayClassName": { "type": "string" },
+      "overlayStyle": { "type": "object" },
+      "arrow": { "type": "union", "types": ["boolean", "object"] }
+    },
+    "events": {
+      "onOpenChange": { "params": [{ "name": "open", "type": "boolean" }] }
+    }
+  },
+  "Popover": {
+    "props": {
+      "content": { "type": "ReactNode" },
+      "title": { "type": "ReactNode" },
+      "open": { "type": "boolean" },
+      "defaultOpen": { "type": "boolean" },
+      "placement": { "type": "enum", "enum": ["top", "left", "right", "bottom", "topLeft", "topRight", "bottomLeft", "bottomRight", "leftTop", "leftBottom", "rightTop", "rightBottom"] },
+      "trigger": { "type": "enum", "enum": ["hover", "focus", "click", "contextMenu"], "default": "hover" },
+      "mouseEnterDelay": { "type": "number", "default": 0.1 },
+      "mouseLeaveDelay": { "type": "number", "default": 0.1 },
+      "overlayClassName": { "type": "string" },
+      "overlayStyle": { "type": "object" },
+      "arrow": { "type": "union", "types": ["boolean", "object"] }
+    },
+    "events": {
+      "onOpenChange": { "params": [{ "name": "open", "type": "boolean" }] }
+    }
+  },
+  "Segmented": {
+    "props": {
+      "options": { "type": "array" },
+      "value": { "type": "union", "types": ["string", "number"] },
+      "defaultValue": { "type": "union", "types": ["string", "number"] },
+      "disabled": { "type": "boolean", "default": false },
+      "block": { "type": "boolean", "default": false },
+      "size": { "type": "enum", "enum": ["large", "middle", "small"] },
+      "type": { "type": "enum", "enum": ["default", "pilled"], "default": "default" }
+    },
+    "events": {
+      "onChange": { "params": [{ "name": "value", "type": "union" }] }
+    }
+  },
+  "QRCode": {
+    "props": {
+      "value": { "type": "string" },
+      "size": { "type": "number", "default": 160 },
+      "level": { "type": "enum", "enum": ["L", "M", "Q", "H"], "default": "M" },
+      "bgColor": { "type": "string", "default": "#ffffff" },
+      "color": { "type": "string", "default": "#000000" },
+      "icon": { "type": "string" },
+      "iconSize": { "type": "number" },
+      "errorCode": { "type": "enum", "enum": [-1, -2], "default": -1 }
+    },
+    "events": {}
+  },
+  "Typography.Text": {
+    "props": {
+      "code": { "type": "boolean", "default": false },
+      "copyable": { "type": "union", "types": ["boolean", "object"] },
+      "delete": { "type": "boolean", "default": false },
+      "disabled": { "type": "boolean", "default": false },
+      "editable": { "type": "union", "types": ["boolean", "object"] },
+      "ellipsis": { "type": "union", "types": ["boolean", "object"] },
+      "italic": { "type": "boolean", "default": false },
+      "keyboard": { "type": "boolean", "default": false },
+      "mark": { "type": "boolean", "default": false },
+      "strong": { "type": "boolean", "default": false },
+      "type": { "type": "enum", "enum": ["secondary", "success", "warning", "danger"] },
+      "underline": { "type": "boolean", "default": false }
+    },
+    "events": {
+      "onCopy": { "params": [] },
+      "onEdit": { "params": [] }
+    }
+  },
+  "Typography.Title": {
+    "props": {
+      "level": { "type": "number", "enum": [1, 2, 3, 4, 5], "default": 1 },
+      "copyable": { "type": "union", "types": ["boolean", "object"] },
+      "editable": { "type": "union", "types": ["boolean", "object"] },
+      "ellipsis": { "type": "union", "types": ["boolean", "object"] },
+      "type": { "type": "enum", "enum": ["secondary", "success", "warning", "danger"] }
+    },
+    "events": {}
+  },
+  "Typography.Paragraph": {
+    "props": {
+      "code": { "type": "boolean", "default": false },
+      "copyable": { "type": "union", "types": ["boolean", "object"] },
+      "editable": { "type": "union", "types": ["boolean", "object"] },
+      "ellipsis": { "type": "union", "types": ["boolean", "object"] },
+      "type": { "type": "enum", "enum": ["secondary", "success", "warning", "danger"] }
+    },
+    "events": {}
+  }
+}
