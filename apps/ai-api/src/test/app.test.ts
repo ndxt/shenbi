@@ -384,6 +384,38 @@ describe('POST /api/ai/debug/client-error', () => {
     expect(json.success).toBe(true);
     expect(json.data.debugFile).toMatch(/\.ai-debug[\\/]+errors[\\/]+/);
   });
+
+  it('is not blocked by the AI request rate limit', async () => {
+    const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+    const app = createApp({
+      runtime: makeRuntime(),
+      rateLimitStore,
+      rateLimitMaxRequests: 1,
+    });
+
+    const runRes = await app.request('/api/ai/run', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-forwarded-for': '9.9.9.9',
+      },
+      body: JSON.stringify(VALID_BODY),
+    });
+    expect(runRes.status).toBe(200);
+
+    const debugRes = await app.request('/api/ai/debug/client-error', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-forwarded-for': '9.9.9.9',
+      },
+      body: JSON.stringify({
+        source: 'agent-loop-react-parse',
+        error: 'debug only',
+      }),
+    });
+    expect(debugRes.status).toBe(200);
+  });
 });
 
 describe('POST /api/ai/run — 503 LLM error', () => {
@@ -412,7 +444,7 @@ describe('POST /api/ai/run — 429 rate limit', () => {
   it('rejects after exceeding limit', async () => {
     // 独立 store 确保测试隔离，不受其他用例影响
     const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
-    const app = createApp({ runtime: makeRuntime(), rateLimitStore });
+    const app = createApp({ runtime: makeRuntime(), rateLimitStore, rateLimitMaxRequests: 10 });
 
     const results: number[] = [];
     for (let i = 0; i < 11; i++) {

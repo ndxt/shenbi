@@ -1,5 +1,5 @@
 /**
- * 基于 IP 的内存限流 — 10 req/min
+ * 基于 IP 的内存限流 — 默认 60 req/min
  * 二期替换为 Redis 限流，支持多实例部署
  */
 import { createMiddleware } from 'hono/factory';
@@ -7,7 +7,7 @@ import { RateLimitError } from '../adapters/errors.ts';
 import { logger } from '../adapters/logger.ts';
 
 export const RATE_LIMIT_WINDOW_MS = 60_000;
-export const RATE_LIMIT_MAX_REQUESTS = 10;
+export const RATE_LIMIT_MAX_REQUESTS = 60;
 
 interface WindowEntry {
   count: number;
