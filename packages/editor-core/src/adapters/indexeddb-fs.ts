@@ -225,7 +225,8 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
 
     await new Promise<void>((resolve, reject) => {
       transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
+      transaction.onerror = () => reject(transaction.error ?? new Error('IndexedDB createFile transaction error'));
+      transaction.onabort = () => reject(transaction.error ?? new Error('IndexedDB createFile transaction aborted'));
     });
 
     return node;

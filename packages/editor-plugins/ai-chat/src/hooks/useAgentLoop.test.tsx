@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createEditor } from '@shenbi/editor-core';
 import type { PluginPersistenceService } from '@shenbi/editor-plugin-api';
 import type { PageSchema } from '@shenbi/schema';
+import type { VirtualFileSystemAdapter } from '@shenbi/editor-core/src/adapters/virtual-fs';
 import { resetAIClient, setAIClient } from '../ai/sse-client';
 import type {
   AIClient,
@@ -26,57 +27,97 @@ function createSchema(id: string, name = id): PageSchema {
   };
 }
 
-interface TestFileMetadata {
-  id: string;
-  name: string;
-  updatedAt: number;
-}
-
-interface TestFileStorageAdapter {
-  list(): Promise<TestFileMetadata[]>;
-  read(fileId: string): Promise<PageSchema>;
-  write(fileId: string, schema: PageSchema): Promise<void>;
-  saveAs(name: string, schema: PageSchema): Promise<string>;
-  delete(fileId: string): Promise<void>;
-}
-
-function createMemoryStorage(initialFiles: Record<string, PageSchema>): TestFileStorageAdapter & { files: Map<string, PageSchema> } {
+function createMemoryVFS(initialFiles: Record<string, PageSchema>): VirtualFileSystemAdapter & { files: Map<string, PageSchema> } {
   const files = new Map<string, PageSchema>(Object.entries(initialFiles));
+  const nodes = new Map(Array.from(files.entries()).map(([id, schema]) => [
+    id,
+    {
+      id,
+      name: schema.name ?? id,
+      type: 'file' as const,
+      fileType: 'page' as const,
+      parentId: null,
+      path: `/${id}.page.json`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      size: JSON.stringify(schema).length,
+    },
+  ]));
+
   return {
     files,
-    async list(): Promise<TestFileMetadata[]> {
-      return Array.from(files.entries()).map(([id, schema]) => ({
-        id,
-        name: schema.name ?? id,
-        updatedAt: Date.now(),
-      }));
+    async initialize() {
+      return undefined;
     },
-    async read(fileId: string): Promise<PageSchema> {
+    async listTree() {
+      return Array.from(nodes.values());
+    },
+    async createFile(_projectId, parentId, name, fileType, content) {
+      const id = `file-${name}-${nodes.size + 1}`;
+      const node = {
+        id,
+        name,
+        type: 'file' as const,
+        fileType,
+        parentId,
+        path: `/${name}.page.json`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        size: JSON.stringify(content).length,
+      };
+      nodes.set(id, node);
+      files.set(id, content as PageSchema);
+      return node;
+    },
+    async readFile(_projectId, fileId) {
       const schema = files.get(fileId);
       if (!schema) {
         throw new Error(`missing file: ${fileId}`);
       }
       return schema;
     },
-    async write(fileId: string, schema: PageSchema): Promise<void> {
+    async writeFile(_projectId, fileId, schema) {
+      if (!files.has(fileId)) {
+        throw new Error(`missing file: ${fileId}`);
+      }
       files.set(fileId, schema);
+      const node = nodes.get(fileId);
+      if (node) {
+        node.updatedAt = Date.now();
+        node.size = JSON.stringify(schema).length;
+      }
     },
-    async saveAs(name: string, schema: PageSchema): Promise<string> {
-      const nextId = `${name}-${files.size + 1}`;
-      files.set(nextId, schema);
-      return nextId;
-    },
-    async delete(fileId: string): Promise<void> {
+    async deleteFile(_projectId, fileId) {
       files.delete(fileId);
+      nodes.delete(fileId);
+    },
+    async createDirectory() {
+      throw new Error('not implemented');
+    },
+    async deleteDirectory() {
+      throw new Error('not implemented');
+    },
+    async rename() {
+      throw new Error('not implemented');
+    },
+    async move() {
+      throw new Error('not implemented');
+    },
+    async getNode(_projectId, nodeId) {
+      return nodes.get(nodeId);
+    },
+    async getNodeByPath() {
+      return undefined;
     },
   };
 }
 
 function createBridge(initialFiles: Record<string, PageSchema> = { current: createSchema('current', 'Current Page') }) {
-  const fileStorage = createMemoryStorage(initialFiles);
+  const vfs = createMemoryVFS(initialFiles);
   const editor = createEditor({
     initialSchema: initialFiles.current ?? createSchema('current', 'Current Page'),
-    fileStorage,
+    vfs,
+    projectId: 'test-project',
   });
   const commandLog: Array<{ commandId: string; args?: unknown }> = [];
 
@@ -107,7 +148,7 @@ function createBridge(initialFiles: Record<string, PageSchema> = { current: crea
   return {
     bridge,
     commandLog,
-    fileStorage,
+    fileStorage: vfs,
   };
 }
 
@@ -304,11 +345,12 @@ describe('useAgentLoop', () => {
     });
     expect(onRunComplete).toHaveBeenCalledTimes(1);
     expect(result.current.phase).toBe('done');
+    const createdFileId = result.current.lastRunResult?.agentLoop?.createdFileIds[0];
+    expect(createdFileId).toBeTruthy();
     expect(result.current.lastRunResult?.agentLoop).toMatchObject({
       projectPlan: {
         projectName: '客服中台',
       },
-      createdFileIds: ['dashboard'],
       traceFile: '.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json',
     });
     expect(result.current.pages).toMatchObject([
@@ -316,7 +358,7 @@ describe('useAgentLoop', () => {
         pageId: 'dashboard',
         pageName: '客服看板',
         status: 'done',
-        fileId: 'dashboard',
+        fileId: createdFileId,
       },
     ]);
     expect(result.current.lastRunResult?.debugFile).toBe('.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json');
@@ -325,7 +367,7 @@ describe('useAgentLoop', () => {
       blockModel: 'block-model',
       intent: 'schema.create',
     });
-    expect(fileStorage.files.get('dashboard')).toMatchObject({
+    expect(fileStorage.files.get(createdFileId!)).toMatchObject({
       name: '客服看板',
     });
     expect(fetchMock).toHaveBeenCalledWith('/api/ai/debug/trace', expect.objectContaining({
@@ -784,5 +826,77 @@ describe('useAgentLoop', () => {
     expect(onError).not.toHaveBeenCalled();
     expect(onDone).toHaveBeenCalled();
     expect(result.current.phase).toBe('done');
+  });
+
+  it('surfaces fs.createFile failures before writing schema', async () => {
+    const { bridge: baseBridge } = createBridge();
+    const bridge: EditorAIBridge = {
+      ...baseBridge,
+      execute: async (commandId, args) => {
+        if (commandId === 'fs.createFile') {
+          return { success: false, error: 'fs.createFile unavailable' };
+        }
+        return baseBridge.execute(commandId, args);
+      },
+    };
+    const persistence = createPersistence();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: { traceFile: '.ai-debug/traces/create-file-error.json' },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new LoopScenarioAIClient([
+      {
+        content: JSON.stringify({
+          action: 'proposeProjectPlan',
+          actionInput: {
+            projectName: '订单管理后台',
+            pages: [
+              { pageId: 'order-list', pageName: '订单列表页', action: 'create', description: '展示订单列表' },
+            ],
+          },
+        }),
+      },
+      {
+        content: JSON.stringify({
+          action: 'createPage',
+          actionInput: { pageId: 'order-list', pageName: '订单列表页', description: '展示订单列表' },
+        }),
+      },
+    ], []);
+    setAIClient(client);
+
+    const onDone = vi.fn();
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
+
+    let runPromise!: Promise<void>;
+    await act(async () => {
+      runPromise = result.current.runAgent(
+        '帮我做一个订单管理后台项目，包含列表页',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-create-file-error',
+        () => 'msg-create-file-error',
+        vi.fn(),
+        onDone,
+        onError,
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.phase).toBe('awaiting_confirmation');
+      expect(result.current.projectPlan?.pages).toHaveLength(1);
+    });
+
+    await act(async () => {
+      result.current.confirmProjectPlan();
+      await runPromise;
+    });
+
+    expect(onDone).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('fs.createFile unavailable'));
   });
 });

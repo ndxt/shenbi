@@ -539,9 +539,23 @@ export function useAgentLoop(
           body: [],
         },
       });
-      if (createFileResult.success && createFileResult.data && typeof (createFileResult.data as { id?: unknown }).id === 'string') {
+      if (!createFileResult.success) {
+        throw new Error(createFileResult.error ?? `Failed to create workspace file for ${input.pageName}`);
+      }
+
+      if (typeof createFileResult.data === 'string' && createFileResult.data.trim()) {
+        fileId = createFileResult.data.trim();
+        placeholderCreated = true;
+      } else if (
+        createFileResult.data
+        && typeof createFileResult.data === 'object'
+        && 'id' in createFileResult.data
+        && typeof (createFileResult.data as { id: unknown }).id === 'string'
+      ) {
         fileId = String((createFileResult.data as { id: unknown }).id);
         placeholderCreated = true;
+      } else {
+        throw new Error(`fs.createFile returned no file id for ${input.pageName}`);
       }
 
       for await (const event of aiClient.runStream(request, { signal: timeoutController.signal })) {
