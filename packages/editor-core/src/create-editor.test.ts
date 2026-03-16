@@ -238,6 +238,21 @@ describe('createEditor', () => {
     expect(editor.history.getSize()).toBe(0);
   });
 
+  it('uses in-memory file storage by default instead of localStorage', async () => {
+    const localStorageRef = globalThis.localStorage;
+    localStorageRef?.removeItem('shenbi-editor-files');
+    const editor = createEditor({
+      initialSchema: createSchema('memory-default'),
+    });
+
+    const fileId = await editor.commands.execute('file.saveAs', { name: '内存页面' });
+    const files = await editor.commands.execute('file.listSchemas') as FileMetadata[];
+
+    expect(fileId).toMatch(/^page-/);
+    expect(files.map((file) => file.name)).toContain('内存页面');
+    expect(localStorageRef?.getItem('shenbi-editor-files') ?? null).toBeNull();
+  });
+
   it('file.listSchemas returns metadata and does not mutate history', async () => {
     const storage = createMemoryStorage(createSchema('demo-page'));
     const editor = createEditor({

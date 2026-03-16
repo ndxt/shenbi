@@ -4,7 +4,7 @@ import { EditorState } from './editor-state';
 import { EventBus } from './event-bus';
 import { History } from './history';
 import type { EditorEventMap, EditorStateSnapshot } from './types';
-import { LocalFileStorageAdapter, type FileStorageAdapter, type FileType } from './adapters/file-storage';
+import { MemoryFileStorageAdapter, type FileStorageAdapter, type FileType } from './adapters/file-storage';
 import type { VirtualFileSystemAdapter } from './adapters/virtual-fs';
 import { TabManager, type TabState } from './tab-manager';
 import {
@@ -1087,7 +1087,7 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
   const commands = new CommandManager(state, history, eventBus);
   const fileStorage = options.vfs && options.projectId
     ? createVFSFileStorageAdapter(options.vfs, options.projectId)
-    : options.fileStorage ?? new LocalFileStorageAdapter();
+    : options.fileStorage ?? new MemoryFileStorageAdapter();
 
   registerBuiltinCommands(state, history, commands, eventBus, fileStorage);
 

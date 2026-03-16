@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PageSchema } from '@shenbi/schema';
 import {
   createEditor,
-  LocalFileStorageAdapter,
+  MemoryFileStorageAdapter,
   type EditorStateSnapshot,
   type FileStorageAdapter,
 } from '@shenbi/editor-core';
@@ -62,7 +62,7 @@ export function useEditorSession(options: UseEditorSessionOptions): UseEditorSes
     } else {
       editorRef.current = createEditor({
         initialSchema: initialShellSchema,
-        fileStorage: fileStorage ?? new LocalFileStorageAdapter(),
+        fileStorage: fileStorage ?? new MemoryFileStorageAdapter(),
       });
     }
   }

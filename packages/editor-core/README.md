@@ -9,7 +9,7 @@
 - `EventBus`
 - `CommandManager`
 - `createEditor(...)`
-- `LocalFileStorageAdapter`
+- `MemoryFileStorageAdapter`
 - schema tree / patch 工具：
   - `buildEditorTree`
   - `getSchemaNodeByTreeId`
