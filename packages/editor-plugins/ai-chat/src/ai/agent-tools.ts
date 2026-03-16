@@ -23,7 +23,7 @@ export interface ToolContext {
   writePageSchema: (fileId: string, schema: PageSchema) => Promise<void>;
   deletePageSchema: (fileId: string) => Promise<void>;
   proposeProjectPlan: (plan: ProjectPlan) => Promise<string>;
-  executeCreatePage: (input: { pageId: string; pageName: string; prompt: string }, page: AgentLoopPageProgress) => Promise<Record<string, unknown>>;
+  executeCreatePage: (input: { pageId: string; pageName: string; prompt: string; fileId?: string }, page: AgentLoopPageProgress) => Promise<Record<string, unknown>>;
   executeModifyPage: (input: { fileId: string; prompt: string; pageName?: string }, page: AgentLoopPageProgress) => Promise<Record<string, unknown>>;
 }
 
@@ -118,6 +118,19 @@ function buildModifyPagePrompt(actionInput: Record<string, unknown>): string {
     parts.push(`交互调整: ${actionInput.interactions.trim()}`);
   }
   return parts.join('\n');
+}
+
+function normalizeBackgroundFileId(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 function createEphemeralBridge(schema: PageSchema): EditorAIBridge {
@@ -272,14 +285,18 @@ export async function executeAgentTool(
         ? actionInput.pageId.trim()
         : typeof actionInput.fileId === 'string' && actionInput.fileId.trim()
           ? actionInput.fileId.trim()
-        : typeof actionInput.name === 'string' && actionInput.name.trim()
-          ? actionInput.name.trim()
+          : typeof actionInput.name === 'string' && actionInput.name.trim()
+            ? actionInput.name.trim()
           : `page-${pageLookup.size + 1}`;
       const pageName = typeof actionInput.pageName === 'string' && actionInput.pageName.trim()
         ? actionInput.pageName.trim()
         : typeof actionInput.name === 'string' && actionInput.name.trim()
           ? actionInput.name.trim()
           : pageId;
+      const fileId = normalizeBackgroundFileId(pageName)
+        ?? normalizeBackgroundFileId(typeof actionInput.fileId === 'string' ? actionInput.fileId : undefined)
+        ?? normalizeBackgroundFileId(pageId)
+        ?? `页面-${pageLookup.size + 1}`;
       const prompt = buildCreatePagePrompt(actionInput, pageName);
       const page = pageLookup.get(pageId) ?? {
         pageId,
@@ -289,7 +306,7 @@ export async function executeAgentTool(
         status: 'waiting',
         blocks: [] as AgentLoopBlockProgress[],
       };
-      return context.executeCreatePage({ pageId, pageName, prompt }, page);
+      return context.executeCreatePage({ pageId, pageName, prompt, fileId }, page);
     }
     case 'modifyPage': {
       const fileId = typeof actionInput.fileId === 'string' ? actionInput.fileId.trim() : '';

@@ -12,11 +12,9 @@ import { useChatSession } from '../hooks/useChatSession';
 import { useAgentLoop } from '../hooks/useAgentLoop';
 import { ChatMessageList } from './ChatMessageList';
 import { ChatInput, type PromptOption } from './ChatInput';
-import { LoopTraceViewer } from './LoopTraceViewer';
 import { ModelSelector } from './ModelSelector';
 import { ProjectPlanCard } from './ProjectPlanCard';
 import { ProjectProgressCard } from './ProjectProgressCard';
-import { ReActStepList } from './ReActStepList';
 
 export interface AIPanelProps {
   bridge?: EditorAIBridge;
@@ -85,7 +83,6 @@ export function AIPanel({
     isRunning,
     progressText,
     elapsedMs,
-    steps,
     projectPlan,
     pages,
     errorMessage,
@@ -522,8 +519,6 @@ export function AIPanel({
               />
 
               <ProjectProgressCard pages={pages} />
-              <ReActStepList steps={steps} isRunning={isRunning} />
-              <LoopTraceViewer steps={steps} />
             </>
           )}
 

@@ -171,6 +171,16 @@ describe('useAgentLoop', () => {
   it('plans a project, waits for confirmation, creates a page in background, and completes with loop summary', async () => {
     const { bridge, commandLog, fileStorage } = createBridge();
     const persistence = createPersistence();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: {
+        traceFile: '.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json',
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
     const client = new LoopScenarioAIClient([
       {
         content: [
@@ -298,24 +308,29 @@ describe('useAgentLoop', () => {
       projectPlan: {
         projectName: '客服中台',
       },
-      createdFileIds: ['dashboard'],
+      createdFileIds: ['客服看板'],
+      traceFile: '.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json',
     });
     expect(result.current.pages).toMatchObject([
       {
         pageId: 'dashboard',
         pageName: '客服看板',
         status: 'done',
-        fileId: 'dashboard',
+        fileId: '客服看板',
       },
     ]);
+    expect(result.current.lastRunResult?.debugFile).toBe('.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json');
     expect(client.runRequests[0]).toMatchObject({
       plannerModel: 'planner-model',
       blockModel: 'block-model',
       intent: 'schema.create',
     });
-    expect(fileStorage.files.get('dashboard')).toMatchObject({
+    expect(fileStorage.files.get('客服看板')).toMatchObject({
       name: '客服看板',
     });
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/debug/trace', expect.objectContaining({
+      method: 'POST',
+    }));
     expect(commandLog.map((entry) => entry.commandId)).toContain('file.writeSchema');
     expect(commandLog.map((entry) => entry.commandId)).toContain('file.openSchema');
     expect(persistence.remove).toHaveBeenCalledWith('ai-chat', 'agent-loop-state');

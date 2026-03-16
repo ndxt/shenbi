@@ -3,10 +3,8 @@ import { CheckCircle2 } from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
 import type { LastRunResult } from '../hooks/useAgentRun';
 import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
-import { LoopTraceViewer } from './LoopTraceViewer';
 import { ProjectPlanCard } from './ProjectPlanCard';
 import { ProjectProgressCard } from './ProjectProgressCard';
-import { ReActStepList } from './ReActStepList';
 
 const MetricsBadge = ({ durationMs, inputTokens, outputTokens }: { durationMs: number | undefined; inputTokens: number | undefined; outputTokens: number | undefined }) => {
   const parts: string[] = [];
@@ -96,13 +94,16 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
           onSubmitRevision={() => undefined}
         />
         <ProjectProgressCard pages={loopSummary.pages} />
-        <ReActStepList steps={loopSummary.trace} />
-        <LoopTraceViewer steps={loopSummary.trace} />
 
-        {(typeof result.durationMs === 'number' || result.memoryDebugFile) && (
+        {(typeof result.durationMs === 'number' || result.debugFile || result.memoryDebugFile) && (
           <div className="text-text-secondary flex flex-col items-center gap-1 opacity-50 pt-1" style={{ fontSize: '10px' }}>
             {typeof result.durationMs === 'number' && (
               <span>{t('result.duration')}: {result.durationMs}ms</span>
+            )}
+            {result.debugFile && (
+              <span className="font-mono break-all text-center">
+                {getDebugFileLabel(result.debugFile)}: {result.debugFile}
+              </span>
             )}
             {result.memoryDebugFile && (
               <span className="font-mono break-all text-center">{t('result.memoryDump')}: {result.memoryDebugFile}</span>

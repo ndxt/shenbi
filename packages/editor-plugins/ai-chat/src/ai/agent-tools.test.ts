@@ -62,7 +62,7 @@ describe('executeAgentTool', () => {
   });
 
   it('normalizes structured createPage input into a concrete page id and prompt', async () => {
-    const executeCreatePage = vi.fn(async () => ({ fileId: 'order-list-page', success: true }));
+    const executeCreatePage = vi.fn(async () => ({ fileId: '订单列表页', success: true }));
     await executeAgentTool(
       createContext({ executeCreatePage }),
       'createPage',
@@ -81,6 +81,7 @@ describe('executeAgentTool', () => {
     expect(executeCreatePage).toHaveBeenCalledWith({
       pageId: 'order-list-page',
       pageName: '订单列表页',
+      fileId: '订单列表页',
       prompt: [
         '订单列表页 页面',
         '目标: 展示订单列表和筛选条件',

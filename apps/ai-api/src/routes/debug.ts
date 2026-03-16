@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { writeErrorDump } from '../adapters/debug-dump.ts';
+import { writeErrorDump, writeTraceDump } from '../adapters/debug-dump.ts';
 
 export function createDebugRoute(): Hono {
   const app = new Hono();
@@ -26,6 +26,28 @@ export function createDebugRoute(): Hono {
       success: true,
       data: {
         debugFile,
+      },
+    });
+  });
+
+  app.post('/trace', async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const status = body && typeof body === 'object' && (body as { status?: unknown }).status === 'error'
+      ? 'error'
+      : 'success';
+    const trace = body && typeof body === 'object' && 'trace' in body
+      ? (body as { trace?: unknown }).trace
+      : body;
+
+    const traceFile = writeTraceDump({
+      status,
+      trace,
+    });
+
+    return c.json({
+      success: true,
+      data: {
+        traceFile,
       },
     });
   });

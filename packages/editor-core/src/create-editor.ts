@@ -557,6 +557,7 @@ function registerBuiltinCommands(
       const { fileId, schema } = extractWriteSchemaArgs(args);
       await fileStorage.write(fileId, schema);
       eventBus.emit('file:saved', { fileId, source: 'auto' });
+      eventBus.emit('fs:treeChanged', undefined);
     },
   });
 

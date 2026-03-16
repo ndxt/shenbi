@@ -269,14 +269,16 @@ describe('createEditor', () => {
     expect(editor.history.getSize()).toBe(0);
   });
 
-  it('file.writeSchema writes schema without mutating editor state and emits auto file:saved', async () => {
+  it('file.writeSchema writes schema without mutating editor state and emits auto file:saved plus fs:treeChanged', async () => {
     const storage = createMemoryStorage();
     const editor = createEditor({
       initialSchema: createSchema('current-page'),
       fileStorage: storage,
     });
     const saved = vi.fn();
+    const treeChanged = vi.fn();
     editor.eventBus.on('file:saved', saved);
+    editor.eventBus.on('fs:treeChanged', treeChanged);
     const backgroundSchema = createSchema('background-page');
 
     await editor.commands.execute('file.writeSchema', {
@@ -289,6 +291,7 @@ describe('createEditor', () => {
     expect(editor.state.getCurrentFileId()).toBeUndefined();
     expect(editor.history.getSize()).toBe(0);
     expect(saved).toHaveBeenCalledWith({ fileId: 'background', source: 'auto' });
+    expect(treeChanged).toHaveBeenCalled();
   });
 
   it('trims file command args for fileId/name', async () => {

@@ -136,6 +136,31 @@ async function writeAgentLoopDebugDump(payload: Record<string, unknown>): Promis
   }
 }
 
+async function writeAgentLoopTraceDump(
+  status: 'success' | 'error',
+  trace: Record<string, unknown>,
+): Promise<string | undefined> {
+  try {
+    const response = await fetch('/api/ai/debug/trace', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        status,
+        trace,
+      }),
+    });
+    if (!response.ok) {
+      return undefined;
+    }
+    const json = await response.json() as { data?: { traceFile?: string } };
+    return json.data?.traceFile;
+  } catch {
+    return undefined;
+  }
+}
+
 function createLoopRunResult(summary: AgentLoopResultSummary, elapsedMs: number): LastRunResult {
   const completed = summary.pages.filter((page) => page.status === 'done').length;
   return {
@@ -154,6 +179,7 @@ function createLoopRunResult(summary: AgentLoopResultSummary, elapsedMs: number)
       ? `${summary.projectPlan.projectName}: ${completed}/${summary.pages.length} pages completed`
       : `Agent Loop completed: ${completed}/${summary.pages.length}`,
     didApplySchema: summary.createdFileIds.length > 0 || summary.pages.some((page) => page.action === 'modify' && page.status === 'done'),
+    ...(summary.traceFile ? { debugFile: summary.traceFile } : {}),
     agentLoop: summary,
   };
 }
@@ -381,7 +407,7 @@ export function useAgentLoop(
   }, [listWorkspaceFiles]);
 
   const executeCreatePage = useCallback(async (
-    input: { pageId: string; pageName: string; prompt: string },
+    input: { pageId: string; pageName: string; prompt: string; fileId?: string },
     page: AgentLoopPageProgress,
   ) => {
     if (!bridge) {
@@ -389,7 +415,7 @@ export function useAgentLoop(
     }
     const parentSignal = abortControllerRef.current?.signal;
     const timeoutController = createIdleTimeoutSignal(parentSignal);
-    const fileId = await ensureUniqueFileId(input.pageId);
+    const fileId = await ensureUniqueFileId(input.fileId ?? input.pageId);
     updatePage(page.pageId, (current) => ({
       ...(() => {
         const { error: _error, ...rest } = current;
@@ -639,15 +665,29 @@ export function useAgentLoop(
   }, [persistLoopState]);
 
   const finalizeLoop = useCallback(async (summary: AgentLoopResultSummary) => {
+    const traceFile = await writeAgentLoopTraceDump('success', {
+      ...(summary.projectPlan ? { projectPlan: summary.projectPlan } : {}),
+      pages: summary.pages,
+      createdFileIds: summary.createdFileIds,
+      trace: summary.trace,
+      ...(summary.loopState ? { loopState: summary.loopState } : {}),
+    });
+    const finalizedSummary = traceFile
+      ? {
+          ...summary,
+          traceFile,
+        }
+      : summary;
     setPhase('done');
     setProgressText('Agent Loop 已完成');
     setIsLoopRunning(false);
     setErrorMessage(undefined);
-    setLastRunResult(createLoopRunResult(summary, Date.now() - startTimeRef.current));
-    if (summary.createdFileIds.length > 0 && bridge) {
-      await bridge.execute('file.openSchema', { fileId: summary.createdFileIds[0] });
+    setLastRunResult(createLoopRunResult(finalizedSummary, Date.now() - startTimeRef.current));
+    if (finalizedSummary.createdFileIds.length > 0 && bridge) {
+      await bridge.execute('file.openSchema', { fileId: finalizedSummary.createdFileIds[0] });
     }
     await clearPersistedLoopState();
+    return finalizedSummary;
   }, [bridge, clearPersistedLoopState]);
 
   const cancelRun = useCallback(async () => {
@@ -910,12 +950,12 @@ export function useAgentLoop(
             createdFileIds: loopStateRef.current?.createdFileIds ?? [],
             ...(loopStateRef.current ? { loopState: loopStateRef.current } : {}),
           };
-          await finalizeLoop(summary);
+          const finalizedSummary = await finalizeLoop(summary);
           onDone({
             sessionId: currentConversationId,
             conversationId: currentConversationId,
           });
-          onRunComplete?.(createLoopRunResult(summary, Date.now() - startTimeRef.current));
+          onRunComplete?.(createLoopRunResult(finalizedSummary, Date.now() - startTimeRef.current));
           return;
         }
 
@@ -927,9 +967,20 @@ export function useAgentLoop(
 
       throw new Error(`Agent Loop exceeded ${MAX_LOOP_ITERATIONS} iterations`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      let message = error instanceof Error ? error.message : String(error);
       tracerRef.current?.updateLastError(message);
       const failedSteps = tracerRef.current?.snapshot() ?? [];
+      const traceFile = await writeAgentLoopTraceDump('error', {
+        error: message,
+        ...(projectPlanRef.current ? { projectPlan: projectPlanRef.current } : {}),
+        pages: Array.from(pageLookupRef.current.values()),
+        trace: failedSteps,
+        messages: loopMessagesRef.current,
+        ...(loopStateRef.current ? { loopState: loopStateRef.current } : {}),
+      });
+      if (traceFile && !message.includes(traceFile)) {
+        message = `${message}. Debug file: ${traceFile}`;
+      }
       stepsRef.current = failedSteps;
       setSteps(failedSteps);
       setIsLoopRunning(false);

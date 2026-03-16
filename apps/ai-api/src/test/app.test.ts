@@ -416,6 +416,32 @@ describe('POST /api/ai/debug/client-error', () => {
     });
     expect(debugRes.status).toBe(200);
   });
+
+  it('writes a trace dump and returns the trace file path', async () => {
+    const app = createApp({ runtime: makeRuntime() });
+    const res = await app.request('/api/ai/debug/trace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'success',
+        trace: {
+          steps: [
+            { action: 'listWorkspaceFiles' },
+          ],
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json() as {
+      success: boolean;
+      data: {
+        traceFile: string;
+      };
+    };
+    expect(json.success).toBe(true);
+    expect(json.data.traceFile).toMatch(/\.ai-debug[\\/]+traces[\\/]+/);
+  });
 });
 
 describe('POST /api/ai/run — 503 LLM error', () => {
