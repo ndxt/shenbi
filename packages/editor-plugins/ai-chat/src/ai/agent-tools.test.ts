@@ -3,20 +3,22 @@ import { buildAgentLoopSystemPrompt, executeAgentTool, type ToolContext } from '
 import type { AgentLoopPageProgress } from './agent-loop-types';
 
 describe('buildAgentLoopSystemPrompt', () => {
-  it('emphasizes strict plain-text protocol and forbids common wrapper formats', () => {
+  it('keeps the loop protocol short, strict, and execution-oriented', () => {
     const prompt = buildAgentLoopSystemPrompt();
 
-    expect(prompt).toContain('你的回复会被程序直接解析');
-    expect(prompt).toContain('不要返回 JSON 包装对象');
-    expect(prompt).toContain('不要输出 reasoning、thought、answer、type、content、output、input、params、arguments 等包装字段');
-    expect(prompt).toContain('如果工具没有参数，也必须输出 Action Input: {}');
-    expect(prompt).toContain('{"type":"listWorkspaceFiles"}');
-    expect(prompt).toContain('{"reasoning":"...","answer":"Action: listWorkspaceFiles\\nAction Input: {}"}');
-    expect(prompt).toContain('proposeProjectPlan 的 Action Input 必须包含 projectName 和 pages，pages 不能为空');
-    expect(prompt).toContain('多页面需求必须先 proposeProjectPlan');
+    expect(prompt).toContain('你是 Shenbi 低代码平台的 Agent。你只能通过工具推进任务。');
+    expect(prompt).toContain('每次回复必须严格使用以下纯文本格式之一');
+    expect(prompt).toContain('Action: <tool-name>');
+    expect(prompt).toContain('Action Input: <json object>');
+    expect(prompt).toContain('无参工具也必须写空对象');
     expect(prompt).toContain('Observation: []');
     expect(prompt).toContain('Action: proposeProjectPlan');
     expect(prompt).toContain('"projectName":"订单管理后台"');
+    expect(prompt).toContain('Observation: 用户已确认项目规划');
+    expect(prompt).toContain('Action: createPage');
+    expect(prompt).toContain('项目规划一旦确认，后续按已确认计划继续执行');
+    expect(prompt).toContain('不要重复输出 Observation');
+    expect(prompt).not.toContain('错误示例');
   });
 });
 
