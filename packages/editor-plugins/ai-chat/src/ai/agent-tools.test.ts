@@ -14,6 +14,9 @@ describe('buildAgentLoopSystemPrompt', () => {
     expect(prompt).toContain('{"reasoning":"...","answer":"Action: listWorkspaceFiles\\nAction Input: {}"}');
     expect(prompt).toContain('proposeProjectPlan 的 Action Input 必须包含 projectName 和 pages，pages 不能为空');
     expect(prompt).toContain('多页面需求必须先 proposeProjectPlan');
+    expect(prompt).toContain('Observation: []');
+    expect(prompt).toContain('Action: proposeProjectPlan');
+    expect(prompt).toContain('"projectName":"订单管理后台"');
   });
 });
 

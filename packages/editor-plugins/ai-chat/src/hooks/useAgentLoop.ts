@@ -176,6 +176,15 @@ function buildReActRepairPrompt(errorMessage: string, invalidResponse: string): 
   ].join('\n');
 }
 
+function formatParsedReActMessage(parsed: ParsedReActResponse): string {
+  return [
+    ...(parsed.status ? [`Status: ${parsed.status}`] : []),
+    ...(parsed.reasoningSummary ? [`Reasoning Summary: ${parsed.reasoningSummary}`] : []),
+    `Action: ${parsed.action}`,
+    `Action Input: ${parsed.rawActionInput}`,
+  ].join('\n');
+}
+
 function createLoopRunResult(summary: AgentLoopResultSummary, elapsedMs: number): LastRunResult {
   const completed = summary.pages.filter((page) => page.status === 'done').length;
   return {
@@ -881,10 +890,6 @@ export function useAgentLoop(
           messages: compactMessages(loopMessagesRef.current),
           thinking: { type: thinkingEnabled ? 'enabled' : 'disabled' },
         });
-        loopMessagesRef.current = [
-          ...loopMessagesRef.current,
-          { role: 'assistant', content: response.content },
-        ];
 
         let parsed: ParsedReActResponse;
         let parseSource = response.content;
@@ -892,26 +897,20 @@ export function useAgentLoop(
           parsed = parseReActResponse(parseSource);
         } catch (error) {
           const initialError = error instanceof Error ? error.message : String(error);
+          const repairPrompt = buildReActRepairPrompt(initialError, response.content);
           try {
             const repairResponse = await aiClient.chat({
               model: plannerModel,
               messages: compactMessages([
                 ...loopMessagesRef.current,
+                { role: 'assistant', content: response.content },
                 {
                   role: 'user',
-                  content: buildReActRepairPrompt(initialError, response.content),
+                  content: repairPrompt,
                 },
               ]),
               thinking: { type: 'disabled' },
             });
-            loopMessagesRef.current = [
-              ...loopMessagesRef.current,
-              {
-                role: 'user',
-                content: buildReActRepairPrompt(initialError, response.content),
-              },
-              { role: 'assistant', content: repairResponse.content },
-            ];
             parseSource = repairResponse.content;
             parsed = parseReActResponse(parseSource);
           } catch (repairError) {
@@ -933,6 +932,11 @@ export function useAgentLoop(
             throw repairError;
           }
         }
+
+        loopMessagesRef.current = [
+          ...loopMessagesRef.current,
+          { role: 'assistant', content: formatParsedReActMessage(parsed) },
+        ];
 
         const step = tracerRef.current?.addStep({
           ...(parsed.status ? { status: parsed.status } : {}),

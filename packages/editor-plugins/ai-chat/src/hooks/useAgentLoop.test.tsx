@@ -473,6 +473,80 @@ describe('useAgentLoop', () => {
     });
   });
 
+  it('normalizes parsed assistant actions before sending the next loop turn', async () => {
+    const { bridge } = createBridge();
+    const persistence = createPersistence();
+    const client = new LoopScenarioAIClient([
+      {
+        content: JSON.stringify({
+          reasoning: '先查看工作区文件。',
+          action: 'listWorkspaceFiles',
+          action_input: {},
+        }, null, 2),
+      },
+      {
+        content: [
+          'Action: proposeProjectPlan',
+          `Action Input: ${JSON.stringify({
+            projectName: '订单管理后台',
+            pages: [
+              {
+                pageId: 'order-list',
+                pageName: '订单列表页',
+                action: 'create',
+                description: '展示订单列表、筛选和分页',
+              },
+            ],
+          })}`,
+        ].join('\n'),
+      },
+      {
+        content: 'Action: finish\nAction Input: {"summary":"项目完成"}',
+      },
+    ], []);
+    setAIClient(client);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: {
+        traceFile: '.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json',
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+
+    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
+
+    let runPromise!: Promise<void>;
+    await act(async () => {
+      runPromise = result.current.runAgent(
+        '帮我做一个订单管理后台项目，包含列表页、详情页、创建页',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-normalized-history',
+        () => 'message-normalized-history',
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.phase).toBe('awaiting_confirmation');
+    });
+
+    expect(client.chatRequests[1]?.messages.at(-2)).toMatchObject({
+      role: 'assistant',
+      content: 'Action: listWorkspaceFiles\nAction Input: {}',
+    });
+
+    await act(async () => {
+      result.current.confirmProjectPlan();
+      await runPromise;
+    });
+  });
+
   it('writes a debug dump when ReAct parsing fails', async () => {
     const { bridge } = createBridge();
     const persistence = createPersistence();
