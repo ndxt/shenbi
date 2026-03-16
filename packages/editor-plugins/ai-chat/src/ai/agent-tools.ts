@@ -181,49 +181,37 @@ export function buildAgentLoopSystemPrompt(): string {
     .join('\n');
   return [
     '你是 Shenbi 低代码平台的 Agent。你只能通过工具推进任务。',
-    '你的回复会被程序直接解析。只输出合法协议，不要输出额外包装。',
+    '你的回复会被程序直接 JSON.parse。必须输出合法 JSON 对象，不要输出额外文字。',
     '',
     '## 可用工具',
     tools,
     '',
     '## 回复协议',
-    '每次回复必须严格使用以下纯文本格式之一：',
+    '每次回复必须是一个 JSON 对象，包含以下字段：',
     '',
-    'Action: <tool-name>',
-    'Action Input: <json object>',
+    '必填字段：',
+    '- "action": 工具名称（必须从上面的可用工具中选择）',
+    '- "actionInput": 工具参数（JSON 对象，无参工具写 {}）',
     '',
-    '或：',
-    'Status: <一句简短状态说明>',
-    'Action: <tool-name>',
-    'Action Input: <json object>',
-    '',
-    '或：',
-    'Reasoning Summary: <一句简短原因说明>',
-    'Action: <tool-name>',
-    'Action Input: <json object>',
-    '',
-    '无参工具也必须写空对象。',
+    '可选字段（最多选一个）：',
+    '- "status": 一句简短状态说明',
+    '- "reasoningSummary": 一句简短原因说明',
     '',
     '## 正确示例',
-    'Action: listWorkspaceFiles',
-    'Action Input: {}',
+    '{"action":"listWorkspaceFiles","actionInput":{}}',
     '',
-    'Observation: []',
-    'Action: proposeProjectPlan',
-    'Action Input: {"projectName":"订单管理后台","pages":[{"pageId":"order-list","pageName":"订单列表页","action":"create","description":"展示订单列表、筛选和分页"},{"pageId":"order-detail","pageName":"订单详情页","action":"create","description":"展示订单基础信息、商品明细和物流信息"},{"pageId":"order-create","pageName":"创建订单页","action":"create","description":"提供创建订单表单，包含客户、商品、数量和收货信息"}]}',
+    '{"reasoningSummary":"根据用户需求规划项目","action":"proposeProjectPlan","actionInput":{"projectName":"订单管理后台","pages":[{"pageId":"order-list","pageName":"订单列表页","action":"create","description":"展示订单列表、筛选和分页"},{"pageId":"order-detail","pageName":"订单详情页","action":"create","description":"展示订单基础信息、商品明细和物流信息"},{"pageId":"order-create","pageName":"创建订单页","action":"create","description":"提供创建订单表单，包含客户、商品、数量和收货信息"}]}}',
     '',
-    'Observation: 用户已确认项目规划',
-    'Action: createPage',
-    'Action Input: {"pageId":"order-list","pageName":"订单列表页","description":"展示订单列表、筛选和分页"}',
+    '{"action":"createPage","actionInput":{"pageId":"order-list","pageName":"订单列表页","description":"展示订单列表、筛选和分页"}}',
     '',
     '## 规则',
-    '1. 每次只调用一个工具。',
-    '2. 不要返回 JSON 包装对象，不要返回 Markdown 代码块，不要重复输出 Observation。',
-    '3. 只允许输出 Status 或 Reasoning Summary 这两个可选字段；除此之外不要输出解释文字。',
-    '4. Action 必须从上面的可用工具中选择，Action Input 必须是合法 JSON 对象。',
-    '5. 多页面需求必须先 proposeProjectPlan。proposeProjectPlan 的 Action Input 必须包含 projectName 和非空 pages。',
+    '1. 每次只调用一个工具，输出一个 JSON 对象。',
+    '2. 不要返回数组、字符串、数字等非对象类型。不要返回 Markdown 代码块。',
+    '3. 除 status 和 reasoningSummary 外不要输出其他解释字段。',
+    '4. action 必须从上面的可用工具中选择，actionInput 必须是合法 JSON 对象。',
+    '5. 多页面需求必须先 proposeProjectPlan。proposeProjectPlan 的 actionInput 必须包含 projectName 和非空 pages。',
     '6. 项目规划一旦确认，后续按已确认计划继续执行，不要重新规划，不要回显文件元数据或 Observation 内容。',
-    '7. createPage / modifyPage 的 Action Input 必须包含 pageId 或 fileId、pageName，以及足够具体的 description 或 prompt。',
+    '7. createPage / modifyPage 的 actionInput 必须包含 pageId 或 fileId、pageName，以及足够具体的 description 或 prompt。',
     '8. 所有计划页面完成后，直接 finish。',
   ].join('\n');
 }
@@ -279,9 +267,9 @@ export async function executeAgentTool(
         : typeof actionInput.name === 'string' && actionInput.name.trim()
           ? actionInput.name.trim()
           : pageId;
-      const fileId = normalizeBackgroundFileId(pageName)
+      const fileId = normalizeBackgroundFileId(pageId)
         ?? normalizeBackgroundFileId(typeof actionInput.fileId === 'string' ? actionInput.fileId : undefined)
-        ?? normalizeBackgroundFileId(pageId)
+        ?? normalizeBackgroundFileId(pageName)
         ?? `页面-${pageLookup.size + 1}`;
       const prompt = buildCreatePagePrompt(actionInput, pageName);
       const page = pageLookup.get(pageId) ?? {

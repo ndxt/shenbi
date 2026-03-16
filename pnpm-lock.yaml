@@ -11,6 +11,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.11
+      jsdom:
+        specifier: ^26.1.0
+        version: 26.1.0
 
   apps/ai-api:
     dependencies:

@@ -22,6 +22,7 @@
     "demo:ai-agents": "pnpm dlx tsx scripts/ai-agents-demo.ts"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2"
+    "@types/node": "^22.10.2",
+    "jsdom": "^26.1.0"
   }
 }

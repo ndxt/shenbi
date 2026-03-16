@@ -164,12 +164,10 @@ async function writeAgentLoopTraceDump(
 function buildReActRepairPrompt(errorMessage: string, invalidResponse: string): string {
   return [
     `格式错误：上一条回复无法被程序解析，错误是：${errorMessage}`,
-    '请基于同一上下文，立刻重新输出唯一合法的下一步。',
-    '不要解释，不要重复 reasoning，不要返回包装 JSON。',
-    '你的回复必须只包含以下字段：',
-    'Action: [工具名称]',
-    'Action Input: [JSON 对象]',
-    '如果需要说明，只能额外加一行 Status 或 Reasoning Summary。',
+    '请基于同一上下文，立刻重新输出合法的下一步。',
+    '你的回复必须是一个 JSON 对象，包含 action 和 actionInput 字段。',
+    '示例：{"action":"listWorkspaceFiles","actionInput":{}}',
+    '不要解释，不要重复 reasoning，不要返回数组或其他非对象类型。',
     '',
     '这是你刚才的错误回复：',
     invalidResponse,
@@ -177,12 +175,17 @@ function buildReActRepairPrompt(errorMessage: string, invalidResponse: string): 
 }
 
 function formatParsedReActMessage(parsed: ParsedReActResponse): string {
-  return [
-    ...(parsed.status ? [`Status: ${parsed.status}`] : []),
-    ...(parsed.reasoningSummary ? [`Reasoning Summary: ${parsed.reasoningSummary}`] : []),
-    `Action: ${parsed.action}`,
-    `Action Input: ${parsed.rawActionInput}`,
-  ].join('\n');
+  const obj: Record<string, unknown> = {
+    action: parsed.action,
+    actionInput: parsed.actionInput,
+  };
+  if (parsed.status) {
+    obj.status = parsed.status;
+  }
+  if (parsed.reasoningSummary) {
+    obj.reasoningSummary = parsed.reasoningSummary;
+  }
+  return JSON.stringify(obj);
 }
 
 export function buildExecutionFallbackAction(
@@ -968,27 +971,30 @@ export function useAgentLoop(
             parseSource = repairResponse.content;
             parsed = parseReActResponse(parseSource);
           } catch (repairError) {
-            const fallbackParsed = buildExecutionFallbackAction(loopStateRef.current, Array.from(pageLookupRef.current.values()));
+            const fallbackParsed = buildExecutionFallbackAction(
+              loopStateRef.current,
+              Array.from(pageLookupRef.current.values()),
+            );
             if (fallbackParsed) {
               parsed = fallbackParsed;
               parseSource = formatParsedReActMessage(fallbackParsed);
             } else {
-            const debugFile = await writeAgentLoopDebugDump({
-              source: 'agent-loop-react-parse',
-              conversationId: currentConversationId,
-              plannerModel,
-              blockModel,
-              thinkingEnabled,
-              error: repairError instanceof Error ? repairError.message : String(repairError),
-              rawResponse: response.content,
-              repairedResponse: parseSource !== response.content ? parseSource : undefined,
-              messages: loopMessagesRef.current,
-              loopState: loopStateRef.current,
-            });
-            if (debugFile) {
-              throw new Error(`${repairError instanceof Error ? repairError.message : String(repairError)}. Debug file: ${debugFile}`);
-            }
-            throw repairError;
+              const debugFile = await writeAgentLoopDebugDump({
+                source: 'agent-loop-react-parse',
+                conversationId: currentConversationId,
+                plannerModel,
+                blockModel,
+                thinkingEnabled,
+                error: repairError instanceof Error ? repairError.message : String(repairError),
+                rawResponse: response.content,
+                repairedResponse: parseSource !== response.content ? parseSource : undefined,
+                messages: loopMessagesRef.current,
+                loopState: loopStateRef.current,
+              });
+              if (debugFile) {
+                throw new Error(`${repairError instanceof Error ? repairError.message : String(repairError)}. Debug file: ${debugFile}`);
+              }
+              throw repairError;
             }
           }
         }

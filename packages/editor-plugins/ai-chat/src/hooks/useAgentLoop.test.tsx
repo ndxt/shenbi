@@ -308,7 +308,7 @@ describe('useAgentLoop', () => {
       projectPlan: {
         projectName: '客服中台',
       },
-      createdFileIds: ['客服看板'],
+      createdFileIds: ['dashboard'],
       traceFile: '.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json',
     });
     expect(result.current.pages).toMatchObject([
@@ -316,7 +316,7 @@ describe('useAgentLoop', () => {
         pageId: 'dashboard',
         pageName: '客服看板',
         status: 'done',
-        fileId: '客服看板',
+        fileId: 'dashboard',
       },
     ]);
     expect(result.current.lastRunResult?.debugFile).toBe('.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json');
@@ -325,7 +325,7 @@ describe('useAgentLoop', () => {
       blockModel: 'block-model',
       intent: 'schema.create',
     });
-    expect(fileStorage.files.get('客服看板')).toMatchObject({
+    expect(fileStorage.files.get('dashboard')).toMatchObject({
       name: '客服看板',
     });
     expect(fetchMock).toHaveBeenCalledWith('/api/ai/debug/trace', expect.objectContaining({
@@ -538,7 +538,7 @@ describe('useAgentLoop', () => {
 
     expect(client.chatRequests[1]?.messages.at(-2)).toMatchObject({
       role: 'assistant',
-      content: 'Action: listWorkspaceFiles\nAction Input: {}',
+      content: JSON.stringify({ action: 'listWorkspaceFiles', actionInput: {} }),
     });
 
     await act(async () => {
@@ -649,9 +649,8 @@ describe('useAgentLoop', () => {
     const { bridge } = createBridge();
     const persistence = createPersistence();
     const client = new LoopScenarioAIClient([
-      {
-        content: '我先分析一下需求，然后给出项目规划。',
-      },
+      { content: '-1.0' },
+      { content: '-1.0' },
     ], []);
     setAIClient(client);
     const onError = vi.fn();
@@ -689,5 +688,101 @@ describe('useAgentLoop', () => {
       expect.stringContaining('.ai-debug/errors/2026-03-16T00-00-00-000Z-client-debug.json'),
     );
     expect(result.current.phase).toBe('error');
+  });
+
+  it('model responds with valid JSON object from the start', async () => {
+    const { bridge } = createBridge();
+    const persistence = createPersistence();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: { traceFile: '.ai-debug/traces/json-success.json' },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    // With JSON protocol, the model returns JSON objects directly
+    const client = new LoopScenarioAIClient([
+      // Turn 1: valid JSON → listWorkspaceFiles
+      { content: '{"action":"listWorkspaceFiles","actionInput":{}}' },
+      // Turn 2: valid JSON → proposeProjectPlan
+      {
+        content: JSON.stringify({
+          reasoningSummary: '根据用户需求规划项目',
+          action: 'proposeProjectPlan',
+          actionInput: {
+            projectName: '订单管理后台',
+            pages: [
+              { pageId: 'order-list', pageName: '订单列表页', action: 'create', description: '展示订单列表' },
+              { pageId: 'order-detail', pageName: '订单详情页', action: 'create', description: '展示订单详情' },
+              { pageId: 'order-create', pageName: '创建订单页', action: 'create', description: '创建订单表单' },
+            ],
+          },
+        }),
+      },
+      // Turn 3 (after confirm): createPage
+      {
+        content: JSON.stringify({
+          action: 'createPage',
+          actionInput: { pageId: 'order-list', pageName: '订单列表页', description: '展示订单列表' },
+        }),
+      },
+      // Turn 4: finish
+      { content: '{"action":"finish","actionInput":{"summary":"项目完成"}}' },
+    ], [
+      {
+        type: 'schema:done',
+        data: {
+          schema: {
+            id: 'order-list',
+            name: '订单列表页',
+            body: [{ id: 'table', component: 'Table', props: { title: '订单列表' } }],
+          },
+        },
+      },
+      {
+        type: 'done',
+        data: {
+          metadata: { sessionId: 's', conversationId: 'c', durationMs: 100 },
+        },
+      },
+    ]);
+    setAIClient(client);
+
+    const onDone = vi.fn();
+    const onError = vi.fn();
+
+    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
+
+    let runPromise!: Promise<void>;
+    await act(async () => {
+      runPromise = result.current.runAgent(
+        '帮我做一个订单管理后台项目，包含列表页、详情页、创建页',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-json-protocol',
+        () => 'msg-1',
+        vi.fn(),
+        onDone,
+        onError,
+        2,
+      );
+    });
+
+    // After listWorkspaceFiles and proposeProjectPlan, waiting for confirmation
+    await waitFor(() => {
+      expect(result.current.phase).toBe('awaiting_confirmation');
+      expect(result.current.projectPlan).toBeTruthy();
+      expect(result.current.projectPlan!.pages).toHaveLength(3);
+    });
+
+    // Confirm and let the loop finish
+    await act(async () => {
+      result.current.confirmProjectPlan();
+      await runPromise;
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(onDone).toHaveBeenCalled();
+    expect(result.current.phase).toBe('done');
   });
 });

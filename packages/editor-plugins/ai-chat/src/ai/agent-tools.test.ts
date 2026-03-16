@@ -7,17 +7,14 @@ describe('buildAgentLoopSystemPrompt', () => {
     const prompt = buildAgentLoopSystemPrompt();
 
     expect(prompt).toContain('你是 Shenbi 低代码平台的 Agent。你只能通过工具推进任务。');
-    expect(prompt).toContain('每次回复必须严格使用以下纯文本格式之一');
-    expect(prompt).toContain('Action: <tool-name>');
-    expect(prompt).toContain('Action Input: <json object>');
-    expect(prompt).toContain('无参工具也必须写空对象');
-    expect(prompt).toContain('Observation: []');
-    expect(prompt).toContain('Action: proposeProjectPlan');
+    expect(prompt).toContain('必须输出合法 JSON 对象');
+    expect(prompt).toContain('"action"');
+    expect(prompt).toContain('"actionInput"');
+    expect(prompt).toContain('proposeProjectPlan');
     expect(prompt).toContain('"projectName":"订单管理后台"');
-    expect(prompt).toContain('Observation: 用户已确认项目规划');
-    expect(prompt).toContain('Action: createPage');
+    expect(prompt).toContain('createPage');
     expect(prompt).toContain('项目规划一旦确认，后续按已确认计划继续执行');
-    expect(prompt).toContain('不要重复输出 Observation');
+    expect(prompt).toContain('不要返回数组');
     expect(prompt).not.toContain('错误示例');
   });
 });
@@ -86,7 +83,7 @@ describe('executeAgentTool', () => {
     expect(executeCreatePage).toHaveBeenCalledWith({
       pageId: 'order-list-page',
       pageName: '订单列表页',
-      fileId: '订单列表页',
+      fileId: 'order-list-page',
       prompt: [
         '订单列表页 页面',
         '目标: 展示订单列表和筛选条件',
