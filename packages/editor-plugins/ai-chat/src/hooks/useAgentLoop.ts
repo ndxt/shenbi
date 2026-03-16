@@ -161,6 +161,21 @@ async function writeAgentLoopTraceDump(
   }
 }
 
+function buildReActRepairPrompt(errorMessage: string, invalidResponse: string): string {
+  return [
+    `格式错误：上一条回复无法被程序解析，错误是：${errorMessage}`,
+    '请基于同一上下文，立刻重新输出唯一合法的下一步。',
+    '不要解释，不要重复 reasoning，不要返回包装 JSON。',
+    '你的回复必须只包含以下字段：',
+    'Action: [工具名称]',
+    'Action Input: [JSON 对象]',
+    '如果需要说明，只能额外加一行 Status 或 Reasoning Summary。',
+    '',
+    '这是你刚才的错误回复：',
+    invalidResponse,
+  ].join('\n');
+}
+
 function createLoopRunResult(summary: AgentLoopResultSummary, elapsedMs: number): LastRunResult {
   const completed = summary.pages.filter((page) => page.status === 'done').length;
   return {
@@ -872,24 +887,51 @@ export function useAgentLoop(
         ];
 
         let parsed: ParsedReActResponse;
+        let parseSource = response.content;
         try {
-          parsed = parseReActResponse(response.content);
+          parsed = parseReActResponse(parseSource);
         } catch (error) {
-          const debugFile = await writeAgentLoopDebugDump({
-            source: 'agent-loop-react-parse',
-            conversationId: currentConversationId,
-            plannerModel,
-            blockModel,
-            thinkingEnabled,
-            error: error instanceof Error ? error.message : String(error),
-            rawResponse: response.content,
-            messages: loopMessagesRef.current,
-            loopState: loopStateRef.current,
-          });
-          if (debugFile) {
-            throw new Error(`${error instanceof Error ? error.message : String(error)}. Debug file: ${debugFile}`);
+          const initialError = error instanceof Error ? error.message : String(error);
+          try {
+            const repairResponse = await aiClient.chat({
+              model: plannerModel,
+              messages: compactMessages([
+                ...loopMessagesRef.current,
+                {
+                  role: 'user',
+                  content: buildReActRepairPrompt(initialError, response.content),
+                },
+              ]),
+              thinking: { type: 'disabled' },
+            });
+            loopMessagesRef.current = [
+              ...loopMessagesRef.current,
+              {
+                role: 'user',
+                content: buildReActRepairPrompt(initialError, response.content),
+              },
+              { role: 'assistant', content: repairResponse.content },
+            ];
+            parseSource = repairResponse.content;
+            parsed = parseReActResponse(parseSource);
+          } catch (repairError) {
+            const debugFile = await writeAgentLoopDebugDump({
+              source: 'agent-loop-react-parse',
+              conversationId: currentConversationId,
+              plannerModel,
+              blockModel,
+              thinkingEnabled,
+              error: repairError instanceof Error ? repairError.message : String(repairError),
+              rawResponse: response.content,
+              repairedResponse: parseSource !== response.content ? parseSource : undefined,
+              messages: loopMessagesRef.current,
+              loopState: loopStateRef.current,
+            });
+            if (debugFile) {
+              throw new Error(`${repairError instanceof Error ? repairError.message : String(repairError)}. Debug file: ${debugFile}`);
+            }
+            throw repairError;
           }
-          throw error;
         }
 
         const step = tracerRef.current?.addStep({

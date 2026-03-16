@@ -389,6 +389,90 @@ describe('useAgentLoop', () => {
     });
   });
 
+  it('repairs a reasoning-only loop response by asking the model to reissue a valid action', async () => {
+    const { bridge } = createBridge();
+    const persistence = createPersistence();
+    const onDone = vi.fn();
+    const onError = vi.fn();
+    const client = new LoopScenarioAIClient([
+      {
+        content: 'Action: listWorkspaceFiles\nAction Input: {}',
+      },
+      {
+        content: JSON.stringify({
+          reasoning: '工作区为空，现在需要提出项目计划。',
+        }, null, 2),
+      },
+      {
+        content: [
+          'Action: proposeProjectPlan',
+          `Action Input: ${JSON.stringify({
+            projectName: '订单管理后台',
+            pages: [
+              {
+                pageId: 'order-list',
+                pageName: '订单列表页',
+                action: 'create',
+                description: '展示订单列表、筛选和分页',
+              },
+            ],
+          })}`,
+        ].join('\n'),
+      },
+      {
+        content: 'Action: finish\nAction Input: {"summary":"项目完成"}',
+      },
+    ], []);
+    setAIClient(client);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: {
+        traceFile: '.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json',
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+
+    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
+
+    let runPromise!: Promise<void>;
+    await act(async () => {
+      runPromise = result.current.runAgent(
+        '帮我做一个订单管理后台项目，包含列表页、详情页、创建页',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-repair',
+        () => 'message-repair',
+        vi.fn(),
+        onDone,
+        onError,
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.phase).toBe('awaiting_confirmation');
+      expect(result.current.projectPlan?.projectName).toBe('订单管理后台');
+    });
+
+    await act(async () => {
+      result.current.confirmProjectPlan();
+      await runPromise;
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(onDone).toHaveBeenCalledWith({
+      sessionId: 'conv-repair',
+      conversationId: 'conv-repair',
+    });
+    expect(client.chatRequests).toHaveLength(4);
+    expect(client.chatRequests[2]?.messages.at(-1)).toMatchObject({
+      role: 'user',
+      content: expect.stringContaining('格式错误'),
+    });
+  });
+
   it('writes a debug dump when ReAct parsing fails', async () => {
     const { bridge } = createBridge();
     const persistence = createPersistence();
