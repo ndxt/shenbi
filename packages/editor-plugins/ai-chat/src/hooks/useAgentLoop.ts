@@ -1,19 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createEditor } from '@shenbi/editor-core';
 import type { PluginPersistenceService } from '@shenbi/editor-plugin-api';
 import type { PageSchema } from '@shenbi/schema';
-import type { AgentEvent, LoopSessionState, ProjectPlan, ReActStep, RunAttachmentInput, RunMetadata, RunRequest } from '../ai/api-types';
+import type { LoopSessionState, ProjectPlan, ReActStep, RunAttachmentInput, RunRequest } from '../ai/api-types';
 import { aiClient } from '../ai/sse-client';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import { AgentLoopTracer } from '../ai/agent-loop-tracer';
 import { buildAgentLoopSystemPrompt, executeAgentTool } from '../ai/agent-tools';
+import { executeAgentOperation } from '../ai/operation-executor';
 import type {
   AgentLoopPageProgress,
   AgentLoopResultSummary,
   PersistedAgentLoopState,
   UIPhase,
 } from '../ai/agent-loop-types';
+import {
+  createPageExecutionSnapshot,
+  replaceSkeletonNode,
+  runPageExecution,
+  type PageExecutionSnapshot,
+} from '../ai/page-execution';
 import { parseReActResponse, type ParsedReActResponse } from '../ai/react-parser';
-import { applyModifyOperationsToSchema } from '../ai/agent-tools';
 import { useAgentRun, type LastRunResult } from './useAgentRun';
 
 const PERSISTENCE_NAMESPACE = 'ai-chat';
@@ -317,6 +324,8 @@ export function useAgentLoop(
   const confirmResolverRef = useRef<((observation: string) => void) | null>(null);
   const activePlannerModelRef = useRef<string>('');
   const activeBlockModelRef = useRef<string>('');
+  const activeThinkingEnabledRef = useRef(false);
+  const activeBlockConcurrencyRef = useRef(3);
 
   useEffect(() => {
     if (!persistence) {
@@ -398,6 +407,8 @@ export function useAgentLoop(
     confirmResolverRef.current = null;
     activePlannerModelRef.current = '';
     activeBlockModelRef.current = '';
+    activeThinkingEnabledRef.current = false;
+    activeBlockConcurrencyRef.current = 3;
     setMode(null);
     setPhase('idle');
     setProgressText('');
@@ -434,6 +445,14 @@ export function useAgentLoop(
       return next;
     });
   }, []);
+
+  const setPageExecutionSnapshot = useCallback((pageId: string, snapshot: PageExecutionSnapshot, expanded = true) => {
+    updatePage(pageId, (current) => ({
+      ...current,
+      execution: snapshot,
+      expanded,
+    }));
+  }, [updatePage]);
 
   const listWorkspaceFiles = useCallback(async () => {
     if (!bridge) {
@@ -487,6 +506,107 @@ export function useAgentLoop(
     return `${desiredId}-${index}`;
   }, [listWorkspaceFiles]);
 
+  const syncPageTabState = useCallback(async (
+    fileId: string,
+    pageName: string,
+    options: {
+      schema?: PageSchema;
+      isGenerating: boolean;
+      readOnlyReason?: string;
+    },
+  ) => {
+    if (!bridge) {
+      throw new Error('editor bridge unavailable');
+    }
+    if (options.schema) {
+      await writePageSchema(fileId, options.schema);
+    }
+    const syncResult = await bridge.execute('tab.syncState', {
+      fileId,
+      ...(options.schema ? { schema: options.schema } : {}),
+      isDirty: false,
+      isGenerating: options.isGenerating,
+      readOnlyReason: options.readOnlyReason,
+      generationUpdatedAt: Date.now(),
+    });
+    if (!syncResult.success) {
+      throw new Error(syncResult.error ?? `Failed to sync tab state for ${pageName}`);
+    }
+  }, [bridge, writePageSchema]);
+
+  const openGeneratingPageTab = useCallback(async (
+    fileId: string,
+    pageName: string,
+    schema?: PageSchema,
+  ) => {
+    if (!bridge) {
+      throw new Error('editor bridge unavailable');
+    }
+    const openResult = await bridge.execute('tab.open', { fileId });
+    if (!openResult.success) {
+      throw new Error(openResult.error ?? `Failed to open tab for ${pageName}`);
+    }
+    await syncPageTabState(fileId, pageName, {
+      ...(schema ? { schema } : {}),
+      isGenerating: true,
+      readOnlyReason: `AI 正在生成 ${pageName}`,
+    });
+  }, [bridge, syncPageTabState]);
+
+  const createBackgroundPageSession = useCallback((initialSchema: PageSchema): {
+    getSchema: () => PageSchema;
+    replaceSchema: (schema: PageSchema) => Promise<void>;
+    applyOperation: (operation: Parameters<typeof executeAgentOperation>[1]) => Promise<void>;
+    destroy: () => void;
+  } => {
+    const backgroundEditor = createEditor({
+      initialSchema,
+    });
+
+    const executeHiddenCommand = async (commandId: string, args?: unknown) => {
+      const data = await backgroundEditor.commands.execute(commandId, args);
+      return { success: true as const, data };
+    };
+
+    const hiddenBridge: EditorAIBridge = {
+      getSchema: () => backgroundEditor.state.getSchema(),
+      getSelectedNodeId: () => backgroundEditor.state.getSelectedNodeId(),
+      getAvailableComponents: () => bridge?.getAvailableComponents() ?? [],
+      execute: async (commandId, args) => {
+        try {
+          return await executeHiddenCommand(commandId, args);
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      },
+      replaceSchema: (schema) => {
+        void backgroundEditor.commands.execute('schema.replace', { schema });
+      },
+      appendBlock: async (node, parentTreeId) => hiddenBridge.execute('node.append', { node, parentTreeId }),
+      removeNode: async (treeId) => hiddenBridge.execute('node.remove', { treeId }),
+      subscribe: () => () => undefined,
+    };
+
+    return {
+      getSchema: () => backgroundEditor.state.getSchema(),
+      replaceSchema: async (schema) => {
+        await backgroundEditor.commands.execute('schema.replace', { schema });
+      },
+      applyOperation: async (operation) => {
+        const result = await executeAgentOperation(hiddenBridge, operation);
+        if (!result.success) {
+          throw new Error(result.error ?? 'modify operation failed');
+        }
+      },
+      destroy: () => {
+        backgroundEditor.destroy();
+      },
+    };
+  }, [bridge]);
+
   const executeCreatePage = useCallback(async (
     input: { pageId: string; pageName: string; prompt: string; fileId?: string },
     page: AgentLoopPageProgress,
@@ -497,47 +617,35 @@ export function useAgentLoop(
     const parentSignal = abortControllerRef.current?.signal;
     const timeoutController = createIdleTimeoutSignal(parentSignal);
     let fileId = await ensureUniqueFileId(input.fileId ?? input.pageId);
-    let placeholderCreated = false;
+    const initialSchema: PageSchema = {
+      id: fileId,
+      name: input.pageName,
+      body: [],
+    };
     updatePage(page.pageId, (current) => ({
       ...(() => {
         const { error: _error, ...rest } = current;
         return rest;
       })(),
       pageName: input.pageName,
+      fileId,
       status: 'running',
-      blocks: [],
+      expanded: true,
+      execution: {
+        ...createPageExecutionSnapshot('create'),
+        progressText: `正在创建页面 ${input.pageName}`,
+      },
     }));
     setProgressText(`正在创建页面 ${input.pageName}`);
-    const request: RunRequest = {
-      prompt: input.prompt,
-      intent: 'schema.create',
-      ...(activePlannerModelRef.current ? { plannerModel: activePlannerModelRef.current } : {}),
-      ...(activeBlockModelRef.current ? { blockModel: activeBlockModelRef.current } : {}),
-      thinking: { type: 'disabled' },
-      context: {
-        schemaSummary: 'pageId=empty; pageName=empty; nodeCount=0',
-        componentSummary: summarizeComponents(bridge),
-        schemaJson: {
-          id: fileId,
-          name: input.pageName,
-          body: [],
-        },
-      },
-    };
-
-    let finalSchema: PageSchema | undefined;
-    let metadata: RunMetadata | undefined;
     const startedAt = Date.now();
+    const session = createBackgroundPageSession(initialSchema);
+    let tabReady = false;
     try {
       const createFileResult = await bridge.execute('fs.createFile', {
         parentId: null,
         name: input.pageName,
         fileType: 'page',
-        content: {
-          id: fileId,
-          name: input.pageName,
-          body: [],
-        },
+        content: initialSchema,
       });
       if (!createFileResult.success) {
         throw new Error(createFileResult.error ?? `Failed to create workspace file for ${input.pageName}`);
@@ -545,7 +653,6 @@ export function useAgentLoop(
 
       if (typeof createFileResult.data === 'string' && createFileResult.data.trim()) {
         fileId = createFileResult.data.trim();
-        placeholderCreated = true;
       } else if (
         createFileResult.data
         && typeof createFileResult.data === 'object'
@@ -553,95 +660,143 @@ export function useAgentLoop(
         && typeof (createFileResult.data as { id: unknown }).id === 'string'
       ) {
         fileId = String((createFileResult.data as { id: unknown }).id);
-        placeholderCreated = true;
       } else {
         throw new Error(`fs.createFile returned no file id for ${input.pageName}`);
       }
 
-      for await (const event of aiClient.runStream(request, { signal: timeoutController.signal })) {
-        timeoutController.refresh();
-        if (event.type === 'plan') {
-          setProgressText(`正在规划 ${input.pageName} 的页面区块`);
-          updatePage(page.pageId, (current) => ({
-            ...current,
-            blocks: event.data.blocks.map((block) => ({
-              id: block.id,
-              label: block.description,
-              status: 'waiting',
-            })),
-          }));
-        } else if (event.type === 'schema:block:start') {
-          setProgressText(`正在生成 ${input.pageName} · ${event.data.description}`);
-          updatePage(page.pageId, (current) => ({
-            ...current,
-            blocks: current.blocks.map((block) => block.id === event.data.blockId ? { ...block, status: 'generating' } : block),
-          }));
-        } else if (event.type === 'schema:block') {
-          updatePage(page.pageId, (current) => ({
-            ...current,
-            blocks: current.blocks.map((block) => block.id === event.data.blockId
-              ? {
-                  ...block,
-                  status: 'done',
-                  ...(event.data.durationMs !== undefined ? { durationMs: event.data.durationMs } : {}),
-                  ...(event.data.inputTokens !== undefined ? { inputTokens: event.data.inputTokens } : {}),
-                  ...(event.data.outputTokens !== undefined ? { outputTokens: event.data.outputTokens } : {}),
-                }
-              : block),
-          }));
-        } else if (event.type === 'schema:done') {
-          setProgressText(`${input.pageName} 已生成，正在写入工作区`);
-          finalSchema = {
-            ...event.data.schema,
+      const openedSchema: PageSchema = {
+        ...initialSchema,
+        id: fileId,
+      };
+      await openGeneratingPageTab(fileId, input.pageName, openedSchema);
+      tabReady = true;
+      updatePage(page.pageId, (current) => ({
+        ...current,
+        fileId,
+      }));
+
+      const request: RunRequest = {
+        prompt: input.prompt,
+        intent: 'schema.create',
+        ...(activePlannerModelRef.current ? { plannerModel: activePlannerModelRef.current } : {}),
+        ...(activeBlockModelRef.current ? { blockModel: activeBlockModelRef.current } : {}),
+        thinking: { type: activeThinkingEnabledRef.current ? 'enabled' : 'disabled' },
+        blockConcurrency: activeBlockConcurrencyRef.current,
+        context: {
+          schemaSummary: 'pageId=empty; pageName=empty; nodeCount=0',
+          componentSummary: summarizeComponents(bridge),
+          schemaJson: openedSchema,
+        },
+      };
+
+      const executionResult = await runPageExecution({
+        aiClient,
+        request,
+        signal: timeoutController.signal,
+        initialMode: 'create',
+        callbacks: {
+          onSnapshot: async (snapshot) => {
+            timeoutController.refresh();
+            setPageExecutionSnapshot(page.pageId, snapshot, true);
+            setProgressText(snapshot.progressText || `正在创建页面 ${input.pageName}`);
+          },
+          onSchemaSkeleton: async (schema) => {
+            timeoutController.refresh();
+            await session.replaceSchema(schema);
+            await syncPageTabState(fileId, input.pageName, {
+              schema,
+              isGenerating: true,
+              readOnlyReason: `AI 正在生成 ${input.pageName}`,
+            });
+          },
+          onSchemaBlock: async (data) => {
+            timeoutController.refresh();
+            const nextSchema = replaceSkeletonNode(session.getSchema(), data.blockId, data.node);
+            await session.replaceSchema(nextSchema);
+            await syncPageTabState(fileId, input.pageName, {
+              schema: nextSchema,
+              isGenerating: true,
+              readOnlyReason: `AI 正在生成 ${input.pageName}`,
+            });
+          },
+          onSchemaDone: async (schema) => {
+            timeoutController.refresh();
+            await session.replaceSchema(schema);
+            await syncPageTabState(fileId, input.pageName, {
+              schema,
+              isGenerating: true,
+              readOnlyReason: `AI 正在生成 ${input.pageName}`,
+            });
+          },
+        },
+      });
+      const finalSchema = executionResult.finalSchema
+        ? {
+            ...executionResult.finalSchema,
+            id: fileId,
+            name: input.pageName,
+          }
+        : {
+            ...session.getSchema(),
             id: fileId,
             name: input.pageName,
           };
-        } else if (event.type === 'done') {
-          metadata = event.data.metadata;
-        } else if (event.type === 'error') {
-          throw new Error(event.data.message);
-        }
-      }
+      const metadata = executionResult.metadata;
+
+      await syncPageTabState(fileId, input.pageName, {
+        schema: finalSchema,
+        isGenerating: false,
+      });
+      const completedSnapshot: PageExecutionSnapshot = {
+        ...executionResult.snapshot,
+        finalSchema,
+        progressText: `${input.pageName} 已写入工作区`,
+      };
+      setPageExecutionSnapshot(page.pageId, completedSnapshot, true);
+      setProgressText(`${input.pageName} 已写入工作区`);
+      updatePage(page.pageId, (current) => ({
+        ...current,
+        fileId,
+        status: 'done',
+        durationMs: metadata?.durationMs ?? (Date.now() - startedAt),
+        execution: completedSnapshot,
+        expanded: false,
+      }));
+      return {
+        fileId,
+        success: true,
+        durationMs: metadata?.durationMs ?? (Date.now() - startedAt),
+      };
     } catch (error) {
       const message = timeoutController.didTimeout()
         ? `createPage timed out after ${Math.round(TOOL_IDLE_TIMEOUT_MS / 1000)}s for ${input.pageName}`
         : error instanceof Error
           ? error.message
           : String(error);
-      if (placeholderCreated) {
-        await deletePageSchema(fileId).catch(() => undefined);
+      const fallbackSchema = session.getSchema();
+      if (tabReady && fallbackSchema) {
+        await syncPageTabState(fileId, input.pageName, {
+          schema: {
+            ...fallbackSchema,
+            id: fileId,
+            name: input.pageName,
+          },
+          isGenerating: false,
+        }).catch(() => undefined);
       }
       updatePage(page.pageId, (current) => ({
         ...current,
+        fileId,
         status: 'failed',
         error: message,
+        expanded: true,
       }));
       throw new Error(message);
     } finally {
+      session.destroy();
       timeoutController.dispose();
     }
-
-    if (!finalSchema) {
-      if (placeholderCreated) {
-        await deletePageSchema(fileId).catch(() => undefined);
-      }
-      throw new Error(`createPage did not produce a final schema for ${input.pageName}`);
-    }
-
-    await writePageSchema(fileId, finalSchema);
-    setProgressText(`${input.pageName} 已写入工作区`);
-    updatePage(page.pageId, (current) => ({
-      ...current,
-      fileId,
-      status: 'done',
-      durationMs: metadata?.durationMs ?? (Date.now() - startedAt),
-    }));
-    return {
-      fileId,
-      success: true,
-      durationMs: metadata?.durationMs ?? (Date.now() - startedAt),
-    };
-  }, [bridge, ensureUniqueFileId, updatePage, writePageSchema]);
+  }, [bridge, createBackgroundPageSession, ensureUniqueFileId, openGeneratingPageTab, setPageExecutionSnapshot, syncPageTabState, updatePage]);
 
   const executeModifyPage = useCallback(async (
     input: { fileId: string; prompt: string; pageName?: string },
@@ -653,13 +808,18 @@ export function useAgentLoop(
     const parentSignal = abortControllerRef.current?.signal;
     const timeoutController = createIdleTimeoutSignal(parentSignal);
     const existingSchema = await readPageSchema(input.fileId);
+    const session = createBackgroundPageSession(existingSchema);
     updatePage(page.pageId, (current) => ({
       ...(() => {
         const { error: _error, ...rest } = current;
         return rest;
       })(),
       status: 'running',
-      blocks: [],
+      expanded: true,
+      execution: {
+        ...createPageExecutionSnapshot('modify'),
+        progressText: `正在修改页面 ${page.pageName}`,
+      },
     }));
     setProgressText(`正在修改页面 ${page.pageName}`);
 
@@ -668,7 +828,8 @@ export function useAgentLoop(
       intent: 'schema.modify',
       ...(activePlannerModelRef.current ? { plannerModel: activePlannerModelRef.current } : {}),
       ...(activeBlockModelRef.current ? { blockModel: activeBlockModelRef.current } : {}),
-      thinking: { type: 'disabled' },
+      thinking: { type: activeThinkingEnabledRef.current ? 'enabled' : 'disabled' },
+      blockConcurrency: activeBlockConcurrencyRef.current,
       context: {
         schemaSummary: summarizeSchema(existingSchema),
         componentSummary: summarizeComponents(bridge),
@@ -676,76 +837,79 @@ export function useAgentLoop(
       },
     };
 
-    const operations: AgentEvent[] = [];
-    let metadata: RunMetadata | undefined;
     const startedAt = Date.now();
     try {
-      for await (const event of aiClient.runStream(request, { signal: timeoutController.signal })) {
-        timeoutController.refresh();
-        operations.push(event);
-        if (event.type === 'modify:start') {
-          setProgressText(`正在规划 ${page.pageName} 的修改操作`);
-          updatePage(page.pageId, (current) => ({
-            ...current,
-            blocks: (event.data.operations ?? []).map((operation, index) => ({
-              id: String(index),
-              label: operation.label ?? operation.op,
-              status: 'waiting',
-            })),
-          }));
-        } else if (event.type === 'modify:op:pending') {
-          setProgressText(`正在修改 ${page.pageName} · 步骤 ${event.data.index + 1}`);
-          updatePage(page.pageId, (current) => ({
-            ...current,
-            blocks: current.blocks.map((block, index) => index === event.data.index ? { ...block, status: 'generating' } : block),
-          }));
-        } else if (event.type === 'modify:op') {
-          updatePage(page.pageId, (current) => ({
-            ...current,
-            blocks: current.blocks.map((block, index) => index === event.data.index ? { ...block, status: 'done' } : block),
-          }));
-        } else if (event.type === 'done') {
-          metadata = event.data.metadata;
-        } else if (event.type === 'error') {
-          throw new Error(event.data.message);
-        }
-      }
+      await openGeneratingPageTab(input.fileId, page.pageName, existingSchema);
+      const executionResult = await runPageExecution({
+        aiClient,
+        request,
+        signal: timeoutController.signal,
+        initialMode: 'modify',
+        callbacks: {
+          onSnapshot: async (snapshot) => {
+            timeoutController.refresh();
+            setPageExecutionSnapshot(page.pageId, snapshot, true);
+            setProgressText(snapshot.progressText || `正在修改页面 ${page.pageName}`);
+          },
+          onModifyOperation: async (data) => {
+            timeoutController.refresh();
+            await session.applyOperation(data.operation);
+            await syncPageTabState(input.fileId, page.pageName, {
+              schema: session.getSchema(),
+              isGenerating: true,
+              readOnlyReason: `AI 正在生成 ${page.pageName}`,
+            });
+          },
+        },
+      });
+
+      const nextSchema = session.getSchema();
+      await syncPageTabState(input.fileId, page.pageName, {
+        schema: nextSchema,
+        isGenerating: false,
+      });
+      const completedSnapshot: PageExecutionSnapshot = {
+        ...executionResult.snapshot,
+        finalSchema: nextSchema,
+        progressText: `${page.pageName} 修改完成`,
+      };
+      setPageExecutionSnapshot(page.pageId, completedSnapshot, true);
+      setProgressText(`${page.pageName} 修改完成`);
+      updatePage(page.pageId, (current) => ({
+        ...current,
+        status: 'done',
+        durationMs: executionResult.metadata?.durationMs ?? (Date.now() - startedAt),
+        fileId: input.fileId,
+        execution: completedSnapshot,
+        expanded: false,
+      }));
+      return {
+        fileId: input.fileId,
+        success: true,
+        durationMs: executionResult.metadata?.durationMs ?? (Date.now() - startedAt),
+      };
     } catch (error) {
       const message = timeoutController.didTimeout()
         ? `modifyPage timed out after ${Math.round(TOOL_IDLE_TIMEOUT_MS / 1000)}s for ${page.pageName}`
         : error instanceof Error
           ? error.message
           : String(error);
+      await syncPageTabState(input.fileId, page.pageName, {
+        schema: session.getSchema(),
+        isGenerating: false,
+      }).catch(() => undefined);
       updatePage(page.pageId, (current) => ({
         ...current,
         status: 'failed',
         error: message,
+        expanded: true,
       }));
       throw new Error(message);
     } finally {
+      session.destroy();
       timeoutController.dispose();
     }
-
-    const nextSchema = await applyModifyOperationsToSchema(
-      existingSchema,
-      operations
-        .filter((event): event is Extract<AgentEvent, { type: 'modify:op' }> => event.type === 'modify:op')
-        .map((event) => event.data.operation),
-    );
-    await writePageSchema(input.fileId, nextSchema);
-    setProgressText(`${page.pageName} 修改完成`);
-    updatePage(page.pageId, (current) => ({
-      ...current,
-      status: 'done',
-      durationMs: metadata?.durationMs ?? (Date.now() - startedAt),
-      fileId: input.fileId,
-    }));
-    return {
-      fileId: input.fileId,
-      success: true,
-      durationMs: metadata?.durationMs ?? (Date.now() - startedAt),
-    };
-  }, [bridge, readPageSchema, updatePage, writePageSchema]);
+  }, [bridge, createBackgroundPageSession, openGeneratingPageTab, readPageSchema, setPageExecutionSnapshot, syncPageTabState, updatePage]);
 
   const proposeProjectPlan = useCallback(async (plan: ProjectPlan) => {
     projectPlanRef.current = plan;
@@ -757,7 +921,7 @@ export function useAgentLoop(
       action: page.action,
       description: page.description,
       status: page.action === 'skip' ? 'skipped' : 'waiting',
-      blocks: [],
+      expanded: false,
       ...(page.reason ? { reason: page.reason } : {}),
     } satisfies AgentLoopPageProgress));
     pagesRef.current = nextPages;
@@ -800,12 +964,9 @@ export function useAgentLoop(
     setIsLoopRunning(false);
     setErrorMessage(undefined);
     setLastRunResult(createLoopRunResult(finalizedSummary, Date.now() - startTimeRef.current));
-    if (finalizedSummary.createdFileIds.length > 0 && bridge) {
-      await bridge.execute('file.openSchema', { fileId: finalizedSummary.createdFileIds[0] });
-    }
     await clearPersistedLoopState();
     return finalizedSummary;
-  }, [bridge, clearPersistedLoopState]);
+  }, [clearPersistedLoopState]);
 
   const cancelRun = useCallback(async () => {
     if (mode === 'legacy') {
@@ -905,6 +1066,11 @@ export function useAgentLoop(
       return;
     }
 
+    const ensureTabResult = await bridge.execute('shell.ensureCurrentTab');
+    if (!ensureTabResult.success && ensureTabResult.error !== 'Command not found: shell.ensureCurrentTab') {
+      console.warn('[agent-loop] failed to materialize current shell tab before project generation:', ensureTabResult.error);
+    }
+
     const currentConversationId = conversationId ?? `conv-${Date.now()}`;
     setMode('loop');
     setPhase('thinking');
@@ -918,6 +1084,8 @@ export function useAgentLoop(
     tracerRef.current = new AgentLoopTracer();
     activePlannerModelRef.current = plannerModel;
     activeBlockModelRef.current = blockModel;
+    activeThinkingEnabledRef.current = thinkingEnabled;
+    activeBlockConcurrencyRef.current = typeof blockConcurrency === 'number' ? blockConcurrency : 3;
 
     if (isResumePrompt(prompt) && persistedRef.current) {
       loopMessagesRef.current = persistedRef.current.reactMessages;

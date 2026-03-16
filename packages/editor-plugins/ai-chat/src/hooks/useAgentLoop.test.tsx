@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createEditor } from '@shenbi/editor-core';
+import { TabManager, createEditor } from '@shenbi/editor-core';
 import type { PluginPersistenceService } from '@shenbi/editor-plugin-api';
 import type { PageSchema } from '@shenbi/schema';
 import type { VirtualFileSystemAdapter } from '@shenbi/editor-core/src/adapters/virtual-fs';
@@ -114,9 +114,11 @@ function createMemoryVFS(initialFiles: Record<string, PageSchema>): VirtualFileS
 
 function createBridge(initialFiles: Record<string, PageSchema> = { current: createSchema('current', 'Current Page') }) {
   const vfs = createMemoryVFS(initialFiles);
+  const tabManager = new TabManager();
   const editor = createEditor({
     initialSchema: initialFiles.current ?? createSchema('current', 'Current Page'),
     vfs,
+    tabManager,
     projectId: 'test-project',
   });
   const commandLog: Array<{ commandId: string; args?: unknown }> = [];
@@ -149,6 +151,7 @@ function createBridge(initialFiles: Record<string, PageSchema> = { current: crea
     bridge,
     commandLog,
     fileStorage: vfs,
+    tabManager,
   };
 }
 
@@ -210,7 +213,7 @@ afterEach(() => {
 
 describe('useAgentLoop', () => {
   it('plans a project, waits for confirmation, creates a page in background, and completes with loop summary', async () => {
-    const { bridge, commandLog, fileStorage } = createBridge();
+    const { bridge, commandLog, fileStorage, tabManager } = createBridge();
     const persistence = createPersistence();
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       success: true,
@@ -269,6 +272,43 @@ describe('useAgentLoop', () => {
               complexity: 'simple',
             },
           ],
+        },
+      },
+      {
+        type: 'schema:skeleton',
+        data: {
+          schema: {
+            id: 'dashboard',
+            name: '客服看板',
+            body: [
+              {
+                id: 'hero-skeleton',
+                component: 'Container',
+                children: [],
+              },
+            ],
+          },
+        },
+      },
+      {
+        type: 'schema:block:start',
+        data: {
+          blockId: 'hero',
+          description: '核心统计区',
+        },
+      },
+      {
+        type: 'schema:block',
+        data: {
+          blockId: 'hero',
+          node: {
+            id: 'hero',
+            component: 'Card',
+            props: {
+              title: '客服看板',
+            },
+          },
+          durationMs: 12,
         },
       },
       {
@@ -359,6 +399,14 @@ describe('useAgentLoop', () => {
         pageName: '客服看板',
         status: 'done',
         fileId: createdFileId,
+        execution: {
+          plan: {
+            pageTitle: '客服看板',
+          },
+          blockStatuses: {
+            hero: 'done',
+          },
+        },
       },
     ]);
     expect(result.current.lastRunResult?.debugFile).toBe('.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json');
@@ -366,6 +414,8 @@ describe('useAgentLoop', () => {
       plannerModel: 'planner-model',
       blockModel: 'block-model',
       intent: 'schema.create',
+      thinking: { type: 'disabled' },
+      blockConcurrency: 2,
     });
     expect(fileStorage.files.get(createdFileId!)).toMatchObject({
       name: '客服看板',
@@ -373,8 +423,14 @@ describe('useAgentLoop', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/ai/debug/trace', expect.objectContaining({
       method: 'POST',
     }));
+    expect(commandLog[0]?.commandId).toBe('shell.ensureCurrentTab');
     expect(commandLog.map((entry) => entry.commandId)).toContain('file.writeSchema');
-    expect(commandLog.map((entry) => entry.commandId)).toContain('file.openSchema');
+    expect(commandLog.map((entry) => entry.commandId)).toContain('tab.open');
+    expect(commandLog.filter((entry) => entry.commandId === 'tab.syncState').length).toBeGreaterThanOrEqual(3);
+    expect(tabManager.getTab(createdFileId!)).toMatchObject({
+      isGenerating: false,
+      schema: expect.objectContaining({ name: '客服看板' }),
+    });
     expect(persistence.remove).toHaveBeenCalledWith('ai-chat', 'agent-loop-state');
   });
 
@@ -414,7 +470,6 @@ describe('useAgentLoop', () => {
             action: 'create',
             description: '概览页描述',
             status: 'waiting',
-            blocks: [],
           },
         ],
         createdFileIds: [],
@@ -621,7 +676,6 @@ describe('useAgentLoop', () => {
         action: 'create',
         description: '展示订单列表、筛选和分页',
         status: 'done',
-        blocks: [],
         fileId: '订单列表页',
       },
       {
@@ -630,7 +684,6 @@ describe('useAgentLoop', () => {
         action: 'create',
         description: '展示订单详情和商品信息',
         status: 'waiting',
-        blocks: [],
       },
     ]);
 
@@ -663,7 +716,6 @@ describe('useAgentLoop', () => {
         action: 'create',
         description: '展示订单列表、筛选和分页',
         status: 'done',
-        blocks: [],
         fileId: '订单列表页',
       },
       {
@@ -672,7 +724,6 @@ describe('useAgentLoop', () => {
         action: 'create',
         description: '展示订单详情和商品信息',
         status: 'done',
-        blocks: [],
         fileId: '订单详情页',
       },
     ]);
