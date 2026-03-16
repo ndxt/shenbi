@@ -16,7 +16,7 @@ import type {
   RunStreamOptions,
 } from '../ai/api-types';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
-import { useAgentLoop } from './useAgentLoop';
+import { buildExecutionFallbackAction, useAgentLoop } from './useAgentLoop';
 
 function createSchema(id: string, name = id): PageSchema {
   return {
@@ -544,6 +544,104 @@ describe('useAgentLoop', () => {
     await act(async () => {
       result.current.confirmProjectPlan();
       await runPromise;
+    });
+  });
+
+  it('falls back to the approved plan when execution-phase model replies are malformed', () => {
+    const fallbackCreate = buildExecutionFallbackAction({
+      conversationId: 'conv-fallback',
+      status: 'executing',
+      createdFileIds: ['订单列表页'],
+      completedPageIds: ['order-list'],
+      failedPageIds: [],
+      updatedAt: '2026-03-16T00:00:00.000Z',
+      approvedPlan: {
+        projectName: '订单管理后台',
+        pages: [
+          {
+            pageId: 'order-list',
+            pageName: '订单列表页',
+            action: 'create',
+            description: '展示订单列表、筛选和分页',
+          },
+          {
+            pageId: 'order-detail',
+            pageName: '订单详情页',
+            action: 'create',
+            description: '展示订单详情和商品信息',
+          },
+        ],
+      },
+    }, [
+      {
+        pageId: 'order-list',
+        pageName: '订单列表页',
+        action: 'create',
+        description: '展示订单列表、筛选和分页',
+        status: 'done',
+        blocks: [],
+        fileId: '订单列表页',
+      },
+      {
+        pageId: 'order-detail',
+        pageName: '订单详情页',
+        action: 'create',
+        description: '展示订单详情和商品信息',
+        status: 'waiting',
+        blocks: [],
+      },
+    ]);
+
+    expect(fallbackCreate).toEqual({
+      reasoningSummary: '按已确认规划继续执行下一页',
+      action: 'createPage',
+      actionInput: {
+        pageId: 'order-detail',
+        pageName: '订单详情页',
+        description: '展示订单详情和商品信息',
+      },
+      rawActionInput: '{"pageId":"order-detail","pageName":"订单详情页","description":"展示订单详情和商品信息"}',
+    });
+
+    const fallbackFinish = buildExecutionFallbackAction({
+      conversationId: 'conv-fallback',
+      status: 'executing',
+      createdFileIds: ['订单列表页', '订单详情页'],
+      completedPageIds: ['order-list', 'order-detail'],
+      failedPageIds: [],
+      updatedAt: '2026-03-16T00:00:00.000Z',
+      approvedPlan: {
+        projectName: '订单管理后台',
+        pages: [],
+      },
+    }, [
+      {
+        pageId: 'order-list',
+        pageName: '订单列表页',
+        action: 'create',
+        description: '展示订单列表、筛选和分页',
+        status: 'done',
+        blocks: [],
+        fileId: '订单列表页',
+      },
+      {
+        pageId: 'order-detail',
+        pageName: '订单详情页',
+        action: 'create',
+        description: '展示订单详情和商品信息',
+        status: 'done',
+        blocks: [],
+        fileId: '订单详情页',
+      },
+    ]);
+
+    expect(fallbackFinish).toEqual({
+      reasoningSummary: '所有计划页面已完成，结束本轮项目执行',
+      action: 'finish',
+      actionInput: {
+        summary: '项目执行完成',
+      },
+      rawActionInput: '{"summary":"项目执行完成"}',
     });
   });
 

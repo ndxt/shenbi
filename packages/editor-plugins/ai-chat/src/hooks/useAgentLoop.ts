@@ -185,6 +185,60 @@ function formatParsedReActMessage(parsed: ParsedReActResponse): string {
   ].join('\n');
 }
 
+export function buildExecutionFallbackAction(
+  loopState: LoopSessionState | undefined,
+  pages: AgentLoopPageProgress[],
+): ParsedReActResponse | undefined {
+  if (!loopState || loopState.status !== 'executing' || !loopState.approvedPlan) {
+    return undefined;
+  }
+
+  const nextPage = pages.find((page) => page.status === 'waiting' && (page.action === 'create' || page.action === 'modify'));
+  if (nextPage) {
+    if (nextPage.action === 'create') {
+      const actionInput = {
+        pageId: nextPage.pageId,
+        pageName: nextPage.pageName,
+        description: nextPage.description,
+      };
+      return {
+        reasoningSummary: '按已确认规划继续执行下一页',
+        action: 'createPage',
+        actionInput,
+        rawActionInput: JSON.stringify(actionInput),
+      };
+    }
+
+    const actionInput = {
+      fileId: nextPage.fileId ?? nextPage.pageId,
+      pageName: nextPage.pageName,
+      description: nextPage.description,
+    };
+    return {
+      reasoningSummary: '按已确认规划继续执行下一页',
+      action: 'modifyPage',
+      actionInput,
+      rawActionInput: JSON.stringify(actionInput),
+    };
+  }
+
+  const unfinishedPages = pages.filter((page) => ['waiting', 'running'].includes(page.status));
+  if (unfinishedPages.length > 0) {
+    return undefined;
+  }
+
+  const hasFailedPage = pages.some((page) => page.status === 'failed');
+  const actionInput = {
+    summary: hasFailedPage ? '项目执行结束，部分页面失败' : '项目执行完成',
+  };
+  return {
+    reasoningSummary: hasFailedPage ? '没有可继续执行的页面，结束本轮项目执行' : '所有计划页面已完成，结束本轮项目执行',
+    action: 'finish',
+    actionInput,
+    rawActionInput: JSON.stringify(actionInput),
+  };
+}
+
 function createLoopRunResult(summary: AgentLoopResultSummary, elapsedMs: number): LastRunResult {
   const completed = summary.pages.filter((page) => page.status === 'done').length;
   return {
@@ -914,6 +968,11 @@ export function useAgentLoop(
             parseSource = repairResponse.content;
             parsed = parseReActResponse(parseSource);
           } catch (repairError) {
+            const fallbackParsed = buildExecutionFallbackAction(loopStateRef.current, Array.from(pageLookupRef.current.values()));
+            if (fallbackParsed) {
+              parsed = fallbackParsed;
+              parseSource = formatParsedReActMessage(fallbackParsed);
+            } else {
             const debugFile = await writeAgentLoopDebugDump({
               source: 'agent-loop-react-parse',
               conversationId: currentConversationId,
@@ -930,6 +989,7 @@ export function useAgentLoop(
               throw new Error(`${repairError instanceof Error ? repairError.message : String(repairError)}. Debug file: ${debugFile}`);
             }
             throw repairError;
+            }
           }
         }
 
