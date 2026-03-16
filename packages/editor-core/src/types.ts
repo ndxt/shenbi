@@ -40,4 +40,11 @@ export interface EditorEventMap {
   'tab:closed': { fileId: string };
   'tab:activated': { fileId: string };
   'tab:dirtyChanged': { fileId: string; isDirty: boolean };
+  'tab:stateChanged': {
+    fileId: string;
+    isDirty: boolean;
+    isGenerating?: boolean;
+    readOnlyReason?: string;
+    generationUpdatedAt?: number;
+  };
 }

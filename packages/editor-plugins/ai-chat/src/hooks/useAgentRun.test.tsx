@@ -181,6 +181,7 @@ describe('useAgentRun', () => {
         onMessageDelta,
         onDone,
         onError,
+        4,
       );
     });
 
@@ -195,6 +196,8 @@ describe('useAgentRun', () => {
       prompt: '把当前卡片标题改成新标题，并追加一段说明',
       conversationId: 'conv-success',
       selectedNodeId: 'card-1',
+      thinking: { type: 'disabled' },
+      blockConcurrency: 4,
       context: {
         schemaJson: createInitialSchema(),
       },
@@ -223,6 +226,15 @@ describe('useAgentRun', () => {
     expect(result.current.lastRunResult).toMatchObject({
       didApplySchema: true,
       autoSaveError: expect.any(String),
+      pageExecution: {
+        modifyPlan: {
+          operationCount: 2,
+        },
+        modifyStatuses: {
+          0: 'done',
+          1: 'done',
+        },
+      },
     });
 
     await act(async () => {

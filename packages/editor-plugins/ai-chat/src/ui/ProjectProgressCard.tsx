@@ -1,7 +1,8 @@
 import React from 'react';
-import { CheckCircle2, CircleDashed, FileStack, TriangleAlert } from 'lucide-react';
+import { FileStack } from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
 import type { AgentLoopPageProgress } from '../ai/agent-loop-types';
+import { PageExecutionDetails } from './PageExecutionDetails';
 
 export interface ProjectProgressCardProps {
   pages: AgentLoopPageProgress[];
@@ -19,19 +20,6 @@ function getStatusClass(status: AgentLoopPageProgress['status']): string {
       return 'text-text-secondary bg-bg-panel border-border-ide';
     default:
       return 'text-text-secondary bg-bg-panel border-border-ide';
-  }
-}
-
-function blockStatusLabel(status: 'waiting' | 'generating' | 'done' | 'failed') {
-  switch (status) {
-    case 'generating':
-      return '...';
-    case 'done':
-      return 'done';
-    case 'failed':
-      return 'failed';
-    default:
-      return 'wait';
   }
 }
 
@@ -75,22 +63,12 @@ export function ProjectProgressCard({ pages }: ProjectProgressCardProps) {
 
             <div className="text-text-secondary whitespace-pre-wrap" style={{ fontSize: '11px' }}>{page.description}</div>
 
-            {page.blocks.length > 0 && (
-              <div className="grid grid-cols-1 gap-1">
-                {page.blocks.map((block) => (
-                  <div key={block.id} className="rounded bg-bg-canvas px-2 py-1.5 flex items-center gap-2">
-                    {block.status === 'done' ? (
-                      <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
-                    ) : block.status === 'failed' ? (
-                      <TriangleAlert size={11} className="text-red-400 shrink-0" />
-                    ) : (
-                      <CircleDashed size={11} className={`shrink-0 ${block.status === 'generating' ? 'text-blue-500 animate-spin' : 'text-text-secondary'}`} />
-                    )}
-                    <span className="text-text-primary flex-1 truncate" style={{ fontSize: '11px' }} title={block.label}>{block.label}</span>
-                    <span className="text-text-secondary font-mono uppercase" style={{ fontSize: '10px' }}>{blockStatusLabel(block.status)}</span>
-                  </div>
-                ))}
-              </div>
+            {page.execution && (
+              <PageExecutionDetails
+                snapshot={page.execution}
+                variant="embedded"
+                isRunning={page.status === 'running'}
+              />
             )}
 
             {page.error && (

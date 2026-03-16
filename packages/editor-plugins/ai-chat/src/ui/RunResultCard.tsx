@@ -2,59 +2,41 @@ import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
 import type { LastRunResult } from '../hooks/useAgentRun';
-import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
+import { createPageExecutionSnapshot } from '../ai/page-execution';
+import { PageExecutionDetails, summarizeExecutionTokens } from './PageExecutionDetails';
 import { ProjectPlanCard } from './ProjectPlanCard';
-
-const MetricsBadge = ({ durationMs, inputTokens, outputTokens }: { durationMs: number | undefined; inputTokens: number | undefined; outputTokens: number | undefined }) => {
-  const parts: string[] = [];
-  if (durationMs !== undefined) parts.push(`${(durationMs / 1000).toFixed(1)}s`);
-  if (inputTokens !== undefined) parts.push(`In${inputTokens}`);
-  if (outputTokens !== undefined) parts.push(`Out${outputTokens}`);
-  if (parts.length === 0) return null;
-  return <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '9px' }}>{parts.join(' ')}</span>;
-};
-
-const OpRow = ({
-  label,
-  isDone,
-  metrics,
-  isError,
-}: {
-  label: string;
-  isDone?: boolean;
-  metrics?: { durationMs: number | undefined; inputTokens: number | undefined; outputTokens: number | undefined };
-  isError?: boolean;
-}) => (
-  <li className="flex items-center gap-1.5 py-0.5 rounded px-1.5" style={{ fontSize: '11px' }}>
-    <span className="text-text-primary opacity-80 truncate flex-1 leading-none translate-y-[1px]" title={label}>{label}</span>
-    {isDone && metrics && <MetricsBadge durationMs={metrics.durationMs} inputTokens={metrics.inputTokens} outputTokens={metrics.outputTokens} />}
-    {isDone && (
-      <CheckCircle2
-        size={11}
-        className={`shrink-0 ${isError ? 'text-red-400' : 'text-emerald-400'}`}
-      />
-    )}
-  </li>
-);
 
 export interface RunResultCardProps {
   result: LastRunResult;
   onDismiss?: (() => void) | undefined;
 }
 
+function getStandaloneSnapshot(result: LastRunResult) {
+  if (result.pageExecution) {
+    return result.pageExecution;
+  }
+  const mode = result.modifyPlan ? 'modify' : 'create';
+  return {
+    ...createPageExecutionSnapshot(mode),
+    plan: result.plan,
+    plannerMetrics: result.plannerMetrics,
+    blockStatuses: result.blockStatuses,
+    blockTokens: result.blockTokens,
+    blockInputTokens: result.blockInputTokens,
+    blockOutputTokens: result.blockOutputTokens,
+    blockDurationMs: result.blockDurationMs,
+    modifyPlan: result.modifyPlan,
+    modifyStatuses: result.modifyStatuses,
+    modifyOpMetrics: result.modifyOpMetrics,
+    progressText: result.statusLabel,
+    didApplySchema: result.didApplySchema,
+  };
+}
+
 export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
   const { t } = useTranslation('pluginAiChat');
-
-  const totalInput = [
-    result.plannerMetrics?.inputTokens ?? 0,
-    ...Object.values(result.blockInputTokens),
-    ...Object.values(result.modifyOpMetrics).map((m: AgentOperationMetrics) => m.inputTokens ?? 0),
-  ].reduce((a, b) => a + b, 0);
-  const totalOutput = [
-    result.plannerMetrics?.outputTokens ?? 0,
-    ...Object.values(result.blockOutputTokens),
-    ...Object.values(result.modifyOpMetrics).map((m: AgentOperationMetrics) => m.outputTokens ?? 0),
-  ].reduce((a, b) => a + b, 0);
+  const standaloneSnapshot = getStandaloneSnapshot(result);
+  const { totalInput, totalOutput } = summarizeExecutionTokens(standaloneSnapshot);
   const hasTokenInfo = totalInput > 0 || totalOutput > 0;
 
   // Helper function to get debug file label from translation
@@ -131,45 +113,7 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
           </button>
         )}
       </div>
-      {/* Planner row (create-page) */}
-      {result.plannerMetrics && result.plan && (
-        <div className="border-t border-border-ide py-2 flex items-center gap-1.5 px-1">
-          <span className="text-text-secondary opacity-70 truncate flex-1 leading-none translate-y-[1px]">Planner</span>
-          <MetricsBadge durationMs={result.plannerMetrics.durationMs} inputTokens={result.plannerMetrics.inputTokens} outputTokens={result.plannerMetrics.outputTokens} />
-          <CheckCircle2 size={10} className="text-emerald-400 shrink-0" />
-        </div>
-      )}
-      {/* Block list (create-page) */}
-      {result.plan && (
-        <div className="border-t border-border-ide pt-2 pb-1">
-          <ul className="flex flex-col gap-1.5 m-0 p-0">
-            {result.plan.blocks.map((b) => (
-              <OpRow
-                key={b.id}
-                label={b.description}
-                isDone={result.blockStatuses[b.id] === 'done'}
-                metrics={{ durationMs: result.blockDurationMs[b.id], inputTokens: result.blockInputTokens[b.id], outputTokens: result.blockOutputTokens[b.id] }}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
-      {/* Modify op list */}
-      {result.modifyPlan && (
-        <div className="border-t border-border-ide pt-2 pb-1">
-          <ul className="flex flex-col gap-1.5 m-0 p-0">
-            {Array.from({ length: result.modifyPlan.operationCount }, (_, i) => (
-              <OpRow
-                key={i}
-                label={result.modifyPlan?.operationLabels[i] ?? t('status.operationWithIndex', { index: i + 1 })}
-                isDone={result.modifyStatuses[i] === 'done'}
-                isError={result.modifyStatuses[i] !== 'done'}
-                {...(result.modifyOpMetrics[i] ? { metrics: { durationMs: result.modifyOpMetrics[i].durationMs, inputTokens: result.modifyOpMetrics[i].inputTokens, outputTokens: result.modifyOpMetrics[i].outputTokens } } : {})}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
+      <PageExecutionDetails snapshot={standaloneSnapshot} variant="standalone" />
       {/* Summary totals */}
       <div className="border-t border-border-ide pt-2 flex items-center gap-2 px-1" style={{ fontSize: '10px', marginTop: '-6px', paddingTop: '8px' }}>
         <span className="text-text-secondary opacity-70 flex-1 leading-none translate-y-[1px]">{t('result.total')}</span>

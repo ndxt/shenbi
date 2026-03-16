@@ -172,6 +172,73 @@ function extractWriteSchemaArgs(args: unknown): { fileId: string; schema: PageSc
   };
 }
 
+function extractTabSyncStateArgs(args: unknown): {
+  fileId: string;
+  schema?: PageSchema;
+  selectedNodeId?: string;
+  isDirty?: boolean;
+  isGenerating?: boolean;
+  readOnlyReason?: string | undefined;
+  generationUpdatedAt?: number;
+} {
+  if (!isRecord(args) || typeof args.fileId !== 'string' || args.fileId.trim().length === 0) {
+    throw new Error('tab.syncState expects args: { fileId: string, ... }');
+  }
+
+  const result: {
+    fileId: string;
+    schema?: PageSchema;
+    selectedNodeId?: string;
+    isDirty?: boolean;
+    isGenerating?: boolean;
+    readOnlyReason?: string | undefined;
+    generationUpdatedAt?: number;
+  } = {
+    fileId: args.fileId.trim(),
+  };
+
+  if (Object.prototype.hasOwnProperty.call(args, 'schema')) {
+    validatePageSchema(args.schema);
+    result.schema = args.schema;
+  }
+  if (Object.prototype.hasOwnProperty.call(args, 'selectedNodeId')) {
+    if (args.selectedNodeId !== undefined && typeof args.selectedNodeId !== 'string') {
+      throw new Error('tab.syncState expects selectedNodeId to be a string');
+    }
+    if (typeof args.selectedNodeId === 'string') {
+      result.selectedNodeId = args.selectedNodeId;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(args, 'isDirty')) {
+    if (typeof args.isDirty !== 'boolean') {
+      throw new Error('tab.syncState expects isDirty to be a boolean');
+    }
+    result.isDirty = args.isDirty;
+  }
+  if (Object.prototype.hasOwnProperty.call(args, 'isGenerating')) {
+    if (typeof args.isGenerating !== 'boolean') {
+      throw new Error('tab.syncState expects isGenerating to be a boolean');
+    }
+    result.isGenerating = args.isGenerating;
+  }
+  if (Object.prototype.hasOwnProperty.call(args, 'readOnlyReason')) {
+    if (args.readOnlyReason !== undefined && args.readOnlyReason !== null && typeof args.readOnlyReason !== 'string') {
+      throw new Error('tab.syncState expects readOnlyReason to be a string');
+    }
+    if (typeof args.readOnlyReason === 'string') {
+      result.readOnlyReason = args.readOnlyReason;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(args, 'generationUpdatedAt')) {
+    if (!Number.isFinite(args.generationUpdatedAt)) {
+      throw new Error('tab.syncState expects generationUpdatedAt to be a finite number');
+    }
+    result.generationUpdatedAt = Number(args.generationUpdatedAt);
+  }
+
+  return result;
+}
+
 function createVFSFileStorageAdapter(
   vfs: VirtualFileSystemAdapter,
   projectId: string,
@@ -955,6 +1022,61 @@ function registerTabCommands(
       tabManager.activateTab(fileId);
       await restoreEditorForTab(tab);
       eventBus.emit('tab:activated', { fileId });
+    },
+  });
+
+  commands.register({
+    id: 'tab.syncState',
+    label: 'Sync Tab State',
+    recordHistory: false,
+    async execute(_currentState, args) {
+      const {
+        fileId,
+        schema,
+        selectedNodeId,
+        isDirty,
+        isGenerating,
+        readOnlyReason,
+        generationUpdatedAt,
+      } = extractTabSyncStateArgs(args);
+      const existingTab = tabManager.getTab(fileId);
+      if (!existingTab) {
+        return { synced: false };
+      }
+
+      const patch: Partial<Omit<TabState, 'fileId'>> = {
+        ...(schema ? { schema } : {}),
+        ...(selectedNodeId !== undefined ? { selectedNodeId } : {}),
+        ...(isDirty !== undefined ? { isDirty } : {}),
+        ...(isGenerating !== undefined ? { isGenerating } : {}),
+        ...(Object.prototype.hasOwnProperty.call(args as object, 'readOnlyReason')
+          ? { readOnlyReason }
+          : {}),
+        ...(generationUpdatedAt !== undefined ? { generationUpdatedAt } : {}),
+      };
+      tabManager.updateTab(fileId, patch);
+
+      const dirtyChanged = typeof isDirty === 'boolean' && existingTab.isDirty !== isDirty;
+      const syncedTab = tabManager.getTab(fileId);
+      if (!syncedTab) {
+        return { synced: false };
+      }
+
+      if (tabManager.getActiveTabId() === fileId) {
+        await restoreEditorForTab(syncedTab);
+      }
+
+      if (dirtyChanged) {
+        eventBus.emit('tab:dirtyChanged', { fileId, isDirty });
+      }
+      eventBus.emit('tab:stateChanged', {
+        fileId,
+        isDirty: syncedTab.isDirty,
+        ...(syncedTab.isGenerating !== undefined ? { isGenerating: syncedTab.isGenerating } : {}),
+        ...(syncedTab.readOnlyReason ? { readOnlyReason: syncedTab.readOnlyReason } : {}),
+        ...(syncedTab.generationUpdatedAt !== undefined ? { generationUpdatedAt: syncedTab.generationUpdatedAt } : {}),
+      });
+      return { synced: true };
     },
   });
 

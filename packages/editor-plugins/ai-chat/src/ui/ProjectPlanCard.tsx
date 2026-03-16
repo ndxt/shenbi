@@ -1,8 +1,9 @@
 import React from 'react';
-import { CheckCircle2, CircleDashed, ClipboardList, TriangleAlert } from 'lucide-react';
+import { ClipboardList, ChevronRight, ChevronDown } from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
 import type { ProjectPlan } from '../ai/api-types';
 import type { AgentLoopPageProgress, UIPhase } from '../ai/agent-loop-types';
+import { PageExecutionDetails } from './PageExecutionDetails';
 
 export interface ProjectPlanCardProps {
   projectPlan: ProjectPlan | null;
@@ -45,19 +46,6 @@ function getProgressClass(status: AgentLoopPageProgress['status']): string {
   }
 }
 
-function blockStatusLabel(status: 'waiting' | 'generating' | 'done' | 'failed') {
-  switch (status) {
-    case 'generating':
-      return '...';
-    case 'done':
-      return 'done';
-    case 'failed':
-      return 'failed';
-    default:
-      return 'wait';
-  }
-}
-
 export function ProjectPlanCard({
   projectPlan,
   pages,
@@ -74,12 +62,21 @@ export function ProjectPlanCard({
 }: ProjectPlanCardProps) {
   const { t } = useTranslation('pluginAiChat');
   const [revisionText, setRevisionText] = React.useState('');
+  const [expandedPages, setExpandedPages] = React.useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
     if (!planRevisionRequested) {
       setRevisionText('');
     }
   }, [planRevisionRequested]);
+
+  React.useEffect(() => {
+    const nextExpanded: Record<string, boolean> = {};
+    for (const page of pages ?? []) {
+      nextExpanded[page.pageId] = page.expanded ?? (page.status === 'running' || page.status === 'failed');
+    }
+    setExpandedPages(nextExpanded);
+  }, [pages]);
 
   if (!projectPlan) {
     return null;
@@ -141,9 +138,24 @@ export function ProjectPlanCard({
       <div className="flex flex-col gap-2">
         {projectPlan.pages.map((page) => {
           const pageProgress = pageProgressMap.get(page.pageId);
+          const isExpanded = expandedPages[page.pageId] ?? false;
+          const canExpand = !awaitingConfirmation && Boolean(pageProgress?.execution);
           return (
           <div key={page.pageId} className="group rounded-md border border-border-ide bg-bg-panel/70 px-3 py-2 flex flex-col gap-1.5 transition-colors hover:bg-bg-panel hover:border-blue-500/30">
             <div className="flex items-center gap-2 flex-wrap">
+              {canExpand && (
+                <button
+                  type="button"
+                  className="rounded p-0.5 text-text-secondary hover:text-text-primary transition-colors"
+                  onClick={() => setExpandedPages((current) => ({
+                    ...current,
+                    [page.pageId]: !isExpanded,
+                  }))}
+                  aria-label={isExpanded ? 'collapse page execution' : 'expand page execution'}
+                >
+                  {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </button>
+              )}
               <span className="font-semibold text-text-primary" style={{ fontSize: '13px' }}>{page.pageName}</span>
               {awaitingConfirmation ? (
                 <span className={`px-1.5 py-0.5 rounded uppercase tracking-wider font-medium ${getActionClass(page.action)}`} style={{ fontSize: '10px' }}>
@@ -167,26 +179,12 @@ export function ProjectPlanCard({
                 {t('loop.reasonLabel')}: {page.reason}
               </div>
             )}
-            {!awaitingConfirmation && pageProgress && pageProgress.blocks.length > 0 && (
-              <div className="grid grid-cols-1 gap-1 pt-1">
-                {pageProgress.blocks.map((block) => (
-                  <div key={block.id} className="rounded bg-bg-canvas px-2 py-1.5 flex items-center gap-2">
-                    {block.status === 'done' ? (
-                      <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
-                    ) : block.status === 'failed' ? (
-                      <TriangleAlert size={11} className="text-red-400 shrink-0" />
-                    ) : (
-                      <CircleDashed size={11} className={`shrink-0 ${block.status === 'generating' ? 'text-blue-500 animate-spin' : 'text-text-secondary'}`} />
-                    )}
-                    <span className="text-text-primary flex-1 truncate" style={{ fontSize: '11px' }} title={block.label}>
-                      {block.label}
-                    </span>
-                    <span className="text-text-secondary font-mono uppercase" style={{ fontSize: '10px' }}>
-                      {blockStatusLabel(block.status)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            {!awaitingConfirmation && pageProgress?.execution && isExpanded && (
+              <PageExecutionDetails
+                snapshot={pageProgress.execution}
+                variant="embedded"
+                isRunning={pageProgress.status === 'running'}
+              />
             )}
             {!awaitingConfirmation && pageProgress?.error && (
               <div className="rounded bg-red-500/10 border border-red-500/20 px-2 py-1.5 text-red-400" style={{ fontSize: '11px' }}>

@@ -398,6 +398,7 @@ describe('createEditor', () => {
     expect(editor.commands.has('tab.closeAll')).toBe(true);
     expect(editor.commands.has('tab.closeSaved')).toBe(true);
     expect(editor.commands.has('tab.save')).toBe(true);
+    expect(editor.commands.has('tab.syncState')).toBe(true);
   });
 
   it('uses VFS-backed file commands when VFS is configured', async () => {
@@ -516,6 +517,87 @@ describe('createEditor', () => {
 
     expect(editor.state.getCurrentFileId()).toBe('demo');
     expect(editor.state.getSelectedNodeId()).toBe('node-a');
+  });
+
+  it('tab.syncState updates a non-active tab without switching the visible editor', async () => {
+    const vfs = createMemoryVFS(createSchema('page-a'));
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+
+    const secondNode = await vfs.createFile(
+      'project-1',
+      null,
+      'page-b',
+      'page',
+      createSchema('page-b'),
+    );
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    await editor.commands.execute('tab.open', { fileId: secondNode.id });
+    await editor.commands.execute('tab.activate', { fileId: 'demo' });
+    const stateChanged = vi.fn();
+    editor.eventBus.on('tab:stateChanged', stateChanged);
+
+    await editor.commands.execute('tab.syncState', {
+      fileId: secondNode.id,
+      schema: createSchema('page-b-updated'),
+      isGenerating: true,
+      readOnlyReason: 'AI 正在生成此页面',
+      generationUpdatedAt: 123,
+    });
+
+    expect(editor.state.getCurrentFileId()).toBe('demo');
+    expect(editor.state.getSchema()).toMatchObject({ name: 'page-a' });
+    expect(tabManager.getTab(secondNode.id)).toMatchObject({
+      schema: expect.objectContaining({ name: 'page-b-updated' }),
+      isGenerating: true,
+      readOnlyReason: 'AI 正在生成此页面',
+      generationUpdatedAt: 123,
+    });
+    expect(stateChanged).toHaveBeenCalledWith({
+      fileId: secondNode.id,
+      isDirty: false,
+      isGenerating: true,
+      readOnlyReason: 'AI 正在生成此页面',
+      generationUpdatedAt: 123,
+    });
+  });
+
+  it('tab.syncState refreshes the active tab editor snapshot and dirty state', async () => {
+    const vfs = createMemoryVFS(createSchema('page-a'));
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+    const dirtyChanged = vi.fn();
+    editor.eventBus.on('tab:dirtyChanged', dirtyChanged);
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    await editor.commands.execute('tab.syncState', {
+      fileId: 'demo',
+      schema: createSchema('page-a-live'),
+      isDirty: true,
+      isGenerating: true,
+      generationUpdatedAt: 456,
+    });
+
+    expect(editor.state.getCurrentFileId()).toBe('demo');
+    expect(editor.state.getSchema()).toMatchObject({ name: 'page-a-live' });
+    expect(editor.state.getIsDirty()).toBe(true);
+    expect(tabManager.getTab('demo')).toMatchObject({
+      isDirty: true,
+      isGenerating: true,
+      generationUpdatedAt: 456,
+    });
+    expect(dirtyChanged).toHaveBeenCalledWith({ fileId: 'demo', isDirty: true });
   });
 
   it('restores tab manager snapshots in order', () => {

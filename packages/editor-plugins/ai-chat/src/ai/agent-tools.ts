@@ -3,7 +3,7 @@ import type { PageSchema } from '@shenbi/schema';
 import { executeAgentOperation } from './operation-executor';
 import type { AIClient, ProjectPlan } from './api-types';
 import type { EditorAIBridge } from './editor-ai-bridge';
-import type { AgentLoopBlockProgress, AgentLoopPageProgress } from './agent-loop-types';
+import type { AgentLoopPageProgress } from './agent-loop-types';
 
 export interface ToolDefinition {
   name: string;
@@ -278,7 +278,6 @@ export async function executeAgentTool(
         action: 'create',
         description: prompt,
         status: 'waiting',
-        blocks: [] as AgentLoopBlockProgress[],
       };
       return context.executeCreatePage({ pageId, pageName, prompt, fileId }, page);
     }
@@ -294,7 +293,6 @@ export async function executeAgentTool(
         action: 'modify',
         description: prompt,
         status: 'waiting',
-        blocks: [] as AgentLoopBlockProgress[],
       };
       return context.executeModifyPage({ fileId, prompt, pageName: page.pageName }, page);
     }

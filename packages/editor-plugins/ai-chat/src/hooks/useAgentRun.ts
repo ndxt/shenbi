@@ -6,15 +6,17 @@ import { executeAgentOperation } from '../ai/operation-executor';
 import { createSchemaDigest, type AgentIntent, type PagePlan, type RunAttachmentInput, type RunMetadata, type RunRequest } from '../ai/api-types';
 import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
 import type { AgentLoopResultSummary } from '../ai/agent-loop-types';
+import {
+    createPageExecutionSnapshot,
+    replaceSkeletonNode,
+    runPageExecution,
+    type BlockRunStatus,
+    type ModifyPlan,
+    type PageExecutionSnapshot,
+} from '../ai/page-execution';
 
 export type PlanConfig = PagePlan;
-export type BlockRunStatus = 'waiting' | 'generating' | 'done';
-
-export interface ModifyPlan {
-  operationCount: number;
-  explanation: string;
-  operationLabels: string[];
-}
+export type { BlockRunStatus, ModifyPlan, PageExecutionSnapshot };
 
 export interface LastRunResult {
   plan: PlanConfig | null;
@@ -37,6 +39,7 @@ export interface LastRunResult {
   debugFile?: string;
   memoryDebugFile?: string;
   agentLoop?: AgentLoopResultSummary;
+  pageExecution?: PageExecutionSnapshot;
 }
 
 
@@ -92,40 +95,6 @@ function summarizeComponents(contracts: ComponentContract[]): string {
         .join('; ');
 }
 
-function replaceNodeInTree(value: unknown, targetId: string, replacement: SchemaNode): unknown {
-    if (Array.isArray(value)) {
-        return value.map((item) => replaceNodeInTree(item, targetId, replacement));
-    }
-    if (!isSchemaNode(value)) {
-        return value;
-    }
-
-    if (value.id === targetId) {
-        return replacement;
-    }
-
-    if (Array.isArray(value.children)) {
-        return {
-            ...value,
-            children: value.children.map((child) => replaceNodeInTree(child, targetId, replacement)),
-        };
-    }
-
-    return value;
-}
-
-function replaceSkeletonNode(schema: PageSchema, blockId: string, node: SchemaNode): PageSchema {
-    const skeletonId = `${blockId}-skeleton`;
-    const nextSchema: PageSchema = {
-        ...schema,
-        body: replaceNodeInTree(schema.body, skeletonId, node) as PageSchema['body'],
-    };
-    if (Array.isArray(schema.dialogs)) {
-        nextSchema.dialogs = replaceNodeInTree(schema.dialogs, skeletonId, node) as SchemaNode[];
-    }
-    return nextSchema;
-}
-
 function hasSchemaContent(schema: PageSchema): boolean {
     const bodyCount = Array.isArray(schema.body) ? schema.body.length : (schema.body ? 1 : 0);
     const dialogCount = Array.isArray(schema.dialogs) ? schema.dialogs.length : (schema.dialogs ? 1 : 0);
@@ -173,17 +142,8 @@ function resolveSelectedNodeId(schema: PageSchema, rawId: string | undefined): s
 export function useAgentRun(bridge: EditorAIBridge | undefined) {
     const [isRunning, setIsRunning] = useState(false);
     const [progressText, setProgressText] = useState('');
-    const [currentPlan, setCurrentPlan] = useState<PlanConfig | null>(null);
-    const [blockStatuses, setBlockStatuses] = useState<Record<string, BlockRunStatus>>({});
-    const [modifyPlan, setModifyPlan] = useState<ModifyPlan | null>(null);
-    const [modifyStatuses, setModifyStatuses] = useState<Record<number, BlockRunStatus>>({});
-    const [modifyOpMetrics, setModifyOpMetrics] = useState<Record<number, AgentOperationMetrics>>({});
     const [elapsedMs, setElapsedMs] = useState(0);
-    const [blockTokens, setBlockTokens] = useState<Record<string, number>>({});
-    const [blockInputTokens, setBlockInputTokens] = useState<Record<string, number>>({});
-    const [blockOutputTokens, setBlockOutputTokens] = useState<Record<string, number>>({});
-    const [blockDurationMs, setBlockDurationMs] = useState<Record<string, number>>({});
-    const [plannerMetrics, setPlannerMetrics] = useState<AgentOperationMetrics | null>(null);
+    const [executionSnapshot, setExecutionSnapshot] = useState<PageExecutionSnapshot>(() => createPageExecutionSnapshot());
     const [lastRunResult, setLastRunResult] = useState<LastRunResult | null>(null);
     const startTimeRef = useRef<number>(0);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -198,6 +158,24 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
     const preGenerationSchemaRef = useRef<PageSchema | null>(null);
     const historyBatchActiveRef = useRef(false);
     const currentIntentRef = useRef<AgentIntent | null>(null);
+    const executionSnapshotRef = useRef<PageExecutionSnapshot>(createPageExecutionSnapshot());
+
+    const updateExecutionSnapshot = useCallback((snapshot: PageExecutionSnapshot) => {
+        executionSnapshotRef.current = snapshot;
+        setExecutionSnapshot(snapshot);
+        setProgressText(snapshot.progressText);
+    }, []);
+
+    const currentPlan = executionSnapshot.plan;
+    const blockStatuses = executionSnapshot.blockStatuses;
+    const modifyPlan = executionSnapshot.modifyPlan;
+    const modifyStatuses = executionSnapshot.modifyStatuses;
+    const modifyOpMetrics = executionSnapshot.modifyOpMetrics;
+    const blockTokens = executionSnapshot.blockTokens;
+    const blockInputTokens = executionSnapshot.blockInputTokens;
+    const blockOutputTokens = executionSnapshot.blockOutputTokens;
+    const blockDurationMs = executionSnapshot.blockDurationMs;
+    const plannerMetrics = executionSnapshot.plannerMetrics;
 
     // Block undo/redo globally during generation
     useEffect(() => {
@@ -277,15 +255,17 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         }
         setIsRunning(false);
         setProgressText('已取消');
-        setCurrentPlan(null);
-        setBlockStatuses({});
+        updateExecutionSnapshot({
+            ...createPageExecutionSnapshot(currentIntentRef.current === 'schema.modify' ? 'modify' : 'create'),
+            progressText: '已取消',
+        });
         const discardResult = historyBatchActiveRef.current
             ? await discardHistoryBatch()
             : { success: true };
         if (!discardResult.success && preGenerationSchemaRef.current && bridgeRef.current) {
             await bridgeRef.current.execute('schema.restore', { schema: preGenerationSchemaRef.current });
         }
-    }, [discardHistoryBatch]);
+    }, [discardHistoryBatch, updateExecutionSnapshot]);
 
     const runAgent = useCallback(
         async (
@@ -307,17 +287,11 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
 
             setIsRunning(true);
             setProgressText('初始化...');
-            setCurrentPlan(null);
-            setBlockStatuses({});
-            setModifyPlan(null);
-            setModifyStatuses({});
-            setModifyOpMetrics({});
             setElapsedMs(0);
-            setBlockTokens({});
-            setBlockInputTokens({});
-            setBlockOutputTokens({});
-            setBlockDurationMs({});
-            setPlannerMetrics(null);
+            updateExecutionSnapshot({
+                ...createPageExecutionSnapshot(),
+                progressText: '初始化...',
+            });
             startTimeRef.current = Date.now();
             currentIntentRef.current = null;
 
@@ -408,214 +382,85 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
             };
 
             try {
-                const stream = aiClient.runStream(request, { signal: ac.signal });
-                // Local tracking for lastRunResult snapshot
-                let localPlan: PlanConfig | null = null;
-                let localPlannerMetrics: AgentOperationMetrics | null = null;
-                const localBlockStatuses: Record<string, BlockRunStatus> = {};
-                const localBlockTokens: Record<string, number> = {};
-                const localBlockInputTokens: Record<string, number> = {};
-                const localBlockOutputTokens: Record<string, number> = {};
-                const localBlockDurationMs: Record<string, number> = {};
-                let localModifyPlan: ModifyPlan | null = null;
-                const localModifyStatuses: Record<number, BlockRunStatus> = {};
-                const localModifyOpMetrics: Record<number, AgentOperationMetrics> = {};
-
-                for await (const event of stream) {
-                    if (ac.signal.aborted) {
-                        break;
-                    }
-
-                    switch (event.type) {
-                        case 'run:start':
-                            setProgressText('运行开始');
-                            break;
-                        case 'intent':
-                            currentIntentRef.current = event.data.intent;
-                            setProgressText(
-                                event.data.intent === 'schema.modify'
-                                    ? '识别为页面修改任务'
-                                    : event.data.intent === 'schema.create'
-                                        ? '识别为页面生成任务'
-                                        : '识别为对话任务'
-                            );
-                            break;
-                        case 'message:start':
+                const executionResult = await runPageExecution({
+                    aiClient,
+                    request,
+                    signal: ac.signal,
+                    callbacks: {
+                        onIntent: async (intent) => {
+                            currentIntentRef.current = intent;
+                        },
+                        onMessageStart: async () => {
                             activeMessageId = onMessageStart();
-                            break;
-                        case 'message:delta':
+                        },
+                        onMessageDelta: async (text) => {
                             if (activeMessageId) {
-                                onMessageDelta(activeMessageId, event.data.text);
+                                onMessageDelta(activeMessageId, text);
                             }
-                            break;
-                        case 'tool:start':
-                            setProgressText(`正在使用工具: ${event.data.label ?? event.data.tool}...`);
-                            break;
-                        case 'tool:result':
-                            setProgressText(`工具: ${event.data.tool} ${event.data.ok ? '完成' : '失败'}${event.data.summary ? `. ${event.data.summary}` : ''}`);
-                            break;
-                        case 'plan':
-                            localPlan = event.data as PlanConfig;
-                            if ('_plannerMetrics' in event.data && event.data._plannerMetrics) {
-                                const m = event.data._plannerMetrics as AgentOperationMetrics;
-                                localPlannerMetrics = m;
-                                setPlannerMetrics(m);
+                        },
+                        onSnapshot: async (snapshot) => {
+                            updateExecutionSnapshot(snapshot);
+                        },
+                        onSchemaSkeleton: async (schema) => {
+                            const batchResult = await ensureHistoryBatch();
+                            if (!batchResult.success) {
+                                throw new Error(batchResult.error || 'history.beginBatch failed');
                             }
-                            setCurrentPlan(event.data);
-                            setBlockStatuses(
-                                Object.fromEntries(event.data.blocks.map((block) => [block.id, 'waiting' as const]))
-                            );
-                            setProgressText('获取到架构计划');
-                            break;
-                        case 'schema:skeleton':
-                            {
-                                const batchResult = await ensureHistoryBatch();
-                                if (!batchResult.success) {
-                                    throw new Error(batchResult.error || 'history.beginBatch failed');
-                                }
-                            }
-                            setProgressText('渲染页面骨架');
-                            bridgeRef.current?.replaceSchema(event.data.schema);
+                            bridgeRef.current?.replaceSchema(schema);
                             didApplySchemaChange = true;
-                            break;
-                        case 'schema:block:start':
-                            localBlockStatuses[event.data.blockId] = 'generating';
-                            setBlockStatuses((prev) => ({
-                                ...prev,
-                                [event.data.blockId]: 'generating',
-                            }));
-                            setProgressText(`正在生成区块: ${event.data.description}`);
-                            break;
-                        case 'schema:block':
-                            {
-                                const batchResult = await ensureHistoryBatch();
-                                if (!batchResult.success) {
-                                    throw new Error(batchResult.error || 'history.beginBatch failed');
-                                }
+                        },
+                        onSchemaBlock: async (data) => {
+                            const batchResult = await ensureHistoryBatch();
+                            if (!batchResult.success) {
+                                throw new Error(batchResult.error || 'history.beginBatch failed');
                             }
-                            setProgressText(`正在替换区块: ${event.data.node.component}`);
                             if (bridgeRef.current) {
                                 const nextSchema = replaceSkeletonNode(
                                     bridgeRef.current.getSchema(),
-                                    event.data.blockId,
-                                    event.data.node,
+                                    data.blockId,
+                                    data.node,
                                 );
                                 bridgeRef.current.replaceSchema(nextSchema);
                             }
                             didApplySchemaChange = true;
-                            localBlockStatuses[event.data.blockId] = 'done';
-                            setBlockStatuses((prev) => ({
-                                ...prev,
-                                [event.data.blockId]: 'done',
-                            }));
-                            if (typeof event.data.tokensUsed === 'number') {
-                                localBlockTokens[event.data.blockId] = event.data.tokensUsed;
-                                setBlockTokens((prev) => ({
-                                    ...prev,
-                                    [event.data.blockId]: event.data.tokensUsed as number,
-                                }));
+                        },
+                        onSchemaDone: async (schema) => {
+                            const batchResult = await ensureHistoryBatch();
+                            if (!batchResult.success) {
+                                throw new Error(batchResult.error || 'history.beginBatch failed');
                             }
-                            if (typeof event.data.inputTokens === 'number') {
-                                localBlockInputTokens[event.data.blockId] = event.data.inputTokens;
-                                setBlockInputTokens((prev) => ({ ...prev, [event.data.blockId]: event.data.inputTokens as number }));
-                            }
-                            if (typeof event.data.outputTokens === 'number') {
-                                localBlockOutputTokens[event.data.blockId] = event.data.outputTokens;
-                                setBlockOutputTokens((prev) => ({ ...prev, [event.data.blockId]: event.data.outputTokens as number }));
-                            }
-                            if (typeof event.data.durationMs === 'number') {
-                                localBlockDurationMs[event.data.blockId] = event.data.durationMs;
-                                setBlockDurationMs((prev) => ({ ...prev, [event.data.blockId]: event.data.durationMs as number }));
-                            }
-                            break;
-                        case 'schema:done':
-                            {
-                                const batchResult = await ensureHistoryBatch();
-                                if (!batchResult.success) {
-                                    throw new Error(batchResult.error || 'history.beginBatch failed');
-                                }
-                            }
-                            setProgressText('更新页面 Schema');
-                            bridgeRef.current?.replaceSchema(event.data.schema);
+                            bridgeRef.current?.replaceSchema(schema);
                             didApplySchemaChange = true;
-                            setBlockStatuses((prev) => Object.fromEntries(
-                                Object.keys(prev).map((blockId) => [blockId, 'done' as const])
-                            ));
-                            break;
-                        case 'modify:start':
-                            modifyFailed = false;
-                            failedOpIndex = undefined;
-                            failedError = undefined;
-                            {
-                                const batchResult = await ensureHistoryBatch();
-                                if (!batchResult.success) {
-                                    throw new Error(batchResult.error || 'history.beginBatch failed');
-                                }
-                            }
-                            {
-                                const labels = (event.data.operations ?? []).map((o: { op: string; label?: string; nodeId?: string }) => {
-                                    if (o.label) return o.label;
-                                    const shortOp = o.op.replace('schema.', '');
-                                    return o.nodeId ? `${shortOp} → ${o.nodeId}` : shortOp;
-                                });
-                                localModifyPlan = {
-                                    operationCount: event.data.operationCount,
-                                    explanation: event.data.explanation,
-                                    operationLabels: labels,
-                                };
-                            }
-                            setModifyPlan(localModifyPlan);
-                            for (let j = 0; j < event.data.operationCount; j++) {
-                                localModifyStatuses[j] = 'waiting';
-                            }
-                            setModifyStatuses(
-                                Object.fromEntries(
-                                    Array.from({ length: event.data.operationCount }, (_, i) => [i, 'waiting' as const])
-                                )
-                            );
-                            setProgressText(`准备执行 ${event.data.operationCount} 个修改`);
-                            break;
-                        case 'modify:op:pending':
-                            // Phase 2 LLM call is starting for this insertNode op
-                            localModifyStatuses[event.data.index] = 'generating';
-                            setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'generating' }));
-                            break;
-                        case 'modify:op':
+                        },
+                        onModifyOperation: async (data) => {
                             if (modifyFailed) {
-                                break;
+                                return;
                             }
-                            setProgressText(`执行修改 ${event.data.index + 1}`);
+                            const batchResult = await ensureHistoryBatch();
+                            if (!batchResult.success) {
+                                throw new Error(batchResult.error || 'history.beginBatch failed');
+                            }
                             if (!bridgeRef.current) {
                                 throw new Error('editor bridge unavailable');
                             }
-                            {
-                                if (event.data.metrics && Object.keys(event.data.metrics).length > 0) {
-                                setModifyOpMetrics((prev) => ({ ...prev, [event.data.index]: event.data.metrics as AgentOperationMetrics }));
-                                localModifyOpMetrics[event.data.index] = event.data.metrics as AgentOperationMetrics;
-                            }
-                            const result = await executeAgentOperation(bridgeRef.current, event.data.operation);
-                                if (!result.success) {
-                                    modifyFailed = true;
-                                    failedOpIndex = event.data.index;
-                                    failedError = result.error || `modify operation ${event.data.index + 1} failed`;
-                                    setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'done' }));
-                                    localModifyStatuses[event.data.index] = 'done';
-                                    const discardResult = await discardHistoryBatchOnFailure();
-                                    if (!discardResult.success) {
-                                        onError(`修改失败且回滚失败：第 ${event.data.index + 1} 条 ${event.data.operation.op} 执行出错 - ${discardResult.error || 'history.discardBatch failed'}`);
-                                    } else {
-                                        setProgressText(`修改已回滚：第 ${event.data.index + 1} 条失败`);
-                                    }
-                                    onError(`修改失败：第 ${event.data.index + 1} 条 ${event.data.operation.op} 执行出错${failedError ? ` - ${failedError}` : ''}`);
+                            const result = await executeAgentOperation(bridgeRef.current, data.operation);
+                            if (!result.success) {
+                                modifyFailed = true;
+                                failedOpIndex = data.index;
+                                failedError = result.error || `modify operation ${data.index + 1} failed`;
+                                const discardResult = await discardHistoryBatchOnFailure();
+                                if (!discardResult.success) {
+                                    onError(`修改失败且回滚失败：第 ${data.index + 1} 条 ${data.operation.op} 执行出错 - ${discardResult.error || 'history.discardBatch failed'}`);
                                 } else {
-                                    didApplySchemaChange = true;
-                                    setModifyStatuses((prev) => ({ ...prev, [event.data.index]: 'done' }));
-                                    localModifyStatuses[event.data.index] = 'done';
+                                    setProgressText(`修改已回滚：第 ${data.index + 1} 条失败`);
                                 }
+                                onError(`修改失败：第 ${data.index + 1} 条 ${data.operation.op} 执行出错${failedError ? ` - ${failedError}` : ''}`);
+                            } else {
+                                didApplySchemaChange = true;
                             }
-                            break;
-                        case 'modify:done':
-                            if (historyBatchActiveRef.current) {
+                        },
+                        onDone: async () => {
+                            if (currentIntentRef.current === 'schema.modify' && historyBatchActiveRef.current) {
                                 if (modifyFailed) {
                                     const discardResult = await discardHistoryBatchOnFailure();
                                     if (!discardResult.success) {
@@ -628,50 +473,56 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                                     }
                                 }
                             }
-                            setProgressText(modifyFailed ? '页面修改失败，已回滚' : '页面修改已应用');
-                            break;
-                        case 'done':
-                            {
-                                const finalizedMetadata = await finalizeModifyRun(event.data.metadata);
-                                const shouldAutoSave = didApplySchemaChange && !modifyFailed;
-                                if (shouldAutoSave && bridgeRef.current) {
-                                    const saveResult = await bridgeRef.current.execute('tab.save', { source: 'auto' });
-                                    if (saveResult.success) {
-                                        autoSaved = true;
-                                    } else {
-                                        autoSaveError = saveResult.error || '自动保存失败';
-                                    }
-                                }
-                                const runResult: LastRunResult = {
-                                    plan: localPlan,
-                                    plannerMetrics: localPlannerMetrics,
-                                    blockStatuses: { ...localBlockStatuses },
-                                    blockTokens: { ...localBlockTokens },
-                                    blockInputTokens: { ...localBlockInputTokens },
-                                    blockOutputTokens: { ...localBlockOutputTokens },
-                                    blockDurationMs: { ...localBlockDurationMs },
-                                    modifyPlan: localModifyPlan,
-                                    modifyStatuses: { ...localModifyStatuses },
-                                    modifyOpMetrics: { ...localModifyOpMetrics },
-                                    elapsedMs: Date.now() - startTimeRef.current,
-                                    statusLabel: localModifyPlan ? '页面修改已应用' : '页面生成完成',
-                                    didApplySchema: didApplySchemaChange && !modifyFailed,
-                                    ...(autoSaved ? { autoSaved: true } : {}),
-                                    ...(autoSaveError ? { autoSaveError } : {}),
-                                    ...(typeof finalizedMetadata.tokensUsed === 'number' ? { tokensUsed: finalizedMetadata.tokensUsed } : {}),
-                                    ...(typeof finalizedMetadata.durationMs === 'number' ? { durationMs: finalizedMetadata.durationMs } : {}),
-                                    ...(finalizedMetadata.debugFile ? { debugFile: finalizedMetadata.debugFile } : {}),
-                                    ...(finalizedMetadata.memoryDebugFile ? { memoryDebugFile: finalizedMetadata.memoryDebugFile } : {}),
-                                };
-                                setLastRunResult(runResult);
-                                onRunComplete?.(runResult);
-                                onDone(finalizedMetadata);
-                            }
-                            break;
-                        case 'error':
-                            throw new Error(event.data.message);
+                        },
+                    },
+                });
+
+                const finalizedMetadata = await finalizeModifyRun(
+                    executionResult.metadata ?? { sessionId: conversationId ?? 'unknown', ...(conversationId ? { conversationId } : {}) },
+                );
+                const finalizedSnapshot: PageExecutionSnapshot = {
+                    ...executionResult.snapshot,
+                    ...(finalizedMetadata ? { metadata: finalizedMetadata } : {}),
+                    progressText: currentIntentRef.current === 'schema.modify'
+                        ? (modifyFailed ? '页面修改失败，已回滚' : '页面修改已应用')
+                        : executionResult.snapshot.progressText,
+                };
+                updateExecutionSnapshot(finalizedSnapshot);
+
+                const shouldAutoSave = didApplySchemaChange && !modifyFailed;
+                if (shouldAutoSave && bridgeRef.current) {
+                    const saveResult = await bridgeRef.current.execute('tab.save', { source: 'auto' });
+                    if (saveResult.success) {
+                        autoSaved = true;
+                    } else {
+                        autoSaveError = saveResult.error || '自动保存失败';
                     }
                 }
+                const runResult: LastRunResult = {
+                    plan: finalizedSnapshot.plan,
+                    plannerMetrics: finalizedSnapshot.plannerMetrics,
+                    blockStatuses: { ...finalizedSnapshot.blockStatuses },
+                    blockTokens: { ...finalizedSnapshot.blockTokens },
+                    blockInputTokens: { ...finalizedSnapshot.blockInputTokens },
+                    blockOutputTokens: { ...finalizedSnapshot.blockOutputTokens },
+                    blockDurationMs: { ...finalizedSnapshot.blockDurationMs },
+                    modifyPlan: finalizedSnapshot.modifyPlan,
+                    modifyStatuses: { ...finalizedSnapshot.modifyStatuses },
+                    modifyOpMetrics: { ...finalizedSnapshot.modifyOpMetrics },
+                    elapsedMs: Date.now() - startTimeRef.current,
+                    statusLabel: finalizedSnapshot.modifyPlan ? '页面修改已应用' : '页面生成完成',
+                    didApplySchema: didApplySchemaChange && !modifyFailed,
+                    ...(autoSaved ? { autoSaved: true } : {}),
+                    ...(autoSaveError ? { autoSaveError } : {}),
+                    ...(typeof finalizedMetadata.tokensUsed === 'number' ? { tokensUsed: finalizedMetadata.tokensUsed } : {}),
+                    ...(typeof finalizedMetadata.durationMs === 'number' ? { durationMs: finalizedMetadata.durationMs } : {}),
+                    ...(finalizedMetadata.debugFile ? { debugFile: finalizedMetadata.debugFile } : {}),
+                    ...(finalizedMetadata.memoryDebugFile ? { memoryDebugFile: finalizedMetadata.memoryDebugFile } : {}),
+                    pageExecution: finalizedSnapshot,
+                };
+                setLastRunResult(runResult);
+                onRunComplete?.(runResult);
+                onDone(finalizedMetadata);
             } catch (err: any) {
                 if (!ac.signal.aborted) {
                     onError(err.message || '未知错误');
@@ -708,6 +559,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
         blockOutputTokens,
         blockDurationMs,
         plannerMetrics,
+        executionSnapshot,
         lastRunResult,
         setLastRunResult,
         runAgent,

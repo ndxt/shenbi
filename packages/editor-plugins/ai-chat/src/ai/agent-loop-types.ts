@@ -1,4 +1,5 @@
 import type { LoopSessionState, ProjectPlan, ReActStep } from './api-types';
+import type { PageExecutionSnapshot } from './page-execution';
 
 export type UIPhase =
   | 'idle'
@@ -15,15 +16,6 @@ export type AgentLoopPageStatus =
   | 'failed'
   | 'skipped';
 
-export interface AgentLoopBlockProgress {
-  id: string;
-  label: string;
-  status: 'waiting' | 'generating' | 'done' | 'failed';
-  durationMs?: number;
-  inputTokens?: number;
-  outputTokens?: number;
-}
-
 export interface AgentLoopPageProgress {
   pageId: string;
   pageName: string;
@@ -34,7 +26,8 @@ export interface AgentLoopPageProgress {
   fileId?: string;
   durationMs?: number;
   error?: string;
-  blocks: AgentLoopBlockProgress[];
+  execution?: PageExecutionSnapshot;
+  expanded?: boolean;
 }
 
 export interface AgentLoopResultSummary {
