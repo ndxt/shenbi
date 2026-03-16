@@ -3,4 +3,7 @@
 /* Shared scan strategy for editor-ui package components. */
 @source "../**/*.{ts,tsx}";
 
+/* Scan editor-plugins so Tailwind generates CSS for plugin components (e.g. ai-chat). */
+@source "../../../editor-plugins/**/src/**/*.{ts,tsx}";
+
 @import "./preview-ide.css";
