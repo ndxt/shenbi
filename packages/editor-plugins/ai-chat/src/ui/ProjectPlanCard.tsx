@@ -83,9 +83,11 @@ export function ProjectPlanCard({
         <div className="text-text-primary font-semibold" style={{ fontSize: '12px' }}>
           {projectPlan.projectName}
         </div>
-        <div className="text-text-secondary mt-1" style={{ fontSize: '11px' }}>
-          {awaitingConfirmation ? t('loop.planAwaitingConfirm') : t('loop.planConfirmed')}
-        </div>
+        {!awaitingConfirmation && (
+          <div className="text-text-secondary mt-1" style={{ fontSize: '11px' }}>
+            {t('loop.planConfirmed')}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -160,23 +162,28 @@ export function ProjectPlanCard({
               </div>
             </>
           ) : (
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                className="h-8 px-3 rounded-md bg-blue-500 text-white text-[12px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm"
-                onClick={onConfirm}
-              >
-                <CheckCircle2 size={11} />
-                {t('loop.confirmPlan')}
-              </button>
-              <button
-                type="button"
-                className="h-8 px-3 rounded-md border border-border-ide text-text-secondary text-[12px] inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
-                onClick={onRequestRevision}
-              >
-                <PencilLine size={11} />
-                {t('loop.requestRevision')}
-              </button>
+            <div className="flex flex-col gap-2">
+              <div className="text-text-secondary" style={{ fontSize: '11px' }}>
+                {t('loop.planAwaitingConfirm')}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="h-7 px-2.5 rounded-md bg-blue-500 text-white text-[11px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap shadow-sm"
+                  onClick={onConfirm}
+                >
+                  <CheckCircle2 size={10} />
+                  <span className="leading-none">{t('loop.confirmPlan')}</span>
+                </button>
+                <button
+                  type="button"
+                  className="h-7 px-2.5 rounded-md border border-border-ide text-text-secondary text-[11px] inline-flex items-center justify-center gap-1 whitespace-nowrap"
+                  onClick={onRequestRevision}
+                >
+                  <PencilLine size={10} />
+                  <span className="leading-none">{t('loop.requestRevision')}</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
