@@ -9,10 +9,14 @@ import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import { createPendingAttachment, materializePendingAttachments, type PendingAttachment } from '../attachments';
 import { useModels } from '../hooks/useModels';
 import { useChatSession } from '../hooks/useChatSession';
-import { useAgentRun } from '../hooks/useAgentRun';
+import { useAgentLoop } from '../hooks/useAgentLoop';
 import { ChatMessageList } from './ChatMessageList';
 import { ChatInput, type PromptOption } from './ChatInput';
+import { LoopTraceViewer } from './LoopTraceViewer';
 import { ModelSelector } from './ModelSelector';
+import { ProjectPlanCard } from './ProjectPlanCard';
+import { ProjectProgressCard } from './ProjectProgressCard';
+import { ReActStepList } from './ReActStepList';
 
 export interface AIPanelProps {
   bridge?: EditorAIBridge;
@@ -76,22 +80,37 @@ export function AIPanel({
   } = useChatSession(persistence);
 
   const {
+    mode,
+    phase,
     isRunning,
     progressText,
+    elapsedMs,
+    steps,
+    projectPlan,
+    pages,
+    errorMessage,
+    legacy,
+    planRevisionRequested,
+    runAgent,
+    cancelRun,
+    resetLoopState,
+    confirmProjectPlan,
+    requestProjectPlanRevision,
+    cancelProjectPlanRevision,
+    submitProjectPlanRevision,
+  } = useAgentLoop(bridge, persistence);
+  const {
     currentPlan,
     blockStatuses,
     modifyPlan,
     modifyStatuses,
     modifyOpMetrics,
-    elapsedMs,
     blockTokens,
     blockInputTokens,
     blockOutputTokens,
     blockDurationMs,
     plannerMetrics,
-    runAgent,
-    cancelRun,
-  } = useAgentRun(bridge);
+  } = legacy;
 
   // Memoized prompt presets from i18n
   const promptPresets = useMemo(() => getPromptPresets(t), [t]);
@@ -238,11 +257,12 @@ export function AIPanel({
     if (isRunning) {
       return;
     }
+    void resetLoopState();
     resetSession();
     setDraftText('');
     setPendingAttachments([]);
     void executePluginCommand(pluginContext ?? {}, 'workspace.resetDocument');
-  }, [isRunning, pluginContext, resetSession]);
+  }, [isRunning, pluginContext, resetLoopState, resetSession]);
 
   const handleAddFiles = React.useCallback((files: File[]) => {
     const nextAttachments: PendingAttachment[] = [];
@@ -416,7 +436,7 @@ export function AIPanel({
 
           <ChatMessageList messages={messages} onDismissRunResult={dismissRunResult} />
 
-          {isRunning && (
+          {mode !== 'loop' && isRunning && (
             <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col shadow-sm relative overflow-hidden mt-2">
               <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-400 to-blue-500 animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
               <div className="flex items-center gap-2 text-text-primary pb-2 mb-2" style={{ fontSize: '11px' }}>
@@ -468,6 +488,43 @@ export function AIPanel({
                 </div>
               )}
             </div>
+          )}
+
+          {mode === 'loop' && (
+            <>
+              <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-400 to-blue-500 animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
+                <div className="flex items-center gap-2 text-text-primary">
+                  <LoaderCircle size={12} className={`text-blue-500 shrink-0 ${isRunning ? 'animate-spin' : ''}`} style={isRunning ? { animation: 'spin 1s linear infinite' } : undefined} />
+                  <span className="font-semibold text-blue-500 shrink-0" style={{ fontSize: '11px' }}>
+                    {phase === 'awaiting_confirmation' ? t('loop.awaitingConfirmation') : phase === 'done' ? t('loop.loopDone') : phase === 'error' ? t('loop.loopError') : t('loop.loopRunning')}
+                  </span>
+                  <span className="opacity-70 ml-1 truncate flex-1" style={{ fontSize: '11px' }}>{progressText}</span>
+                  <span className="text-text-secondary font-mono shrink-0 tabular-nums" style={{ fontSize: '10px' }}>
+                    {Math.floor(elapsedMs / 1000)}s
+                  </span>
+                </div>
+                {errorMessage && (
+                  <div className="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-red-400" style={{ fontSize: '11px' }}>
+                    {errorMessage}
+                  </div>
+                )}
+              </div>
+
+              <ProjectPlanCard
+                projectPlan={projectPlan}
+                phase={phase}
+                planRevisionRequested={planRevisionRequested}
+                onConfirm={confirmProjectPlan}
+                onRequestRevision={requestProjectPlanRevision}
+                onCancelRevision={cancelProjectPlanRevision}
+                onSubmitRevision={submitProjectPlanRevision}
+              />
+
+              <ProjectProgressCard pages={pages} />
+              <ReActStepList steps={steps} isRunning={isRunning} />
+              <LoopTraceViewer steps={steps} />
+            </>
           )}
 
 

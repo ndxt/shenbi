@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createEditor, getSchemaNodeByTreeId, getTreeIdBySchemaNodeId } from '@shenbi/editor-core';
 import type { PageSchema } from '@shenbi/schema';
 import { resetAIClient, setAIClient } from '../ai/sse-client';
-import type { AIClient, AgentEvent, FinalizeRequest, FinalizeResult, RunRequest, RunStreamOptions } from '../ai/api-types';
+import type { AIClient, AgentEvent, ChatRequest, ChatResponse, FinalizeRequest, FinalizeResult, RunRequest, RunStreamOptions } from '../ai/api-types';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import { useAgentRun } from './useAgentRun';
 
@@ -82,6 +82,17 @@ class ScenarioAIClient implements AIClient {
   async finalize(request: FinalizeRequest): Promise<FinalizeResult> {
     this.finalizeCalls.push(request);
     return this.finalizeResult;
+  }
+
+  async chat(_request: ChatRequest): Promise<ChatResponse> {
+    return {
+      content: 'Action: finish\nAction Input: {"summary":"noop"}',
+    };
+  }
+
+  async *chatStream(_request: ChatRequest, _options: RunStreamOptions = {}): AsyncIterable<{ delta: string }> {
+    yield { delta: 'Action: finish\n' };
+    yield { delta: 'Action Input: {"summary":"noop"}' };
   }
 }
 

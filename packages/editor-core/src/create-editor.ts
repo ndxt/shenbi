@@ -160,6 +160,18 @@ function extractFileNameFromArgs(args: unknown): string {
   return args.name.trim();
 }
 
+function extractWriteSchemaArgs(args: unknown): { fileId: string; schema: PageSchema } {
+  if (!isRecord(args) || typeof args.fileId !== 'string' || args.fileId.trim().length === 0 || !('schema' in args)) {
+    throw new Error('file.writeSchema expects args: { fileId: string, schema: PageSchema }');
+  }
+  const schema = args.schema;
+  validatePageSchema(schema);
+  return {
+    fileId: args.fileId.trim(),
+    schema,
+  };
+}
+
 function extractTreeIdFromArgs(args: unknown, commandId: string): string {
   if (!isRecord(args) || typeof args.treeId !== 'string' || args.treeId.trim().length === 0) {
     throw new Error(`${commandId} expects args: { treeId: string, ... }`);
@@ -511,6 +523,16 @@ function registerBuiltinCommands(
   });
 
   commands.register({
+    id: 'file.readSchema',
+    label: 'Read File',
+    recordHistory: false,
+    async execute(_currentState, args) {
+      const fileId = extractFileIdFromArgs(args);
+      return fileStorage.read(fileId);
+    },
+  });
+
+  commands.register({
     id: 'file.saveSchema',
     label: 'Save File',
     recordHistory: false,
@@ -528,6 +550,17 @@ function registerBuiltinCommands(
   });
 
   commands.register({
+    id: 'file.writeSchema',
+    label: 'Write File',
+    recordHistory: false,
+    async execute(_currentState, args) {
+      const { fileId, schema } = extractWriteSchemaArgs(args);
+      await fileStorage.write(fileId, schema);
+      eventBus.emit('file:saved', { fileId, source: 'auto' });
+    },
+  });
+
+  commands.register({
     id: 'file.saveAs',
     label: 'Save As',
     recordHistory: false,
@@ -541,6 +574,23 @@ function registerBuiltinCommands(
       currentState.setDirty(false);
       eventBus.emit('file:saved', { fileId });
       return fileId;
+    },
+  });
+
+  commands.register({
+    id: 'file.deleteSchema',
+    label: 'Delete File',
+    recordHistory: false,
+    async execute(currentState, args) {
+      const fileId = extractFileIdFromArgs(args);
+      if (!fileStorage.delete) {
+        throw new Error('delete is not supported by current adapter');
+      }
+      await fileStorage.delete(fileId);
+      if (currentState.getCurrentFileId() === fileId) {
+        updateCurrentFileId(currentState, undefined);
+      }
+      eventBus.emit('file:deleted', { fileId });
     },
   });
 }

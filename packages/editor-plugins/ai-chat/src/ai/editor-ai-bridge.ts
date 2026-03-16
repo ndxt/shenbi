@@ -15,6 +15,7 @@ export interface EditorBridgeSnapshot {
 export interface ExecuteResult {
   success: boolean;
   error?: string;
+  data?: unknown;
 }
 
 export interface EditorAIBridge {
@@ -176,8 +177,8 @@ export function createEditorAIBridgeFromPluginContext(
 
         const hasCommandHandler = Boolean(options.context.commands?.execute || options.context.executeCommand);
         if (hasCommandHandler) {
-          await executePluginCommand(options.context, commandId, args);
-          return { success: true };
+          const data = await executePluginCommand(options.context, commandId, args);
+          return { success: true, data };
         }
         if (commandId === 'schema.replace' && args && typeof args === 'object' && 'schema' in args) {
           if (replacePluginSchema(options.context, (args as { schema: PageSchema }).schema)) {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createApp } from '../app.ts';
 import type { AgentRuntime } from '../runtime/types.ts';
-import type { AgentEvent, FinalizeRequest, RunMetadata } from '@shenbi/ai-contracts';
+import type { AgentEvent, ChatRequest, ChatResponse, FinalizeRequest, RunMetadata } from '@shenbi/ai-contracts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -40,6 +40,20 @@ function makeRuntime(overrides: Partial<AgentRuntime> = {}): AgentRuntime {
       for (const e of FAKE_EVENTS) {
         yield e;
       }
+    },
+    async chat() {
+      return {
+        content: 'chat response',
+        tokensUsed: {
+          input: 3,
+          output: 5,
+          total: 8,
+        },
+      };
+    },
+    async *chatStream() {
+      yield { delta: 'chat ' };
+      yield { delta: 'response' };
     },
     async finalize() {
       return {};
@@ -265,6 +279,85 @@ describe('POST /api/ai/run/finalize', () => {
       error: 'node not found',
       schemaDigest: 'fnv1a-12345678',
     });
+  });
+});
+
+describe('POST /api/ai/chat', () => {
+  const VALID_CHAT_BODY = {
+    model: 'openai-compatible::glm-4.6',
+    messages: [
+      { role: 'system', content: 'You are helpful.' },
+      { role: 'user', content: 'List the next step.' },
+    ],
+  };
+
+  it('returns non-stream chat response', async () => {
+    let received: ChatRequest | undefined;
+    const app = createApp({
+      runtime: makeRuntime({
+        async chat(request) {
+          received = request;
+          return {
+            content: 'next step',
+            tokensUsed: { input: 4, output: 6, total: 10 },
+            durationMs: 12,
+          } satisfies ChatResponse;
+        },
+      }),
+    });
+
+    const res = await app.request('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(VALID_CHAT_BODY),
+    });
+
+    expect(res.status).toBe(200);
+    expect(received).toEqual(VALID_CHAT_BODY);
+    expect(await res.json()).toEqual({
+      success: true,
+      data: {
+        content: 'next step',
+        tokensUsed: { input: 4, output: 6, total: 10 },
+        durationMs: 12,
+      },
+    });
+  });
+
+  it('streams chat deltas over SSE when stream=true', async () => {
+    const app = createApp({
+      runtime: makeRuntime({
+        async *chatStream() {
+          yield { delta: 'step ' };
+          yield { delta: 'one' };
+        },
+      }),
+    });
+
+    const res = await app.request('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...VALID_CHAT_BODY, stream: true }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toContain('text/event-stream');
+    expect(await res.text()).toContain('"delta":"step "');
+    expect(await app.request('/health')).toBeTruthy();
+  });
+
+  it('rejects invalid chat payloads', async () => {
+    const app = createApp();
+    const res = await app.request('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: '', messages: [] }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json() as { success: boolean; error: string };
+    expect(json.success).toBe(false);
+    expect(json.error).toMatch(/model|messages/i);
   });
 });
 

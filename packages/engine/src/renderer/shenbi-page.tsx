@@ -53,7 +53,10 @@ export function ShenbiPage({
     const isOpen = runtime.state[visibleKey] === true;
     const payload = runtime.dialogPayloads[dialogId];
 
-    // 始终渲染，通过 open 状态控制显隐，让 Ant Design 处理开关动画和遮罩交互
+    if (!isOpen) {
+      return null;
+    }
+
     return createElement(NodeRenderer, {
       key: dialogId,
       node: dialog,

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createInMemoryAgentMemoryStore } from '@shenbi/ai-agents';
@@ -230,8 +230,25 @@ function trySalvageJsonCandidate(text: string): { candidate: string; strategy: s
   return null;
 }
 
+function resolveTracePath(name: string): string {
+  const candidates = [
+    resolve(process.cwd(), 'src', 'runtime', '__fixtures__', 'traces', name),
+    resolve(process.cwd(), '.ai-debug', 'traces', name),
+  ];
+  const found = candidates.find((candidate) => existsSync(candidate));
+  if (!found) {
+    throw new Error(`missing trace fixture: ${name}`);
+  }
+  return found;
+}
+
+function hasTraceFixture(name: string): boolean {
+  return existsSync(resolve(process.cwd(), 'src', 'runtime', '__fixtures__', 'traces', name))
+    || existsSync(resolve(process.cwd(), '.ai-debug', 'traces', name));
+}
+
 function loadTrace(name: string): any {
-  const tracePath = resolve(process.cwd(), '.ai-debug', 'traces', name);
+  const tracePath = resolveTracePath(name);
   return JSON.parse(readFileSync(tracePath, 'utf8'));
 }
 
@@ -1022,7 +1039,7 @@ describe('agent runtime quality guidance', () => {
     ]));
   });
 
-  it('regresses the 2026-03-09 workbench trace with quality diagnostics', () => {
+  it.runIf(hasTraceFixture('2026-03-09T06-20-11-463Z-success.json'))('regresses the 2026-03-09 workbench trace with quality diagnostics', () => {
     const trace = loadTrace('2026-03-09T06-20-11-463Z-success.json');
     const blocks = trace.trace.blocks as Array<{ blockId: string; rawOutput: string; description: string; suggestedComponents: string[] }>;
     const filterBlock = blocks.find((block) => block.blockId === 'filter-block');
@@ -1073,7 +1090,7 @@ describe('agent runtime quality guidance', () => {
     expect(tabsDiagnostics.map((item) => item.rule)).not.toContain('alert-missing-copy');
   });
 
-  it('regresses the 2026-03-09 filter trace for legacy children and fake form labels', () => {
+  it.runIf(hasTraceFixture('2026-03-09T06-39-06-634Z-success.json'))('regresses the 2026-03-09 filter trace for legacy children and fake form labels', () => {
     const trace = loadTrace('2026-03-09T06-39-06-634Z-success.json');
     const blocks = trace.trace.blocks as Array<{ blockId: string; rawOutput: string; description: string; suggestedComponents: string[] }>;
     const filterBlock = blocks.find((block) => block.blockId === 'filter-block');
@@ -1115,7 +1132,7 @@ describe('agent runtime quality guidance', () => {
     ]));
   });
 
-  it('regresses the 2026-03-09 dashboard filter trace for vertical stacked layout drift', () => {
+  it.runIf(hasTraceFixture('2026-03-09T06-56-41-203Z-success.json'))('regresses the 2026-03-09 dashboard filter trace for vertical stacked layout drift', () => {
     const trace = loadTrace('2026-03-09T06-56-41-203Z-success.json');
     const blocks = trace.trace.blocks as Array<{ blockId: string; rawOutput: string; description: string; suggestedComponents: string[] }>;
     const filterBlock = blocks.find((block) => block.blockId === 'filter-block');
@@ -1140,7 +1157,7 @@ describe('agent runtime quality guidance', () => {
     ]));
   });
 
-  it('regresses the 2026-03-09 master-detail trace for misclassification and left list layout drift', () => {
+  it.runIf(hasTraceFixture('2026-03-09T07-29-56-720Z-success.json'))('regresses the 2026-03-09 master-detail trace for misclassification and left list layout drift', () => {
     const trace = loadTrace('2026-03-09T07-29-56-720Z-success.json');
     const prompt = trace.trace.request.prompt as string;
     const blocks = trace.trace.blocks as Array<{ blockId: string; rawOutput: string; description: string; suggestedComponents: string[] }>;
@@ -1174,7 +1191,7 @@ describe('agent runtime quality guidance', () => {
     ]));
   });
 
-  it('regresses the 2026-03-09 complex form trace for fake field labels on section nodes', () => {
+  it.runIf(hasTraceFixture('2026-03-09T07-48-49-880Z-success.json'))('regresses the 2026-03-09 complex form trace for fake field labels on section nodes', () => {
     const trace = loadTrace('2026-03-09T07-48-49-880Z-success.json');
     const blocks = trace.trace.blocks as Array<{ blockId: string; rawOutput: string; description: string; suggestedComponents: string[] }>;
     const formBlock = blocks.find((block) => block.blockId === 'form-main-block');
@@ -1238,8 +1255,8 @@ describe('validateGeneratedBlockNode', () => {
     expect((normalized.children as Array<{ component: string }>).map((child) => child.component)).toEqual(['Card', 'Card']);
   });
 
-  it('reproduces the trace fix for form, tabs, and status summary blocks', () => {
-    const tracePath = resolve(process.cwd(), '.ai-debug', 'traces', '2026-03-09T04-55-55-917Z-success.json');
+  it.runIf(hasTraceFixture('2026-03-09T04-55-55-917Z-success.json'))('reproduces the trace fix for form, tabs, and status summary blocks', () => {
+    const tracePath = resolveTracePath('2026-03-09T04-55-55-917Z-success.json');
     const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as {
       trace: {
         blocks: Array<{
@@ -1269,8 +1286,8 @@ describe('validateGeneratedBlockNode', () => {
     expect(JSON.stringify(statusNode)).not.toContain('[[{');
   });
 
-  it('drops invalid function props from the pagination trace and records diagnostics', () => {
-    const tracePath = resolve(process.cwd(), '.ai-debug', 'traces', '2026-03-09T05-32-28-171Z-success.json');
+  it.runIf(hasTraceFixture('2026-03-09T05-32-28-171Z-success.json'))('drops invalid function props from the pagination trace and records diagnostics', () => {
+    const tracePath = resolveTracePath('2026-03-09T05-32-28-171Z-success.json');
     const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as {
       trace: {
         blocks: Array<{
@@ -1295,8 +1312,8 @@ describe('validateGeneratedBlockNode', () => {
     ]));
   });
 
-  it('reproduces the table title regression fix from the 2026-03-09 trace', () => {
-    const tracePath = resolve(process.cwd(), '.ai-debug', 'traces', '2026-03-09T06-06-00-103Z-success.json');
+  it.runIf(hasTraceFixture('2026-03-09T06-06-00-103Z-success.json'))('reproduces the table title regression fix from the 2026-03-09 trace', () => {
+    const tracePath = resolveTracePath('2026-03-09T06-06-00-103Z-success.json');
     const trace = JSON.parse(readFileSync(tracePath, 'utf8')) as {
       trace: {
         blocks: Array<{

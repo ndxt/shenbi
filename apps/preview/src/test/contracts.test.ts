@@ -36,7 +36,7 @@ describe('contracts/runtime verification', () => {
     for (const contract of builtinContracts) {
       expect(contract.componentType).toBeTruthy();
       expect(contract.version).toBe('1.0.0');
-      expect(contract.runtimeType).toMatch(/^(antd|shenbi)\./);
+      expect(contract.runtimeType).toMatch(/^(antd|shenbi|Chart)\./);
     }
   });
 

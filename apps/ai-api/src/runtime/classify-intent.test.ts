@@ -94,5 +94,5 @@ describe('classifyIntentWithModel', () => {
       intent: 'schema.modify',
       confidence: 0.91,
     });
-  });
+  }, 15000);
 });

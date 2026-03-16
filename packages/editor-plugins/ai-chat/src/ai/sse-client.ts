@@ -1,7 +1,8 @@
-import type { AIClient, AgentEvent, FinalizeRequest, FinalizeResult, RunRequest, RunStreamOptions } from './api-types';
+import type { AIClient, AgentEvent, ChatRequest, ChatResponse, FinalizeRequest, FinalizeResult, RunRequest, RunStreamOptions } from './api-types';
 
 const DEFAULT_STREAM_ENDPOINT = '/api/ai/run/stream';
 const DEFAULT_FINALIZE_ENDPOINT = '/api/ai/run/finalize';
+const DEFAULT_CHAT_ENDPOINT = '/api/ai/chat';
 const TEXT_DECODER = new TextDecoder();
 
 function createRequestInit(request: RunRequest, signal?: AbortSignal): RequestInit {
@@ -96,21 +97,24 @@ async function* parseEventStream(body: ReadableStream<Uint8Array>): AsyncIterabl
 }
 
 export interface FetchAIClientOptions {
-    endpoint?: string;
-    finalizeEndpoint?: string;
-    fetchImplementation?: typeof fetch;
+  endpoint?: string;
+  finalizeEndpoint?: string;
+  chatEndpoint?: string;
+  fetchImplementation?: typeof fetch;
 }
 
 export class FetchAIClient implements AIClient {
-    private readonly endpoint: string;
-    private readonly finalizeEndpoint: string;
-    private readonly fetchImplementation: typeof fetch;
+  private readonly endpoint: string;
+  private readonly finalizeEndpoint: string;
+  private readonly chatEndpoint: string;
+  private readonly fetchImplementation: typeof fetch;
 
     constructor(options: FetchAIClientOptions = {}) {
-        this.endpoint = options.endpoint ?? DEFAULT_STREAM_ENDPOINT;
-        this.finalizeEndpoint = options.finalizeEndpoint ?? DEFAULT_FINALIZE_ENDPOINT;
-        this.fetchImplementation = options.fetchImplementation ?? globalThis.fetch.bind(globalThis);
-    }
+    this.endpoint = options.endpoint ?? DEFAULT_STREAM_ENDPOINT;
+    this.finalizeEndpoint = options.finalizeEndpoint ?? DEFAULT_FINALIZE_ENDPOINT;
+    this.chatEndpoint = options.chatEndpoint ?? DEFAULT_CHAT_ENDPOINT;
+    this.fetchImplementation = options.fetchImplementation ?? globalThis.fetch.bind(globalThis);
+  }
 
     async *runStream(request: RunRequest, options: RunStreamOptions = {}): AsyncIterable<AgentEvent> {
         const response = await this.fetchImplementation(
@@ -128,7 +132,7 @@ export class FetchAIClient implements AIClient {
         yield* parseEventStream(response.body);
     }
 
-    async finalize(request: FinalizeRequest): Promise<FinalizeResult> {
+  async finalize(request: FinalizeRequest): Promise<FinalizeResult> {
         const response = await this.fetchImplementation(this.finalizeEndpoint, {
             method: 'POST',
             headers: {
@@ -140,9 +144,85 @@ export class FetchAIClient implements AIClient {
         if (!response.ok) {
             throw new Error(await readResponseError(response));
         }
-        const payload = await response.json() as { success?: boolean; data?: FinalizeResult };
-        return payload.data ?? {};
+    const payload = await response.json() as { success?: boolean; data?: FinalizeResult };
+    return payload.data ?? {};
+  }
+
+  async chat(request: ChatRequest): Promise<ChatResponse> {
+    const response = await this.fetchImplementation(this.chatEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...request,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readResponseError(response));
     }
+    const payload = await response.json() as { success?: boolean; data?: ChatResponse };
+    return payload.data ?? { content: '' };
+  }
+
+  async *chatStream(request: ChatRequest, options: RunStreamOptions = {}): AsyncIterable<{ delta: string }> {
+    const response = await this.fetchImplementation(this.chatEndpoint, {
+      method: 'POST',
+      headers: {
+        Accept: 'text/event-stream',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...request,
+        stream: true,
+      }),
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readResponseError(response));
+    }
+    if (!response.body) {
+      throw new Error('AI chat stream response body is missing');
+    }
+
+    const reader = response.body.getReader();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += TEXT_DECODER.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+
+        let boundaryIndex = buffer.indexOf('\n\n');
+        while (boundaryIndex !== -1) {
+          const chunk = buffer.slice(0, boundaryIndex);
+          buffer = buffer.slice(boundaryIndex + 2);
+          const dataLines = chunk
+            .split('\n')
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.slice('data:'.length).trimStart());
+          if (dataLines.length > 0) {
+            const parsed = JSON.parse(dataLines.join('\n')) as { delta?: string; error?: string };
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
+            if (parsed.delta) {
+              yield { delta: parsed.delta };
+            }
+          }
+          boundaryIndex = buffer.indexOf('\n\n');
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
 }
 
 export let aiClient: AIClient = new FetchAIClient();

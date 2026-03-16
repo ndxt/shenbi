@@ -4,6 +4,74 @@ export interface ThinkingConfig {
   type: 'enabled' | 'disabled';
 }
 
+export type ChatRole = 'system' | 'user' | 'assistant';
+
+export interface ChatMessageInput {
+  role: ChatRole;
+  content: string;
+}
+
+export interface ChatRequest {
+  messages: ChatMessageInput[];
+  model: string;
+  maxTokens?: number;
+  thinking?: ThinkingConfig;
+  stream?: boolean;
+}
+
+export interface ChatResponse {
+  content: string;
+  tokensUsed?: {
+    input?: number;
+    output?: number;
+    total?: number;
+  };
+  durationMs?: number;
+}
+
+export type ProjectPlanPageAction = 'create' | 'modify' | 'skip';
+
+export interface ProjectPlanPage {
+  pageId: string;
+  pageName: string;
+  action: ProjectPlanPageAction;
+  description: string;
+  reason?: string;
+}
+
+export interface ProjectPlan {
+  projectName: string;
+  pages: ProjectPlanPage[];
+}
+
+export interface ReActStep {
+  stepIndex: number;
+  timestamp: string;
+  status?: string;
+  reasoningSummary?: string;
+  action: string;
+  actionInput: Record<string, unknown>;
+  observation?: string;
+  llmDurationMs?: number;
+  toolDurationMs?: number;
+  tokensInput?: number;
+  tokensOutput?: number;
+  nestedTraceFile?: string;
+  error?: string;
+}
+
+export interface LoopSessionState {
+  conversationId: string;
+  status: 'planning' | 'awaiting_confirmation' | 'executing' | 'done' | 'failed' | 'cancelled';
+  approvedPlan?: ProjectPlan;
+  createdFileIds: string[];
+  completedPageIds: string[];
+  failedPageIds: string[];
+  currentPageId?: string;
+  lastCompletedAction?: string;
+  updatedAt: string;
+}
+
 export type RunAttachmentKind = 'image' | 'document';
 
 export interface RunAttachmentInput {

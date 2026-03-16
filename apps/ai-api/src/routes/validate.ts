@@ -2,7 +2,7 @@
  * RunRequest 校验 — 首版必须校验 prompt、context.schemaSummary、context.componentSummary
  */
 import { ValidationError } from '../adapters/errors.ts';
-import type { FinalizeRequest, RunRequest } from '@shenbi/ai-contracts';
+import type { ChatRequest, FinalizeRequest, RunRequest } from '@shenbi/ai-contracts';
 import { MAX_ATTACHMENT_BYTES, SUPPORTED_DOCUMENT_MIME_TYPES } from '../runtime/request-attachments.ts';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -158,6 +158,68 @@ export function validateRunRequest(body: unknown): RunRequest {
   }
 
   return req;
+}
+
+export function validateChatRequest(body: unknown): ChatRequest {
+  if (!isRecord(body)) {
+    throw new ValidationError('Request body must be a JSON object');
+  }
+
+  if (typeof body['model'] !== 'string' || body['model'].trim() === '') {
+    throw new ValidationError('model is required and must be a non-empty string');
+  }
+
+  if (!Array.isArray(body['messages']) || body['messages'].length === 0) {
+    throw new ValidationError('messages is required and must be a non-empty array');
+  }
+
+  const request: ChatRequest = {
+    model: body['model'].trim(),
+    messages: body['messages'].map((message, index) => {
+      if (!isRecord(message)) {
+        throw new ValidationError(`messages[${index}] must be an object`);
+      }
+      if (
+        message['role'] !== 'system'
+        && message['role'] !== 'user'
+        && message['role'] !== 'assistant'
+      ) {
+        throw new ValidationError(`messages[${index}].role must be "system", "user", or "assistant"`);
+      }
+      if (typeof message['content'] !== 'string' || message['content'].trim() === '') {
+        throw new ValidationError(`messages[${index}].content must be a non-empty string`);
+      }
+      return {
+        role: message['role'],
+        content: message['content'],
+      };
+    }),
+  };
+
+  if (body['maxTokens'] !== undefined) {
+    if (!Number.isInteger(body['maxTokens']) || Number(body['maxTokens']) <= 0) {
+      throw new ValidationError('maxTokens must be a positive integer');
+    }
+    request.maxTokens = Number(body['maxTokens']);
+  }
+
+  if (isRecord(body['thinking'])) {
+    const thinkingType = body['thinking']['type'];
+    if (thinkingType === 'enabled' || thinkingType === 'disabled') {
+      request.thinking = { type: thinkingType };
+    } else {
+      throw new ValidationError('thinking.type must be "enabled" or "disabled"');
+    }
+  }
+
+  if (body['stream'] !== undefined) {
+    if (typeof body['stream'] !== 'boolean') {
+      throw new ValidationError('stream must be a boolean');
+    }
+    request.stream = body['stream'];
+  }
+
+  return request;
 }
 
 export function validateFinalizeRequest(body: unknown): FinalizeRequest {

@@ -5,6 +5,7 @@ import { aiClient } from '../ai/sse-client';
 import { executeAgentOperation } from '../ai/operation-executor';
 import { createSchemaDigest, type AgentIntent, type PagePlan, type RunAttachmentInput, type RunMetadata, type RunRequest } from '../ai/api-types';
 import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
+import type { AgentLoopResultSummary } from '../ai/agent-loop-types';
 
 export type PlanConfig = PagePlan;
 export type BlockRunStatus = 'waiting' | 'generating' | 'done';
@@ -35,6 +36,7 @@ export interface LastRunResult {
   durationMs?: number;
   debugFile?: string;
   memoryDebugFile?: string;
+  agentLoop?: AgentLoopResultSummary;
 }
 
 

@@ -3,6 +3,10 @@ import { CheckCircle2 } from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
 import type { LastRunResult } from '../hooks/useAgentRun';
 import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
+import { LoopTraceViewer } from './LoopTraceViewer';
+import { ProjectPlanCard } from './ProjectPlanCard';
+import { ProjectProgressCard } from './ProjectProgressCard';
+import { ReActStepList } from './ReActStepList';
 
 const MetricsBadge = ({ durationMs, inputTokens, outputTokens }: { durationMs: number | undefined; inputTokens: number | undefined; outputTokens: number | undefined }) => {
   const parts: string[] = [];
@@ -62,6 +66,52 @@ export function RunResultCard({ result, onDismiss }: RunResultCardProps) {
       ? t('result.traceFile')
       : t('result.debugFile');
   };
+
+  if (result.agentLoop) {
+    const loopSummary = result.agentLoop;
+    return (
+      <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-3 shadow-sm mt-2" style={{ fontSize: '11px' }}>
+        <div className="flex items-center gap-2 text-text-primary">
+          <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
+          <span className="font-semibold text-emerald-400 shrink-0">{t('loop.loopDone')}</span>
+          <span className="opacity-70 ml-1 truncate flex-1 leading-none">{result.statusLabel}</span>
+          {onDismiss && (
+            <button
+              className="text-text-secondary hover:text-text-primary opacity-50 hover:opacity-100 transition-opacity ml-1 shrink-0"
+              onClick={onDismiss}
+              title={t('result.dismiss')}
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        <ProjectPlanCard
+          projectPlan={loopSummary.projectPlan ?? null}
+          phase="done"
+          planRevisionRequested={false}
+          onConfirm={() => undefined}
+          onRequestRevision={() => undefined}
+          onCancelRevision={() => undefined}
+          onSubmitRevision={() => undefined}
+        />
+        <ProjectProgressCard pages={loopSummary.pages} />
+        <ReActStepList steps={loopSummary.trace} />
+        <LoopTraceViewer steps={loopSummary.trace} />
+
+        {(typeof result.durationMs === 'number' || result.memoryDebugFile) && (
+          <div className="text-text-secondary flex flex-col items-center gap-1 opacity-50 pt-1" style={{ fontSize: '10px' }}>
+            {typeof result.durationMs === 'number' && (
+              <span>{t('result.duration')}: {result.durationMs}ms</span>
+            )}
+            {result.memoryDebugFile && (
+              <span className="font-mono break-all text-center">{t('result.memoryDump')}: {result.memoryDebugFile}</span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col shadow-sm mt-2" style={{ fontSize: '11px' }}>

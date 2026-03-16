@@ -64,6 +64,9 @@ function createMemoryStorage(initial: PageSchema = createSchema('loaded')): File
       files.set(id, { ...schema, name });
       return id;
     },
+    async delete(fileId: string): Promise<void> {
+      files.delete(fileId);
+    },
   };
 }
 
@@ -182,7 +185,10 @@ describe('createEditor', () => {
     expect(editor.commands.has('editor.restoreSnapshot')).toBe(true);
     expect(editor.commands.has('file.listSchemas')).toBe(true);
     expect(editor.commands.has('file.openSchema')).toBe(true);
+    expect(editor.commands.has('file.readSchema')).toBe(true);
     expect(editor.commands.has('file.saveSchema')).toBe(true);
+    expect(editor.commands.has('file.writeSchema')).toBe(true);
+    expect(editor.commands.has('file.deleteSchema')).toBe(true);
     expect(editor.commands.has('editor.undo')).toBe(true);
     expect(editor.commands.has('editor.redo')).toBe(true);
   });
@@ -248,6 +254,43 @@ describe('createEditor', () => {
     expect(editor.history.getSize()).toBe(0);
   });
 
+  it('file.readSchema returns schema without mutating editor state', async () => {
+    const source = createSchema('read-target');
+    const storage = createMemoryStorage(source);
+    const editor = createEditor({
+      initialSchema: createSchema('current-page'),
+      fileStorage: storage,
+    });
+
+    const result = await editor.commands.execute('file.readSchema', { fileId: 'demo' });
+
+    expect(result).toEqual(source);
+    expect(editor.state.getSchema().name).toBe('current-page');
+    expect(editor.history.getSize()).toBe(0);
+  });
+
+  it('file.writeSchema writes schema without mutating editor state and emits auto file:saved', async () => {
+    const storage = createMemoryStorage();
+    const editor = createEditor({
+      initialSchema: createSchema('current-page'),
+      fileStorage: storage,
+    });
+    const saved = vi.fn();
+    editor.eventBus.on('file:saved', saved);
+    const backgroundSchema = createSchema('background-page');
+
+    await editor.commands.execute('file.writeSchema', {
+      fileId: 'background',
+      schema: backgroundSchema,
+    });
+
+    await expect(storage.read('background')).resolves.toEqual(backgroundSchema);
+    expect(editor.state.getSchema().name).toBe('current-page');
+    expect(editor.state.getCurrentFileId()).toBeUndefined();
+    expect(editor.history.getSize()).toBe(0);
+    expect(saved).toHaveBeenCalledWith({ fileId: 'background', source: 'auto' });
+  });
+
   it('trims file command args for fileId/name', async () => {
     const storage = createMemoryStorage();
     const editor = createEditor({
@@ -306,6 +349,22 @@ describe('createEditor', () => {
 
     expect(changed).toHaveBeenCalledWith({ fileId: 'demo' });
     expect(changed).toHaveBeenCalledWith({ fileId: 'id-new-page' });
+  });
+
+  it('file.deleteSchema removes file and emits file:deleted', async () => {
+    const storage = createMemoryStorage(createSchema('delete-target'));
+    const editor = createEditor({
+      initialSchema: createSchema('current-page'),
+      fileStorage: storage,
+    });
+    const deleted = vi.fn();
+    editor.eventBus.on('file:deleted', deleted);
+
+    await editor.commands.execute('file.deleteSchema', { fileId: 'demo' });
+
+    await expect(storage.read('demo')).rejects.toThrow(/missing file/i);
+    expect(deleted).toHaveBeenCalledWith({ fileId: 'demo' });
+    expect(editor.history.getSize()).toBe(0);
   });
 
   it('registers tab commands when tab manager is configured', () => {
