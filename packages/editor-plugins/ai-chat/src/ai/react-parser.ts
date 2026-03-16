@@ -85,10 +85,28 @@ function getObjectString(value: unknown): string | undefined {
   return undefined;
 }
 
+function extractNestedActionObject(object: Record<string, unknown>): Record<string, unknown> | undefined {
+  const nested = [
+    object.data,
+    object.Data,
+    object.payload,
+    object.Payload,
+  ].find((value): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value));
+  return nested;
+}
+
 function extractFromJSONObject(source: string): ParsedReActResponse | undefined {
   const object = extractJSONObject(source);
   if (!object) {
     return undefined;
+  }
+
+  const nestedObject = extractNestedActionObject(object);
+  if (nestedObject) {
+    const nestedResult = extractFromJSONObject(JSON.stringify(nestedObject));
+    if (nestedResult) {
+      return nestedResult;
+    }
   }
 
   const status = [
@@ -106,6 +124,8 @@ function extractFromJSONObject(source: string): ParsedReActResponse | undefined 
   const action = [
     object.action,
     object.Action,
+    object.type === 'action' && typeof object.content === 'string' ? object.content : undefined,
+    object.Type === 'action' && typeof object.content === 'string' ? object.content : undefined,
     object.type,
     object.Type,
     object.actionName,

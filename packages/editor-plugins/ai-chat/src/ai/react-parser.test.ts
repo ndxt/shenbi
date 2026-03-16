@@ -116,6 +116,22 @@ describe('parseReActResponse', () => {
       rawActionInput: '{}',
     });
 
+    expect(parseReActResponse(JSON.stringify({
+      data: {
+        type: 'action',
+        content: 'readPageSchema',
+        action_input: {
+          fileId: 'order-detail',
+        },
+      },
+    }))).toEqual({
+      action: 'readPageSchema',
+      actionInput: {
+        fileId: 'order-detail',
+      },
+      rawActionInput: '{"fileId":"order-detail"}',
+    });
+
     expect(parseReActResponse([
       'Status: 正在检查现有页面',
       'Action: getAvailableComponents',
