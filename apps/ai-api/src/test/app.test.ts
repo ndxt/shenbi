@@ -361,6 +361,31 @@ describe('POST /api/ai/chat', () => {
   });
 });
 
+describe('POST /api/ai/debug/client-error', () => {
+  it('writes a client debug dump and returns the debug file path', async () => {
+    const app = createApp({ runtime: makeRuntime() });
+    const res = await app.request('/api/ai/debug/client-error', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: 'agent-loop-react-parse',
+        error: 'Missing Action field in ReAct response',
+        rawResponse: '我先分析一下需求',
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json() as {
+      success: boolean;
+      data: {
+        debugFile: string;
+      };
+    };
+    expect(json.success).toBe(true);
+    expect(json.data.debugFile).toMatch(/\.ai-debug[\\/]+errors[\\/]+/);
+  });
+});
+
 describe('POST /api/ai/run — 503 LLM error', () => {
   it('maps LLMError to 503', async () => {
     const { LLMError } = await import('../adapters/errors.ts');

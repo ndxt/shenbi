@@ -13,7 +13,7 @@ interface InvalidJsonDumpInput {
 }
 
 interface ErrorDumpInput {
-  category: 'http-error' | 'stream-error';
+  category: 'http-error' | 'stream-error' | 'client-debug';
   error: unknown;
   requestId?: string;
   path?: string;

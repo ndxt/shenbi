@@ -163,6 +163,8 @@ class LoopScenarioAIClient implements AIClient {
 
 afterEach(() => {
   resetAIClient();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('useAgentLoop', () => {
@@ -365,5 +367,51 @@ describe('useAgentLoop', () => {
       expect(result.current.projectPlan?.projectName).toBe('已恢复项目');
       expect(result.current.pages).toHaveLength(1);
     });
+  });
+
+  it('writes a debug dump when ReAct parsing fails', async () => {
+    const { bridge } = createBridge();
+    const persistence = createPersistence();
+    const client = new LoopScenarioAIClient([
+      {
+        content: '我先分析一下需求，然后给出项目规划。',
+      },
+    ], []);
+    setAIClient(client);
+    const onError = vi.fn();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: {
+        debugFile: '.ai-debug/errors/2026-03-16T00-00-00-000Z-client-debug.json',
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
+
+    await act(async () => {
+      await result.current.runAgent(
+        '帮我做一个订单管理后台项目，包含列表页、详情页、创建页',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-parse-failure',
+        () => 'message-parse-failure',
+        vi.fn(),
+        vi.fn(),
+        onError,
+      );
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/debug/client-error', expect.objectContaining({
+      method: 'POST',
+    }));
+    expect(onError).toHaveBeenCalledWith(
+      expect.stringContaining('.ai-debug/errors/2026-03-16T00-00-00-000Z-client-debug.json'),
+    );
+    expect(result.current.phase).toBe('error');
   });
 });

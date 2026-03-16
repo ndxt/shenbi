@@ -12,7 +12,7 @@ import type {
   PersistedAgentLoopState,
   UIPhase,
 } from '../ai/agent-loop-types';
-import { parseReActResponse } from '../ai/react-parser';
+import { parseReActResponse, type ParsedReActResponse } from '../ai/react-parser';
 import { applyModifyOperationsToSchema } from '../ai/agent-tools';
 import { useAgentRun, type LastRunResult } from './useAgentRun';
 
@@ -67,6 +67,25 @@ function createLoopState(conversationId: string): LoopSessionState {
     failedPageIds: [],
     updatedAt: new Date().toISOString(),
   };
+}
+
+async function writeAgentLoopDebugDump(payload: Record<string, unknown>): Promise<string | undefined> {
+  try {
+    const response = await fetch('/api/ai/debug/client-error', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      return undefined;
+    }
+    const json = await response.json() as { data?: { debugFile?: string } };
+    return json.data?.debugFile;
+  } catch {
+    return undefined;
+  }
 }
 
 function createLoopRunResult(summary: AgentLoopResultSummary, elapsedMs: number): LastRunResult {
@@ -684,12 +703,32 @@ export function useAgentLoop(
           messages: compactMessages(loopMessagesRef.current),
           thinking: { type: thinkingEnabled ? 'enabled' : 'disabled' },
         });
-
-        const parsed = parseReActResponse(response.content);
         loopMessagesRef.current = [
           ...loopMessagesRef.current,
           { role: 'assistant', content: response.content },
         ];
+
+        let parsed: ParsedReActResponse;
+        try {
+          parsed = parseReActResponse(response.content);
+        } catch (error) {
+          const debugFile = await writeAgentLoopDebugDump({
+            source: 'agent-loop-react-parse',
+            conversationId: currentConversationId,
+            plannerModel,
+            blockModel,
+            thinkingEnabled,
+            error: error instanceof Error ? error.message : String(error),
+            rawResponse: response.content,
+            messages: loopMessagesRef.current,
+            loopState: loopStateRef.current,
+          });
+          if (debugFile) {
+            throw new Error(`${error instanceof Error ? error.message : String(error)}. Debug file: ${debugFile}`);
+          }
+          throw error;
+        }
+
         const step = tracerRef.current?.addStep({
           ...(parsed.status ? { status: parsed.status } : {}),
           ...(parsed.reasoningSummary ? { reasoningSummary: parsed.reasoningSummary } : {}),
