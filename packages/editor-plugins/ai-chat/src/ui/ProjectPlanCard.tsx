@@ -129,9 +129,9 @@ export function ProjectPlanCard({
       </div>
 
       {awaitingConfirmation && (
-        <div className="rounded-md border border-border-ide bg-bg-panel/70 p-3 flex flex-col gap-2">
+        <div className="rounded-md border border-border-ide bg-bg-panel/70 px-2.5 py-2">
           {planRevisionRequested ? (
-            <>
+            <div className="flex flex-col gap-2">
               <label className="text-text-primary font-semibold" style={{ fontSize: '11px' }}>
                 {t('loop.revisionLabel')}
               </label>
@@ -160,23 +160,23 @@ export function ProjectPlanCard({
                   {t('loop.cancelRevision')}
                 </button>
               </div>
-            </>
+            </div>
           ) : (
-            <div className="flex flex-col gap-2">
-              <div className="text-text-secondary" style={{ fontSize: '11px' }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="min-w-0 flex-1 text-text-secondary leading-tight" style={{ fontSize: '11px' }}>
                 {t('loop.planAwaitingConfirm')}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="ml-auto flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
-                  className="h-7 min-w-[76px] px-3 rounded-md bg-blue-500 text-white text-[11px] font-semibold inline-flex items-center justify-center whitespace-nowrap transition-colors hover:bg-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400/60"
+                  className="h-6 px-2.5 rounded border border-blue-400/40 bg-blue-500 text-white text-[11px] font-semibold inline-flex items-center justify-center whitespace-nowrap transition-colors hover:bg-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400/60"
                   onClick={onConfirm}
                 >
                   <span className="leading-none">{t('loop.confirmPlan')}</span>
                 </button>
                 <button
                   type="button"
-                  className="h-7 min-w-[76px] px-3 rounded-md border border-border-ide bg-bg-canvas/70 text-text-secondary text-[11px] font-medium inline-flex items-center justify-center whitespace-nowrap transition-colors hover:border-blue-500/40 hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-blue-400/40"
+                  className="h-6 px-2.5 rounded border border-border-ide bg-bg-canvas/70 text-text-secondary text-[11px] font-medium inline-flex items-center justify-center whitespace-nowrap transition-colors hover:border-blue-500/40 hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-blue-400/40"
                   onClick={onRequestRevision}
                 >
                   <span className="leading-none">{t('loop.requestRevision')}</span>
