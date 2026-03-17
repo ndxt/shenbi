@@ -1,6 +1,6 @@
 import type { PageSchema } from '@shenbi/schema';
 
-const PREVIEW_API_BASE = import.meta.env.PROD ? '/shenbi/api' : '/api';
+const PREVIEW_API_BASE = import.meta.env.PROD ? '/locode/shenbi/api' : '/api';
 
 export const userManagementSchema: PageSchema = {
   id: 'user-management',

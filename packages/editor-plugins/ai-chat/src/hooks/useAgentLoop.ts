@@ -27,7 +27,7 @@ const PERSISTENCE_NAMESPACE = 'ai-chat';
 const AGENT_LOOP_PERSISTENCE_KEY = 'agent-loop-state';
 const MAX_LOOP_ITERATIONS = 30;
 const TOOL_IDLE_TIMEOUT_MS = 90_000;
-const AI_DEBUG_API_BASE = import.meta.env.PROD ? '/shenbi/api/ai/debug' : '/api/ai/debug';
+const AI_DEBUG_API_BASE = import.meta.env.PROD ? '/locode/shenbi/api/ai/debug' : '/api/ai/debug';
 
 function summarizeSchema(schema: PageSchema): string {
   const bodyCount = Array.isArray(schema.body) ? schema.body.length : schema.body ? 1 : 0;
