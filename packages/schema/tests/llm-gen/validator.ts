@@ -1,502 +1,550 @@
 import type { PageSchema, SchemaNode } from '../../types';
+import type { ComponentContract, ContractProp, Diagnostic } from '../../types/contract';
 import { builtinContractMap } from '../../contracts';
-import type { Diagnostic } from './types';
-
-// Build supported component set from builtinContractMap
-export const supportedComponentSet = new Set(Object.keys(builtinContractMap));
 
 /**
- * Schema 校验器
- *
- * 校验层次：
- * 1. 结构校验 - Schema 基本结构合法性
- * 2. 契约校验 - 组件/Props/Events 是否符合契约
- * 3. 表达式校验 - 表达式语法和引用合法性
- * 4. Action 校验 - Action 类型和引用合法性
+ * Schema 验证器
  */
+export class SchemaValidator {
+  private diagnostics: Diagnostic[] = [];
 
-const VALID_ACTION_TYPES = new Set([
-  'setState',
-  'callMethod',
-  'fetch',
-  'navigate',
-  'message',
-  'notification',
-  'confirm',
-  'modal',
-  'drawer',
-  'validate',
-  'resetForm',
-  'condition',
-  'loop',
-  'script',
-  'copy',
-  'debounce',
-  'throttle',
-  'emit',
-  'download',
-]);
+  /**
+   * 验证生成的 PageSchema
+   */
+  validateSchema(schema: unknown): Diagnostic[] {
+    this.diagnostics = [];
 
-export interface ValidatorOptions {
-  /** 是否校验表达式引用的状态已声明 */
-  validateExpressionReferences?: boolean;
-  /** 是否校验 Action 引用的状态/方法已声明 */
-  validateActionReferences?: boolean;
-}
-
-export interface ValidatorResult {
-  valid: boolean;
-  diagnostics: Diagnostic[];
-}
-
-/**
- * 主校验函数
- */
-export function validateSchema(
-  schema: PageSchema,
-  options: ValidatorOptions = {},
-): ValidatorResult {
-  const diagnostics: Diagnostic[] = [];
-
-  // 1. 基础结构校验
-  validatePageSchemaStructure(schema, diagnostics);
-
-  // 2. 校验组件和 Props 是否符合契约
-  validateSchemaNodesAgainstContracts(schema, diagnostics);
-
-  // 3. 表达式校验
-  if (options.validateExpressionReferences !== false) {
-    validateExpressions(schema, diagnostics);
-  }
-
-  // 4. Action 校验
-  if (options.validateActionReferences !== false) {
-    validateActions(schema, diagnostics);
-  }
-
-  return {
-    valid: diagnostics.every((d) => d.level !== 'error'),
-    diagnostics,
-  };
-}
-
-/**
- * 校验 PageSchema 基础结构
- */
-function validatePageSchemaStructure(schema: PageSchema, diagnostics: Diagnostic[]): void {
-  // 校验 schema 基本字段
-  if (!schema || typeof schema !== 'object') {
-    diagnostics.push({
-      level: 'error',
-      code: 'SCHEMA_NOT_OBJECT',
-      message: 'Schema must be an object',
-    });
-    return;
-  }
-
-  // 校验 blocks 数组
-  if (schema.blocks && !Array.isArray(schema.blocks)) {
-    diagnostics.push({
-      level: 'error',
-      code: 'BLOCKS_NOT_ARRAY',
-      message: 'schema.blocks must be an array',
-      path: '/blocks',
-    });
-  }
-
-  // 校验 state 对象
-  if (schema.state && typeof schema.state !== 'object') {
-    diagnostics.push({
-      level: 'error',
-      code: 'STATE_NOT_OBJECT',
-      message: 'schema.state must be an object',
-      path: '/state',
-    });
-  }
-
-  // 校验 methods 对象
-  if (schema.methods && typeof schema.methods !== 'object') {
-    diagnostics.push({
-      level: 'error',
-      code: 'METHODS_NOT_OBJECT',
-      message: 'schema.methods must be an object',
-      path: '/methods',
-    });
-  }
-
-  // 递归校验 nodes
-  const seenIds = new Set<string>();
-  if (schema.blocks) {
-    for (const block of schema.blocks) {
-      validateSchemaNode(block, diagnostics, seenIds, '/blocks');
+    if (!schema || typeof schema !== 'object') {
+      this.addError('Schema 必须是一个对象', 'INVALID_SCHEMA');
+      return this.diagnostics;
     }
+
+    const pageSchema = schema as Partial<PageSchema>;
+
+    // 验证 PageSchema 结构
+    this.validatePageSchema(pageSchema);
+
+    return this.diagnostics;
   }
 
-  // 校验 nodes 数组
-  if (schema.nodes && Array.isArray(schema.nodes)) {
-    for (const node of schema.nodes) {
-      validateSchemaNode(node, diagnostics, seenIds, '/nodes');
+  /**
+   * 验证 PageSchema 结构
+   */
+  private validatePageSchema(schema: Partial<PageSchema>): void {
+    // 检查 body 字段
+    if (!schema.body) {
+      this.addError('PageSchema 必须包含 body 字段', 'MISSING_BODY', 'body');
+      return;
     }
-  }
 
-  // 检查节点 ID 唯一性
-  // (already checked in validateSchemaNode)
-}
-
-/**
- * 递归校验 SchemaNode
- */
-function validateSchemaNode(
-  node: unknown,
-  diagnostics: Diagnostic[],
-  seenIds: Set<string>,
-  basePath: string,
-): void {
-  if (!node || typeof node !== 'object') {
-    return;
-  }
-
-  const nodeRecord = node as Record<string, unknown>;
-
-  // 校验 component 字段
-  const component = nodeRecord.component as string | undefined;
-  if (!component || typeof component !== 'string') {
-    diagnostics.push({
-      level: 'error',
-      code: 'NODE_MISSING_COMPONENT',
-      message: 'SchemaNode must have a string component field',
-      path: basePath,
-    });
-    return;
-  }
-
-  // 校验 component 是否在支持的组件列表中
-  if (!supportedComponentSet.has(component)) {
-    diagnostics.push({
-      level: 'error',
-      code: 'UNSUPPORTED_COMPONENT',
-      message: `Component "${component}" is not in the supported components list`,
-      path: basePath,
-    });
-  }
-
-  // 校验 ID 唯一性
-  const nodeId = nodeRecord.id as string | undefined;
-  if (nodeId) {
-    if (seenIds.has(nodeId)) {
-      diagnostics.push({
-        level: 'error',
-        code: 'DUPLICATE_NODE_ID',
-        message: `Duplicate node ID: "${nodeId}"`,
-        path: basePath,
+    // 验证 body 内容
+    if (Array.isArray(schema.body)) {
+      schema.body.forEach((node, index) => {
+        this.validateSchemaNode(node, `body[${index}]`);
       });
     } else {
-      seenIds.add(nodeId);
+      this.validateSchemaNode(schema.body, 'body');
+    }
+
+    // 验证 state 字段
+    if (schema.state) {
+      this.validateState(schema.state);
+    }
+
+    // 验证 dataSources 字段
+    if (schema.dataSources) {
+      this.validateDataSources(schema.dataSources);
+    }
+
+    // 验证 methods 字段
+    if (schema.methods) {
+      this.validateMethods(schema.methods);
+    }
+
+    // 验证 watchers 字段
+    if (schema.watchers) {
+      this.validateWatchers(schema.watchers);
     }
   }
 
-  // 校验 props
-  const props = nodeRecord.props as Record<string, unknown> | undefined;
-  if (props && typeof props === 'object') {
-    validateNodeProps(props, component, diagnostics, `${basePath}/props`);
-  }
+  /**
+   * 验证 SchemaNode
+   */
+  private validateSchemaNode(node: unknown, path: string): void {
+    if (!node || typeof node !== 'object') {
+      this.addError(`${path}: SchemaNode 必须是一个对象`, 'INVALID_SCHEMA_NODE', path);
+      return;
+    }
 
-  // 校验 children
-  const children = nodeRecord.children;
-  if (Array.isArray(children)) {
-    for (const [index, child] of children.entries()) {
-      if (child && typeof child === 'object') {
-        validateSchemaNode(child, diagnostics, seenIds, `${basePath}/children[${index}]`);
+    const schemaNode = node as Partial<SchemaNode>;
+
+    // 检查 component 字段
+    if (!schemaNode.component) {
+      this.addError(`${path}: SchemaNode 必须包含 component 字段`, 'MISSING_COMPONENT', `${path}.component`);
+      return;
+    }
+
+    // 验证 component 是否存在于契约中
+    const contract = builtinContractMap[schemaNode.component];
+    if (!contract) {
+      // 检查是否是复合组件（如 Input.TextArea）
+      const compositeContract = builtinContractMap[schemaNode.component];
+      if (!compositeContract) {
+        this.addWarning(`${path}: 组件 "${schemaNode.component}" 未在契约中找到`, 'UNKNOWN_COMPONENT', `${path}.component`);
       }
     }
-  }
-}
 
-/**
- * 校验节点 Props 是否符合契约
- */
-function validateNodeProps(
-  props: Record<string, unknown>,
-  componentType: string,
-  diagnostics: Diagnostic[],
-  basePath: string,
-): void {
-  const contract = builtinContractMap[componentType];
-  if (!contract?.props) {
-    return;
-  }
-
-  for (const [propName, propValue] of Object.entries(props)) {
-    const contractProp = contract.props[propName];
-
-    // 检查 prop 是否在契约中声明
-    if (!contractProp) {
-      diagnostics.push({
-        level: 'warning',
-        code: 'UNDECLARED_PROP',
-        message: `Prop "${propName}" is not declared in component "${componentType}" contract`,
-        path: `${basePath}/${propName}`,
-      });
-      continue;
+    // 验证 props
+    if (schemaNode.props) {
+      this.validateProps(schemaNode.props, schemaNode.component, `${path}.props`);
     }
 
-    // 校验 prop 值类型
-    validatePropValue(propValue, contractProp, diagnostics, `${basePath}/${propName}`);
-  }
-}
-
-/**
- * 校验 Prop 值是否符合契约类型定义
- */
-function validatePropValue(
-  value: unknown,
-  contractProp: { type: string; enum?: unknown[]; shape?: Record<string, unknown>; items?: unknown },
-  diagnostics: Diagnostic[],
-  path: string,
-): void {
-  const { type, enum: enumValues, shape, items } = contractProp;
-
-  // 校验 enum 类型
-  if (type === 'enum' && enumValues && Array.isArray(enumValues)) {
-    if (!enumValues.includes(value)) {
-      diagnostics.push({
-        level: 'error',
-        code: 'INVALID_ENUM_VALUE',
-        message: `Value "${String(value)}" is not in the allowed enum values: [${enumValues.join(', ')}]`,
-        path,
-      });
+    // 验证 events
+    if (schemaNode.events) {
+      this.validateEvents(schemaNode.events, `${path}.events`);
     }
-    return;
-  }
 
-  // 校验基本类型
-  if (type === 'string' && typeof value !== 'string') {
-    diagnostics.push({
-      level: 'error',
-      code: 'TYPE_MISMATCH',
-      message: `Expected string but got ${typeof value}`,
-      path,
-    });
-  } else if (type === 'number' && typeof value !== 'number') {
-    diagnostics.push({
-      level: 'error',
-      code: 'TYPE_MISMATCH',
-      message: `Expected number but got ${typeof value}`,
-      path,
-    });
-  } else if (type === 'boolean' && typeof value !== 'boolean') {
-    diagnostics.push({
-      level: 'error',
-      code: 'TYPE_MISMATCH',
-      message: `Expected boolean but got ${typeof value}`,
-      path,
-    });
-  }
-
-  // 校验 object 类型
-  if (type === 'object' && shape && typeof value === 'object' && value !== null) {
-    const valueRecord = value as Record<string, unknown>;
-    for (const [key, val] of Object.entries(valueRecord)) {
-      const shapeProp = shape[key];
-      if (shapeProp && typeof shapeProp === 'object') {
-        validatePropValue(val, shapeProp as typeof contractProp, diagnostics, `${path}/${key}`);
-      }
-    }
-  }
-
-  // 校验 array 类型
-  if (type === 'array' && items && Array.isArray(value)) {
-    for (const [index, item] of value.entries()) {
-      validatePropValue(item, items as typeof contractProp, diagnostics, `${path}[${index}]`);
-    }
-  }
-}
-
-/**
- * 校验表达式
- */
-function validateExpressions(schema: PageSchema, diagnostics: Diagnostic[]): void {
-  const declaredStateKeys = schema.state ? Object.keys(schema.state) : [];
-  const declaredParamsKeys = schema.params ? Object.keys(schema.params) : [];
-  const declaredComputedKeys = schema.computed ? Object.keys(schema.computed) : [];
-  const declaredDatasourceKeys = schema.datasources ? Object.keys(schema.datasources) : [];
-
-  // 收集所有引用的 key
-  const referencedKeys = collectExpressionReferences(schema);
-
-  // 检查引用是否已声明
-  for (const ref of referencedKeys) {
-    const [scope, ...keyParts] = ref.split('.');
-    const key = keyParts.join('.');
-
-    switch (scope) {
-      case 'state':
-        if (!declaredStateKeys.includes(key)) {
-          diagnostics.push({
-            level: 'warning',
-            code: 'UNDECLARED_STATE_REFERENCE',
-            message: `Expression references state.${key} which is not declared`,
+    // 验证 slots
+    if (schemaNode.slots) {
+      Object.entries(schemaNode.slots).forEach(([slotName, slotContent]) => {
+        if (Array.isArray(slotContent)) {
+          slotContent.forEach((child, index) => {
+            this.validateSchemaNode(child, `${path}.slots.${slotName}[${index}]`);
           });
+        } else {
+          this.validateSchemaNode(slotContent, `${path}.slots.${slotName}`);
         }
-        break;
-      case 'params':
-        if (!declaredParamsKeys.includes(key)) {
-          diagnostics.push({
-            level: 'warning',
-            code: 'UNDECLARED_PARAMS_REFERENCE',
-            message: `Expression references params.${key} which is not declared`,
-          });
-        }
-        break;
-      case 'computed':
-        if (!declaredComputedKeys.includes(key)) {
-          diagnostics.push({
-            level: 'warning',
-            code: 'UNDECLARED_COMPUTED_REFERENCE',
-            message: `Expression references computed.${key} which is not declared`,
-          });
-        }
-        break;
-      case 'ds':
-        if (!declaredDatasourceKeys.includes(key)) {
-          diagnostics.push({
-            level: 'warning',
-            code: 'UNDECLARED_DATASOURCE_REFERENCE',
-            message: `Expression references ds.${key} which is not declared`,
-          });
-        }
-        break;
-    }
-  }
-}
-
-/**
- * 收集所有表达式引用
- */
-function collectExpressionReferences(schema: PageSchema): string[] {
-  const references = new Set<string>();
-  const expressionRegex = /\{\{\s*([^}]+)\s*\}\}/g;
-
-  function traverse(node: unknown): void {
-    if (typeof node === 'string') {
-      const matches = node.matchAll(expressionRegex);
-      for (const match of matches) {
-        const expr = match[1].trim();
-        // 提取引用，如 state.foo, params.bar
-        const refMatch = expr.match(/^(state|params|computed|ds)\.([a-zA-Z0-9_]+)/);
-        if (refMatch) {
-          references.add(`${refMatch[1]}.${refMatch[2]}`);
-        }
-      }
-    } else if (Array.isArray(node)) {
-      for (const item of node) {
-        traverse(item);
-      }
-    } else if (node && typeof node === 'object') {
-      for (const value of Object.values(node as Record<string, unknown>)) {
-        traverse(value);
-      }
-    }
-  }
-
-  traverse(schema);
-  return [...references];
-}
-
-/**
- * 校验 Actions
- */
-function validateActions(schema: PageSchema, diagnostics: Diagnostic[]): void {
-  const declaredStateKeys = schema.state ? Object.keys(schema.state) : [];
-  const declaredMethodKeys = schema.methods ? Object.keys(schema.methods) : [];
-
-  // 收集所有 actions
-  const allActions = collectAllActions(schema);
-
-  for (const action of allActions) {
-    // 校验 action type
-    if (!VALID_ACTION_TYPES.has(action.type)) {
-      diagnostics.push({
-        level: 'error',
-        code: 'INVALID_ACTION_TYPE',
-        message: `Invalid action type: "${action.type}". Must be one of: ${[...VALID_ACTION_TYPES].join(', ')}`,
       });
     }
 
-    // 校验 setState 的 key
-    if (action.type === 'setState' && action.key) {
-      if (!declaredStateKeys.includes(String(action.key))) {
-        diagnostics.push({
-          level: 'error',
-          code: 'UNDECLARED_STATE_KEY',
-          message: `setState action references state.${action.key} which is not declared`,
-        });
-      }
-    }
-
-    // 校验 callMethod 的 name
-    if (action.type === 'callMethod' && action.name) {
-      if (!declaredMethodKeys.includes(String(action.name))) {
-        diagnostics.push({
-          level: 'error',
-          code: 'UNDECLARED_METHOD',
-          message: `callMethod action references method.${action.name} which is not declared`,
-        });
-      }
-    }
-  }
-}
-
-/**
- * 收集所有 actions
- */
-function collectAllActions(schema: PageSchema): Array<{ type: string; [key: string]: unknown }> {
-  const actions: Array<{ type: string; [key: string]: unknown }> = [];
-
-  function traverse(node: unknown): void {
-    if (node && typeof node === 'object') {
-      const record = node as Record<string, unknown>;
-
-      // 检查是否有 actions 字段
-      if (Array.isArray(record.actions)) {
-        for (const action of record.actions) {
-          if (action && typeof action === 'object') {
-            const actionRecord = action as { type: string; [key: string]: unknown };
-            if (actionRecord.type) {
-              actions.push(actionRecord);
-            }
+    // 验证 children
+    if (schemaNode.children) {
+      if (Array.isArray(schemaNode.children)) {
+        schemaNode.children.forEach((child, index) => {
+          if (typeof child === 'object') {
+            this.validateSchemaNode(child, `${path}.children[${index}]`);
           }
-        }
+        });
       }
+    }
 
-      // 检查是否有 onClick 等事件处理中的 actions
-      if (typeof record.onClick === 'object' && record.onClick !== null) {
-        traverse(record.onClick);
-      }
+    // 验证 if 条件表达式
+    if (schemaNode.if && typeof schemaNode.if === 'string') {
+      this.validateExpression(schemaNode.if as string, `${path}.if`);
+    }
 
-      // 递归遍历 children
-      if (Array.isArray(record.children)) {
-        for (const child of record.children) {
-          traverse(child);
-        }
-      }
+    // 验证 loop 循环
+    if (schemaNode.loop) {
+      this.validateLoop(schemaNode.loop, `${path}.loop`);
     }
   }
 
-  traverse(schema);
-  return actions;
+  /**
+   * 验证 props
+   */
+  private validateProps(props: Record<string, unknown>, componentName: string, path: string): void {
+    const contract = builtinContractMap[componentName];
+
+    Object.entries(props).forEach(([propName, propValue]) => {
+      const propPath = `${path}.${propName}`;
+
+      // 验证表达式
+      if (typeof propValue === 'string' && propValue.startsWith('{{') && propValue.endsWith('}}')) {
+        this.validateExpression(propValue, propPath);
+      }
+
+      // 如果契约存在，验证 prop 是否在契约中定义
+      if (contract?.props) {
+        const contractProp = contract.props[propName];
+        if (!contractProp) {
+          // 检查是否是通用属性
+          const allowedCommonProps = ['style', 'className', 'id', 'key', 'ref', 'if', 'show', 'loop', 'slots'];
+          if (!allowedCommonProps.includes(propName)) {
+            this.addWarning(`${propPath}: 属性 "${propName}" 未在组件 "${componentName}" 的契约中定义`, 'UNKNOWN_PROP', propPath);
+          }
+        } else {
+          // 验证 prop 类型
+          this.validatePropType(propValue, contractProp, propPath);
+        }
+      }
+    });
+  }
+
+  /**
+   * 验证 prop 类型
+   */
+  private validatePropType(value: unknown, contractProp: ContractProp, path: string): void {
+    if (!contractProp.type) return;
+
+    // 跳过 any 类型
+    if (contractProp.type === 'any') return;
+
+    // 验证 enum 类型
+    if (contractProp.type === 'enum' && contractProp.enum) {
+      if (typeof value === 'string' && !value.startsWith('{{')) {
+        if (!contractProp.enum.includes(value)) {
+          this.addError(`${path}: 值 "${value}" 不在允许的枚举值中: ${contractProp.enum.join(', ')}`, 'INVALID_ENUM_VALUE', path);
+        }
+      }
+      return;
+    }
+
+    // 验证基本类型
+    const typeChecks: Record<string, (v: unknown) => boolean> = {
+      string: (v) => typeof v === 'string',
+      number: (v) => typeof v === 'number',
+      boolean: (v) => typeof v === 'boolean',
+      object: (v) => typeof v === 'object' && v !== null,
+      array: (v) => Array.isArray(v),
+      function: () => true, // 函数无法在 JSON 中表示
+    };
+
+    const checkFn = typeChecks[contractProp.type];
+    if (checkFn && !checkFn(value)) {
+      this.addWarning(`${path}: 期望类型 ${contractProp.type}，但得到 ${typeof value}`, 'TYPE_MISMATCH', path);
+    }
+  }
+
+  /**
+   * 验证 events
+   */
+  private validateEvents(events: Record<string, unknown>, path: string): void {
+    Object.entries(events).forEach(([eventName, eventValue]) => {
+      // 验证事件处理函数是 ActionChain
+      if (Array.isArray(eventValue)) {
+        this.validateActionChain(eventValue, `${path}.${eventName}`);
+      } else {
+        this.addError(`${path}.${eventName}: 事件处理函数必须是 ActionChain 数组`, 'INVALID_EVENT_HANDLER', `${path}.${eventName}`);
+      }
+    });
+  }
+
+  /**
+   * 验证 ActionChain
+   */
+  private validateActionChain(actions: unknown[], path: string): void {
+    const validActionTypes = new Set([
+      'setState',
+      'callMethod',
+      'fetch',
+      'navigate',
+      'message',
+      'notification',
+      'confirm',
+      'modal',
+      'drawer',
+      'validate',
+      'resetForm',
+      'condition',
+      'loop',
+      'script',
+      'copy',
+      'debounce',
+      'throttle',
+      'batch',
+      'emit',
+      'callProp',
+      'setQuery',
+      'download',
+    ]);
+
+    actions.forEach((action, index) => {
+      const actionPath = `${path}[${index}]`;
+
+      if (!action || typeof action !== 'object') {
+        this.addError(`${actionPath}: Action 必须是一个对象`, 'INVALID_ACTION', actionPath);
+        return;
+      }
+
+      const actionObj = action as Record<string, unknown>;
+
+      // 检查 type 字段
+      if (!actionObj.type) {
+        this.addError(`${actionPath}: Action 必须包含 type 字段`, 'MISSING_ACTION_TYPE', `${actionPath}.type`);
+        return;
+      }
+
+      const actionType = actionObj.type as string;
+
+      // 验证 action 类型是否有效
+      if (!validActionTypes.has(actionType)) {
+        this.addError(`${actionPath}: 无效的 Action 类型 "${actionType}"`, 'INVALID_ACTION_TYPE', `${actionPath}.type`);
+      }
+
+      // 验证特定 action 的必需字段
+      this.validateActionFields(actionObj, actionType, actionPath);
+    });
+  }
+
+  /**
+   * 验证 Action 字段
+   */
+  private validateActionFields(action: Record<string, unknown>, actionType: string, path: string): void {
+    const requiredFields: Record<string, string[]> = {
+      setState: ['key', 'value'],
+      callMethod: ['name'],
+      fetch: [],
+      navigate: [],
+      message: ['content'],
+      notification: ['message'],
+      confirm: ['title'],
+      modal: ['id', 'open'],
+      drawer: ['id', 'open'],
+      validate: ['formRef'],
+      resetForm: ['formRef'],
+      condition: ['if'],
+      loop: ['data', 'body'],
+      script: ['code'],
+      copy: ['text'],
+      debounce: ['wait', 'body'],
+      throttle: ['wait', 'body'],
+      batch: ['actions'],
+      emit: ['event'],
+      callProp: ['name'],
+      setQuery: ['query'],
+      download: ['url'],
+    };
+
+    const fields = requiredFields[actionType] || [];
+    fields.forEach((field) => {
+      if (!(field in action)) {
+        this.addError(`${path}: Action "${actionType}" 必须包含 "${field}" 字段`, 'MISSING_ACTION_FIELD', `${path}.${field}`);
+      }
+    });
+
+    // 验证特定字段的表达式
+    if (actionType === 'setState' && typeof action.value === 'string') {
+      const value = action.value as string;
+      if (value.startsWith('{{') && value.endsWith('}}')) {
+        this.validateExpression(value, `${path}.value`);
+      }
+    }
+
+    if (actionType === 'condition' && typeof action.if === 'string') {
+      this.validateExpression(action.if as string, `${path}.if`);
+    }
+  }
+
+  /**
+   * 验证表达式
+   */
+  private validateExpression(expr: string, path: string): void {
+    if (!expr.startsWith('{{') || !expr.endsWith('}}')) {
+      this.addError(`${path}: 表达式必须以 {{ 开始，以 }} 结束`, 'INVALID_EXPRESSION_SYNTAX', path);
+      return;
+    }
+
+    const content = expr.slice(2, -2).trim();
+
+    if (!content) {
+      this.addError(`${path}: 表达式不能为空`, 'EMPTY_EXPRESSION', path);
+      return;
+    }
+
+    // 验证表达式内容
+    // 检查是否是合法的 JS 表达式或路径引用
+    const pathPattern = /^[a-zA-Z_$][\w$]*(\.[a-zA-Z_$][\w$]*)*$/;
+    const expressionPattern = /^[a-zA-Z_$][\w$\s\.\(\)\[\]+'"*/\-!&|<>=?,]*$/;
+
+    if (!pathPattern.test(content) && !expressionPattern.test(content)) {
+      this.addWarning(`${path}: 表达式可能包含非法字符`, 'SUSPICIOUS_EXPRESSION', path);
+    }
+
+    // 检查引用的变量是否存在（简单检查）
+    const refPattern = /(state|params|computed|ds|utils|refs|event|loop)\./g;
+    const refs = content.match(refPattern);
+    if (refs) {
+      const validContexts = new Set(['state.', 'params.', 'computed.', 'ds.', 'utils.', 'refs.', 'event.', 'loop.']);
+      refs.forEach((ref) => {
+        if (!validContexts.has(ref)) {
+          this.addWarning(`${path}: 未知的引用上下文 "${ref}"`, 'UNKNOWN_CONTEXT', path);
+        }
+      });
+    }
+  }
+
+  /**
+   * 验证 loop 指令
+   */
+  private validateLoop(loop: unknown, path: string): void {
+    if (!loop || typeof loop !== 'object') {
+      this.addError(`${path}: loop 必须是一个对象`, 'INVALID_LOOP', path);
+      return;
+    }
+
+    const loopObj = loop as Record<string, unknown>;
+
+    if (!loopObj.data) {
+      this.addError(`${path}: loop 必须包含 data 字段`, 'MISSING_LOOP_DATA', `${path}.data`);
+    }
+
+    // 验证 data 是表达式或数组
+    if (typeof loopObj.data === 'string' && loopObj.data.startsWith('{{')) {
+      this.validateExpression(loopObj.data, `${path}.data`);
+    }
+  }
+
+  /**
+   * 验证 state
+   */
+  private validateState(state: Record<string, unknown>, path: string = 'state'): void {
+    Object.entries(state).forEach(([key, value]) => {
+      if (!value || typeof value !== 'object') {
+        this.addWarning(`${path}.${key}: state 字段应该是一个对象`, 'INVALID_STATE_FIELD', `${path}.${key}`);
+      }
+    });
+  }
+
+  /**
+   * 验证 dataSources
+   */
+  private validateDataSources(dataSources: Record<string, unknown>, path: string = 'dataSources'): void {
+    Object.entries(dataSources).forEach(([key, value]) => {
+      if (!value || typeof value !== 'object') {
+        this.addError(`${path}.${key}: DataSource 必须是一个对象`, 'INVALID_DATASOURCE', `${path}.${key}`);
+        return;
+      }
+
+      const ds = value as Record<string, unknown>;
+
+      // 检查 type 字段
+      if (!ds.type) {
+        this.addError(`${path}.${key}: DataSource 必须包含 type 字段`, 'MISSING_DATASOURCE_TYPE', `${path}.${key}.type`);
+      }
+    });
+  }
+
+  /**
+   * 验证 methods
+   */
+  private validateMethods(methods: Record<string, unknown>, path: string = 'methods'): void {
+    Object.entries(methods).forEach(([key, value]) => {
+      if (!value || typeof value !== 'object') {
+        this.addError(`${path}.${key}: Method 必须是一个对象`, 'INVALID_METHOD', `${path}.${key}`);
+        return;
+      }
+
+      const method = value as Record<string, unknown>;
+
+      // 检查 body 字段
+      if (!method.body) {
+        this.addError(`${path}.${key}: Method 必须包含 body 字段`, 'MISSING_METHOD_BODY', `${path}.${key}.body`);
+      } else if (Array.isArray(method.body)) {
+        this.validateActionChain(method.body, `${path}.${key}.body`);
+      }
+    });
+  }
+
+  /**
+   * 验证 watchers
+   */
+  private validateWatchers(watchers: unknown[], path: string = 'watchers'): void {
+    if (!Array.isArray(watchers)) {
+      this.addError(`${path}: watchers 必须是一个数组`, 'INVALID_WATCHERS', path);
+      return;
+    }
+
+    watchers.forEach((watcher, index) => {
+      if (!watcher || typeof watcher !== 'object') {
+        this.addError(`${path}[${index}]: Watcher 必须是一个对象`, 'INVALID_WATCHER', `${path}[${index}]`);
+        return;
+      }
+
+      const watcherObj = watcher as Record<string, unknown>;
+
+      // 检查 watch 字段
+      if (!watcherObj.watch) {
+        this.addError(`${path}[${index}]: Watcher 必须包含 watch 字段`, 'MISSING_WATCH', `${path}[${index}].watch`);
+      }
+
+      // 检查 handler 字段
+      if (!watcherObj.handler) {
+        this.addError(`${path}[${index}]: Watcher 必须包含 handler 字段`, 'MISSING_WATCHER_HANDLER', `${path}[${index}].handler`);
+      } else if (Array.isArray(watcherObj.handler)) {
+        this.validateActionChain(watcherObj.handler, `${path}[${index}].handler`);
+      }
+    });
+  }
+
+  /**
+   * 检查节点 ID 唯一性
+   */
+  checkNodeIds(schema: PageSchema): void {
+    const ids = new Map<string, string>();
+
+    const collectIds = (node: SchemaNode | SchemaNode[], path: string): void => {
+      if (Array.isArray(node)) {
+        node.forEach((n, i) => collectIds(n, `${path}[${i}]`));
+        return;
+      }
+
+      if (node.id) {
+        if (ids.has(node.id)) {
+          this.addError(`${path}: 节点 ID "${node.id}" 重复（首次出现在 ${ids.get(node.id)}）`, 'DUPLICATE_NODE_ID', `${path}.id`);
+        } else {
+          ids.set(node.id, path);
+        }
+      }
+
+      if (node.slots) {
+        Object.entries(node.slots).forEach(([slotName, slotContent]) => {
+          if (Array.isArray(slotContent)) {
+            slotContent.forEach((child, index) => {
+              if (typeof child === 'object') {
+                collectIds(child, `${path}.slots.${slotName}[${index}]`);
+              }
+            });
+          }
+        });
+      }
+
+      if (node.children && Array.isArray(node.children)) {
+        node.children.forEach((child, index) => {
+          if (typeof child === 'object') {
+            collectIds(child, `${path}.children[${index}]`);
+          }
+        });
+      }
+    };
+
+    if (Array.isArray(schema.body)) {
+      schema.body.forEach((node, i) => collectIds(node, `body[${i}]`));
+    } else {
+      collectIds(schema.body, 'body');
+    }
+  }
+
+  private addError(message: string, code?: string, path?: string): void {
+    this.diagnostics.push({
+      level: 'error',
+      message,
+      code,
+      path,
+    });
+  }
+
+  private addWarning(message: string, code?: string, path?: string): void {
+    this.diagnostics.push({
+      level: 'warning',
+      message,
+      code,
+      path,
+    });
+  }
 }
 
 /**
- * 校验单个 SchemaNode
+ * 验证 Schema（便捷函数）
  */
-export function validateNode(node: SchemaNode): ValidatorResult {
-  const diagnostics: Diagnostic[] = [];
-  const seenIds = new Set<string>();
-  validateSchemaNode(node, diagnostics, seenIds, '/');
+export function validateSchema(schema: unknown): Diagnostic[] {
+  const validator = new SchemaValidator();
+  return validator.validateSchema(schema);
+}
 
-  return {
-    valid: diagnostics.every((d) => d.level !== 'error'),
-    diagnostics,
-  };
+/**
+ * 检查 Schema 是否有效
+ */
+export function isValidSchema(schema: unknown): boolean {
+  const diagnostics = validateSchema(schema);
+  return !diagnostics.some((d) => d.level === 'error');
 }

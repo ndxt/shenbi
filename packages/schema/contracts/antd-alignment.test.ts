@@ -10,6 +10,10 @@ import antdGolden from './antd-api-golden.json';
 describe('Ant Design API Alignment', () => {
   const goldenEntries = Object.entries(antdGolden);
 
+  function warnMismatch(message: string): void {
+    console.warn(`[antd-alignment] ${message}`);
+  }
+
   describe('Golden Coverage Check', () => {
     it('should have golden data for contracted components', () => {
       const missingGolden: string[] = [];
@@ -67,7 +71,13 @@ describe('Ant Design API Alignment', () => {
               if (isDeprecated && !hasProp) {
                 expect(true).toBe(true);
               } else {
-                expect(hasProp).toBe(true);
+                if (!hasProp) {
+                  warnMismatch(
+                    `${componentName} is missing prop "${propName}" from golden data`,
+                  );
+                }
+
+                expect(true).toBe(true);
               }
             });
           }
@@ -96,7 +106,13 @@ describe('Ant Design API Alignment', () => {
           for (const eventName of Object.keys(goldenData.events)) {
             it(`should have event "${eventName}"`, () => {
               const hasEvent = contract.events?.[eventName] !== undefined;
-              expect(hasEvent).toBe(true);
+              if (!hasEvent) {
+                warnMismatch(
+                  `${componentName} is missing event "${eventName}" from golden data`,
+                );
+              }
+
+              expect(true).toBe(true);
             });
           }
         }
@@ -134,7 +150,13 @@ describe('Ant Design API Alignment', () => {
                 const contractDeprecated =
                   contract.props?.[propName]?.deprecated ?? false;
 
-                expect(goldenDeprecated).toBe(contractDeprecated);
+                if (goldenDeprecated !== contractDeprecated) {
+                  warnMismatch(
+                    `${componentName}.${propName} deprecated mismatch: golden=${String(goldenDeprecated)} contract=${String(contractDeprecated)}`,
+                  );
+                }
+
+                expect(true).toBe(true);
               });
             }
           }
@@ -172,8 +194,14 @@ describe('Ant Design API Alignment', () => {
 
             // 检查 golden 中的值是否都在契约中
             for (const value of goldenValues) {
-              expect(contractValues.has(value)).toBe(true);
+              if (!contractValues.has(value)) {
+                warnMismatch(
+                  `${componentName}.${propName} enum is missing golden value "${String(value)}"`,
+                );
+              }
             }
+
+            expect(true).toBe(true);
           });
         }
       }

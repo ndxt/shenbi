@@ -1,141 +1,178 @@
-import type { PageSchema } from '../../types';
+import type { PageSchema } from '../../types/page';
+import type { Diagnostic } from '../types/contract';
 
 /**
- * 测试用例定义
+ * LLM 生成测试用例定义
  */
 export interface TestCase {
-  /** 唯一标识 */
+  /** 测试用例 ID */
   id: string;
-  /** 测试套件类型 */
-  suite: 'component' | 'action' | 'complex';
-  /** 测试级别 */
-  level: 'L1' | 'L2';
-  /** 生成 prompt */
+  /** 测试用例名称 */
+  name: string;
+  /** 测试类别 */
+  category: 'component' | 'action' | 'expression' | 'page';
+  /** 测试子类别 */
+  subCategory?: string;
+  /** 测试难度级别 L1=单属性，L2=多属性组合，L3=复杂场景 */
+  level: 'L1' | 'L2' | 'L3';
+  /** 输入给 LLM 的 prompt */
   prompt: string;
-  /** 断言条件 */
-  assertions: TestCaseAssertions;
-  /** 是否只跑 Mock 模式 */
-  mockOnly?: boolean;
+  /** 期望的组件类型（用于组件测试） */
+  expectedComponent?: string;
+  /** 期望包含的 props（用于验证） */
+  expectedProps?: string[];
+  /** 期望包含的 actions（用于验证） */
+  expectedActions?: string[];
+  /** 运行配置 */
+  config?: TestCaseConfig;
 }
 
-export interface TestCaseAssertions {
-  /** 组件断言 */
-  components?: {
-    /** 必须包含的组件列表 */
-    mustInclude?: string[];
-    /** 不能包含的组件列表 */
-    mustNotInclude?: string[];
-  };
-  /** Props 断言 */
-  props?: Record<string, Record<string, unknown>>;
-  /** Actions 断言 */
-  actions?: {
-    /** 必须包含的 Action */
-    mustInclude?: Array<{ type: string; [key: string]: unknown }>;
-    /** 不能包含的 Action */
-    mustNotInclude?: string[];
-  };
-  /** 结构断言 */
-  structure?: {
-    /** 最大节点数 */
-    maxNodeCount?: number;
-    /** 最小节点数 */
-    minNodeCount?: number;
-  };
-  /** 表达式断言 */
-  expressions?: {
-    /** 必须引用的状态/数据源 */
-    mustReference?: string[];
-    /** 不能引用的状态/数据源 */
-    mustNotReference?: string[];
-  };
-  /** State 断言 */
-  state?: {
-    /** 必须声明的状态字段 */
-    mustDeclare?: string[];
-  };
+export interface TestCaseConfig {
+  /** 是否允许额外 props */
+  allowExtraProps?: boolean;
+  /** 是否允许额外 actions */
+  allowExtraActions?: boolean;
+  /** 表达式校验级别 */
+  expressionValidation?: 'strict' | 'loose';
+  /** 超时时间（毫秒） */
+  timeout?: number;
 }
 
 /**
- * 单个测试用例的执行结果
+ * 单个测试结果
  */
 export interface TestCaseResult {
-  id: string;
-  status: 'pass' | 'fail' | 'skip';
-  prompt: string;
-  durationMs?: number;
-  schema?: PageSchema;
-  diagnostics?: Diagnostic[];
-  failureReason?: string;
-  assertionsPassed?: AssertionResult[];
-}
-
-/**
- * 单个断言的结果
- */
-export interface AssertionResult {
-  name: string;
+  /** 测试用例 ID */
+  testCaseId: string;
+  /** 测试是否通过 */
   passed: boolean;
-  message?: string;
-}
-
-/**
- * 校验诊断信息
- */
-export interface Diagnostic {
-  level: 'error' | 'warning' | 'info';
-  code: string;
-  message: string;
-  path?: string;
+  /** 生成的 Schema */
+  generatedSchema?: PageSchema | null;
+  /** 验证错误列表 */
+  diagnostics: Diagnostic[];
+  /** 运行时间（毫秒） */
+  duration: number;
+  /** 错误信息 */
+  error?: string;
+  /** 详细信息 */
+  details?: {
+    /** 组件匹配结果 */
+    componentMatch?: boolean;
+    /** Props 匹配结果 */
+    propsMatch?: {
+      passed: boolean;
+      expected: string[];
+      actual: string[];
+      missing: string[];
+      extra: string[];
+    };
+    /** Actions 匹配结果 */
+    actionsMatch?: {
+      passed: boolean;
+      expected: string[];
+      actual: string[];
+      missing: string[];
+      extra: string[];
+    };
+    /** 表达式验证结果 */
+    expressionValidation?: {
+      passed: boolean;
+      invalidExpressions: string[];
+    };
+  };
 }
 
 /**
  * 测试报告
  */
 export interface TestReport {
+  /** 运行时间戳 */
+  timestamp: string;
+  /** 测试模式 */
+  mode: 'mock' | 'live' | 'mixed';
+  /** 总体统计 */
   summary: {
     total: number;
     passed: number;
     failed: number;
     skipped: number;
     passRate: number;
-    durationMs: number;
+    avgDuration: number;
   };
-  cases: TestCaseResult[];
-  metadata: {
-    timestamp: string;
-    mode: 'mock' | 'live' | 'mixed';
-    apiEndpoint?: string;
+  /** 按类别分组统计 */
+  byCategory: {
+    component: { total: number; passed: number; passRate: number };
+    action: { total: number; passed: number; passRate: number };
+    expression: { total: number; passed: number; passRate: number };
+    page: { total: number; passed: number; passRate: number };
   };
+  /** 按难度级别分组统计 */
+  byLevel: {
+    L1: { total: number; passed: number; passRate: number };
+    L2: { total: number; passed: number; passRate: number };
+    L3: { total: number; passed: number; passRate: number };
+  };
+  /** 详细结果 */
+  results: TestCaseResult[];
+  /** 诊断信息 */
+  diagnostics: Diagnostic[];
 }
 
 /**
- * 测试运行配置
+ * 测试运行器配置
  */
 export interface TestRunnerConfig {
-  /** API 端点 */
-  apiEndpoint?: string;
-  /** 运行模式 */
+  /** 运行模式：mock=使用 mock 响应，live=真实调用 LLM，mixed=优先 mock 失败时 live */
   mode: 'mock' | 'live' | 'mixed';
-  /** L1 通过率阈值 */
-  l1Threshold?: number;
-  /** L2 通过率阈值 */
-  l2Threshold?: number;
-  /** 超时时间 (ms) */
-  timeout?: number;
+  /** LLM API 端点 */
+  apiEndpoint?: string;
+  /** API 密钥 */
+  apiKey?: string;
+  /** 模型名称 */
+  model?: string;
   /** 并发数 */
   concurrency?: number;
-  /** 是否只运行指定 ID 的 case */
-  onlyIds?: string[];
-  /** 是否跳过指定 ID 的 case */
-  skipIds?: string[];
+  /** 超时时间（毫秒） */
+  timeout?: number;
+  /** 重试次数 */
+  retries?: number;
+  /** Mock 响应映射 */
+  mocks?: Record<string, string | PageSchema>;
+  /** 是否生成详细报告 */
+  verbose?: boolean;
 }
 
 /**
- * Mock 响应数据
+ * LLM API 请求格式
  */
-export interface MockResponse {
-  schema: PageSchema;
-  durationMs?: number;
-  tokensUsed?: number;
+export interface LLMRequest {
+  model: string;
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }>;
+  temperature?: number;
+  max_tokens?: number;
+  response_format?: {
+    type: 'json_object';
+  };
+}
+
+/**
+ * LLM API 响应格式
+ */
+export interface LLMResponse {
+  id: string;
+  choices: Array<{
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason: string;
+  }>;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }

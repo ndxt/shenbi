@@ -231,13 +231,13 @@ describe('AIPanel integration', () => {
     expect(streamRequests).toHaveLength(1);
     expect(streamRequests[0]).toMatchObject({
       prompt: '把当前卡片标题改成新标题，并追加一段说明',
-      intent: 'schema.modify',
       conversationId: expect.stringContaining('conv-'),
       selectedNodeId: 'card-1',
       context: {
         schemaJson: createInitialSchema(),
       },
     });
+    expect(streamRequests[0]).not.toHaveProperty('intent');
 
     expect(finalizeRequests).toHaveLength(1);
     expect(finalizeRequests[0]).toMatchObject({

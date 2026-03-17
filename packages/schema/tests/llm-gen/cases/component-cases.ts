@@ -1,953 +1,1033 @@
-import type { TestCase } from '../types';
+import type { TestCase } from './types';
 
 /**
- * 组件属性测试用例
- *
- * 覆盖所有 ~100 个组件，每个组件至少 1 个 L1 case
+ * 组件测试用例 - L1 级别（单属性测试）
  */
-export const componentCases: TestCase[] = [
+export const componentCasesL1: TestCase[] = [
   // ==================== Button ====================
   {
-    id: 'button-primary',
-    suite: 'component',
+    id: 'button-001',
+    name: 'Button - 基础按钮',
+    category: 'component',
+    subCategory: 'Button',
     level: 'L1',
-    prompt: '生成一个主要类型的按钮，文字为提交',
-    assertions: {
-      components: { mustInclude: ['Button'] },
-      props: {
-        Button: { type: 'primary', children: '提交' },
-      },
-      structure: { maxNodeCount: 3 },
-    },
+    prompt: '创建一个_primary_类型的按钮，显示文本"提交"',
+    expectedComponent: 'Button',
+    expectedProps: ['type'],
   },
   {
-    id: 'button-default',
-    suite: 'component',
+    id: 'button-002',
+    name: 'Button - 危险按钮',
+    category: 'component',
+    subCategory: 'Button',
     level: 'L1',
-    prompt: '生成一个默认类型的按钮',
-    assertions: {
-      components: { mustInclude: ['Button'] },
-      props: { Button: { type: 'default' } },
-    },
+    prompt: '创建一个 danger 模式的按钮',
+    expectedComponent: 'Button',
+    expectedProps: ['danger'],
   },
   {
-    id: 'button-link',
-    suite: 'component',
+    id: 'button-003',
+    name: 'Button - 加载中按钮',
+    category: 'component',
+    subCategory: 'Button',
     level: 'L1',
-    prompt: '生成一个链接类型的按钮，文字为了解更多',
-    assertions: {
-      components: { mustInclude: ['Button'] },
-      props: { Button: { type: 'link' } },
-    },
+    prompt: '创建一个加载中状态的按钮',
+    expectedComponent: 'Button',
+    expectedProps: ['loading'],
   },
   {
-    id: 'button-disabled',
-    suite: 'component',
+    id: 'button-004',
+    name: 'Button - 禁用按钮',
+    category: 'component',
+    subCategory: 'Button',
     level: 'L1',
-    prompt: '生成一个禁用的按钮',
-    assertions: {
-      components: { mustInclude: ['Button'] },
-      props: { Button: { disabled: true } },
-    },
+    prompt: '创建一个禁用的按钮',
+    expectedComponent: 'Button',
+    expectedProps: ['disabled'],
   },
   {
-    id: 'button-loading',
-    suite: 'component',
+    id: 'button-005',
+    name: 'Button - 块级按钮',
+    category: 'component',
+    subCategory: 'Button',
     level: 'L1',
-    prompt: '生成一个加载状态的按钮',
-    assertions: {
-      components: { mustInclude: ['Button'] },
-      props: { Button: { loading: true } },
-    },
+    prompt: '创建一个块级按钮，宽度占满父容器',
+    expectedComponent: 'Button',
+    expectedProps: ['block'],
   },
   {
-    id: 'button-sizes',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成三个不同尺寸的按钮：小号、中号、大号',
-    assertions: {
-      components: { mustInclude: ['Button'] },
-      structure: { minNodeCount: 3 },
-    },
+    id: 'button-006',
+    name: 'Button - 圆形按钮',
+    category: 'component',
+    subCategory: 'Button',
+    level: 'L1',
+    prompt: '创建一个圆形形状的按钮',
+    expectedComponent: 'Button',
+    expectedProps: ['shape'],
   },
 
   // ==================== Input ====================
   {
-    id: 'input-basic',
-    suite: 'component',
+    id: 'input-001',
+    name: 'Input - 基础输入框',
+    category: 'component',
+    subCategory: 'Input',
     level: 'L1',
-    prompt: '生成一个输入框，占位符为请输入用户名',
-    assertions: {
-      components: { mustInclude: ['Input'] },
-      props: {
-        Input: { placeholder: '请输入用户名' },
-      },
-    },
+    prompt: '创建一个文本输入框，占位符为"请输入用户名"',
+    expectedComponent: 'Input',
+    expectedProps: ['placeholder'],
   },
   {
-    id: 'input-password',
-    suite: 'component',
+    id: 'input-002',
+    name: 'Input - 密码输入框',
+    category: 'component',
+    subCategory: 'Input',
     level: 'L1',
-    prompt: '生成一个密码输入框',
-    assertions: {
-      components: { mustInclude: ['Input'] },
-      props: { Input: { type: 'password', placeholder: '请输入密码' } },
-    },
+    prompt: '创建一个密码输入框，输入内容应被隐藏',
+    expectedComponent: 'Input',
+    expectedProps: ['type'],
   },
   {
-    id: 'input-disabled',
-    suite: 'component',
+    id: 'input-003',
+    name: 'Input - 带清除按钮的输入框',
+    category: 'component',
+    subCategory: 'Input',
     level: 'L1',
-    prompt: '生成一个禁用的输入框',
-    assertions: {
-      components: { mustInclude: ['Input'] },
-      props: { Input: { disabled: true } },
-    },
+    prompt: '创建一个带清除按钮的输入框',
+    expectedComponent: 'Input',
+    expectedProps: ['allowClear'],
   },
   {
-    id: 'input-textarea',
-    suite: 'component',
+    id: 'input-004',
+    name: 'Input - 禁用输入框',
+    category: 'component',
+    subCategory: 'Input',
     level: 'L1',
-    prompt: '生成一个多行文本输入框',
-    assertions: {
-      components: { mustInclude: ['Input.TextArea'] },
-    },
+    prompt: '创建一个禁用的输入框',
+    expectedComponent: 'Input',
+    expectedProps: ['disabled'],
   },
   {
-    id: 'input-with-addon',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个带前缀的输入框，前缀显示https://',
-    assertions: {
-      components: { mustInclude: ['Input'] },
-      props: { Input: { addonBefore: 'https://' } },
-    },
+    id: 'input-005',
+    name: 'Input - 限制长度的输入框',
+    category: 'component',
+    subCategory: 'Input',
+    level: 'L1',
+    prompt: '创建一个最大长度为 50 的输入框',
+    expectedComponent: 'Input',
+    expectedProps: ['maxLength'],
+  },
+  {
+    id: 'input-006',
+    name: 'Input - 带前缀的输入框',
+    category: 'component',
+    subCategory: 'Input',
+    level: 'L1',
+    prompt: '创建一个带用户图标前缀的输入框',
+    expectedComponent: 'Input',
+    expectedProps: ['prefix'],
   },
 
   // ==================== Select ====================
   {
-    id: 'select-basic',
-    suite: 'component',
+    id: 'select-001',
+    name: 'Select - 基础选择器',
+    category: 'component',
+    subCategory: 'Select',
     level: 'L1',
-    prompt: '生成一个下拉选择框，选项包含北京、上海、广州',
-    assertions: {
-      components: { mustInclude: ['Select'] },
-      props: {
-        Select: { options: { length: 3 } },
-      },
-    },
+    prompt: '创建一个下拉选择器，选项为 ["选项 1", "选项 2", "选项 3"]',
+    expectedComponent: 'Select',
+    expectedProps: ['options'],
   },
   {
-    id: 'select-multiple',
-    suite: 'component',
+    id: 'select-002',
+    name: 'Select - 禁用选择器',
+    category: 'component',
+    subCategory: 'Select',
     level: 'L1',
-    prompt: '生成一个多选下拉框',
-    assertions: {
-      components: { mustInclude: ['Select'] },
-      props: { Select: { mode: 'multiple' } },
-    },
+    prompt: '创建一个禁用的下拉选择器',
+    expectedComponent: 'Select',
+    expectedProps: ['disabled'],
   },
   {
-    id: 'select-disabled',
-    suite: 'component',
+    id: 'select-003',
+    name: 'Select - 可搜索选择器',
+    category: 'component',
+    subCategory: 'Select',
     level: 'L1',
-    prompt: '生成一个禁用的下拉选择框',
-    assertions: {
-      components: { mustInclude: ['Select'] },
-      props: { Select: { disabled: true } },
-    },
+    prompt: '创建一个支持搜索的下拉选择器',
+    expectedComponent: 'Select',
+    expectedProps: ['showSearch'],
   },
   {
-    id: 'select-placeholder',
-    suite: 'component',
+    id: 'select-004',
+    name: 'Select - 多选选择器',
+    category: 'component',
+    subCategory: 'Select',
     level: 'L1',
-    prompt: '生成一个带占位符请选择的下拉选择框',
-    assertions: {
-      components: { mustInclude: ['Select'] },
-      props: { Select: { placeholder: '请选择' } },
-    },
+    prompt: '创建一个支持多选的下拉选择器',
+    expectedComponent: 'Select',
+    expectedProps: ['mode'],
+  },
+  {
+    id: 'select-005',
+    name: 'Select - 带占位符的选择器',
+    category: 'component',
+    subCategory: 'Select',
+    level: 'L1',
+    prompt: '创建一个占位符为"请选择"的下拉选择器',
+    expectedComponent: 'Select',
+    expectedProps: ['placeholder'],
   },
 
   // ==================== Radio ====================
   {
-    id: 'radio-basic',
-    suite: 'component',
+    id: 'radio-001',
+    name: 'Radio - 基础单选框',
+    category: 'component',
+    subCategory: 'Radio',
     level: 'L1',
-    prompt: '生成一个单选框',
-    assertions: {
-      components: { mustInclude: ['Radio'] },
-    },
+    prompt: '创建一个单选按钮，标签为"选项 A"',
+    expectedComponent: 'Radio',
+    expectedProps: [],
   },
   {
-    id: 'radio-group',
-    suite: 'component',
+    id: 'radio-002',
+    name: 'Radio - 禁用单选框',
+    category: 'component',
+    subCategory: 'Radio',
     level: 'L1',
-    prompt: '生成一个单选框组，选项包含男、女',
-    assertions: {
-      components: { mustInclude: ['Radio.Group'] },
-    },
+    prompt: '创建一个禁用的单选按钮',
+    expectedComponent: 'Radio',
+    expectedProps: ['disabled'],
   },
   {
-    id: 'radio-disabled',
-    suite: 'component',
+    id: 'radio-group-001',
+    name: 'Radio.Group - 单选组',
+    category: 'component',
+    subCategory: 'Radio.Group',
     level: 'L1',
-    prompt: '生成一个禁用的单选框',
-    assertions: {
-      components: { mustInclude: ['Radio'] },
-      props: { Radio: { disabled: true } },
-    },
+    prompt: '创建一个单选按钮组，包含三个选项',
+    expectedComponent: 'Radio.Group',
+    expectedProps: ['options'],
   },
 
   // ==================== Checkbox ====================
   {
-    id: 'checkbox-basic',
-    suite: 'component',
+    id: 'checkbox-001',
+    name: 'Checkbox - 基础复选框',
+    category: 'component',
+    subCategory: 'Checkbox',
     level: 'L1',
-    prompt: '生成一个复选框',
-    assertions: {
-      components: { mustInclude: ['Checkbox'] },
-    },
+    prompt: '创建一个复选框，标签为"同意协议"',
+    expectedComponent: 'Checkbox',
+    expectedProps: [],
   },
   {
-    id: 'checkbox-group',
-    suite: 'component',
+    id: 'checkbox-002',
+    name: 'Checkbox - 禁用复选框',
+    category: 'component',
+    subCategory: 'Checkbox',
     level: 'L1',
-    prompt: '生成一个复选框组，选项包含苹果、香蕉、橙子',
-    assertions: {
-      components: { mustInclude: ['Checkbox.Group'] },
-    },
+    prompt: '创建一个禁用的复选框',
+    expectedComponent: 'Checkbox',
+    expectedProps: ['disabled'],
   },
   {
-    id: 'checkbox-checked',
-    suite: 'component',
+    id: 'checkbox-group-001',
+    name: 'Checkbox.Group - 复选组',
+    category: 'component',
+    subCategory: 'Checkbox.Group',
     level: 'L1',
-    prompt: '生成一个已选中的复选框',
-    assertions: {
-      components: { mustInclude: ['Checkbox'] },
-      props: { Checkbox: { checked: true } },
-    },
-  },
-  {
-    id: 'checkbox-indeterminate',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个半选状态的复选框',
-    assertions: {
-      components: { mustInclude: ['Checkbox'] },
-      props: { Checkbox: { indeterminate: true } },
-    },
-  },
-
-  // ==================== Form ====================
-  {
-    id: 'form-basic',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个表单，包含用户名和密码两个字段',
-    assertions: {
-      components: { mustInclude: ['Form', 'Form.Item', 'Input'] },
-      structure: { minNodeCount: 3 },
-    },
-  },
-  {
-    id: 'form-item-required',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个必填的表单项',
-    assertions: {
-      components: { mustInclude: ['Form.Item'] },
-      props: { 'Form.Item': { required: true } },
-    },
-  },
-  {
-    id: 'form-with-label',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个带标签的表单项，标签为用户名',
-    assertions: {
-      components: { mustInclude: ['Form.Item'] },
-      props: { 'Form.Item': { label: '用户名' } },
-    },
-  },
-
-  // ==================== Table ====================
-  {
-    id: 'table-basic',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个表格，包含姓名、年龄、地址三列',
-    assertions: {
-      components: { mustInclude: ['Table'] },
-      props: {
-        Table: { columns: { length: 3 } },
-      },
-    },
-  },
-  {
-    id: 'table-with-data',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个表格，数据源绑定 state.userList',
-    assertions: {
-      components: { mustInclude: ['Table'] },
-      expressions: { mustReference: ['state.userList'] },
-    },
-  },
-  {
-    id: 'table-striped',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个带斑马纹的表格',
-    assertions: {
-      components: { mustInclude: ['Table'] },
-      props: { Table: { striped: true } },
-    },
-  },
-  {
-    id: 'table-bordered',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个带边框的表格',
-    assertions: {
-      components: { mustInclude: ['Table'] },
-      props: { Table: { bordered: true } },
-    },
-  },
-  {
-    id: 'table-with-pagination',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个带分页的表格',
-    assertions: {
-      components: { mustInclude: ['Table'] },
-      props: { Table: { pagination: {} } },
-    },
-  },
-
-  // ==================== Card ====================
-  {
-    id: 'card-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个卡片组件',
-    assertions: {
-      components: { mustInclude: ['Card'] },
-    },
-  },
-  {
-    id: 'card-with-title',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个带标题的卡片，标题为用户信息',
-    assertions: {
-      components: { mustInclude: ['Card'] },
-      props: { Card: { title: '用户信息' } },
-    },
-  },
-  {
-    id: 'card-bordered',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个无边框的卡片',
-    assertions: {
-      components: { mustInclude: ['Card'] },
-      props: { Card: { bordered: false } },
-    },
-  },
-
-  // ==================== Modal ====================
-  {
-    id: 'modal-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个模态框',
-    assertions: {
-      components: { mustInclude: ['Modal'] },
-    },
-  },
-  {
-    id: 'modal-with-title',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个带标题的模态框，标题为提示',
-    assertions: {
-      components: { mustInclude: ['Modal'] },
-      props: { Modal: { title: '提示' } },
-    },
-  },
-  {
-    id: 'modal-confirm',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个确认模态框，包含确定和取消按钮',
-    assertions: {
-      components: { mustInclude: ['Modal'] },
-    },
-  },
-
-  // ==================== Alert ====================
-  {
-    id: 'alert-info',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个信息类型的消息提示',
-    assertions: {
-      components: { mustInclude: ['Alert'] },
-      props: { Alert: { type: 'info' } },
-    },
-  },
-  {
-    id: 'alert-success',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个成功类型的消息提示',
-    assertions: {
-      components: { mustInclude: ['Alert'] },
-      props: { Alert: { type: 'success' } },
-    },
-  },
-  {
-    id: 'alert-warning',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个警告类型的消息提示',
-    assertions: {
-      components: { mustInclude: ['Alert'] },
-      props: { Alert: { type: 'warning' } },
-    },
-  },
-  {
-    id: 'alert-error',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个错误类型的消息提示',
-    assertions: {
-      components: { mustInclude: ['Alert'] },
-      props: { Alert: { type: 'error' } },
-    },
-  },
-  {
-    id: 'alert-with-description',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个带描述信息的消息提示',
-    assertions: {
-      components: { mustInclude: ['Alert'] },
-      props: { Alert: { description: {} } },
-    },
-  },
-
-  // ==================== Tabs ====================
-  {
-    id: 'tabs-basic',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个标签页组件，包含两个标签页',
-    assertions: {
-      components: { mustInclude: ['Tabs', 'Tabs.TabPane'] },
-      structure: { minNodeCount: 2 },
-    },
-  },
-  {
-    id: 'tabs-default-active',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个默认选中第一个标签页的标签组件',
-    assertions: {
-      components: { mustInclude: ['Tabs'] },
-      props: { Tabs: { defaultActiveKey: '1' } },
-    },
-  },
-
-  // ==================== DatePicker ====================
-  {
-    id: 'datepicker-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个日期选择器',
-    assertions: {
-      components: { mustInclude: ['DatePicker'] },
-    },
-  },
-  {
-    id: 'datepicker-range',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个日期范围选择器',
-    assertions: {
-      components: { mustInclude: ['DatePicker.RangePicker'] },
-    },
-  },
-  {
-    id: 'datepicker-disabled',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个禁用的日期选择器',
-    assertions: {
-      components: { mustInclude: ['DatePicker'] },
-      props: { DatePicker: { disabled: true } },
-    },
-  },
-
-  // ==================== Typography ====================
-  {
-    id: 'typography-title',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个标题文本',
-    assertions: {
-      components: { mustInclude: ['Typography.Title'] },
-    },
-  },
-  {
-    id: 'typography-text',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一段普通文本',
-    assertions: {
-      components: { mustInclude: ['Typography.Text'] },
-    },
-  },
-  {
-    id: 'typography-paragraph',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个段落',
-    assertions: {
-      components: { mustInclude: ['Typography.Paragraph'] },
-    },
-  },
-
-  // ==================== Avatar ====================
-  {
-    id: 'avatar-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个头像组件',
-    assertions: {
-      components: { mustInclude: ['Avatar'] },
-    },
-  },
-  {
-    id: 'avatar-with-text',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个带文字的头像组件，文字为用户',
-    assertions: {
-      components: { mustInclude: ['Avatar'] },
-      children: '用户',
-    },
-  },
-  {
-    id: 'avatar-group',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个头像组，包含三个头像',
-    assertions: {
-      components: { mustInclude: ['Avatar.Group', 'Avatar'] },
-    },
-  },
-
-  // ==================== Badge ====================
-  {
-    id: 'badge-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个徽标组件',
-    assertions: {
-      components: { mustInclude: ['Badge'] },
-    },
-  },
-  {
-    id: 'badge-with-count',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个带数字的徽标，数字为 5',
-    assertions: {
-      components: { mustInclude: ['Badge'] },
-      props: { Badge: { count: 5 } },
-    },
-  },
-  {
-    id: 'badge-dot',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个点状徽标',
-    assertions: {
-      components: { mustInclude: ['Badge'] },
-      props: { Badge: { dot: true } },
-    },
-  },
-
-  // ==================== Tag ====================
-  {
-    id: 'tag-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个标签',
-    assertions: {
-      components: { mustInclude: ['Tag'] },
-    },
-  },
-  {
-    id: 'tag-colors',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个红色的标签',
-    assertions: {
-      components: { mustInclude: ['Tag'] },
-      props: { Tag: { color: 'red' } },
-    },
-  },
-
-  // ==================== Progress ====================
-  {
-    id: 'progress-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个进度条组件',
-    assertions: {
-      components: { mustInclude: ['Progress'] },
-    },
-  },
-  {
-    id: 'progress-percent',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个进度为 50 的进度条',
-    assertions: {
-      components: { mustInclude: ['Progress'] },
-      props: { Progress: { percent: 50 } },
-    },
-  },
-
-  // ==================== Divider ====================
-  {
-    id: 'divider-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个分割线',
-    assertions: {
-      components: { mustInclude: ['Divider'] },
-    },
-  },
-  {
-    id: 'divider-with-text',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个带文字的分割线，文字为或者',
-    assertions: {
-      components: { mustInclude: ['Divider'] },
-      children: '或者',
-    },
-  },
-
-  // ==================== Breadcrumb ====================
-  {
-    id: 'breadcrumb-basic',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个面包屑导航，包含首页和列表页两级',
-    assertions: {
-      components: { mustInclude: ['Breadcrumb'] },
-      structure: { minNodeCount: 2 },
-    },
-  },
-
-  // ==================== Steps ====================
-  {
-    id: 'steps-basic',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个步骤条，包含三个步骤',
-    assertions: {
-      components: { mustInclude: ['Steps'] },
-      structure: { minNodeCount: 3 },
-    },
-  },
-
-  // ==================== Empty ====================
-  {
-    id: 'empty-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个空状态组件',
-    assertions: {
-      components: { mustInclude: ['Empty'] },
-    },
-  },
-
-  // ==================== Result ====================
-  {
-    id: 'result-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个结果组件',
-    assertions: {
-      components: { mustInclude: ['Result'] },
-    },
-  },
-  {
-    id: 'result-success',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个成功状态的结果组件',
-    assertions: {
-      components: { mustInclude: ['Result'] },
-      props: { Result: { status: 'success' } },
-    },
-  },
-
-  // ==================== Tooltip ====================
-  {
-    id: 'tooltip-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个文字提示组件',
-    assertions: {
-      components: { mustInclude: ['Tooltip'] },
-    },
-  },
-
-  // ==================== Popover ====================
-  {
-    id: 'popover-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个气泡卡片组件',
-    assertions: {
-      components: { mustInclude: ['Popover'] },
-    },
-  },
-
-  // ==================== Popconfirm ====================
-  {
-    id: 'popconfirm-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个气泡确认框',
-    assertions: {
-      components: { mustInclude: ['Popconfirm'] },
-    },
-  },
-
-  // ==================== Tree ====================
-  {
-    id: 'tree-basic',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个树形控件，包含两个节点',
-    assertions: {
-      components: { mustInclude: ['Tree'] },
-    },
-  },
-
-  // ==================== Menu ====================
-  {
-    id: 'menu-basic',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个菜单组件，包含两个菜单项',
-    assertions: {
-      components: { mustInclude: ['Menu'] },
-    },
-  },
-
-  // ==================== Dropdown ====================
-  {
-    id: 'dropdown-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个下拉菜单',
-    assertions: {
-      components: { mustInclude: ['Dropdown'] },
-    },
-  },
-
-  // ==================== Upload ====================
-  {
-    id: 'upload-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个上传组件',
-    assertions: {
-      components: { mustInclude: ['Upload'] },
-    },
-  },
-
-  // ==================== Slider ====================
-  {
-    id: 'slider-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个滑块组件',
-    assertions: {
-      components: { mustInclude: ['Slider'] },
-    },
+    prompt: '创建一个复选框组，包含多个选项',
+    expectedComponent: 'Checkbox.Group',
+    expectedProps: ['options'],
   },
 
   // ==================== Switch ====================
   {
-    id: 'switch-basic',
-    suite: 'component',
+    id: 'switch-001',
+    name: 'Switch - 基础开关',
+    category: 'component',
+    subCategory: 'Switch',
     level: 'L1',
-    prompt: '生成一个开关组件',
-    assertions: {
-      components: { mustInclude: ['Switch'] },
-    },
+    prompt: '创建一个开关组件',
+    expectedComponent: 'Switch',
+    expectedProps: [],
+  },
+  {
+    id: 'switch-002',
+    name: 'Switch - 禁用开关',
+    category: 'component',
+    subCategory: 'Switch',
+    level: 'L1',
+    prompt: '创建一个禁用的开关',
+    expectedComponent: 'Switch',
+    expectedProps: ['disabled'],
+  },
+  {
+    id: 'switch-003',
+    name: 'Switch - 小尺寸开关',
+    category: 'component',
+    subCategory: 'Switch',
+    level: 'L1',
+    prompt: '创建一个小型尺寸的开关',
+    expectedComponent: 'Switch',
+    expectedProps: ['size'],
   },
 
-  // ==================== Rate ====================
+  // ==================== Slider ====================
   {
-    id: 'rate-basic',
-    suite: 'component',
+    id: 'slider-001',
+    name: 'Slider - 基础滑块',
+    category: 'component',
+    subCategory: 'Slider',
     level: 'L1',
-    prompt: '生成一个评分组件',
-    assertions: {
-      components: { mustInclude: ['Rate'] },
-    },
+    prompt: '创建一个滑动输入组件，范围 0-100',
+    expectedComponent: 'Slider',
+    expectedProps: ['min', 'max'],
+  },
+  {
+    id: 'slider-002',
+    name: 'Slider - 范围滑块',
+    category: 'component',
+    subCategory: 'Slider',
+    level: 'L1',
+    prompt: '创建一个双滑块范围选择器',
+    expectedComponent: 'Slider',
+    expectedProps: ['range'],
+  },
+  {
+    id: 'slider-003',
+    name: 'Slider - 带刻度的滑块',
+    category: 'component',
+    subCategory: 'Slider',
+    level: 'L1',
+    prompt: '创建一个带刻度标记的滑块',
+    expectedComponent: 'Slider',
+    expectedProps: ['dots'],
   },
 
-  // ==================== Row/Col ====================
+  // ==================== Form ====================
   {
-    id: 'row-col-basic',
-    suite: 'component',
-    level: 'L2',
-    prompt: '生成一个两列的栅格布局',
-    assertions: {
-      components: { mustInclude: ['Row', 'Col'] },
-    },
+    id: 'form-001',
+    name: 'Form - 基础表单',
+    category: 'component',
+    subCategory: 'Form',
+    level: 'L1',
+    prompt: '创建一个水平布局的表单',
+    expectedComponent: 'Form',
+    expectedProps: ['layout'],
+  },
+  {
+    id: 'form-002',
+    name: 'Form - 垂直表单',
+    category: 'component',
+    subCategory: 'Form',
+    level: 'L1',
+    prompt: '创建一个垂直布局的表单',
+    expectedComponent: 'Form',
+    expectedProps: ['layout'],
+  },
+  {
+    id: 'form-item-001',
+    name: 'Form.Item - 表单项',
+    category: 'component',
+    subCategory: 'Form.Item',
+    level: 'L1',
+    prompt: '创建一个标签为"用户名"的表单项，字段名为 username',
+    expectedComponent: 'Form.Item',
+    expectedProps: ['label', 'name'],
+  },
+  {
+    id: 'form-item-002',
+    name: 'Form.Item - 必填项',
+    category: 'component',
+    subCategory: 'Form.Item',
+    level: 'L1',
+    prompt: '创建一个必填的表单项',
+    expectedComponent: 'Form.Item',
+    expectedProps: ['rules'],
+  },
+  {
+    id: 'form-item-003',
+    name: 'Form.Item - 带验证规则',
+    category: 'component',
+    subCategory: 'Form.Item',
+    level: 'L1',
+    prompt: '创建一个带邮箱验证规则的表单项',
+    expectedComponent: 'Form.Item',
+    expectedProps: ['rules'],
+  },
+
+  // ==================== Table ====================
+  {
+    id: 'table-001',
+    name: 'Table - 基础表格',
+    category: 'component',
+    subCategory: 'Table',
+    level: 'L1',
+    prompt: '创建一个数据表格，显示用户列表',
+    expectedComponent: 'Table',
+    expectedProps: ['dataSource', 'columns'],
+  },
+  {
+    id: 'table-002',
+    name: 'Table - 带边框表格',
+    category: 'component',
+    subCategory: 'Table',
+    level: 'L1',
+    prompt: '创建一个带边框的表格',
+    expectedComponent: 'Table',
+    expectedProps: ['bordered'],
+  },
+  {
+    id: 'table-003',
+    name: 'Table - 加载中表格',
+    category: 'component',
+    subCategory: 'Table',
+    level: 'L1',
+    prompt: '创建一个显示加载中状态的表格',
+    expectedComponent: 'Table',
+    expectedProps: ['loading'],
+  },
+  {
+    id: 'table-004',
+    name: 'Table - 带分页表格',
+    category: 'component',
+    subCategory: 'Table',
+    level: 'L1',
+    prompt: '创建一个带分页功能的表格',
+    expectedComponent: 'Table',
+    expectedProps: ['pagination'],
+  },
+
+  // ==================== Card ====================
+  {
+    id: 'card-001',
+    name: 'Card - 基础卡片',
+    category: 'component',
+    subCategory: 'Card',
+    level: 'L1',
+    prompt: '创建一个卡片容器，标题为"用户信息"',
+    expectedComponent: 'Card',
+    expectedProps: ['title'],
+  },
+  {
+    id: 'card-002',
+    name: 'Card - 带操作卡片',
+    category: 'component',
+    subCategory: 'Card',
+    level: 'L1',
+    prompt: '创建一个带操作按钮的卡片',
+    expectedComponent: 'Card',
+    expectedProps: ['extra'],
+  },
+  {
+    id: 'card-003',
+    name: 'Card - 加载中卡片',
+    category: 'component',
+    subCategory: 'Card',
+    level: 'L1',
+    prompt: '创建一个加载中状态的卡片',
+    expectedComponent: 'Card',
+    expectedProps: ['loading'],
+  },
+  {
+    id: 'card-004',
+    name: 'Card - 悬停效果卡片',
+    category: 'component',
+    subCategory: 'Card',
+    level: 'L1',
+    prompt: '创建一个鼠标悬停时有阴影效果的卡片',
+    expectedComponent: 'Card',
+    expectedProps: ['hoverable'],
+  },
+
+  // ==================== Modal ====================
+  {
+    id: 'modal-001',
+    name: 'Modal - 基础弹窗',
+    category: 'component',
+    subCategory: 'Modal',
+    level: 'L1',
+    prompt: '创建一个模态弹窗，标题为"确认"',
+    expectedComponent: 'Modal',
+    expectedProps: ['title'],
+  },
+  {
+    id: 'modal-002',
+    name: 'Modal - 确认弹窗',
+    category: 'component',
+    subCategory: 'Modal',
+    level: 'L1',
+    prompt: '创建一个确认对话框，显示确定和取消按钮',
+    expectedComponent: 'Modal',
+    expectedProps: ['onOk', 'onCancel'],
+  },
+  {
+    id: 'modal-003',
+    name: 'Modal - 居中弹窗',
+    category: 'component',
+    subCategory: 'Modal',
+    level: 'L1',
+    prompt: '创建一个垂直居中显示的弹窗',
+    expectedComponent: 'Modal',
+    expectedProps: ['centered'],
+  },
+
+  // ==================== Drawer ====================
+  {
+    id: 'drawer-001',
+    name: 'Drawer - 基础抽屉',
+    category: 'component',
+    subCategory: 'Drawer',
+    level: 'L1',
+    prompt: '创建一个从右侧滑出的抽屉，标题为"详情"',
+    expectedComponent: 'Drawer',
+    expectedProps: ['title'],
+  },
+  {
+    id: 'drawer-002',
+    name: 'Drawer - 左侧抽屉',
+    category: 'component',
+    subCategory: 'Drawer',
+    level: 'L1',
+    prompt: '创建一个从左侧滑出的抽屉',
+    expectedComponent: 'Drawer',
+    expectedProps: ['placement'],
+  },
+
+  // ==================== Alert ====================
+  {
+    id: 'alert-001',
+    name: 'Alert - 成功提示',
+    category: 'component',
+    subCategory: 'Alert',
+    level: 'L1',
+    prompt: '创建一个成功类型的提示框',
+    expectedComponent: 'Alert',
+    expectedProps: ['type'],
+  },
+  {
+    id: 'alert-002',
+    name: 'Alert - 错误提示',
+    category: 'component',
+    subCategory: 'Alert',
+    level: 'L1',
+    prompt: '创建一个错误类型的提示框',
+    expectedComponent: 'Alert',
+    expectedProps: ['type'],
+  },
+  {
+    id: 'alert-003',
+    name: 'Alert - 带描述提示',
+    category: 'component',
+    subCategory: 'Alert',
+    level: 'L1',
+    prompt: '创建一个带辅助描述的提示框',
+    expectedComponent: 'Alert',
+    expectedProps: ['description'],
+  },
+
+  // ==================== Tabs ====================
+  {
+    id: 'tabs-001',
+    name: 'Tabs - 基础标签页',
+    category: 'component',
+    subCategory: 'Tabs',
+    level: 'L1',
+    prompt: '创建一个标签页组件，包含两个标签',
+    expectedComponent: 'Tabs',
+    expectedProps: [],
+  },
+  {
+    id: 'tabs-002',
+    name: 'Tabs - 卡片风格',
+    category: 'component',
+    subCategory: 'Tabs',
+    level: 'L1',
+    prompt: '创建一个卡片风格的标签页',
+    expectedComponent: 'Tabs',
+    expectedProps: ['type'],
+  },
+  {
+    id: 'tabs-003',
+    name: 'Tabs - 底部标签',
+    category: 'component',
+    subCategory: 'Tabs',
+    level: 'L1',
+    prompt: '创建一个标签在底部的组件',
+    expectedComponent: 'Tabs',
+    expectedProps: ['tabPosition'],
+  },
+
+  // ==================== DatePicker ====================
+  {
+    id: 'datepicker-001',
+    name: 'DatePicker - 基础日期选择',
+    category: 'component',
+    subCategory: 'DatePicker',
+    level: 'L1',
+    prompt: '创建一个日期选择器',
+    expectedComponent: 'DatePicker',
+    expectedProps: [],
+  },
+  {
+    id: 'datepicker-002',
+    name: 'DatePicker - 带时间选择',
+    category: 'component',
+    subCategory: 'DatePicker',
+    level: 'L1',
+    prompt: '创建一个可以选时间的日期选择器',
+    expectedComponent: 'DatePicker',
+    expectedProps: ['showTime'],
+  },
+  {
+    id: 'datepicker-003',
+    name: 'DatePicker - 禁用日期',
+    category: 'component',
+    subCategory: 'DatePicker',
+    level: 'L1',
+    prompt: '创建一个禁用今天之前日期的选择器',
+    expectedComponent: 'DatePicker',
+    expectedProps: ['disabledDate'],
+  },
+
+  // ==================== Upload ====================
+  {
+    id: 'upload-001',
+    name: 'Upload - 基础上传',
+    category: 'component',
+    subCategory: 'Upload',
+    level: 'L1',
+    prompt: '创建一个文件上传组件',
+    expectedComponent: 'Upload',
+    expectedProps: ['action'],
+  },
+  {
+    id: 'upload-002',
+    name: 'Upload - 多图上传',
+    category: 'component',
+    subCategory: 'Upload',
+    level: 'L1',
+    prompt: '创建一个支持多文件上传的组件',
+    expectedComponent: 'Upload',
+    expectedProps: ['multiple'],
+  },
+  {
+    id: 'upload-003',
+    name: 'Upload - 图片卡片',
+    category: 'component',
+    subCategory: 'Upload',
+    level: 'L1',
+    prompt: '创建一个图片卡片风格上传组件',
+    expectedComponent: 'Upload',
+    expectedProps: ['listType'],
+  },
+
+  // ==================== Tree ====================
+  {
+    id: 'tree-001',
+    name: 'Tree - 基础树',
+    category: 'component',
+    subCategory: 'Tree',
+    level: 'L1',
+    prompt: '创建一个树形控件，显示层级数据',
+    expectedComponent: 'Tree',
+    expectedProps: ['treeData'],
+  },
+  {
+    id: 'tree-002',
+    name: 'Tree - 可选中树',
+    category: 'component',
+    subCategory: 'Tree',
+    level: 'L1',
+    prompt: '创建一个支持勾选的树形控件',
+    expectedComponent: 'Tree',
+    expectedProps: ['checkable'],
+  },
+  {
+    id: 'tree-003',
+    name: 'Tree - 可拖拽树',
+    category: 'component',
+    subCategory: 'Tree',
+    level: 'L1',
+    prompt: '创建一个支持拖拽的树形控件',
+    expectedComponent: 'Tree',
+    expectedProps: ['draggable'],
+  },
+
+  // ==================== Avatar ====================
+  {
+    id: 'avatar-001',
+    name: 'Avatar - 基础头像',
+    category: 'component',
+    subCategory: 'Avatar',
+    level: 'L1',
+    prompt: '创建一个头像组件，显示图片',
+    expectedComponent: 'Avatar',
+    expectedProps: ['src'],
+  },
+  {
+    id: 'avatar-002',
+    name: 'Avatar - 图标头像',
+    category: 'component',
+    subCategory: 'Avatar',
+    level: 'L1',
+    prompt: '创建一个显示图标的头像',
+    expectedComponent: 'Avatar',
+    expectedProps: ['icon'],
+  },
+  {
+    id: 'avatar-003',
+    name: 'Avatar - 方形头像',
+    category: 'component',
+    subCategory: 'Avatar',
+    level: 'L1',
+    prompt: '创建一个方形形状的头像',
+    expectedComponent: 'Avatar',
+    expectedProps: ['shape'],
+  },
+
+  // ==================== Badge ====================
+  {
+    id: 'badge-001',
+    name: 'Badge - 基础徽标',
+    category: 'component',
+    subCategory: 'Badge',
+    level: 'L1',
+    prompt: '创建一个带数字徽标的组件',
+    expectedComponent: 'Badge',
+    expectedProps: ['count'],
+  },
+  {
+    id: 'badge-002',
+    name: 'Badge - 点状徽标',
+    category: 'component',
+    subCategory: 'Badge',
+    level: 'L1',
+    prompt: '创建一个红点状态的徽标',
+    expectedComponent: 'Badge',
+    expectedProps: ['dot'],
+  },
+
+  // ==================== Tag ====================
+  {
+    id: 'tag-001',
+    name: 'Tag - 基础标签',
+    category: 'component',
+    subCategory: 'Tag',
+    level: 'L1',
+    prompt: '创建一个标签组件，显示文本"标签"',
+    expectedComponent: 'Tag',
+    expectedProps: [],
+  },
+  {
+    id: 'tag-002',
+    name: 'Tag - 彩色标签',
+    category: 'component',
+    subCategory: 'Tag',
+    level: 'L1',
+    prompt: '创建一个红色标签',
+    expectedComponent: 'Tag',
+    expectedProps: ['color'],
+  },
+  {
+    id: 'tag-003',
+    name: 'Tag - 可关闭标签',
+    category: 'component',
+    subCategory: 'Tag',
+    level: 'L1',
+    prompt: '创建一个可以关闭的标签',
+    expectedComponent: 'Tag',
+    expectedProps: ['closable'],
+  },
+
+  // ==================== Progress ====================
+  {
+    id: 'progress-001',
+    name: 'Progress - 基础进度条',
+    category: 'component',
+    subCategory: 'Progress',
+    level: 'L1',
+    prompt: '创建一个进度条，显示 50%',
+    expectedComponent: 'Progress',
+    expectedProps: ['percent'],
+  },
+  {
+    id: 'progress-002',
+    name: 'Progress - 环形进度条',
+    category: 'component',
+    subCategory: 'Progress',
+    level: 'L1',
+    prompt: '创建一个环形进度条',
+    expectedComponent: 'Progress',
+    expectedProps: ['type'],
+  },
+
+  // ==================== Spin ====================
+  {
+    id: 'spin-001',
+    name: 'Spin - 基础加载',
+    category: 'component',
+    subCategory: 'Spin',
+    level: 'L1',
+    prompt: '创建一个加载中旋转组件',
+    expectedComponent: 'Spin',
+    expectedProps: ['spinning'],
+  },
+
+  // ==================== Divider ====================
+  {
+    id: 'divider-001',
+    name: 'Divider - 基础分割线',
+    category: 'component',
+    subCategory: 'Divider',
+    level: 'L1',
+    prompt: '创建一个水平分割线',
+    expectedComponent: 'Divider',
+    expectedProps: [],
+  },
+  {
+    id: 'divider-002',
+    name: 'Divider - 垂直分割线',
+    category: 'component',
+    subCategory: 'Divider',
+    level: 'L1',
+    prompt: '创建一个垂直分割线',
+    expectedComponent: 'Divider',
+    expectedProps: ['type'],
   },
 
   // ==================== Space ====================
   {
-    id: 'space-basic',
-    suite: 'component',
+    id: 'space-001',
+    name: 'Space - 基础间距',
+    category: 'component',
+    subCategory: 'Space',
+    level: 'L1',
+    prompt: '创建一个水平间距布局组件',
+    expectedComponent: 'Space',
+    expectedProps: [],
+  },
+  {
+    id: 'space-002',
+    name: 'Space - 垂直间距',
+    category: 'component',
+    subCategory: 'Space',
+    level: 'L1',
+    prompt: '创建一个垂直间距布局',
+    expectedComponent: 'Space',
+    expectedProps: ['direction'],
+  },
+];
+
+/**
+ * 组件测试用例 - L2 级别（多属性组合测试）
+ */
+export const componentCasesL2: TestCase[] = [
+  // ==================== Button 组合 ====================
+  {
+    id: 'button-l2-001',
+    name: 'Button - 加载中的危险按钮',
+    category: 'component',
+    subCategory: 'Button',
     level: 'L2',
-    prompt: '生成一个间距布局组件，包含两个子元素',
-    assertions: {
-      components: { mustInclude: ['Space'] },
-    },
+    prompt: '创建一个加载中状态的危险类型按钮',
+    expectedComponent: 'Button',
+    expectedProps: ['loading', 'danger', 'type'],
   },
-
-  // ==================== Flex ====================
   {
-    id: 'flex-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个弹性布局组件',
-    assertions: {
-      components: { mustInclude: ['Flex'] },
-    },
-  },
-
-  // ==================== Container ====================
-  {
-    id: 'container-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个容器组件',
-    assertions: {
-      components: { mustInclude: ['Container'] },
-    },
-  },
-
-  // ==================== Statistic ====================
-  {
-    id: 'statistic-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个统计数值组件',
-    assertions: {
-      components: { mustInclude: ['Statistic'] },
-    },
-  },
-
-  // ==================== Descriptions ====================
-  {
-    id: 'descriptions-basic',
-    suite: 'component',
+    id: 'button-l2-002',
+    name: 'Button - 带图标的块级主按钮',
+    category: 'component',
+    subCategory: 'Button',
     level: 'L2',
-    prompt: '生成一个描述列表组件，包含两个字段',
-    assertions: {
-      components: { mustInclude: ['Descriptions', 'Descriptions.Item'] },
-    },
+    prompt: '创建一个 primary 类型的块级按钮，带图标',
+    expectedComponent: 'Button',
+    expectedProps: ['type', 'block', 'icon'],
   },
 
-  // ==================== TimePicker ====================
+  // ==================== Input 组合 ====================
   {
-    id: 'timepicker-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个时间选择器',
-    assertions: {
-      components: { mustInclude: ['TimePicker'] },
-    },
+    id: 'input-l2-001',
+    name: 'Input - 带清除和密码切换',
+    category: 'component',
+    subCategory: 'Input',
+    level: 'L2',
+    prompt: '创建一个带清除按钮的密码输入框，最大长度 20',
+    expectedComponent: 'Input',
+    expectedProps: ['allowClear', 'type', 'maxLength'],
+  },
+  {
+    id: 'input-l2-002',
+    name: 'Input - 带前后缀的搜索框',
+    category: 'component',
+    subCategory: 'Input',
+    level: 'L2',
+    prompt: '创建一个带搜索图标前缀和清除按钮的输入框',
+    expectedComponent: 'Input',
+    expectedProps: ['prefix', 'suffix', 'allowClear'],
   },
 
-  // ==================== Cascader ====================
+  // ==================== Form 组合 ====================
   {
-    id: 'cascader-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个级联选择器',
-    assertions: {
-      components: { mustInclude: ['Cascader'] },
-    },
+    id: 'form-l2-001',
+    name: 'Form - 垂直布局带验证',
+    category: 'component',
+    subCategory: 'Form',
+    level: 'L2',
+    prompt: '创建一个垂直布局的表单，包含用户名和密码两个必填项',
+    expectedComponent: 'Form',
+    expectedProps: ['layout'],
+  },
+  {
+    id: 'form-l2-002',
+    name: 'Form - 内联表单',
+    category: 'component',
+    subCategory: 'Form',
+    level: 'L2',
+    prompt: '创建一个内联布局的搜索表单',
+    expectedComponent: 'Form',
+    expectedProps: ['layout'],
   },
 
-  // ==================== TreeSelect ====================
+  // ==================== Table 组合 ====================
   {
-    id: 'treeselect-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个树选择器',
-    assertions: {
-      components: { mustInclude: ['TreeSelect'] },
-    },
+    id: 'table-l2-001',
+    name: 'Table - 带边框和分页',
+    category: 'component',
+    subCategory: 'Table',
+    level: 'L2',
+    prompt: '创建一个带边框和分页功能的表格，显示加载中状态',
+    expectedComponent: 'Table',
+    expectedProps: ['bordered', 'pagination', 'loading'],
+  },
+  {
+    id: 'table-l2-002',
+    name: 'Table - 可滚动表格',
+    category: 'component',
+    subCategory: 'Table',
+    level: 'L2',
+    prompt: '创建一个带横向和纵向滚动的固定表头表格',
+    expectedComponent: 'Table',
+    expectedProps: ['scroll'],
   },
 
-  // ==================== Mentions ====================
+  // ==================== Modal 组合 ====================
   {
-    id: 'mentions-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个提及输入框',
-    assertions: {
-      components: { mustInclude: ['Mentions'] },
-    },
+    id: 'modal-l2-001',
+    name: 'Modal - 带确认加载的弹窗',
+    category: 'component',
+    subCategory: 'Modal',
+    level: 'L2',
+    prompt: '创建一个居中显示的弹窗，标题为"确认删除"，确定按钮显示加载状态',
+    expectedComponent: 'Modal',
+    expectedProps: ['centered', 'confirmLoading'],
   },
 
-  // ==================== AutoComplete ====================
+  // ==================== Select 组合 ====================
   {
-    id: 'autocomplete-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个自动完成输入框',
-    assertions: {
-      components: { mustInclude: ['AutoComplete'] },
-    },
+    id: 'select-l2-001',
+    name: 'Select - 可搜索多选',
+    category: 'component',
+    subCategory: 'Select',
+    level: 'L2',
+    prompt: '创建一个支持搜索和多选的下拉选择器，带占位符',
+    expectedComponent: 'Select',
+    expectedProps: ['showSearch', 'mode', 'placeholder'],
   },
 
-  // ==================== ColorPicker ====================
+  // ==================== DatePicker 组合 ====================
   {
-    id: 'colorpicker-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个颜色选择器',
-    assertions: {
-      components: { mustInclude: ['ColorPicker'] },
-    },
+    id: 'datepicker-l2-001',
+    name: 'DatePicker - 带时间的范围选择',
+    category: 'component',
+    subCategory: 'RangePicker',
+    level: 'L2',
+    prompt: '创建一个带时间选择的日期范围选择器',
+    expectedComponent: 'RangePicker',
+    expectedProps: ['showTime'],
   },
 
-  // ==================== FloatButton ====================
+  // ==================== Card 组合 ====================
   {
-    id: 'floatbutton-basic',
-    suite: 'component',
-    level: 'L1',
-    prompt: '生成一个悬浮按钮',
-    assertions: {
-      components: { mustInclude: ['FloatButton'] },
-    },
+    id: 'card-l2-001',
+    name: 'Card - 带封面和操作',
+    category: 'component',
+    subCategory: 'Card',
+    level: 'L2',
+    prompt: '创建一个带封面图片、标题和底部操作栏的卡片',
+    expectedComponent: 'Card',
+    expectedProps: ['cover', 'title', 'actions'],
   },
+
+  // ==================== Tabs 组合 ====================
+  {
+    id: 'tabs-l2-001',
+    name: 'Tabs - 卡片风格可编辑',
+    category: 'component',
+    subCategory: 'Tabs',
+    level: 'L2',
+    prompt: '创建一个卡片风格的可编辑标签页，支持添加和删除',
+    expectedComponent: 'Tabs',
+    expectedProps: ['type'],
+  },
+
+  // ==================== Alert 组合 ====================
+  {
+    id: 'alert-l2-001',
+    name: 'Alert - 带图标和操作',
+    category: 'component',
+    subCategory: 'Alert',
+    level: 'L2',
+    prompt: '创建一个带图标和关闭按钮的警告提示',
+    expectedComponent: 'Alert',
+    expectedProps: ['showIcon', 'closable'],
+  },
+
+  // ==================== Upload 组合 ====================
+  {
+    id: 'upload-l2-001',
+    name: 'Upload - 拖拽上传多文件',
+    category: 'component',
+    subCategory: 'Upload',
+    level: 'L2',
+    prompt: '创建一个支持拖拽和多文件上传的组件，限制最多 5 个文件',
+    expectedComponent: 'Upload',
+    expectedProps: ['multiple', 'maxCount'],
+  },
+
+  // ==================== Tree 组合 ====================
+  {
+    id: 'tree-l2-001',
+    name: 'Tree - 可选可拖拽',
+    category: 'component',
+    subCategory: 'Tree',
+    level: 'L2',
+    prompt: '创建一个支持勾选和拖拽的树形控件，显示连接线',
+    expectedComponent: 'Tree',
+    expectedProps: ['checkable', 'draggable', 'showLine'],
+  },
+
+  // ==================== Space 组合 ====================
+  {
+    id: 'space-l2-001',
+    name: 'Space - 垂直带分割',
+    category: 'component',
+    subCategory: 'Space',
+    level: 'L2',
+    prompt: '创建一个垂直方向带分割线的间距布局',
+    expectedComponent: 'Space',
+    expectedProps: ['direction', 'split'],
+  },
+];
+
+/**
+ * 所有组件测试用例（L1 + L2）
+ */
+export const componentCases: TestCase[] = [
+  ...componentCasesL1,
+  ...componentCasesL2,
 ];
