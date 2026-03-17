@@ -25,7 +25,7 @@ import {
   type RunMetadata,
   type RunRequest,
 } from '@shenbi/ai-agents';
-import type { AgentEvent } from '@shenbi/ai-contracts';
+import type { AgentEvent, ChatRequest, ChatResponse } from '@shenbi/ai-contracts';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import { LLMError } from '../adapters/errors.ts';
 import {
@@ -2034,6 +2034,43 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
           `${error instanceof Error ? error.message : 'Runtime error'}. Trace file: ${debugFile}`,
           'RUNTIME_TRACE_ERROR',
         );
+      }
+    },
+
+    async chat(request: ChatRequest): Promise<ChatResponse> {
+      const chatModelRef = parseProviderModelRef(request.model);
+      const client = createClient(chatModelRef.provider);
+      const model = requireModel(chatModelRef.model ?? request.model, 'chat');
+      const messages = request.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      }));
+      const result = await client.chat(model, messages, request.thinking);
+      return {
+        content: result.content,
+        ...(result.durationMs !== undefined ? { durationMs: result.durationMs } : {}),
+        ...(result.inputTokens !== undefined || result.outputTokens !== undefined || result.tokensUsed !== undefined
+          ? {
+              tokensUsed: {
+                ...(result.inputTokens !== undefined ? { input: result.inputTokens } : {}),
+                ...(result.outputTokens !== undefined ? { output: result.outputTokens } : {}),
+                ...(result.tokensUsed !== undefined ? { total: result.tokensUsed } : {}),
+              },
+            }
+          : {}),
+      };
+    },
+
+    async *chatStream(request: ChatRequest): AsyncIterable<{ delta: string }> {
+      const chatModelRef = parseProviderModelRef(request.model);
+      const client = createClient(chatModelRef.provider);
+      const model = requireModel(chatModelRef.model ?? request.model, 'chat');
+      const messages = request.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      }));
+      for await (const chunk of client.streamChat(model, messages, request.thinking)) {
+        yield { delta: chunk.text };
       }
     },
 

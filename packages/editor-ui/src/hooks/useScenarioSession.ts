@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import type { PageSchema } from '@shenbi/schema';
 import {
   History,
-  LocalFileStorageAdapter,
+  MemoryFileStorageAdapter,
   type EditorStateSnapshot,
   type FileStorageAdapter,
 } from '@shenbi/editor-core';
@@ -38,7 +38,7 @@ export function useScenarioSession<ScenarioKey extends string>(
   const [scenarioSnapshots, setScenarioSnapshots] = useState<Record<ScenarioKey, EditorStateSnapshot>>(
     () => initialSnapshots,
   );
-  const scenarioFileStorageRef = useRef<FileStorageAdapter>(options.fileStorage ?? new LocalFileStorageAdapter());
+  const scenarioFileStorageRef = useRef<FileStorageAdapter>(options.fileStorage ?? new MemoryFileStorageAdapter());
   const scenarioHistoriesRef = useRef<Record<ScenarioKey, History<EditorStateSnapshot>> | null>(null);
   if (!scenarioHistoriesRef.current) {
     scenarioHistoriesRef.current = Object.fromEntries(

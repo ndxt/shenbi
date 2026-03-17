@@ -79,17 +79,15 @@ function createFileId(name: string): string {
   return `${base}-${Date.now()}`;
 }
 
-export class LocalFileStorageAdapter implements FileStorageAdapter {
-  private readonly indexKey = 'shenbi-editor-files';
-  private readonly prefixKey = 'shenbi-editor-file';
+export class MemoryFileStorageAdapter implements FileStorageAdapter {
+  private readonly files = new Map<string, StoredFileRecord>();
 
   async list(): Promise<FileMetadata[]> {
-    const records = this.readIndex();
-    return records.map((record) => record.metadata);
+    return Array.from(this.files.values()).map((record) => record.metadata);
   }
 
   async read(fileId: string): Promise<PageSchema> {
-    const record = this.readRecord(fileId);
+    const record = this.files.get(fileId);
     if (!record) {
       throw new Error(`File not found: ${fileId}`);
     }
@@ -98,10 +96,8 @@ export class LocalFileStorageAdapter implements FileStorageAdapter {
 
   async write(fileId: string, schema: PageSchema): Promise<void> {
     const nextSchema = cloneSchema(schema);
-    const records = this.readIndex();
     const now = Date.now();
     const size = JSON.stringify(nextSchema).length;
-    const index = records.findIndex((record) => record.metadata.id === fileId);
     const metadata: FileMetadata = {
       id: fileId,
       name: nextSchema.name ?? fileId,
@@ -109,13 +105,7 @@ export class LocalFileStorageAdapter implements FileStorageAdapter {
       size,
     };
     const nextRecord: StoredFileRecord = { metadata, schema: nextSchema };
-    if (index >= 0) {
-      records[index] = nextRecord;
-    } else {
-      records.push(nextRecord);
-    }
-    this.writeIndex(records);
-    this.writeRecord(fileId, nextRecord);
+    this.files.set(fileId, nextRecord);
   }
 
   async saveAs(name: string, schema: PageSchema): Promise<string> {
@@ -129,62 +119,6 @@ export class LocalFileStorageAdapter implements FileStorageAdapter {
   }
 
   async delete(fileId: string): Promise<void> {
-    const records = this.readIndex().filter((record) => record.metadata.id !== fileId);
-    this.writeIndex(records);
-    this.storage().removeItem(this.recordKey(fileId));
-  }
-
-  private storage(): Storage {
-    if (typeof localStorage === 'undefined') {
-      throw new Error('localStorage is not available in current runtime');
-    }
-    return localStorage;
-  }
-
-  private recordKey(fileId: string): string {
-    return `${this.prefixKey}:${fileId}`;
-  }
-
-  private readIndex(): StoredFileRecord[] {
-    const raw = this.storage().getItem(this.indexKey);
-    if (!raw) {
-      return [];
-    }
-    try {
-      const entries = JSON.parse(raw) as FileMetadata[];
-      return entries
-        .map((metadata) => {
-          const recordRaw = this.storage().getItem(this.recordKey(metadata.id));
-          if (!recordRaw) {
-            return undefined;
-          }
-          const parsed = JSON.parse(recordRaw) as StoredFileRecord;
-          return parsed;
-        })
-        .filter((record): record is StoredFileRecord => Boolean(record));
-    } catch {
-      return [];
-    }
-  }
-
-  private writeIndex(records: StoredFileRecord[]): void {
-    const metadataList = records.map((record) => record.metadata);
-    this.storage().setItem(this.indexKey, JSON.stringify(metadataList));
-  }
-
-  private readRecord(fileId: string): StoredFileRecord | undefined {
-    const raw = this.storage().getItem(this.recordKey(fileId));
-    if (!raw) {
-      return undefined;
-    }
-    try {
-      return JSON.parse(raw) as StoredFileRecord;
-    } catch {
-      return undefined;
-    }
-  }
-
-  private writeRecord(fileId: string, record: StoredFileRecord): void {
-    this.storage().setItem(this.recordKey(fileId), JSON.stringify(record));
+    this.files.delete(fileId);
   }
 }

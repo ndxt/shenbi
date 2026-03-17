@@ -64,6 +64,9 @@ function createMemoryStorage(initial: PageSchema = createSchema('loaded')): File
       files.set(id, { ...schema, name });
       return id;
     },
+    async delete(fileId: string): Promise<void> {
+      files.delete(fileId);
+    },
   };
 }
 
@@ -182,7 +185,10 @@ describe('createEditor', () => {
     expect(editor.commands.has('editor.restoreSnapshot')).toBe(true);
     expect(editor.commands.has('file.listSchemas')).toBe(true);
     expect(editor.commands.has('file.openSchema')).toBe(true);
+    expect(editor.commands.has('file.readSchema')).toBe(true);
     expect(editor.commands.has('file.saveSchema')).toBe(true);
+    expect(editor.commands.has('file.writeSchema')).toBe(true);
+    expect(editor.commands.has('file.deleteSchema')).toBe(true);
     expect(editor.commands.has('editor.undo')).toBe(true);
     expect(editor.commands.has('editor.redo')).toBe(true);
   });
@@ -232,6 +238,21 @@ describe('createEditor', () => {
     expect(editor.history.getSize()).toBe(0);
   });
 
+  it('uses in-memory file storage by default instead of localStorage', async () => {
+    const localStorageRef = globalThis.localStorage;
+    localStorageRef?.removeItem('shenbi-editor-files');
+    const editor = createEditor({
+      initialSchema: createSchema('memory-default'),
+    });
+
+    const fileId = await editor.commands.execute('file.saveAs', { name: '内存页面' });
+    const files = await editor.commands.execute('file.listSchemas') as FileMetadata[];
+
+    expect(fileId).toMatch(/^page-/);
+    expect(files.map((file) => file.name)).toContain('内存页面');
+    expect(localStorageRef?.getItem('shenbi-editor-files') ?? null).toBeNull();
+  });
+
   it('file.listSchemas returns metadata and does not mutate history', async () => {
     const storage = createMemoryStorage(createSchema('demo-page'));
     const editor = createEditor({
@@ -246,6 +267,46 @@ describe('createEditor', () => {
     expect(metadataList[0]).toHaveProperty('id');
     expect(metadataList[0]).toHaveProperty('name');
     expect(editor.history.getSize()).toBe(0);
+  });
+
+  it('file.readSchema returns schema without mutating editor state', async () => {
+    const source = createSchema('read-target');
+    const storage = createMemoryStorage(source);
+    const editor = createEditor({
+      initialSchema: createSchema('current-page'),
+      fileStorage: storage,
+    });
+
+    const result = await editor.commands.execute('file.readSchema', { fileId: 'demo' });
+
+    expect(result).toEqual(source);
+    expect(editor.state.getSchema().name).toBe('current-page');
+    expect(editor.history.getSize()).toBe(0);
+  });
+
+  it('file.writeSchema writes schema without mutating editor state and emits auto file:saved plus fs:treeChanged', async () => {
+    const storage = createMemoryStorage();
+    const editor = createEditor({
+      initialSchema: createSchema('current-page'),
+      fileStorage: storage,
+    });
+    const saved = vi.fn();
+    const treeChanged = vi.fn();
+    editor.eventBus.on('file:saved', saved);
+    editor.eventBus.on('fs:treeChanged', treeChanged);
+    const backgroundSchema = createSchema('background-page');
+
+    await editor.commands.execute('file.writeSchema', {
+      fileId: 'background',
+      schema: backgroundSchema,
+    });
+
+    await expect(storage.read('background')).resolves.toEqual(backgroundSchema);
+    expect(editor.state.getSchema().name).toBe('current-page');
+    expect(editor.state.getCurrentFileId()).toBeUndefined();
+    expect(editor.history.getSize()).toBe(0);
+    expect(saved).toHaveBeenCalledWith({ fileId: 'background', source: 'auto' });
+    expect(treeChanged).toHaveBeenCalled();
   });
 
   it('trims file command args for fileId/name', async () => {
@@ -308,6 +369,22 @@ describe('createEditor', () => {
     expect(changed).toHaveBeenCalledWith({ fileId: 'id-new-page' });
   });
 
+  it('file.deleteSchema removes file and emits file:deleted', async () => {
+    const storage = createMemoryStorage(createSchema('delete-target'));
+    const editor = createEditor({
+      initialSchema: createSchema('current-page'),
+      fileStorage: storage,
+    });
+    const deleted = vi.fn();
+    editor.eventBus.on('file:deleted', deleted);
+
+    await editor.commands.execute('file.deleteSchema', { fileId: 'demo' });
+
+    await expect(storage.read('demo')).rejects.toThrow(/missing file/i);
+    expect(deleted).toHaveBeenCalledWith({ fileId: 'demo' });
+    expect(editor.history.getSize()).toBe(0);
+  });
+
   it('registers tab commands when tab manager is configured', () => {
     const editor = createEditor({
       tabManager: new TabManager(),
@@ -321,6 +398,35 @@ describe('createEditor', () => {
     expect(editor.commands.has('tab.closeAll')).toBe(true);
     expect(editor.commands.has('tab.closeSaved')).toBe(true);
     expect(editor.commands.has('tab.save')).toBe(true);
+    expect(editor.commands.has('tab.syncState')).toBe(true);
+  });
+
+  it('uses VFS-backed file commands when VFS is configured', async () => {
+    const vfs = createMemoryVFS(createSchema('page-a'));
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      vfs,
+      projectId: 'project-1',
+    });
+
+    const created = await editor.commands.execute('fs.createFile', {
+      parentId: null,
+      name: '订单列表页',
+      fileType: 'page',
+      content: createSchema('订单列表页'),
+    }) as { id: string };
+
+    const files = await editor.commands.execute('file.listSchemas') as FileMetadata[];
+    expect(files.map((file) => file.name)).toContain('订单列表页');
+
+    await editor.commands.execute('file.writeSchema', {
+      fileId: created.id,
+      schema: createSchema('订单列表页-v2'),
+    });
+
+    await expect(editor.commands.execute('file.readSchema', { fileId: created.id })).resolves.toMatchObject({
+      name: '订单列表页-v2',
+    });
   });
 
   it('tab.save writes VFS content and clears dirty state', async () => {
@@ -411,6 +517,87 @@ describe('createEditor', () => {
 
     expect(editor.state.getCurrentFileId()).toBe('demo');
     expect(editor.state.getSelectedNodeId()).toBe('node-a');
+  });
+
+  it('tab.syncState updates a non-active tab without switching the visible editor', async () => {
+    const vfs = createMemoryVFS(createSchema('page-a'));
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+
+    const secondNode = await vfs.createFile(
+      'project-1',
+      null,
+      'page-b',
+      'page',
+      createSchema('page-b'),
+    );
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    await editor.commands.execute('tab.open', { fileId: secondNode.id });
+    await editor.commands.execute('tab.activate', { fileId: 'demo' });
+    const stateChanged = vi.fn();
+    editor.eventBus.on('tab:stateChanged', stateChanged);
+
+    await editor.commands.execute('tab.syncState', {
+      fileId: secondNode.id,
+      schema: createSchema('page-b-updated'),
+      isGenerating: true,
+      readOnlyReason: 'AI 正在生成此页面',
+      generationUpdatedAt: 123,
+    });
+
+    expect(editor.state.getCurrentFileId()).toBe('demo');
+    expect(editor.state.getSchema()).toMatchObject({ name: 'page-a' });
+    expect(tabManager.getTab(secondNode.id)).toMatchObject({
+      schema: expect.objectContaining({ name: 'page-b-updated' }),
+      isGenerating: true,
+      readOnlyReason: 'AI 正在生成此页面',
+      generationUpdatedAt: 123,
+    });
+    expect(stateChanged).toHaveBeenCalledWith({
+      fileId: secondNode.id,
+      isDirty: false,
+      isGenerating: true,
+      readOnlyReason: 'AI 正在生成此页面',
+      generationUpdatedAt: 123,
+    });
+  });
+
+  it('tab.syncState refreshes the active tab editor snapshot and dirty state', async () => {
+    const vfs = createMemoryVFS(createSchema('page-a'));
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+    const dirtyChanged = vi.fn();
+    editor.eventBus.on('tab:dirtyChanged', dirtyChanged);
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    await editor.commands.execute('tab.syncState', {
+      fileId: 'demo',
+      schema: createSchema('page-a-live'),
+      isDirty: true,
+      isGenerating: true,
+      generationUpdatedAt: 456,
+    });
+
+    expect(editor.state.getCurrentFileId()).toBe('demo');
+    expect(editor.state.getSchema()).toMatchObject({ name: 'page-a-live' });
+    expect(editor.state.getIsDirty()).toBe(true);
+    expect(tabManager.getTab('demo')).toMatchObject({
+      isDirty: true,
+      isGenerating: true,
+      generationUpdatedAt: 456,
+    });
+    expect(dirtyChanged).toHaveBeenCalledWith({ fileId: 'demo', isDirty: true });
   });
 
   it('restores tab manager snapshots in order', () => {

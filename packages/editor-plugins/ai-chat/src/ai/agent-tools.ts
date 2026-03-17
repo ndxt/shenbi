@@ -1,0 +1,320 @@
+import { createEditor } from '@shenbi/editor-core';
+import type { PageSchema } from '@shenbi/schema';
+import { executeAgentOperation } from './operation-executor';
+import type { AIClient, ProjectPlan } from './api-types';
+import type { EditorAIBridge } from './editor-ai-bridge';
+import type { AgentLoopPageProgress } from './agent-loop-types';
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+}
+
+export interface ToolContext {
+  bridge: EditorAIBridge;
+  aiClient: AIClient;
+  plannerModel: string;
+  blockModel: string;
+  thinkingEnabled: boolean;
+  getCurrentConversationId: () => string | undefined;
+  getAvailableComponentsSummary: () => string;
+  listWorkspaceFiles: () => Promise<Array<{ id: string; name: string; updatedAt: number }>>;
+  readPageSchema: (fileId: string) => Promise<PageSchema>;
+  writePageSchema: (fileId: string, schema: PageSchema) => Promise<void>;
+  deletePageSchema: (fileId: string) => Promise<void>;
+  proposeProjectPlan: (plan: ProjectPlan) => Promise<string>;
+  executeCreatePage: (input: { pageId: string; pageName: string; prompt: string; fileId?: string }, page: AgentLoopPageProgress) => Promise<Record<string, unknown>>;
+  executeModifyPage: (input: { fileId: string; prompt: string; pageName?: string }, page: AgentLoopPageProgress) => Promise<Record<string, unknown>>;
+}
+
+function summarizeSchema(schema: PageSchema): string {
+  const nodeCount = Array.isArray(schema.body) ? schema.body.length : schema.body ? 1 : 0;
+  return `pageId=${schema.id}; pageName=${schema.name ?? schema.id}; nodeCount=${nodeCount}`;
+}
+
+function toProjectPlan(value: Record<string, unknown>): ProjectPlan {
+  const projectName = typeof value.projectName === 'string' && value.projectName.trim().length > 0
+    ? value.projectName.trim()
+    : '未命名项目';
+  const rawPages = Array.isArray(value.pages) ? value.pages : [];
+  return {
+    projectName,
+    pages: rawPages.map((page, index) => {
+      const record = (page && typeof page === 'object' ? page : {}) as Record<string, unknown>;
+      return {
+        pageId: typeof record.pageId === 'string' && record.pageId.trim() ? record.pageId.trim() : `page-${index + 1}`,
+        pageName: typeof record.pageName === 'string' && record.pageName.trim() ? record.pageName.trim() : `页面 ${index + 1}`,
+        action: record.action === 'modify' || record.action === 'skip' ? record.action : 'create',
+        description: typeof record.description === 'string' && record.description.trim() ? record.description.trim() : '',
+        ...(typeof record.reason === 'string' && record.reason.trim() ? { reason: record.reason.trim() } : {}),
+      };
+    }),
+  };
+}
+
+function buildCreatePagePrompt(actionInput: Record<string, unknown>, pageName: string): string {
+  if (typeof actionInput.prompt === 'string' && actionInput.prompt.trim()) {
+    return actionInput.prompt.trim();
+  }
+
+  const promptParts = [
+    `${pageName} 页面`,
+  ];
+  const description = typeof actionInput.description === 'string' && actionInput.description.trim()
+    ? actionInput.description.trim()
+    : undefined;
+  const layout = typeof actionInput.layout === 'string' && actionInput.layout.trim()
+    ? actionInput.layout.trim()
+    : undefined;
+  const components = typeof actionInput.components === 'string' && actionInput.components.trim()
+    ? actionInput.components.trim()
+    : undefined;
+  const fields = typeof actionInput.fields === 'string' && actionInput.fields.trim()
+    ? actionInput.fields.trim()
+    : undefined;
+  const interactions = typeof actionInput.interactions === 'string' && actionInput.interactions.trim()
+    ? actionInput.interactions.trim()
+    : undefined;
+  const targetUser = typeof actionInput.targetUser === 'string' && actionInput.targetUser.trim()
+    ? actionInput.targetUser.trim()
+    : undefined;
+
+  if (description) {
+    promptParts.push(`目标: ${description}`);
+  }
+  if (layout) {
+    promptParts.push(`布局: ${layout}`);
+  }
+  if (components) {
+    promptParts.push(`组件: ${components}`);
+  }
+  if (fields) {
+    promptParts.push(`字段: ${fields}`);
+  }
+  if (interactions) {
+    promptParts.push(`交互: ${interactions}`);
+  }
+  if (targetUser) {
+    promptParts.push(`用户: ${targetUser}`);
+  }
+
+  return promptParts.join('\n');
+}
+
+function buildModifyPagePrompt(actionInput: Record<string, unknown>): string {
+  if (typeof actionInput.prompt === 'string' && actionInput.prompt.trim()) {
+    return actionInput.prompt.trim();
+  }
+
+  const parts = [
+    typeof actionInput.description === 'string' && actionInput.description.trim()
+      ? actionInput.description.trim()
+      : '请按当前需求修改页面',
+  ];
+  if (typeof actionInput.fields === 'string' && actionInput.fields.trim()) {
+    parts.push(`字段调整: ${actionInput.fields.trim()}`);
+  }
+  if (typeof actionInput.interactions === 'string' && actionInput.interactions.trim()) {
+    parts.push(`交互调整: ${actionInput.interactions.trim()}`);
+  }
+  return parts.join('\n');
+}
+
+function normalizeBackgroundFileId(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function createEphemeralBridge(schema: PageSchema): EditorAIBridge {
+  const editor = createEditor({ initialSchema: schema });
+  return {
+    getSchema: () => editor.state.getSchema(),
+    getSelectedNodeId: () => undefined,
+    getAvailableComponents: () => [],
+    execute: async (commandId, args) => {
+      try {
+        const data = await editor.commands.execute(commandId, args);
+        return { success: true, data };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    replaceSchema: (nextSchema) => {
+      void editor.commands.execute('schema.replace', { schema: nextSchema });
+    },
+    appendBlock: async (node, parentTreeId) => ({
+      success: true,
+      data: await editor.commands.execute('node.append', { node, parentTreeId }),
+    }),
+    removeNode: async (treeId) => ({
+      success: true,
+      data: await editor.commands.execute('node.remove', { treeId }),
+    }),
+    subscribe: () => () => undefined,
+  };
+}
+
+export function getDefaultToolDefinitions(): ToolDefinition[] {
+  return [
+    { name: 'listWorkspaceFiles', description: 'List all workspace page files with id, name, and updatedAt.' },
+    { name: 'readPageSchema', description: 'Read one page schema by fileId and return a compact summary.' },
+    { name: 'getCurrentPageSchema', description: 'Inspect the currently opened page schema in the editor.' },
+    { name: 'getAvailableComponents', description: 'List currently available component contracts.' },
+    { name: 'proposeProjectPlan', description: 'Present a project plan to the user and wait for confirmation or revision.' },
+    { name: 'createPage', description: 'Generate a new page schema in background storage without switching editor focus.' },
+    { name: 'modifyPage', description: 'Modify an existing page schema in background storage.' },
+    { name: 'finish', description: 'Finish the loop and summarize the completed work.' },
+  ];
+}
+
+export function buildAgentLoopSystemPrompt(): string {
+  const tools = getDefaultToolDefinitions()
+    .map((tool) => `- ${tool.name}: ${tool.description}`)
+    .join('\n');
+  return [
+    '你是 Shenbi 低代码平台的 Agent。你只能通过工具推进任务。',
+    '你的回复会被程序直接 JSON.parse。必须输出合法 JSON 对象，不要输出额外文字。',
+    '',
+    '## 可用工具',
+    tools,
+    '',
+    '## 回复协议',
+    '每次回复必须是一个 JSON 对象，包含以下字段：',
+    '',
+    '必填字段：',
+    '- "action": 工具名称（必须从上面的可用工具中选择）',
+    '- "actionInput": 工具参数（JSON 对象，无参工具写 {}）',
+    '',
+    '可选字段（最多选一个）：',
+    '- "status": 一句简短状态说明',
+    '- "reasoningSummary": 一句简短原因说明',
+    '',
+    '## 正确示例',
+    '{"action":"listWorkspaceFiles","actionInput":{}}',
+    '',
+    '{"reasoningSummary":"根据用户需求规划项目","action":"proposeProjectPlan","actionInput":{"projectName":"订单管理后台","pages":[{"pageId":"order-list","pageName":"订单列表页","action":"create","description":"展示订单列表、筛选和分页"},{"pageId":"order-detail","pageName":"订单详情页","action":"create","description":"展示订单基础信息、商品明细和物流信息"},{"pageId":"order-create","pageName":"创建订单页","action":"create","description":"提供创建订单表单，包含客户、商品、数量和收货信息"}]}}',
+    '',
+    '{"action":"createPage","actionInput":{"pageId":"order-list","pageName":"订单列表页","description":"展示订单列表、筛选和分页"}}',
+    '',
+    '## 规则',
+    '1. 每次只调用一个工具，输出一个 JSON 对象。',
+    '2. 不要返回数组、字符串、数字等非对象类型。不要返回 Markdown 代码块。',
+    '3. 除 status 和 reasoningSummary 外不要输出其他解释字段。',
+    '4. action 必须从上面的可用工具中选择，actionInput 必须是合法 JSON 对象。',
+    '5. 多页面需求必须先 proposeProjectPlan。proposeProjectPlan 的 actionInput 必须包含 projectName 和非空 pages。',
+    '6. 项目规划一旦确认，后续按已确认计划继续执行，不要重新规划，不要回显文件元数据或 Observation 内容。',
+    '7. createPage / modifyPage 的 actionInput 必须包含 pageId 或 fileId、pageName，以及足够具体的 description 或 prompt。',
+    '8. 所有计划页面完成后，直接 finish。',
+  ].join('\n');
+}
+
+export async function executeAgentTool(
+  context: ToolContext,
+  action: string,
+  actionInput: Record<string, unknown>,
+  pageLookup: Map<string, AgentLoopPageProgress>,
+): Promise<Record<string, unknown> | string | Array<unknown>> {
+  switch (action) {
+    case 'listWorkspaceFiles':
+      return context.listWorkspaceFiles();
+    case 'readPageSchema': {
+      const fileId = typeof actionInput.fileId === 'string' ? actionInput.fileId : '';
+      if (!fileId) {
+        throw new Error('readPageSchema requires fileId');
+      }
+      const schema = await context.readPageSchema(fileId);
+      return {
+        fileId,
+        summary: summarizeSchema(schema),
+      };
+    }
+    case 'getCurrentPageSchema': {
+      const schema = context.bridge.getSchema();
+      return {
+        fileId: schema.id,
+        summary: summarizeSchema(schema),
+      };
+    }
+    case 'getAvailableComponents':
+      return {
+        summary: context.getAvailableComponentsSummary(),
+      };
+    case 'proposeProjectPlan': {
+      const plan = toProjectPlan(actionInput);
+      if (plan.pages.length === 0) {
+        throw new Error('proposeProjectPlan requires a non-empty pages array');
+      }
+      return context.proposeProjectPlan(plan);
+    }
+    case 'createPage': {
+      const pageId = typeof actionInput.pageId === 'string' && actionInput.pageId.trim()
+        ? actionInput.pageId.trim()
+        : typeof actionInput.fileId === 'string' && actionInput.fileId.trim()
+          ? actionInput.fileId.trim()
+          : typeof actionInput.name === 'string' && actionInput.name.trim()
+            ? actionInput.name.trim()
+          : `page-${pageLookup.size + 1}`;
+      const pageName = typeof actionInput.pageName === 'string' && actionInput.pageName.trim()
+        ? actionInput.pageName.trim()
+        : typeof actionInput.name === 'string' && actionInput.name.trim()
+          ? actionInput.name.trim()
+          : pageId;
+      const fileId = normalizeBackgroundFileId(pageId)
+        ?? normalizeBackgroundFileId(typeof actionInput.fileId === 'string' ? actionInput.fileId : undefined)
+        ?? normalizeBackgroundFileId(pageName)
+        ?? `页面-${pageLookup.size + 1}`;
+      const prompt = buildCreatePagePrompt(actionInput, pageName);
+      const page = pageLookup.get(pageId) ?? {
+        pageId,
+        pageName,
+        action: 'create',
+        description: prompt,
+        status: 'waiting',
+      };
+      return context.executeCreatePage({ pageId, pageName, prompt, fileId }, page);
+    }
+    case 'modifyPage': {
+      const fileId = typeof actionInput.fileId === 'string' ? actionInput.fileId.trim() : '';
+      if (!fileId) {
+        throw new Error('modifyPage requires fileId');
+      }
+      const prompt = buildModifyPagePrompt(actionInput);
+      const page = pageLookup.get(fileId) ?? {
+        pageId: fileId,
+        pageName: typeof actionInput.pageName === 'string' && actionInput.pageName.trim() ? actionInput.pageName.trim() : fileId,
+        action: 'modify',
+        description: prompt,
+        status: 'waiting',
+      };
+      return context.executeModifyPage({ fileId, prompt, pageName: page.pageName }, page);
+    }
+    case 'finish':
+      return {
+        summary: typeof actionInput.summary === 'string' ? actionInput.summary : '完成',
+      };
+    default:
+      throw new Error(`Unsupported tool: ${action}`);
+  }
+}
+
+export async function applyModifyOperationsToSchema(
+  initialSchema: PageSchema,
+  operations: Array<{ op: string; [key: string]: unknown }>,
+): Promise<PageSchema> {
+  const bridge = createEphemeralBridge(initialSchema);
+  for (const operation of operations) {
+    const result = await executeAgentOperation(bridge, operation as Parameters<typeof executeAgentOperation>[1]);
+    if (!result.success) {
+      throw new Error(result.error ?? `Failed to apply ${operation.op}`);
+    }
+  }
+  return bridge.getSchema();
+}

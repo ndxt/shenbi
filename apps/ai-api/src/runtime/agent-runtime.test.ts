@@ -230,17 +230,33 @@ function trySalvageJsonCandidate(text: string): { candidate: string; strategy: s
   return null;
 }
 
+function resolveTracePath(name: string): string {
+  const candidates = [
+    resolve(process.cwd(), 'src', 'runtime', '__fixtures__', 'traces', name),
+    resolve(process.cwd(), '.ai-debug', 'traces', name),
+  ];
+  const found = candidates.find((candidate) => existsSync(candidate));
+  if (!found) {
+    throw new Error(`missing trace fixture: ${name}`);
+  }
+  return found;
+}
+
+function hasTraceFixture(name: string): boolean {
+  return existsSync(resolve(process.cwd(), 'src', 'runtime', '__fixtures__', 'traces', name))
+    || existsSync(resolve(process.cwd(), '.ai-debug', 'traces', name));
+}
+
 function loadTrace(name: string): any {
-  const tracePath = resolve(process.cwd(), '.ai-debug', 'traces', name);
+  const tracePath = resolveTracePath(name);
   return JSON.parse(readFileSync(tracePath, 'utf8'));
 }
 
 function loadTraceIfExists(name: string): any | null {
-  const tracePath = resolve(process.cwd(), '.ai-debug', 'traces', name);
-  if (!existsSync(tracePath)) {
+  if (!hasTraceFixture(name)) {
     return null;
   }
-  return JSON.parse(readFileSync(tracePath, 'utf8'));
+  return loadTrace(name);
 }
 
 function loadTraceByBlockIds(blockIds: string[]): any | null {

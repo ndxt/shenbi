@@ -10,6 +10,8 @@ export interface Env {
   AI_PLANNER_MODEL?: string | undefined;
   AI_BLOCK_MODEL?: string | undefined;
   AI_AVAILABLE_MODELS?: string[] | undefined;
+  AI_RATE_LIMIT_WINDOW_MS: number;
+  AI_RATE_LIMIT_MAX_REQUESTS: number;
   providers: ProviderEnvConfig[];
 }
 
@@ -226,6 +228,8 @@ export function loadEnv(): Env {
     AI_PLANNER_MODEL: activeProviderConfig?.plannerModel,
     AI_BLOCK_MODEL: activeProviderConfig?.blockModel,
     AI_AVAILABLE_MODELS: activeProviderConfig?.models,
+    AI_RATE_LIMIT_WINDOW_MS: parseInt(readEnvValue(loaded, ['AI_RATE_LIMIT_WINDOW_MS']) ?? '60000', 10),
+    AI_RATE_LIMIT_MAX_REQUESTS: parseInt(readEnvValue(loaded, ['AI_RATE_LIMIT_MAX_REQUESTS']) ?? '60', 10),
     providers,
   };
 }
