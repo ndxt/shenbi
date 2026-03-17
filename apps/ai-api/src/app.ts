@@ -12,7 +12,11 @@ import { handleError } from './middleware/error-handler.ts';
 import { createRunRoute } from './routes/run.ts';
 import { createRunStreamRoute } from './routes/run-stream.ts';
 import { createFinalizeRoute } from './routes/finalize.ts';
+import { createChatRoute } from './routes/chat.ts';
+import { createDebugRoute } from './routes/debug.ts';
 import { createModelsRoute } from './routes/models.ts';
+import { createClassifyRouteRoute } from './routes/classify-route.ts';
+import { loadEnv } from './adapters/env.ts';
 import { agentRuntime } from './runtime/agent-runtime.ts';
 import type { AgentRuntime } from './runtime/types.ts';
 
@@ -21,24 +25,35 @@ export interface AppOptions {
   runtime?: AgentRuntime;
   /** 注入独立限流 store，用于测试隔离 */
   rateLimitStore?: Map<string, { count: number; resetAt: number }>;
+  rateLimitWindowMs?: number;
+  rateLimitMaxRequests?: number;
 }
 
 export function createApp(options: AppOptions = {}): Hono {
   const runtime = options.runtime ?? agentRuntime;
+  const env = loadEnv();
 
   const app = new Hono();
 
   app.use('*', requestIdMiddleware);
-  app.use(
-    '/api/ai/*',
-    createRateLimitMiddleware(
-      options.rateLimitStore !== undefined ? { store: options.rateLimitStore } : {},
-    ),
-  );
+  const rateLimitOptions = {
+    ...(options.rateLimitStore !== undefined ? { store: options.rateLimitStore } : {}),
+    windowMs: options.rateLimitWindowMs ?? env.AI_RATE_LIMIT_WINDOW_MS,
+    maxRequests: options.rateLimitMaxRequests ?? env.AI_RATE_LIMIT_MAX_REQUESTS,
+  };
+  const rateLimitMiddleware = createRateLimitMiddleware(rateLimitOptions);
+  app.use('/api/ai/run', rateLimitMiddleware);
+  app.use('/api/ai/run/stream', rateLimitMiddleware);
+  app.use('/api/ai/run/finalize', rateLimitMiddleware);
+  app.use('/api/ai/chat', rateLimitMiddleware);
+  app.use('/api/ai/classify-route', rateLimitMiddleware);
 
   app.route('/api/ai/run/stream', createRunStreamRoute(runtime));
   app.route('/api/ai/run', createRunRoute(runtime));
   app.route('/api/ai/run/finalize', createFinalizeRoute(runtime));
+  app.route('/api/ai/chat', createChatRoute(runtime));
+  app.route('/api/ai/classify-route', createClassifyRouteRoute());
+  app.route('/api/ai/debug', createDebugRoute());
   app.route('/api/ai/models', createModelsRoute());
 
   app.get('/health', (c) => c.json({ status: 'ok' }));

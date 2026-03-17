@@ -120,6 +120,12 @@ function createEmptyShellSchema(): PageSchema {
   };
 }
 
+function hasSchemaContent(schema: PageSchema): boolean {
+  const bodyCount = Array.isArray(schema.body) ? schema.body.length : (schema.body ? 1 : 0);
+  const dialogCount = Array.isArray(schema.dialogs) ? schema.dialogs.length : (schema.dialogs ? 1 : 0);
+  return bodyCount + dialogCount > 0;
+}
+
 interface PersistedShellSession {
   tabs: TabManagerSnapshot;
   expandedIds: string[];
@@ -131,6 +137,23 @@ function areStringArraysEqual(left: string[], right: string[]): boolean {
     return false;
   }
   return left.every((value, index) => value === right[index]);
+}
+
+function isBlockedDuringGeneration(commandId: string): boolean {
+  if (
+    commandId === 'workspace.resetDocument'
+    || commandId === 'schema.replace'
+    || commandId === 'schema.restore'
+    || commandId === 'file.openSchema'
+    || commandId === 'file.saveSchema'
+    || commandId === 'file.saveAs'
+    || commandId === 'file.deleteSchema'
+    || commandId === 'editor.undo'
+    || commandId === 'editor.redo'
+  ) {
+    return true;
+  }
+  return commandId.startsWith('node.') || commandId.startsWith('history.');
 }
 
 export function App() {
@@ -309,6 +332,12 @@ export function App() {
     () => (tabSnapshot.activeTabId ? shellSaveSources[tabSnapshot.activeTabId] : undefined),
     [shellSaveSources, tabSnapshot.activeTabId],
   );
+  const activeShellTab = useMemo(
+    () => tabSnapshot.tabs.find((tab) => tab.fileId === tabSnapshot.activeTabId),
+    [tabSnapshot.activeTabId, tabSnapshot.tabs],
+  );
+  const shellGenerationLock = appMode === 'shell' && Boolean(activeShellTab?.isGenerating);
+  const shellGenerationReason = activeShellTab?.readOnlyReason ?? 'AI 正在生成此页面，当前页为只读预览。';
 
   const fileExplorerStatusText = useMemo(() => {
     if (!tabSnapshot.activeTabId) {
@@ -367,6 +396,9 @@ export function App() {
             fileName: liveNode.name,
             filePath: liveNode.path,
             fileType: liveNode.fileType ?? persistedTab.fileType,
+            isGenerating: false,
+            readOnlyReason: undefined,
+            generationUpdatedAt: undefined,
           });
         }
 
@@ -439,7 +471,15 @@ export function App() {
         PREVIEW_PERSISTENCE_NAMESPACE,
         SHELL_SESSION_PERSISTENCE_KEY,
         {
-          tabs: tabSnapshot,
+          tabs: {
+            ...tabSnapshot,
+            tabs: tabSnapshot.tabs.map((tab) => ({
+              ...tab,
+              isGenerating: false,
+              readOnlyReason: undefined,
+              generationUpdatedAt: undefined,
+            })),
+          },
           expandedIds: fileExplorerExpandedIds,
           ...(fileExplorerFocusedId ? { focusedId: fileExplorerFocusedId } : {}),
         },
@@ -512,6 +552,35 @@ export function App() {
     handlePatchProps,
     handlePatchStyle,
   ]);
+  const notifyGenerationLock = useCallback(() => {
+    if (!shellGenerationLock) {
+      return false;
+    }
+    antd.message.warning(shellGenerationReason);
+    return true;
+  }, [shellGenerationLock, shellGenerationReason]);
+  const guardedPatchSelectedNode = useMemo(() => ({
+    props: (patch: Record<string, unknown>) => {
+      if (notifyGenerationLock()) return;
+      patchSelectedNode.props?.(patch);
+    },
+    columns: (columns: unknown[]) => {
+      if (notifyGenerationLock()) return;
+      patchSelectedNode.columns?.(columns);
+    },
+    style: (patch: Record<string, unknown>) => {
+      if (notifyGenerationLock()) return;
+      patchSelectedNode.style?.(patch);
+    },
+    events: (patch: Record<string, unknown>) => {
+      if (notifyGenerationLock()) return;
+      patchSelectedNode.events?.(patch);
+    },
+    logic: (patch: Record<string, unknown>) => {
+      if (notifyGenerationLock()) return;
+      patchSelectedNode.logic?.(patch);
+    },
+  }), [notifyGenerationLock, patchSelectedNode]);
   const notifications = useMemo(() => ({
     info: (message: string) => antd.message.info(message),
     success: (message: string) => antd.message.success(message),
@@ -562,12 +631,70 @@ export function App() {
     updateScenarioSnapshot,
     shellSnapshot.currentFileId,
   ]);
+  const ensureCurrentShellTab = useCallback(async () => {
+    if (appMode !== 'shell' || !vfsInitialized) {
+      return undefined;
+    }
+
+    if (tabSnapshot.activeTabId) {
+      return tabSnapshot.activeTabId;
+    }
+
+    if (shellSnapshot.currentFileId) {
+      await fileEditor.commands.execute('tab.open', { fileId: shellSnapshot.currentFileId });
+      return shellSnapshot.currentFileId;
+    }
+
+    const schema = cloneSchema(shellSnapshot.schema);
+    const shouldMaterialize = shellSnapshot.isDirty
+      || hasSchemaContent(schema)
+      || ((schema.name?.trim().length ?? 0) > 0 && schema.name !== createEmptyShellSchema().name);
+    if (!shouldMaterialize) {
+      return undefined;
+    }
+
+    const createdNode = await fileEditor.commands.execute('fs.createFile', {
+      parentId: null,
+      name: schema.name?.trim() || previewT('toolbar.untitled'),
+      fileType: 'page',
+      content: schema,
+    }) as { id?: string } | undefined;
+    if (!createdNode?.id) {
+      throw new Error('Failed to materialize current shell page as a tab');
+    }
+
+    await fileEditor.commands.execute('tab.open', { fileId: createdNode.id });
+    return createdNode.id;
+  }, [
+    appMode,
+    fileEditor.commands,
+    previewT,
+    shellSnapshot.currentFileId,
+    shellSnapshot.isDirty,
+    shellSnapshot.schema,
+    tabSnapshot.activeTabId,
+    vfsInitialized,
+  ]);
   const executeAppCommand = useCallback((commandId: string, payload?: unknown) => {
+    if (appMode === 'shell' && shellGenerationLock && isBlockedDuringGeneration(commandId)) {
+      antd.message.warning(shellGenerationReason);
+      return Promise.resolve(undefined);
+    }
+    if (commandId === 'shell.ensureCurrentTab') {
+      return ensureCurrentShellTab();
+    }
     if (commandId === 'workspace.resetDocument') {
       return handleResetWorkspace();
     }
     return executeHostPluginCommand(commandId, payload);
-  }, [executeHostPluginCommand, handleResetWorkspace]);
+  }, [
+    appMode,
+    ensureCurrentShellTab,
+    executeHostPluginCommand,
+    handleResetWorkspace,
+    shellGenerationLock,
+    shellGenerationReason,
+  ]);
 
   // File system service for plugin context
   const filesystemService = useMemo(() => {
@@ -591,8 +718,13 @@ export function App() {
     schema: activeSchema,
     selectedNode,
     selectedNodeId,
-    replaceSchema: (schema) => updateActiveSchema(() => schema),
-    patchSelectedNode,
+    replaceSchema: (schema) => {
+      if (notifyGenerationLock()) {
+        return;
+      }
+      updateActiveSchema(() => schema);
+    },
+    patchSelectedNode: guardedPatchSelectedNode,
     executeCommand: executeAppCommand,
     notifications,
   });
@@ -678,6 +810,9 @@ export function App() {
     }
 
     try {
+      if (notifyGenerationLock()) {
+        return;
+      }
       const text = await file.text();
       let schema: PageSchema;
 
@@ -706,7 +841,7 @@ export function App() {
     } catch {
       antd.message.error(previewT('import.readError'));
     }
-  }, [fileEditor.commands, previewT, shellSnapshot.currentFileId]);
+  }, [fileEditor.commands, notifyGenerationLock, previewT, shellSnapshot.currentFileId]);
 
   const handleExpandedIdsChange = useCallback((nextExpandedIds: string[]) => {
     setFileExplorerExpandedIds((previous) => (
@@ -719,6 +854,27 @@ export function App() {
       previous === nextFocusedId ? previous : nextFocusedId
     ));
   }, []);
+
+  const handleSaveGuarded = useCallback(() => {
+    if (notifyGenerationLock()) {
+      return;
+    }
+    handleSave();
+  }, [handleSave, notifyGenerationLock]);
+
+  const handleUndoGuarded = useCallback(() => {
+    if (notifyGenerationLock()) {
+      return;
+    }
+    handleUndo();
+  }, [handleUndo, notifyGenerationLock]);
+
+  const handleRedoGuarded = useCallback(() => {
+    if (notifyGenerationLock()) {
+      return;
+    }
+    handleRedo();
+  }, [handleRedo, notifyGenerationLock]);
 
   // Keep stable refs for FileExplorer props to avoid recreating plugins on every tree/tab change
   const fsTreeRef = useRef(fsTree);
@@ -741,8 +897,8 @@ export function App() {
   refreshFsTreeRef.current = refreshFsTree;
   const dirtyFileIdsRef = useRef(dirtyFileIds);
   dirtyFileIdsRef.current = dirtyFileIds;
-  const handleSaveRef = useRef(handleSave);
-  handleSaveRef.current = handleSave;
+  const handleSaveRef = useRef(handleSaveGuarded);
+  handleSaveRef.current = handleSaveGuarded;
   const handleCloseTabRef = useRef(handleCloseTab);
   handleCloseTabRef.current = handleCloseTab;
   const fileExplorerStatusTextRef = useRef(fileExplorerStatusText);
@@ -768,7 +924,9 @@ export function App() {
               title: previewT('commands.resetDocument.title'),
               category: 'Workspace',
               description: previewT('commands.resetDocument.description'),
-              execute: () => handleResetWorkspace(),
+              execute: () => {
+                void executeAppCommand('workspace.resetDocument');
+              },
             },
           ],
         },
@@ -865,19 +1023,25 @@ export function App() {
   }, [
     appMode,
     currentLocale,
+    executeAppCommand,
     fileExplorerStatusText,
     filesPrimaryPanelOptions,
     filesT,
-    handleResetWorkspace,
     previewT,
     vfsInitialized,
   ]);
 
   const handleCanvasSelectNode = (schemaNodeId: string) => {
+    if (shellGenerationLock) {
+      return;
+    }
     selectSchemaNode(schemaNodeId);
   };
 
   const handleCanvasDeselectNode = () => {
+    if (shellGenerationLock) {
+      return;
+    }
     selectTreeNode(getDefaultSelectedNodeId(treeNodes) ?? '');
   };
 
@@ -1040,8 +1204,8 @@ export function App() {
                 type="button"
                 aria-label={previewT('toolbar.undo')}
                 className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={!canUndo}
-                onClick={handleUndo}
+                disabled={!canUndo || shellGenerationLock}
+                onClick={handleUndoGuarded}
                 title={previewT('toolbar.undo')}
               >
                 <Undo2 size={15} />
@@ -1050,8 +1214,8 @@ export function App() {
                 type="button"
                 aria-label={previewT('toolbar.redo')}
                 className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={!canRedo}
-                onClick={handleRedo}
+                disabled={!canRedo || shellGenerationLock}
+                onClick={handleRedoGuarded}
                 title={previewT('toolbar.redo')}
               >
                 <Redo2 size={15} />
@@ -1072,7 +1236,16 @@ export function App() {
         </div>
       )}
     >
-      <ScenarioRuntimeView key={`${appMode}:${activeScenario}`} schema={activeSchema} />
+      <div className="relative min-h-full">
+        {shellGenerationLock ? (
+          <div className="absolute right-3 top-3 z-20 rounded border border-blue-500/40 bg-bg-panel/90 px-3 py-1.5 text-[11px] text-text-secondary shadow-sm">
+            {shellGenerationReason}
+          </div>
+        ) : null}
+        <div className={shellGenerationLock ? 'pointer-events-none select-none' : undefined}>
+          <ScenarioRuntimeView key={`${appMode}:${activeScenario}`} schema={activeSchema} />
+        </div>
+      </div>
     </AppShell>
   );
 }

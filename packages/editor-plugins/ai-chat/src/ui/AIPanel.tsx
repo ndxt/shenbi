@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import { Sparkles, LoaderCircle, Trash2, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Trash2, LoaderCircle } from 'lucide-react';
 import {
   executePluginCommand,
   type PluginContext,
@@ -9,10 +9,12 @@ import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import { createPendingAttachment, materializePendingAttachments, type PendingAttachment } from '../attachments';
 import { useModels } from '../hooks/useModels';
 import { useChatSession } from '../hooks/useChatSession';
-import { useAgentRun } from '../hooks/useAgentRun';
+import { useAgentLoop } from '../hooks/useAgentLoop';
 import { ChatMessageList } from './ChatMessageList';
 import { ChatInput, type PromptOption } from './ChatInput';
 import { ModelSelector } from './ModelSelector';
+import { PageExecutionDetails } from './PageExecutionDetails';
+import { ProjectPlanCard } from './ProjectPlanCard';
 
 export interface AIPanelProps {
   bridge?: EditorAIBridge;
@@ -76,69 +78,37 @@ export function AIPanel({
   } = useChatSession(persistence);
 
   const {
+    mode,
+    phase,
     isRunning,
     progressText,
-    currentPlan,
-    blockStatuses,
-    modifyPlan,
-    modifyStatuses,
-    modifyOpMetrics,
     elapsedMs,
-    blockTokens,
-    blockInputTokens,
-    blockOutputTokens,
-    blockDurationMs,
-    plannerMetrics,
+    projectPlan,
+    pages,
+    errorMessage,
+    legacy,
+    planRevisionRequested,
     runAgent,
     cancelRun,
-  } = useAgentRun(bridge);
+    resetLoopState,
+    confirmProjectPlan,
+    requestProjectPlanRevision,
+    cancelProjectPlanRevision,
+    submitProjectPlanRevision,
+  } = useAgentLoop(bridge, persistence);
+  const {
+    executionSnapshot,
+  } = legacy;
 
   // Memoized prompt presets from i18n
   const promptPresets = useMemo(() => getPromptPresets(t), [t]);
-
-  // Unified compact metrics badge: 'Xs In300 Out2000'
-  const MetricsBadge = ({ durationMs, inputTokens, outputTokens }: { durationMs: number | undefined; inputTokens: number | undefined; outputTokens: number | undefined }) => {
-    const parts: string[] = [];
-    if (durationMs !== undefined) parts.push(`${(durationMs / 1000).toFixed(1)}s`);
-    if (inputTokens !== undefined) parts.push(`In${inputTokens}`);
-    if (outputTokens !== undefined) parts.push(`Out${outputTokens}`);
-    if (parts.length === 0) return null;
-    return <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '9px' }}>{parts.join(' ')}</span>;
-  };
-
-  // Shared op row used in both running and completed cards
-  const OpRow = ({
-    label,
-    isPending,
-    isDone,
-    metrics,
-    isError,
-  }: {
-    label: string;
-    isPending?: boolean;
-    isDone?: boolean;
-    metrics?: { durationMs: number | undefined; inputTokens: number | undefined; outputTokens: number | undefined };
-    isError?: boolean;
-  }) => (
-    <li
-      className="flex items-center gap-1.5 py-0.5 rounded px-1.5"
-      style={{ fontSize: '11px', ...(isPending ? { animation: 'pulse 3s ease-in-out infinite' } : {}) }}
-    >
-      <span className="text-text-primary opacity-80 truncate flex-1 leading-none translate-y-[1px]" title={label}>{label}</span>
-      {isDone && metrics && <MetricsBadge durationMs={metrics.durationMs} inputTokens={metrics.inputTokens} outputTokens={metrics.outputTokens} />}
-      {isDone && (
-        <CheckCircle2
-          size={11}
-          className={`shrink-0 ${isError ? 'text-red-400' : 'text-emerald-400'}`}
-        />
-      )}
-    </li>
-  );
 
   const [selectedNodeLabel, setSelectedNodeLabel] = React.useState<string>(t('status.notSelected'));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const modelsReady = plannerModels.length > 0 && blockModels.length > 0;
   const modelSelectionBlocked = isLoadingModels || Boolean(modelsError) || !modelsReady;
+  const loopAwaitingConfirmation = mode === 'loop' && phase === 'awaiting_confirmation';
+  const showInlineLoopPlan = mode === 'loop' && phase !== 'done';
 
   useEffect(() => {
     let cancelled = false;
@@ -238,11 +208,12 @@ export function AIPanel({
     if (isRunning) {
       return;
     }
+    void resetLoopState();
     resetSession();
     setDraftText('');
     setPendingAttachments([]);
     void executePluginCommand(pluginContext ?? {}, 'workspace.resetDocument');
-  }, [isRunning, pluginContext, resetSession]);
+  }, [isRunning, pluginContext, resetLoopState, resetSession]);
 
   const handleAddFiles = React.useCallback((files: File[]) => {
     const nextAttachments: PendingAttachment[] = [];
@@ -332,7 +303,6 @@ export function AIPanel({
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes shimmer { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 20% { opacity: 1; } 50% { opacity: 0.25; } 80% { opacity: 1; } }
       `}</style>
       <div className="w-full h-full bg-bg-panel border-l border-border-ide flex flex-col shrink-0 overflow-hidden">
         <div className="h-9 px-4 border-b border-border-ide flex items-center justify-between shrink-0">
@@ -416,7 +386,7 @@ export function AIPanel({
 
           <ChatMessageList messages={messages} onDismissRunResult={dismissRunResult} />
 
-          {isRunning && (
+          {mode !== 'loop' && isRunning && (
             <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col shadow-sm relative overflow-hidden mt-2">
               <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-400 to-blue-500 animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
               <div className="flex items-center gap-2 text-text-primary pb-2 mb-2" style={{ fontSize: '11px' }}>
@@ -427,47 +397,28 @@ export function AIPanel({
                   {Math.floor(elapsedMs / 1000)}s
                 </span>
               </div>
-              {/* Planner row (create-page) */}
-              {plannerMetrics && currentPlan && (
-                <div className="border-t border-border-ide py-2 flex items-center gap-1.5 px-1" style={{ fontSize: '10px' }}>
-                  <span className="text-text-secondary opacity-70 truncate flex-1 leading-none translate-y-[1px]">Planner</span>
-                  <MetricsBadge durationMs={plannerMetrics.durationMs} inputTokens={plannerMetrics.inputTokens} outputTokens={plannerMetrics.outputTokens} />
-                  <CheckCircle2 size={10} className="text-emerald-400 shrink-0" />
-                </div>
-              )}
-              {/* Block list (create-page) */}
-              {currentPlan && (
-                <div className="border-t border-border-ide pt-2 pb-1">
-                  <ul className="flex flex-col gap-1.5 m-0 p-0">
-                    {currentPlan.blocks.map((b) => (
-                      <OpRow
-                        key={b.id}
-                        label={b.description}
-                        isPending={blockStatuses[b.id] === 'generating'}
-                        isDone={blockStatuses[b.id] === 'done'}
-                        metrics={{ durationMs: blockDurationMs[b.id], inputTokens: blockInputTokens[b.id], outputTokens: blockOutputTokens[b.id] }}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {/* Modify op list */}
-              {modifyPlan && (
-                <div className="border-t border-border-ide pt-2 pb-1">
-                  <ul className="flex flex-col gap-1.5 m-0 p-0">
-                    {Array.from({ length: modifyPlan.operationCount }, (_, i) => (
-                      <OpRow
-                        key={i}
-                        label={modifyPlan.operationLabels[i] ?? t('status.operationWithIndex', { index: i + 1 })}
-                        isPending={modifyStatuses[i] === 'generating'}
-                        isDone={modifyStatuses[i] === 'done'}
-                        {...(modifyOpMetrics[i] ? { metrics: { durationMs: modifyOpMetrics[i].durationMs, inputTokens: modifyOpMetrics[i].inputTokens, outputTokens: modifyOpMetrics[i].outputTokens } } : {})}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <PageExecutionDetails
+                snapshot={executionSnapshot}
+                variant="standalone"
+                isRunning
+              />
             </div>
+          )}
+
+          {showInlineLoopPlan && (
+            <ProjectPlanCard
+              projectPlan={projectPlan}
+              pages={pages}
+              phase={phase}
+              progressText={progressText}
+              elapsedMs={elapsedMs}
+              errorMessage={errorMessage}
+              planRevisionRequested={planRevisionRequested}
+              onConfirm={confirmProjectPlan}
+              onRequestRevision={requestProjectPlanRevision}
+              onCancelRevision={cancelProjectPlanRevision}
+              onSubmitRevision={submitProjectPlanRevision}
+            />
           )}
 
 

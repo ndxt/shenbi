@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateFinalizeRequest, validateRunRequest } from './validate.ts';
+import { validateChatRequest, validateFinalizeRequest, validateRunRequest } from './validate.ts';
 
 describe('validateRunRequest', () => {
   it('preserves optional schemaJson and workspaceFileIds', () => {
@@ -137,5 +137,41 @@ describe('validateFinalizeRequest', () => {
       success: false,
       failedOpIndex: -1,
     })).toThrow(/failedOpIndex/i);
+  });
+});
+
+describe('validateChatRequest', () => {
+  it('accepts chat payloads with optional thinking and stream', () => {
+    expect(validateChatRequest({
+      model: 'openai-compatible::glm-4.6',
+      messages: [
+        { role: 'system', content: 'You are helpful.' },
+        { role: 'user', content: 'Summarize this request.' },
+      ],
+      thinking: { type: 'enabled' },
+      stream: true,
+      maxTokens: 512,
+    })).toEqual({
+      model: 'openai-compatible::glm-4.6',
+      messages: [
+        { role: 'system', content: 'You are helpful.' },
+        { role: 'user', content: 'Summarize this request.' },
+      ],
+      thinking: { type: 'enabled' },
+      stream: true,
+      maxTokens: 512,
+    });
+  });
+
+  it('rejects invalid roles and empty content', () => {
+    expect(() => validateChatRequest({
+      model: 'foo',
+      messages: [{ role: 'tool', content: 'x' }],
+    })).toThrow(/role/i);
+
+    expect(() => validateChatRequest({
+      model: 'foo',
+      messages: [{ role: 'user', content: '' }],
+    })).toThrow(/content/i);
   });
 });

@@ -126,55 +126,23 @@ function deleteRecord(store: IDBObjectStore, key: IDBValidKey): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Migration: localStorage → IndexedDB
+// Legacy localStorage cleanup
 // ---------------------------------------------------------------------------
-
-interface LegacyFileMetadata {
-  id: string;
-  name: string;
-  updatedAt: number;
-  size?: number;
-}
-
-interface LegacyStoredFileRecord {
-  metadata: LegacyFileMetadata;
-  schema: Record<string, unknown>;
-}
-
-function readLegacyFiles(): LegacyStoredFileRecord[] {
-  if (typeof localStorage === 'undefined') {
-    return [];
-  }
-  const indexRaw = localStorage.getItem('shenbi-editor-files');
-  if (!indexRaw) {
-    return [];
-  }
-  try {
-    const metadataList = JSON.parse(indexRaw) as LegacyFileMetadata[];
-    return metadataList
-      .map((metadata) => {
-        const recordRaw = localStorage.getItem(`shenbi-editor-file:${metadata.id}`);
-        if (!recordRaw) return undefined;
-        return JSON.parse(recordRaw) as LegacyStoredFileRecord;
-      })
-      .filter((record): record is LegacyStoredFileRecord => Boolean(record));
-  } catch {
-    return [];
-  }
-}
 
 function removeLegacyFiles(): void {
   if (typeof localStorage === 'undefined') return;
-  const indexRaw = localStorage.getItem('shenbi-editor-files');
-  if (!indexRaw) return;
-  try {
-    const metadataList = JSON.parse(indexRaw) as LegacyFileMetadata[];
-    for (const metadata of metadataList) {
-      localStorage.removeItem(`shenbi-editor-file:${metadata.id}`);
+  const keysToRemove: string[] = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key) {
+      continue;
     }
-    localStorage.removeItem('shenbi-editor-files');
-  } catch {
-    // ignore
+    if (key === 'shenbi-editor-files' || key.startsWith('shenbi-editor-file:')) {
+      keysToRemove.push(key);
+    }
+  }
+  for (const key of keysToRemove) {
+    localStorage.removeItem(key);
   }
 }
 
@@ -206,48 +174,9 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
     );
 
     if (existingNodes.length > 0) {
+      removeLegacyFiles();
       return; // already initialized
     }
-
-    // Migrate legacy localStorage files
-    const legacyFiles = readLegacyFiles();
-    if (legacyFiles.length === 0) {
-      return;
-    }
-
-    const transaction = db.transaction(['fs_nodes', 'fs_content'], 'readwrite');
-    const nodeStore = transaction.objectStore('fs_nodes');
-    const contentStore = transaction.objectStore('fs_content');
-    const now = Date.now();
-
-    for (const record of legacyFiles) {
-      const nodeId = generateId();
-      const fileName = record.metadata.name || record.metadata.id;
-      const path = `/${fileName}${EXTENSIONS.page}`;
-      const node: FSNodeMetadata = {
-        id: nodeId,
-        name: fileName,
-        type: 'file',
-        fileType: 'page',
-        parentId: null,
-        path,
-        createdAt: record.metadata.updatedAt || now,
-        updatedAt: record.metadata.updatedAt || now,
-        ...(record.metadata.size !== undefined ? { size: record.metadata.size } : {}),
-      };
-      nodeStore.put(node);
-      contentStore.put({
-        fileId: nodeId,
-        content: record.schema,
-        updatedAt: node.updatedAt,
-      });
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-
     removeLegacyFiles();
   }
 
@@ -296,7 +225,8 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
 
     await new Promise<void>((resolve, reject) => {
       transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
+      transaction.onerror = () => reject(transaction.error ?? new Error('IndexedDB createFile transaction error'));
+      transaction.onabort = () => reject(transaction.error ?? new Error('IndexedDB createFile transaction aborted'));
     });
 
     return node;

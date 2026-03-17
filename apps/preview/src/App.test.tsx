@@ -47,6 +47,17 @@ const { messageMock, notificationMock } = vi.hoisted(() => ({
 }));
 
 const fetchMock = vi.hoisted(() => vi.fn());
+const AI_INPUT_PLACEHOLDER = /输入调试提示词，Enter 发送，Shift\+Enter 换行|Enter debug prompt, Enter to send, Shift\+Enter for new line/i;
+const CLEAR_CHAT_BUTTON = /^(清空|Clear)$/;
+const PRESET_MENU_BUTTON = /^(常用覆盖场景|Common Scenarios)$/;
+const WORKSPACE_OVERVIEW_BUTTON = /^(工作台总览|Workspace Overview)$/;
+const HISTORY_BUTTON = /^(历史输入|History)$/;
+const CLEAR_PAGE_BUTTON = /^(清空页面|Clear Page)$/;
+const WORKSPACE_OVERVIEW_PROMPT =
+  '生成一个复杂工作台首页，包含筛选区、指标卡、趋势图、表格列表、右侧详情抽屉和顶部快捷操作，重点覆盖卡片、表格、Tabs、Drawer、Form、按钮和响应式布局组合。';
+const WORKSPACE_OVERVIEW_PROMPT_EN =
+  'Generate a complex workspace homepage with filter area, KPI cards, trend charts, table list, right detail drawer, and top quick actions. Focus on covering Card, Table, Tabs, Drawer, Form, Button, and responsive layout combinations.';
+const WORKSPACE_OVERVIEW_HISTORY_ENTRY = /生成一个复杂工作台首页|Generate a complex workspace homepage/i;
 
 interface FormContextValue {
   form: {
@@ -382,6 +393,22 @@ vi.mock('antd', async (importOriginal) => {
 });
 
 describe('preview/App integration', () => {
+  function getModeSelect() {
+    return screen.queryByLabelText('模式切换') ?? screen.getByLabelText('Mode switch');
+  }
+
+  function queryScenarioSelect() {
+    return screen.queryByLabelText('场景切换') ?? screen.queryByLabelText('Scenario switch');
+  }
+
+  function getScenarioSelect() {
+    const element = queryScenarioSelect();
+    if (!element) {
+      throw new Error('scenario switch is missing');
+    }
+    return element;
+  }
+
   function clearShellModeFlag() {
     delete (window as unknown as Record<string, unknown>).__SHENBI_SHELL_MODE__;
   }
@@ -395,16 +422,17 @@ describe('preview/App integration', () => {
 
   async function selectNodeInOutline(
     user: ReturnType<typeof userEvent.setup>,
-    nodeName: string,
+    nodeId: string,
   ) {
-    await user.click(screen.getByText(outlineTabLabel));
-    await user.click(screen.getByRole('button', { name: new RegExp(nodeName) }));
+    const node = document.querySelector(`[data-shenbi-node-id="${nodeId}"]`);
+    if (!(node instanceof HTMLElement)) {
+      throw new Error(`canvas node ${nodeId} is missing`);
+    }
+    await user.click(node);
   }
 
   async function selectCardNodeInOutline(user: ReturnType<typeof userEvent.setup>) {
-    const cardNode = document.querySelector('[data-shenbi-node-id="user-management-card"]');
-    expect(cardNode).not.toBeNull();
-    await user.click(cardNode as HTMLElement);
+    await selectNodeInOutline(user, 'user-management-card');
     await waitFor(() => {
       expect(screen.getByLabelText('title')).toBeInTheDocument();
     });
@@ -423,7 +451,7 @@ describe('preview/App integration', () => {
           { id: 'GLM-4.7', name: 'GLM-4.7' },
           { id: 'GLM-4.6', name: 'GLM-4.6' },
         ],
-      }),
+    }),
     } satisfies Partial<Response>);
     vi.stubGlobal('fetch', fetchMock);
     vi.stubGlobal('ResizeObserver', ResizeObserverMock as unknown as typeof ResizeObserver);
@@ -488,12 +516,12 @@ describe('preview/App integration', () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
 
-    const modeSelect = screen.getByLabelText(modeSwitchLabel);
-    expect(screen.getByLabelText(scenarioSwitchLabel)).toBeInTheDocument();
+    const modeSelect = getModeSelect();
+    expect(getScenarioSelect()).toBeInTheDocument();
 
     await user.selectOptions(modeSelect, 'shell');
     await waitFor(() => {
-      expect(screen.queryByLabelText(scenarioSwitchLabel)).toBeNull();
+      expect(queryScenarioSelect()).toBeNull();
     });
     await waitFor(() => {
       expect(screen.queryByText('User 1')).toBeNull();
@@ -501,7 +529,7 @@ describe('preview/App integration', () => {
 
     await user.selectOptions(modeSelect, 'scenarios');
     await waitFor(() => {
-      expect(screen.getByLabelText(scenarioSwitchLabel)).toBeInTheDocument();
+      expect(getScenarioSelect()).toBeInTheDocument();
       expect(screen.getByText('User 1')).toBeInTheDocument();
     });
   });
@@ -516,7 +544,7 @@ describe('preview/App integration', () => {
 
     await user.click(screen.getByTitle('Toggle AI Assistant'));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: clearButtonLabel })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: CLEAR_CHAT_BUTTON })).toBeInTheDocument();
     });
 
     await user.selectOptions(screen.getByLabelText('Planner'), 'GLM-4.6');
@@ -527,7 +555,7 @@ describe('preview/App integration', () => {
     render(createElement(App));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: clearButtonLabel })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: CLEAR_CHAT_BUTTON })).toBeInTheDocument();
     });
     await waitFor(() => {
       expect(screen.getByLabelText('Planner')).toHaveValue('GLM-4.6');
@@ -539,24 +567,24 @@ describe('preview/App integration', () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
 
-    await user.selectOptions(screen.getByLabelText(modeSwitchLabel), 'shell');
+    await user.selectOptions(getModeSelect(), 'shell');
     await user.click(screen.getByTitle('Toggle AI Assistant'));
 
-    const input = await screen.findByPlaceholderText(promptInputPlaceholder);
-    await user.click(screen.getByRole('button', { name: presetButtonLabel }));
-    await user.click(screen.getByRole('button', { name: workspaceOverviewLabel }));
-    expect((input as HTMLTextAreaElement).value).toMatch(/(复杂工作台首页|complex workspace homepage)/i);
+    const input = await screen.findByPlaceholderText(AI_INPUT_PLACEHOLDER);
+    await user.click(screen.getByRole('button', { name: PRESET_MENU_BUTTON }));
+    await user.click(screen.getByRole('button', { name: WORKSPACE_OVERVIEW_BUTTON }));
+    expect([WORKSPACE_OVERVIEW_PROMPT, WORKSPACE_OVERVIEW_PROMPT_EN]).toContain((input as HTMLTextAreaElement).value);
 
     await user.type(input, '{enter}');
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: clearButtonLabel })).toBeEnabled();
+      expect(screen.getByRole('button', { name: CLEAR_CHAT_BUTTON })).toBeEnabled();
     }, { timeout: 9000 });
 
-    await user.click(screen.getByRole('button', { name: historyButtonLabel }));
-    await user.click(screen.getByRole('button', { name: /(工作台首页|workspace homepage)/i }));
+    await user.click(screen.getByRole('button', { name: HISTORY_BUTTON }));
+    await user.click(screen.getByRole('button', { name: WORKSPACE_OVERVIEW_HISTORY_ENTRY }));
     await waitFor(() => {
-      expect((input as HTMLTextAreaElement).value).toMatch(/(复杂工作台首页|complex workspace homepage)/i);
+      expect([WORKSPACE_OVERVIEW_PROMPT, WORKSPACE_OVERVIEW_PROMPT_EN]).toContain((input as HTMLTextAreaElement).value);
     });
   }, 12000);
 
@@ -564,13 +592,13 @@ describe('preview/App integration', () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
 
-    await user.selectOptions(screen.getByLabelText(modeSwitchLabel), 'shell');
+    await user.selectOptions(getModeSelect(), 'shell');
     await waitFor(() => {
-      expect(screen.queryByLabelText(scenarioSwitchLabel)).toBeNull();
+      expect(queryScenarioSelect()).toBeNull();
     });
 
     await user.click(screen.getByTitle('Toggle AI Assistant'));
-    const input = await screen.findByPlaceholderText(promptInputPlaceholder);
+    const input = await screen.findByPlaceholderText(AI_INPUT_PLACEHOLDER);
     await user.type(input, '生成演示页面{enter}');
 
     await waitFor(() => {
@@ -584,9 +612,9 @@ describe('preview/App integration', () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
 
-    await user.selectOptions(screen.getByLabelText(modeSwitchLabel), 'shell');
+    await user.selectOptions(getModeSelect(), 'shell');
     await user.click(screen.getByTitle('Toggle AI Assistant'));
-    const input = await screen.findByPlaceholderText(promptInputPlaceholder);
+    const input = await screen.findByPlaceholderText(AI_INPUT_PLACEHOLDER);
     await user.type(input, '生成演示页面{enter}');
 
     await waitFor(() => {
@@ -594,7 +622,7 @@ describe('preview/App integration', () => {
       expect(screen.getByText('右侧说明区', { selector: 'header' })).toBeInTheDocument();
     }, { timeout: 9000 });
 
-    await user.click(screen.getByRole('button', { name: clearButtonLabel }));
+    await user.click(screen.getByRole('button', { name: CLEAR_CHAT_BUTTON }));
 
     await waitFor(() => {
       expect(screen.queryByText('生成完成')).toBeNull();
@@ -606,16 +634,16 @@ describe('preview/App integration', () => {
     const user = userEvent.setup();
     await renderAppAndWaitFirstPage();
 
-    await user.selectOptions(screen.getByLabelText(modeSwitchLabel), 'shell');
+    await user.selectOptions(getModeSelect(), 'shell');
     await user.click(screen.getByTitle('Toggle AI Assistant'));
-    const input = await screen.findByPlaceholderText(promptInputPlaceholder);
+    const input = await screen.findByPlaceholderText(AI_INPUT_PLACEHOLDER);
     await user.type(input, '生成演示页面{enter}');
 
     await waitFor(() => {
       expect(screen.getByText('页面头部', { selector: 'header' })).toBeInTheDocument();
     }, { timeout: 9000 });
 
-    await user.click(screen.getByRole('button', { name: clearPageButtonLabel }));
+    await user.click(screen.getByRole('button', { name: CLEAR_PAGE_BUTTON }));
 
     await waitFor(() => {
       expect(screen.queryByText('页面头部', { selector: 'header' })).toBeNull();

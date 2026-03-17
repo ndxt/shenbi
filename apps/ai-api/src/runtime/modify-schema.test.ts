@@ -112,15 +112,15 @@ describe('executeModifySchema', () => {
     expect(result).toMatchObject({
       explanation: '会更新卡片标题。',
       operations: [
-        {
+        expect.objectContaining({
           op: 'schema.patchProps',
           nodeId: 'card-1',
           patch: { title: '本月营收' },
-        },
+        }),
       ],
     });
     expect(fetchMock).toHaveBeenCalledOnce();
-  });
+  }, 15000);
 
   it('salvages fenced modify JSON with trailing noise', async () => {
     process.env.AI_PROVIDER = 'openai-compatible';

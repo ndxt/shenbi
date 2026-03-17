@@ -26,6 +26,7 @@ export interface EditorEventMap {
   'file:currentChanged': { fileId?: string };
   'file:opened': { fileId: string };
   'file:saved': { fileId: string; source?: 'manual' | 'auto' };
+  'file:deleted': { fileId: string };
 
   // File system events
   'fs:nodeCreated': { node: FSNodeMetadata };
@@ -39,4 +40,11 @@ export interface EditorEventMap {
   'tab:closed': { fileId: string };
   'tab:activated': { fileId: string };
   'tab:dirtyChanged': { fileId: string; isDirty: boolean };
+  'tab:stateChanged': {
+    fileId: string;
+    isDirty: boolean;
+    isGenerating?: boolean;
+    readOnlyReason?: string;
+    generationUpdatedAt?: number;
+  };
 }

@@ -15,6 +15,7 @@ export interface EditorBridgeSnapshot {
 export interface ExecuteResult {
   success: boolean;
   error?: string;
+  data?: unknown;
 }
 
 export interface EditorAIBridge {
@@ -44,6 +45,10 @@ export interface EditorAIBridgeFromPluginContextOptions {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getCommandArgRecord(args: unknown): Record<string, unknown> | undefined {
+  return isRecord(args) ? args : undefined;
 }
 
 function isSchemaNode(value: unknown): boolean {
@@ -165,6 +170,34 @@ export function createEditorAIBridgeFromPluginContext(
     },
     execute: async (commandId, args) => {
       try {
+        const filesystem = options.context.filesystem;
+        const commandArgs = getCommandArgRecord(args);
+
+        if (filesystem && commandId === 'fs.createFile') {
+          const name = typeof commandArgs?.name === 'string' ? commandArgs.name : '';
+          const fileType = typeof commandArgs?.fileType === 'string' ? commandArgs.fileType : 'page';
+          const parentId = typeof commandArgs?.parentId === 'string' ? commandArgs.parentId : undefined;
+          const content = isRecord(commandArgs?.content) ? commandArgs.content : { id: 'page', name, body: [] };
+          const fileId = await filesystem.createFile(name, fileType, content, parentId);
+          return { success: true, data: { id: fileId } };
+        }
+
+        if (filesystem && commandId === 'file.readSchema') {
+          const fileId = typeof commandArgs?.fileId === 'string' ? commandArgs.fileId : '';
+          const schema = await filesystem.readFile(fileId);
+          return { success: true, data: schema };
+        }
+
+        if (filesystem && commandId === 'file.writeSchema') {
+          const fileId = typeof commandArgs?.fileId === 'string' ? commandArgs.fileId : '';
+          const schema = isRecord(commandArgs?.schema) ? commandArgs.schema : undefined;
+          if (!fileId || !schema) {
+            throw new Error('file.writeSchema expects args: { fileId: string, schema: PageSchema }');
+          }
+          await filesystem.writeFile(fileId, schema);
+          return { success: true };
+        }
+
         // Track schema replacements through the command path as well.
         if (commandId === 'schema.replace' && args && typeof args === 'object' && 'schema' in args) {
           lastReplacedSchema = (args as { schema: PageSchema }).schema;
@@ -176,8 +209,8 @@ export function createEditorAIBridgeFromPluginContext(
 
         const hasCommandHandler = Boolean(options.context.commands?.execute || options.context.executeCommand);
         if (hasCommandHandler) {
-          await executePluginCommand(options.context, commandId, args);
-          return { success: true };
+          const data = await executePluginCommand(options.context, commandId, args);
+          return { success: true, data };
         }
         if (commandId === 'schema.replace' && args && typeof args === 'object' && 'schema' in args) {
           if (replacePluginSchema(options.context, (args as { schema: PageSchema }).schema)) {
@@ -186,7 +219,10 @@ export function createEditorAIBridgeFromPluginContext(
         }
         return { success: true };
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
+        const msg = error instanceof Error
+          ? error.message
+          : (error != null ? String(error) : `${commandId} failed (unknown error)`);
+        return { success: false, error: msg };
       }
     },
     getAvailableComponents: options.getAvailableComponents,

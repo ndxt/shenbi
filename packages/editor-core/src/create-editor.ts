@@ -4,7 +4,7 @@ import { EditorState } from './editor-state';
 import { EventBus } from './event-bus';
 import { History } from './history';
 import type { EditorEventMap, EditorStateSnapshot } from './types';
-import { LocalFileStorageAdapter, type FileStorageAdapter, type FileType } from './adapters/file-storage';
+import { MemoryFileStorageAdapter, type FileStorageAdapter, type FileType } from './adapters/file-storage';
 import type { VirtualFileSystemAdapter } from './adapters/virtual-fs';
 import { TabManager, type TabState } from './tab-manager';
 import {
@@ -158,6 +158,124 @@ function extractFileNameFromArgs(args: unknown): string {
     throw new Error('file.saveAs expects args: { name: string }');
   }
   return args.name.trim();
+}
+
+function extractWriteSchemaArgs(args: unknown): { fileId: string; schema: PageSchema } {
+  if (!isRecord(args) || typeof args.fileId !== 'string' || args.fileId.trim().length === 0 || !('schema' in args)) {
+    throw new Error('file.writeSchema expects args: { fileId: string, schema: PageSchema }');
+  }
+  const schema = args.schema;
+  validatePageSchema(schema);
+  return {
+    fileId: args.fileId.trim(),
+    schema,
+  };
+}
+
+function extractTabSyncStateArgs(args: unknown): {
+  fileId: string;
+  schema?: PageSchema;
+  selectedNodeId?: string;
+  isDirty?: boolean;
+  isGenerating?: boolean;
+  readOnlyReason?: string | undefined;
+  generationUpdatedAt?: number;
+} {
+  if (!isRecord(args) || typeof args.fileId !== 'string' || args.fileId.trim().length === 0) {
+    throw new Error('tab.syncState expects args: { fileId: string, ... }');
+  }
+
+  const result: {
+    fileId: string;
+    schema?: PageSchema;
+    selectedNodeId?: string;
+    isDirty?: boolean;
+    isGenerating?: boolean;
+    readOnlyReason?: string | undefined;
+    generationUpdatedAt?: number;
+  } = {
+    fileId: args.fileId.trim(),
+  };
+
+  if (Object.prototype.hasOwnProperty.call(args, 'schema')) {
+    validatePageSchema(args.schema);
+    result.schema = args.schema;
+  }
+  if (Object.prototype.hasOwnProperty.call(args, 'selectedNodeId')) {
+    if (args.selectedNodeId !== undefined && typeof args.selectedNodeId !== 'string') {
+      throw new Error('tab.syncState expects selectedNodeId to be a string');
+    }
+    if (typeof args.selectedNodeId === 'string') {
+      result.selectedNodeId = args.selectedNodeId;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(args, 'isDirty')) {
+    if (typeof args.isDirty !== 'boolean') {
+      throw new Error('tab.syncState expects isDirty to be a boolean');
+    }
+    result.isDirty = args.isDirty;
+  }
+  if (Object.prototype.hasOwnProperty.call(args, 'isGenerating')) {
+    if (typeof args.isGenerating !== 'boolean') {
+      throw new Error('tab.syncState expects isGenerating to be a boolean');
+    }
+    result.isGenerating = args.isGenerating;
+  }
+  if (Object.prototype.hasOwnProperty.call(args, 'readOnlyReason')) {
+    if (args.readOnlyReason !== undefined && args.readOnlyReason !== null && typeof args.readOnlyReason !== 'string') {
+      throw new Error('tab.syncState expects readOnlyReason to be a string');
+    }
+    if (typeof args.readOnlyReason === 'string') {
+      result.readOnlyReason = args.readOnlyReason;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(args, 'generationUpdatedAt')) {
+    if (!Number.isFinite(args.generationUpdatedAt)) {
+      throw new Error('tab.syncState expects generationUpdatedAt to be a finite number');
+    }
+    result.generationUpdatedAt = Number(args.generationUpdatedAt);
+  }
+
+  return result;
+}
+
+function createVFSFileStorageAdapter(
+  vfs: VirtualFileSystemAdapter,
+  projectId: string,
+): FileStorageAdapter {
+  return {
+    async list() {
+      const nodes = await vfs.listTree(projectId);
+      return nodes
+        .filter((node) => node.type === 'file')
+        .map((node) => ({
+          id: node.id,
+          name: node.name,
+          updatedAt: node.updatedAt,
+          ...(node.size !== undefined ? { size: node.size } : {}),
+        }));
+    },
+    async read(fileId) {
+      return await vfs.readFile(projectId, fileId) as PageSchema;
+    },
+    async write(fileId, schema) {
+      const existingNode = await vfs.getNode(projectId, fileId);
+      if (!existingNode || existingNode.type !== 'file') {
+        throw new Error(`File not found: ${fileId}`);
+      }
+      await vfs.writeFile(projectId, fileId, schema);
+    },
+    async saveAs(name, schema) {
+      const node = await vfs.createFile(projectId, null, name, 'page', {
+        ...schema,
+        name,
+      });
+      return node.id;
+    },
+    async delete(fileId) {
+      await vfs.deleteFile(projectId, fileId);
+    },
+  };
 }
 
 function extractTreeIdFromArgs(args: unknown, commandId: string): string {
@@ -511,6 +629,16 @@ function registerBuiltinCommands(
   });
 
   commands.register({
+    id: 'file.readSchema',
+    label: 'Read File',
+    recordHistory: false,
+    async execute(_currentState, args) {
+      const fileId = extractFileIdFromArgs(args);
+      return fileStorage.read(fileId);
+    },
+  });
+
+  commands.register({
     id: 'file.saveSchema',
     label: 'Save File',
     recordHistory: false,
@@ -528,6 +656,18 @@ function registerBuiltinCommands(
   });
 
   commands.register({
+    id: 'file.writeSchema',
+    label: 'Write File',
+    recordHistory: false,
+    async execute(_currentState, args) {
+      const { fileId, schema } = extractWriteSchemaArgs(args);
+      await fileStorage.write(fileId, schema);
+      eventBus.emit('file:saved', { fileId, source: 'auto' });
+      eventBus.emit('fs:treeChanged', undefined);
+    },
+  });
+
+  commands.register({
     id: 'file.saveAs',
     label: 'Save As',
     recordHistory: false,
@@ -541,6 +681,23 @@ function registerBuiltinCommands(
       currentState.setDirty(false);
       eventBus.emit('file:saved', { fileId });
       return fileId;
+    },
+  });
+
+  commands.register({
+    id: 'file.deleteSchema',
+    label: 'Delete File',
+    recordHistory: false,
+    async execute(currentState, args) {
+      const fileId = extractFileIdFromArgs(args);
+      if (!fileStorage.delete) {
+        throw new Error('delete is not supported by current adapter');
+      }
+      await fileStorage.delete(fileId);
+      if (currentState.getCurrentFileId() === fileId) {
+        updateCurrentFileId(currentState, undefined);
+      }
+      eventBus.emit('file:deleted', { fileId });
     },
   });
 }
@@ -869,6 +1026,61 @@ function registerTabCommands(
   });
 
   commands.register({
+    id: 'tab.syncState',
+    label: 'Sync Tab State',
+    recordHistory: false,
+    async execute(_currentState, args) {
+      const {
+        fileId,
+        schema,
+        selectedNodeId,
+        isDirty,
+        isGenerating,
+        readOnlyReason,
+        generationUpdatedAt,
+      } = extractTabSyncStateArgs(args);
+      const existingTab = tabManager.getTab(fileId);
+      if (!existingTab) {
+        return { synced: false };
+      }
+
+      const patch: Partial<Omit<TabState, 'fileId'>> = {
+        ...(schema ? { schema } : {}),
+        ...(selectedNodeId !== undefined ? { selectedNodeId } : {}),
+        ...(isDirty !== undefined ? { isDirty } : {}),
+        ...(isGenerating !== undefined ? { isGenerating } : {}),
+        ...(Object.prototype.hasOwnProperty.call(args as object, 'readOnlyReason')
+          ? { readOnlyReason }
+          : {}),
+        ...(generationUpdatedAt !== undefined ? { generationUpdatedAt } : {}),
+      };
+      tabManager.updateTab(fileId, patch);
+
+      const dirtyChanged = typeof isDirty === 'boolean' && existingTab.isDirty !== isDirty;
+      const syncedTab = tabManager.getTab(fileId);
+      if (!syncedTab) {
+        return { synced: false };
+      }
+
+      if (tabManager.getActiveTabId() === fileId) {
+        await restoreEditorForTab(syncedTab);
+      }
+
+      if (dirtyChanged) {
+        eventBus.emit('tab:dirtyChanged', { fileId, isDirty });
+      }
+      eventBus.emit('tab:stateChanged', {
+        fileId,
+        isDirty: syncedTab.isDirty,
+        ...(syncedTab.isGenerating !== undefined ? { isGenerating: syncedTab.isGenerating } : {}),
+        ...(syncedTab.readOnlyReason ? { readOnlyReason: syncedTab.readOnlyReason } : {}),
+        ...(syncedTab.generationUpdatedAt !== undefined ? { generationUpdatedAt: syncedTab.generationUpdatedAt } : {}),
+      });
+      return { synced: true };
+    },
+  });
+
+  commands.register({
     id: 'tab.closeOthers',
     label: 'Close Other Tabs',
     recordHistory: false,
@@ -995,7 +1207,9 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
   );
   const eventBus = new EventBus<EditorEventMap>();
   const commands = new CommandManager(state, history, eventBus);
-  const fileStorage = options.fileStorage ?? new LocalFileStorageAdapter();
+  const fileStorage = options.vfs && options.projectId
+    ? createVFSFileStorageAdapter(options.vfs, options.projectId)
+    : options.fileStorage ?? new MemoryFileStorageAdapter();
 
   registerBuiltinCommands(state, history, commands, eventBus, fileStorage);
 

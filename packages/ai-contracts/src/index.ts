@@ -4,6 +4,74 @@ export interface ThinkingConfig {
   type: 'enabled' | 'disabled';
 }
 
+export type ChatRole = 'system' | 'user' | 'assistant';
+
+export interface ChatMessageInput {
+  role: ChatRole;
+  content: string;
+}
+
+export interface ChatRequest {
+  messages: ChatMessageInput[];
+  model: string;
+  maxTokens?: number;
+  thinking?: ThinkingConfig;
+  stream?: boolean;
+}
+
+export interface ChatResponse {
+  content: string;
+  tokensUsed?: {
+    input?: number;
+    output?: number;
+    total?: number;
+  };
+  durationMs?: number;
+}
+
+export type ProjectPlanPageAction = 'create' | 'modify' | 'skip';
+
+export interface ProjectPlanPage {
+  pageId: string;
+  pageName: string;
+  action: ProjectPlanPageAction;
+  description: string;
+  reason?: string;
+}
+
+export interface ProjectPlan {
+  projectName: string;
+  pages: ProjectPlanPage[];
+}
+
+export interface ReActStep {
+  stepIndex: number;
+  timestamp: string;
+  status?: string;
+  reasoningSummary?: string;
+  action: string;
+  actionInput: Record<string, unknown>;
+  observation?: string;
+  llmDurationMs?: number;
+  toolDurationMs?: number;
+  tokensInput?: number;
+  tokensOutput?: number;
+  nestedTraceFile?: string;
+  error?: string;
+}
+
+export interface LoopSessionState {
+  conversationId: string;
+  status: 'planning' | 'awaiting_confirmation' | 'executing' | 'done' | 'failed' | 'cancelled';
+  approvedPlan?: ProjectPlan;
+  createdFileIds: string[];
+  completedPageIds: string[];
+  failedPageIds: string[];
+  currentPageId?: string;
+  lastCompletedAction?: string;
+  updatedAt: string;
+}
+
 export type RunAttachmentKind = 'image' | 'document';
 
 export interface RunAttachmentInput {
@@ -19,6 +87,8 @@ export type AgentIntent =
   | 'schema.create'
   | 'schema.modify'
   | 'chat';
+
+export type AgentScope = 'single-page' | 'multi-page';
 
 export interface AgentOperationMetrics {
   durationMs?: number;
@@ -60,6 +130,24 @@ export interface RunRequest {
     schemaJson?: PageSchema;
     workspaceFileIds?: string[];
   };
+}
+
+export interface ClassifyRouteRequest {
+  prompt: string;
+  attachments?: RunAttachmentInput[];
+  plannerModel?: string;
+  thinking?: ThinkingConfig;
+  context: {
+    schemaSummary: string;
+  };
+}
+
+export interface ClassifyRouteResponse {
+  scope: AgentScope;
+  intent: AgentIntent;
+  confidence: number;
+  /** 提取附件文档内容后的完整 prompt，供 Agent Loop 的 user message 使用 */
+  preparedPrompt?: string;
 }
 
 export interface RunMetadata {
@@ -107,7 +195,7 @@ export interface ModifyResult {
 
 export type AgentEvent =
   | { type: 'run:start'; data: { sessionId: string; conversationId?: string } }
-  | { type: 'intent'; data: { intent: AgentIntent; confidence: number } }
+  | { type: 'intent'; data: { intent: AgentIntent; confidence: number; scope?: AgentScope } }
   | { type: 'message:start'; data: { role: 'assistant' } }
   | { type: 'message:delta'; data: { text: string } }
   | { type: 'tool:start'; data: { tool: string; label?: string } }

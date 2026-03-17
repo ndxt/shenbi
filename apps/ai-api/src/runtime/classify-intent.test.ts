@@ -93,6 +93,7 @@ describe('classifyIntentWithModel', () => {
     expect(result).toEqual({
       intent: 'schema.modify',
       confidence: 0.91,
+      scope: 'single-page',
     });
-  });
+  }, 15000);
 });

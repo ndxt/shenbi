@@ -2,6 +2,7 @@ import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import type {
   AgentEvent,
   AgentIntent,
+  AgentScope,
   AgentOperation,
   FinalizeRequest,
   FinalizeResult,
@@ -20,6 +21,7 @@ import type {
 export type {
   AgentEvent,
   AgentIntent,
+  AgentScope,
   AgentOperation,
   FinalizeRequest,
   FinalizeResult,
@@ -155,6 +157,7 @@ export interface ModifySchemaInput {
 export interface IntentClassification {
   intent: AgentIntent;
   confidence: number;
+  scope?: AgentScope;
 }
 
 export interface ClassifyIntentInput {

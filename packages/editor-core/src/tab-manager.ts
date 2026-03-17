@@ -9,6 +9,9 @@ export interface TabState {
   schema: PageSchema;
   selectedNodeId?: string | undefined;
   isDirty: boolean;
+  isGenerating?: boolean | undefined;
+  readOnlyReason?: string | undefined;
+  generationUpdatedAt?: number | undefined;
   historySnapshot?: unknown | undefined; // reserved for per-tab undo/redo
 }
 
