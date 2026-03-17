@@ -24,7 +24,9 @@
     "test:visual:update": "playwright test --update-snapshots",
     "test:visual:report": "playwright show-report",
     "test:visual:install": "playwright install chromium",
-    "dev:visual-preview": "pnpm --filter @shenbi/visual-preview dev"
+    "dev:visual-preview": "pnpm --filter @shenbi/visual-preview dev",
+    "reset:ai-api": "plink -batch -ssh -pw 1315.com root@192.168.128.71 \"systemctl restart shenbi-ai-api && for i in 1 2 3 4 5 6 7 8 9 10; do systemctl is-active --quiet shenbi-ai-api && curl -fsS http://127.0.0.1:3100/health 2>/dev/null && exit 0; sleep 1; done; systemctl status shenbi-ai-api --no-pager; journalctl -u shenbi-ai-api -n 50 --no-pager; exit 1\"",
+    "publish:preview": "pnpm --parallel --filter @shenbi/preview --filter @shenbi/ai-api run build && pscp -r -pw centit.1 ./apps/preview/dist/* front@192.168.128.71:/nfsdata/pvc-27cefccb-6a40-42a8-ac16-811e20e301af/shenbi && pscp -r -pw centit.1 ./apps/ai-api/dist/* front@192.168.128.71:/nfsdata/pvc-27cefccb-6a40-42a8-ac16-811e20e301af/shenbi-api && pnpm reset:ai-api"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

@@ -27,6 +27,7 @@ const PERSISTENCE_NAMESPACE = 'ai-chat';
 const AGENT_LOOP_PERSISTENCE_KEY = 'agent-loop-state';
 const MAX_LOOP_ITERATIONS = 30;
 const TOOL_IDLE_TIMEOUT_MS = 90_000;
+const AI_DEBUG_API_BASE = import.meta.env.PROD ? '/shenbi/api/ai/debug' : '/api/ai/debug';
 
 function summarizeSchema(schema: PageSchema): string {
   const bodyCount = Array.isArray(schema.body) ? schema.body.length : schema.body ? 1 : 0;
@@ -120,7 +121,7 @@ function createIdleTimeoutSignal(parentSignal?: AbortSignal, timeoutMs = TOOL_ID
 
 async function writeAgentLoopDebugDump(payload: Record<string, unknown>): Promise<string | undefined> {
   try {
-    const response = await fetch('/api/ai/debug/client-error', {
+    const response = await fetch(`${AI_DEBUG_API_BASE}/client-error`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -142,7 +143,7 @@ async function writeAgentLoopTraceDump(
   trace: Record<string, unknown>,
 ): Promise<string | undefined> {
   try {
-    const response = await fetch('/api/ai/debug/trace', {
+    const response = await fetch(`${AI_DEBUG_API_BASE}/trace`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

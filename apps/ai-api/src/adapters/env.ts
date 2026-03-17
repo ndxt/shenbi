@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export interface Env {
   PORT: number;
@@ -200,8 +199,9 @@ function resolveProviderConfig(
 }
 
 function loadLocalEnvFiles(): Record<string, string> {
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const rootDir = path.resolve(currentDir, '../../../../');
+  const cwdRoot = process.cwd();
+  const fallbackRoot = path.resolve(__dirname, '../../../../');
+  const rootDir = fs.existsSync(path.join(cwdRoot, 'package.json')) ? cwdRoot : fallbackRoot;
   return {
     ...parseEnvFile(path.join(rootDir, '.env')),
     ...parseEnvFile(path.join(rootDir, '.env.local')),

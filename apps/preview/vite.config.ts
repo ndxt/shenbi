@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/locode/shenbi/' : '/',
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
@@ -30,4 +31,4 @@ export default defineConfig({
       '@shenbi/editor-ui': path.resolve(__dirname, '../../packages/editor-ui/src/index.ts'),
     },
   },
-});
+}));

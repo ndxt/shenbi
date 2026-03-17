@@ -1,5 +1,7 @@
 import type { PageSchema } from '@shenbi/schema';
 
+const PREVIEW_API_BASE = import.meta.env.PROD ? '/shenbi/api' : '/api';
+
 export const userManagementSchema: PageSchema = {
   id: 'user-management',
   name: '用户管理',
@@ -99,7 +101,7 @@ export const userManagementSchema: PageSchema = {
     userList: {
       api: {
         method: 'GET',
-        url: '/api/users',
+        url: `${PREVIEW_API_BASE}/users`,
         params: {
           keyword: '{{state.keyword}}',
           status: '{{state.statusFilter}}',
@@ -113,21 +115,21 @@ export const userManagementSchema: PageSchema = {
     createUser: {
       api: {
         method: 'POST',
-        url: '/api/users',
+        url: `${PREVIEW_API_BASE}/users`,
         data: '{{state.currentRecord}}',
       },
     },
     updateUser: {
       api: {
         method: 'PUT',
-        url: '{{"/api/users/" + state.currentRecord.id}}',
+        url: `{{"${PREVIEW_API_BASE}/users/" + state.currentRecord.id}}`,
         data: '{{state.currentRecord}}',
       },
     },
     deleteUser: {
       api: {
         method: 'DELETE',
-        url: '{{"/api/users/" + state.currentRecord.id}}',
+        url: `{{"${PREVIEW_API_BASE}/users/" + state.currentRecord.id}}`,
       },
     },
   },
@@ -587,7 +589,7 @@ export const userManagementSchema: PageSchema = {
                           {
                             type: 'fetch',
                             method: 'PUT',
-                            url: '{{"/api/users/" + record.id}}',
+                            url: `{{"${PREVIEW_API_BASE}/users/" + record.id}}`,
                             data: '{{state.editingData}}',
                             onSuccess: [
                               { type: 'message', level: 'success', content: '行保存成功' },
@@ -636,7 +638,7 @@ export const userManagementSchema: PageSchema = {
                           {
                             type: 'fetch',
                             method: 'DELETE',
-                            url: '{{"/api/users/" + record.id}}',
+                            url: `{{"${PREVIEW_API_BASE}/users/" + record.id}}`,
                             onSuccess: [
                               { type: 'message', level: 'success', content: '删除成功' },
                               { type: 'callMethod', name: 'fetchUsers' },

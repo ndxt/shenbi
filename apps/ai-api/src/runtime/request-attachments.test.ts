@@ -6,6 +6,7 @@ const pdfDestroyMock = vi.hoisted(() => vi.fn());
 const wordExtractMock = vi.hoisted(() => vi.fn());
 
 vi.mock('mammoth', () => ({
+  extractRawText: extractRawTextMock,
   default: {
     extractRawText: extractRawTextMock,
   },

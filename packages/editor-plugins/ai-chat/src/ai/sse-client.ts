@@ -1,9 +1,10 @@
 import type { AIClient, AgentEvent, ChatRequest, ChatResponse, ClassifyRouteRequest, ClassifyRouteResponse, FinalizeRequest, FinalizeResult, RunRequest, RunStreamOptions } from './api-types';
 
-const DEFAULT_STREAM_ENDPOINT = '/api/ai/run/stream';
-const DEFAULT_FINALIZE_ENDPOINT = '/api/ai/run/finalize';
-const DEFAULT_CHAT_ENDPOINT = '/api/ai/chat';
-const DEFAULT_CLASSIFY_ROUTE_ENDPOINT = '/api/ai/classify-route';
+const AI_API_BASE = import.meta.env.PROD ? '/shenbi/api/ai' : '/api/ai';
+const DEFAULT_STREAM_ENDPOINT = `${AI_API_BASE}/run/stream`;
+const DEFAULT_FINALIZE_ENDPOINT = `${AI_API_BASE}/run/finalize`;
+const DEFAULT_CHAT_ENDPOINT = `${AI_API_BASE}/chat`;
+const DEFAULT_CLASSIFY_ROUTE_ENDPOINT = `${AI_API_BASE}/classify-route`;
 const TEXT_DECODER = new TextDecoder();
 
 function createRequestInit(request: RunRequest, signal?: AbortSignal): RequestInit {

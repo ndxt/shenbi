@@ -1,10 +1,7 @@
-import mammoth from 'mammoth';
-import { PDFParse } from 'pdf-parse';
 import type { AgentMemoryAttachment } from '@shenbi/ai-agents';
 import type { RunAttachmentInput, RunRequest } from '@shenbi/ai-contracts';
 import { ValidationError } from '../adapters/errors.ts';
 import type { OpenAICompatibleContentPart, OpenAICompatibleMessage } from '../adapters/openai-compatible.ts';
-import WordExtractor from 'word-extractor';
 
 const MAX_DOCUMENT_TEXT_CHARS = 12_000;
 const MAX_DOCUMENT_PREVIEW_CHARS = 600;
@@ -15,8 +12,6 @@ export const SUPPORTED_DOCUMENT_MIME_TYPES = new Set([
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
-
-const wordExtractor = new WordExtractor();
 
 type PreparedRunRequest = RunRequest & {
   _originalPrompt?: string;
@@ -57,6 +52,7 @@ async function extractDocumentText(attachment: RunAttachmentInput): Promise<stri
   }
 
   if (attachment.mimeType === 'application/pdf') {
+    const { PDFParse } = await import('pdf-parse');
     const parser = new PDFParse({ data: buffer });
     try {
       const result = await parser.getText();
@@ -67,11 +63,14 @@ async function extractDocumentText(attachment: RunAttachmentInput): Promise<stri
   }
 
   if (attachment.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    const mammoth = await import('mammoth');
     const result = await mammoth.extractRawText({ buffer });
     return normalizeWhitespace(result.value ?? '');
   }
 
   if (attachment.mimeType === 'application/msword') {
+    const { default: WordExtractor } = await import('word-extractor');
+    const wordExtractor = new WordExtractor();
     const document = await wordExtractor.extract(buffer);
     return normalizeWhitespace(document.getBody());
   }
