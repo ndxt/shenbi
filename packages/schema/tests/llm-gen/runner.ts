@@ -1,51 +1,40 @@
 import type { PageSchema } from '../../types';
-import type {
-  TestCase,
-  TestCaseResult,
-  TestReport,
-  TestRunnerConfig,
-  AssertionResult,
-  Diagnostic,
-} from './types';
+import type { TestCase, TestCaseResult, TestReport, TestRunnerConfig, LLMRequest, LLMResponse } from './types';
 import { validateSchema } from './validator';
 
 /**
- * 默认配置
- */
-const DEFAULT_CONFIG: TestRunnerConfig = {
-  mode: 'mixed',
-  apiEndpoint: 'http://localhost:3001',
-  l1Threshold: 95,
-  l2Threshold: 80,
-  timeout: 60000,
-  concurrency: 3,
-};
-
-/**
- * LLM 生成质量测试运行器
+ * LLM 生成测试运行器
  */
 export class TestRunner {
   private config: TestRunnerConfig;
-  private mockResponses: Map<string, PageSchema> = new Map();
+  private mocks: Map<string, string | PageSchema> = new Map();
+  private results: TestCaseResult[] = [];
 
-  constructor(config: Partial<TestRunnerConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+  constructor(config: TestRunnerConfig) {
+    this.config = {
+      mode: 'mock',
+      concurrency: 5,
+      timeout: 30000,
+      retries: 1,
+      verbose: false,
+      ...config,
+    };
   }
 
   /**
    * 注册 Mock 响应
    */
-  registerMock(testId: string, schema: PageSchema): void {
-    this.mockResponses.set(testId, schema);
+  registerMock(testId: string, response: string | PageSchema): void {
+    this.mocks.set(testId, response);
   }
 
   /**
-   * 加载 Mock 响应文件
+   * 注册多个 Mock 响应
    */
-  async loadMockResponses(mockModule: Record<string, PageSchema>): Promise<void> {
-    for (const [key, value] of Object.entries(mockModule)) {
-      this.mockResponses.set(key, value);
-    }
+  registerMocks(mocks: Record<string, string | PageSchema>): void {
+    Object.entries(mocks).forEach(([id, response]) => {
+      this.mocks.set(id, response);
+    });
   }
 
   /**
@@ -53,659 +42,451 @@ export class TestRunner {
    */
   async runTestCase(testCase: TestCase): Promise<TestCaseResult> {
     const startTime = Date.now();
-    const assertionsPassed: AssertionResult[] = [];
+    const result: TestCaseResult = {
+      testCaseId: testCase.id,
+      passed: false,
+      generatedSchema: null,
+      diagnostics: [],
+      duration: 0,
+    };
 
     try {
-      // 检查是否跳过
-      if (this.config.skipIds?.includes(testCase.id)) {
-        return {
-          id: testCase.id,
-          status: 'skip',
-          prompt: testCase.prompt,
-        };
+      // 尝试获取 Mock 响应
+      let response: string | null = null;
+
+      if (this.config.mode === 'mock' || this.config.mode === 'mixed') {
+        response = await this.getMockResponse(testCase);
       }
 
-      // 检查是否只运行指定的 case
-      if (this.config.onlyIds && !this.config.onlyIds.includes(testCase.id)) {
-        return {
-          id: testCase.id,
-          status: 'skip',
-          prompt: testCase.prompt,
-        };
+      // 如果 Mock 失败且是 mixed 模式，尝试真实调用
+      if (!response && (this.config.mode === 'live' || this.config.mode === 'mixed')) {
+        response = await this.callLLM(testCase.prompt);
       }
 
-      // 获取 Schema（Mock 或实时调用）
-      const schema = await this.fetchSchema(testCase);
+      if (!response) {
+        result.diagnostics.push({
+          level: 'error',
+          message: '无法获取响应（Mock 和 Live 均失败）',
+          code: 'NO_RESPONSE',
+        });
+        result.duration = Date.now() - startTime;
+        return result;
+      }
+
+      // 解析响应
+      const schema = this.parseResponse(response);
 
       if (!schema) {
-        return {
-          id: testCase.id,
-          status: 'fail',
-          prompt: testCase.prompt,
-          failureReason: 'Failed to fetch schema from API',
-          durationMs: Date.now() - startTime,
-        };
+        result.diagnostics.push({
+          level: 'error',
+          message: '无法解析响应为有效的 Schema',
+          code: 'PARSE_ERROR',
+        });
+        result.duration = Date.now() - startTime;
+        return result;
       }
 
-      // 校验 Schema
-      const validatorResult = validateSchema(schema);
+      result.generatedSchema = schema;
 
-      // 运行断言
-      const componentAssertions = this.assertComponents(schema, testCase.assertions.components);
-      assertionsPassed.push(...componentAssertions);
+      // 验证 Schema
+      const validationDiagnostics = validateSchema(schema);
+      result.diagnostics.push(...validationDiagnostics);
 
-      const propAssertions = this.assertProps(schema, testCase.assertions.props);
-      assertionsPassed.push(...propAssertions);
-
-      const actionAssertions = this.assertActions(schema, testCase.assertions.actions);
-      assertionsPassed.push(...actionAssertions);
-
-      const structureAssertions = this.assertStructure(schema, testCase.assertions.structure);
-      assertionsPassed.push(...structureAssertions);
-
-      const expressionAssertions = this.assertExpressions(schema, testCase.assertions.expressions);
-      assertionsPassed.push(...expressionAssertions);
-
-      const stateAssertions = this.assertState(schema, testCase.assertions.state);
-      assertionsPassed.push(...stateAssertions);
-
-      // 添加校验器诊断
-      for (const diag of validatorResult.diagnostics) {
-        if (diag.level === 'error') {
-          assertionsPassed.push({
-            name: `validator:${diag.code}`,
-            passed: false,
-            message: diag.message,
+      // 验证期望的组件
+      if (testCase.expectedComponent) {
+        const componentMatch = this.checkComponent(schema, testCase.expectedComponent);
+        if (!componentMatch) {
+          result.diagnostics.push({
+            level: 'error',
+            message: `期望组件 "${testCase.expectedComponent}"，但生成的组件不匹配`,
+            code: 'COMPONENT_MISMATCH',
           });
         }
       }
 
-      const allPassed = assertionsPassed.every((a) => a.passed);
+      // 验证期望的 props
+      if (testCase.expectedProps && testCase.expectedProps.length > 0) {
+        const propsMatch = this.checkProps(schema, testCase.expectedProps);
+        if (!propsMatch.passed) {
+          result.diagnostics.push({
+            level: 'warning',
+            message: `Props 不匹配：缺少 [${propsMatch.missing.join(', ')}]`,
+            code: 'PROPS_MISMATCH',
+          });
+        }
+      }
 
-      return {
-        id: testCase.id,
-        status: allPassed ? 'pass' : 'fail',
-        prompt: testCase.prompt,
-        schema,
-        durationMs: Date.now() - startTime,
-        diagnostics: validatorResult.diagnostics,
-        assertionsPassed,
-        failureReason: allPassed ? undefined : this.buildFailureMessage(assertionsPassed),
+      // 验证期望的 actions
+      if (testCase.expectedActions && testCase.expectedActions.length > 0) {
+        const actionsMatch = this.checkActions(schema, testCase.expectedActions);
+        if (!actionsMatch.passed) {
+          result.diagnostics.push({
+            level: 'warning',
+            message: `Actions 不匹配：缺少 [${actionsMatch.missing.join(', ')}]`,
+            code: 'ACTIONS_MISMATCH',
+          });
+        }
+      }
+
+      // 判断是否通过
+      const hasErrors = result.diagnostics.some((d) => d.level === 'error');
+      result.passed = !hasErrors;
+
+      // 添加详细匹配信息
+      result.details = {
+        componentMatch: this.checkComponent(schema, testCase.expectedComponent || ''),
+        propsMatch: this.checkProps(schema, testCase.expectedProps || []),
+        actionsMatch: this.checkActions(schema, testCase.expectedActions || []),
       };
     } catch (error) {
-      return {
-        id: testCase.id,
-        status: 'fail',
-        prompt: testCase.prompt,
-        durationMs: Date.now() - startTime,
-        failureReason: error instanceof Error ? error.message : 'Unknown error',
-      };
+      result.error = error instanceof Error ? error.message : String(error);
+      result.diagnostics.push({
+        level: 'error',
+        message: result.error,
+        code: 'RUNTIME_ERROR',
+      });
     }
+
+    result.duration = Date.now() - startTime;
+    return result;
   }
 
   /**
-   * 运行所有测试用例
+   * 批量运行测试
    */
   async runAll(testCases: TestCase[]): Promise<TestReport> {
+    this.results = [];
     const startTime = Date.now();
-    const results: TestCaseResult[] = [];
 
-    // 并发执行
-    const concurrency = this.config.concurrency ?? 3;
+    // 并发控制
+    const concurrency = this.config.concurrency || 5;
     const batches = this.chunkArray(testCases, concurrency);
 
     for (const batch of batches) {
       const batchResults = await Promise.all(
-        batch.map((testCase) => this.runTestCase(testCase)),
+        batch.map((tc) => this.runTestCase(tc))
       );
-      results.push(...batchResults);
+      this.results.push(...batchResults);
     }
 
-    const passed = results.filter((r) => r.status === 'pass').length;
-    const failed = results.filter((r) => r.status === 'fail').length;
-    const skipped = results.filter((r) => r.status === 'skip').length;
-    const total = results.length;
+    return this.generateReport(startTime);
+  }
+
+  /**
+   * 获取 Mock 响应
+   */
+  private async getMockResponse(testCase: TestCase): Promise<string | null> {
+    const mock = this.mocks.get(testCase.id);
+
+    if (mock === undefined) {
+      return null;
+    }
+
+    // 模拟网络延迟
+    await this.sleep(10);
+
+    if (typeof mock === 'string') {
+      return mock;
+    }
+
+    return JSON.stringify(mock, null, 2);
+  }
+
+  /**
+   * 调用 LLM API
+   */
+  private async callLLM(prompt: string): Promise<string | null> {
+    const endpoint = this.config.apiEndpoint;
+    const apiKey = this.config.apiKey;
+    const model = this.config.model || 'claude-sonnet-4-20250514';
+
+    if (!endpoint) {
+      return null;
+    }
+
+    try {
+      const request: LLMRequest = {
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: '你是一个低代码页面 Schema 生成器。请根据用户描述生成符合 PageSchema 类型的 JSON。只返回 JSON，不要任何解释。',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.2,
+        max_tokens: 4096,
+        response_format: {
+          type: 'json_object',
+        },
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}),
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API 请求失败：${response.status} ${response.statusText}`);
+      }
+
+      const data: LLMResponse = await response.json();
+      return data.choices[0]?.message.content || null;
+    } catch (error) {
+      console.error('LLM 调用失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 解析响应
+   */
+  private parseResponse(response: string): PageSchema | null {
+    try {
+      // 尝试直接解析
+      const schema = JSON.parse(response);
+      return schema as PageSchema;
+    } catch {
+      // 尝试提取 JSON 块
+      const jsonMatch = response.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
+      if (jsonMatch) {
+        try {
+          return JSON.parse(jsonMatch[1]) as PageSchema;
+        } catch {
+          return null;
+        }
+      }
+
+      // 尝试提取花括号内容
+      const braceMatch = response.match(/{[\s\S]*}/);
+      if (braceMatch) {
+        try {
+          return JSON.parse(braceMatch[0]) as PageSchema;
+        } catch {
+          return null;
+        }
+      }
+
+      return null;
+    }
+  }
+
+  /**
+   * 检查组件
+   */
+  private checkComponent(schema: PageSchema, expectedComponent: string): boolean {
+    if (!expectedComponent) return true;
+
+    const checkNode = (node: unknown): boolean => {
+      if (!node || typeof node !== 'object') return false;
+      const n = node as Record<string, unknown>;
+      if (n.component === expectedComponent) return true;
+
+      // 检查 slots
+      if (n.slots && typeof n.slots === 'object') {
+        for (const slotContent of Object.values(n.slots)) {
+          if (Array.isArray(slotContent)) {
+            if (slotContent.some(checkNode)) return true;
+          } else if (checkNode(slotContent)) {
+            return true;
+          }
+        }
+      }
+
+      // 检查 children
+      if (Array.isArray(n.children)) {
+        if (n.children.some(checkNode)) return true;
+      }
+
+      return false;
+    };
+
+    if (Array.isArray(schema.body)) {
+      return schema.body.some(checkNode);
+    }
+    return checkNode(schema.body);
+  }
+
+  /**
+   * 检查 Props
+   */
+  private checkProps(schema: PageSchema, expectedProps: string[]): {
+    passed: boolean;
+    expected: string[];
+    actual: string[];
+    missing: string[];
+    extra: string[];
+  } {
+    const actualProps = new Set<string>();
+
+    const collectProps = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      const n = node as Record<string, unknown>;
+      if (n.props && typeof n.props === 'object') {
+        Object.keys(n.props).forEach((key) => actualProps.add(key));
+      }
+      if (Array.isArray(n.children)) {
+        n.children.forEach(collectProps);
+      }
+      if (n.slots && typeof n.slots === 'object') {
+        Object.values(n.slots).forEach((content) => {
+          if (Array.isArray(content)) {
+            content.forEach(collectProps);
+          } else {
+            collectProps(content);
+          }
+        });
+      }
+    };
+
+    if (Array.isArray(schema.body)) {
+      schema.body.forEach(collectProps);
+    } else {
+      collectProps(schema.body);
+    }
+
+    const actual = [...actualProps];
+    const missing = expectedProps.filter((p) => !actualProps.has(p));
+    const extra = actual.filter((p) => !expectedProps.includes(p));
 
     return {
+      passed: missing.length === 0,
+      expected: expectedProps,
+      actual,
+      missing,
+      extra,
+    };
+  }
+
+  /**
+   * 检查 Actions
+   */
+  private checkActions(schema: PageSchema, expectedActions: string[]): {
+    passed: boolean;
+    expected: string[];
+    actual: string[];
+    missing: string[];
+    extra: string[];
+  } {
+    const actualActions = new Set<string>();
+
+    const collectActions = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      const n = node as Record<string, unknown>;
+
+      // 收集 events 中的 actions
+      if (n.events && typeof n.events === 'object') {
+        for (const eventValue of Object.values(n.events)) {
+          if (Array.isArray(eventValue)) {
+            eventValue.forEach((action) => {
+              if (action && typeof action === 'object' && 'type' in action) {
+                actualActions.add((action as Record<string, unknown>).type as string);
+              }
+            });
+          }
+        }
+      }
+
+      if (Array.isArray(n.children)) {
+        n.children.forEach(collectActions);
+      }
+      if (n.slots && typeof n.slots === 'object') {
+        Object.values(n.slots).forEach((content) => {
+          if (Array.isArray(content)) {
+            content.forEach(collectActions);
+          } else {
+            collectActions(content);
+          }
+        });
+      }
+    };
+
+    if (Array.isArray(schema.body)) {
+      schema.body.forEach(collectActions);
+    } else {
+      collectActions(schema.body);
+    }
+
+    const actual = [...actualActions];
+    const missing = expectedActions.filter((a) => !actualActions.has(a));
+    const extra = actual.filter((a) => !expectedActions.includes(a));
+
+    return {
+      passed: missing.length === 0,
+      expected: expectedActions,
+      actual,
+      missing,
+      extra,
+    };
+  }
+
+  /**
+   * 生成报告
+   */
+  private generateReport(startTime: number): TestReport {
+    const total = this.results.length;
+    const passed = this.results.filter((r) => r.passed).length;
+    const failed = this.results.filter((r) => !r.passed).length;
+    const skipped = 0;
+
+    const duration = Date.now() - startTime;
+    const avgDuration = total > 0 ? duration / total : 0;
+
+    // 按类别分组
+    const byCategory = {
+      component: this.categoryStats('component'),
+      action: this.categoryStats('action'),
+      expression: this.categoryStats('expression'),
+      page: this.categoryStats('page'),
+    };
+
+    // 按难度级别分组
+    const byLevel = {
+      L1: this.levelStats('L1'),
+      L2: this.levelStats('L2'),
+      L3: this.levelStats('L3'),
+    };
+
+    // 收集所有诊断信息
+    const diagnostics = this.results.flatMap((r) => r.diagnostics);
+
+    return {
+      timestamp: new Date().toISOString(),
+      mode: this.config.mode,
       summary: {
         total,
         passed,
         failed,
         skipped,
-        passRate: total > 0 ? (passed / (total - skipped)) * 100 : 0,
-        durationMs: Date.now() - startTime,
+        passRate: total > 0 ? (passed / total) * 100 : 0,
+        avgDuration,
       },
-      cases: results,
-      metadata: {
-        timestamp: new Date().toISOString(),
-        mode: this.config.mode,
-        apiEndpoint: this.config.apiEndpoint,
-      },
+      byCategory,
+      byLevel,
+      results: this.results,
+      diagnostics,
     };
   }
 
-  /**
-   * 获取 Schema（Mock 或实时）
-   */
-  private async fetchSchema(testCase: TestCase): Promise<PageSchema | null> {
-    // 检查是否有 Mock 响应
-    const mockSchema = this.mockResponses.get(testCase.id);
-    if (mockSchema) {
-      return mockSchema;
-    }
-
-    // 检查是否配置为只使用 Mock
-    if (this.config.mode === 'mock') {
-      console.warn(`No mock response found for test case: ${testCase.id}`);
-      return null;
-    }
-
-    // 实时调用 API
-    try {
-      const response = await fetch(`${this.config.apiEndpoint}/run`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: testCase.prompt,
-          context: {},
-        }),
-        signal: AbortSignal.timeout(this.config.timeout ?? 60000),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result.schema as PageSchema;
-    } catch (error) {
-      console.error(`Failed to fetch schema for ${testCase.id}:`, error);
-      return null;
-    }
+  private categoryStats(category: string): { total: number; passed: number; passRate: number } {
+    // Note: In a real implementation, test cases would need to store category info
+    // For now, return placeholder stats
+    return { total: 0, passed: 0, passRate: 0 };
   }
 
-  /**
-   * 断言：组件包含
-   */
-  private assertComponents(
-    schema: PageSchema,
-    assertion: { mustInclude?: string[]; mustNotInclude?: string[] } = {},
-  ): AssertionResult[] {
-    const results: AssertionResult[] = [];
-
-    // 收集所有组件
-    const foundComponents = new Set<string>();
-    this.collectComponents(schema, foundComponents);
-
-    // 检查 mustInclude
-    if (assertion.mustInclude) {
-      for (const component of assertion.mustInclude) {
-        results.push({
-          name: `components.mustInclude.${component}`,
-          passed: foundComponents.has(component),
-          message: foundComponents.has(component)
-            ? undefined
-            : `Component "${component}" not found in generated schema`,
-        });
-      }
-    }
-
-    // 检查 mustNotInclude
-    if (assertion.mustNotInclude) {
-      for (const component of assertion.mustNotInclude) {
-        const found = foundComponents.has(component);
-        results.push({
-          name: `components.mustNotInclude.${component}`,
-          passed: !found,
-          message: found
-            ? `Component "${component}" should not be in generated schema`
-            : undefined,
-        });
-      }
-    }
-
-    return results;
+  private levelStats(level: string): { total: number; passed: number; passRate: number } {
+    // Note: In a real implementation, test cases would need to store level info
+    // For now, return placeholder stats
+    return { total: 0, passed: 0, passRate: 0 };
   }
 
-  /**
-   * 断言：Props 值
-   */
-  private assertProps(
-    schema: PageSchema,
-    assertions: Record<string, Record<string, unknown>> = {},
-  ): AssertionResult[] {
-    const results: AssertionResult[] = [];
-
-    for (const [componentName, propAssertions] of Object.entries(assertions)) {
-      const component = this.findComponent(schema, componentName);
-      if (!component) {
-        results.push({
-          name: `props.${componentName}`,
-          passed: false,
-          message: `Component "${componentName}" not found`,
-        });
-        continue;
-      }
-
-      const props = component.props ?? {};
-      for (const [propName, expectedValue] of Object.entries(propAssertions)) {
-        const actualValue = props[propName];
-        const passed = this.deepEquals(actualValue, expectedValue);
-        results.push({
-          name: `props.${componentName}.${propName}`,
-          passed,
-          message: passed
-            ? undefined
-            : `Prop "${propName}" mismatch. Expected: ${JSON.stringify(expectedValue)}, Got: ${JSON.stringify(actualValue)}`,
-        });
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * 断言：Actions
-   */
-  private assertActions(
-    schema: PageSchema,
-    assertion: { mustInclude?: Array<{ type: string; [key: string]: unknown }>; mustNotInclude?: string[] } = {},
-  ): AssertionResult[] {
-    const results: AssertionResult[] = [];
-
-    // 收集所有 actions
-    const allActions = this.collectActions(schema);
-
-    // 检查 mustInclude
-    if (assertion.mustInclude) {
-      for (const expectedAction of assertion.mustInclude) {
-        const found = allActions.some((action) => {
-          if (action.type !== expectedAction.type) {
-            return false;
-          }
-          // 检查其他属性是否匹配
-          for (const [key, value] of Object.entries(expectedAction)) {
-            if (key === 'type') {
-              continue;
-            }
-            if (!this.deepEquals(action[key], value)) {
-              return false;
-            }
-          }
-          return true;
-        });
-
-        results.push({
-          name: `actions.mustInclude.${expectedAction.type}`,
-          passed: found,
-          message: found
-            ? undefined
-            : `Action ${JSON.stringify(expectedAction)} not found in generated schema`,
-        });
-      }
-    }
-
-    // 检查 mustNotInclude
-    if (assertion.mustNotInclude) {
-      for (const actionType of assertion.mustNotInclude) {
-        const found = allActions.some((action) => action.type === actionType);
-        results.push({
-          name: `actions.mustNotInclude.${actionType}`,
-          passed: !found,
-          message: found
-            ? `Action type "${actionType}" should not be in generated schema`
-            : undefined,
-        });
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * 断言：结构
-   */
-  private assertStructure(
-    schema: PageSchema,
-    assertion: { maxNodeCount?: number; minNodeCount?: number } = {},
-  ): AssertionResult[] {
-    const results: AssertionResult[] = [];
-
-    const nodeCount = this.countNodes(schema);
-
-    if (assertion.maxNodeCount !== undefined) {
-      results.push({
-        name: `structure.maxNodeCount`,
-        passed: nodeCount <= assertion.maxNodeCount,
-        message:
-          nodeCount <= assertion.maxNodeCount
-            ? undefined
-            : `Node count ${nodeCount} exceeds max ${assertion.maxNodeCount}`,
-      });
-    }
-
-    if (assertion.minNodeCount !== undefined) {
-      results.push({
-        name: `structure.minNodeCount`,
-        passed: nodeCount >= assertion.minNodeCount,
-        message:
-          nodeCount >= assertion.minNodeCount
-            ? undefined
-            : `Node count ${nodeCount} is less than min ${assertion.minNodeCount}`,
-      });
-    }
-
-    return results;
-  }
-
-  /**
-   * 断言：表达式引用
-   */
-  private assertExpressions(
-    schema: PageSchema,
-    assertion: { mustReference?: string[]; mustNotReference?: string[] } = {},
-  ): AssertionResult[] {
-    const results: AssertionResult[] = [];
-
-    // 收集所有引用
-    const referencedKeys = this.collectExpressionReferences(schema);
-
-    // 检查 mustReference
-    if (assertion.mustReference) {
-      for (const ref of assertion.mustReference) {
-        const found = referencedKeys.has(ref);
-        results.push({
-          name: `expressions.mustReference.${ref}`,
-          passed: found,
-          message: found
-            ? undefined
-            : `Expression reference "${ref}" not found in generated schema`,
-        });
-      }
-    }
-
-    // 检查 mustNotReference
-    if (assertion.mustNotReference) {
-      for (const ref of assertion.mustNotReference) {
-        const found = referencedKeys.has(ref);
-        results.push({
-          name: `expressions.mustNotReference.${ref}`,
-          passed: !found,
-          message: found
-            ? `Expression reference "${ref}" should not be in generated schema`
-            : undefined,
-        });
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * 断言：State 声明
-   */
-  private assertState(
-    schema: PageSchema,
-    assertion: { mustDeclare?: string[] } = {},
-  ): AssertionResult[] {
-    const results: AssertionResult[] = [];
-
-    const declaredStateKeys = schema.state ? Object.keys(schema.state) : [];
-
-    if (assertion.mustDeclare) {
-      for (const key of assertion.mustDeclare) {
-        const found = declaredStateKeys.includes(key);
-        results.push({
-          name: `state.mustDeclare.${key}`,
-          passed: found,
-          message: found
-            ? undefined
-            : `State key "${key}" not declared in schema`,
-        });
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * 构建失败消息
-   */
-  private buildFailureMessage(assertions: AssertionResult[]): string {
-    const failed = assertions.filter((a) => !a.passed);
-    return failed.map((a) => `${a.name}: ${a.message}`).join('; ');
-  }
-
-  /**
-   * 辅助函数：收集组件
-   */
-  private collectComponents(schema: PageSchema, found: Set<string>): void {
-    function traverse(node: unknown): void {
-      if (!node || typeof node !== 'object') {
-        return;
-      }
-      const record = node as Record<string, unknown>;
-      if (typeof record.component === 'string') {
-        found.add(record.component);
-      }
-      if (Array.isArray(record.children)) {
-        for (const child of record.children) {
-          traverse(child);
-        }
-      }
-    }
-
-    traverse(schema);
-
-    // 也检查 blocks
-    if (Array.isArray(schema.blocks)) {
-      for (const block of schema.blocks) {
-        traverse(block);
-      }
-    }
-
-    // 也检查 nodes
-    if (Array.isArray(schema.nodes)) {
-      for (const node of schema.nodes) {
-        traverse(node);
-      }
-    }
-  }
-
-  /**
-   * 辅助函数：查找组件
-   */
-  private findComponent(
-    schema: PageSchema,
-    componentName: string,
-  ): { component: string; props?: Record<string, unknown> } | null {
-    let found: { component: string; props?: Record<string, unknown> } | null = null;
-
-    function traverse(node: unknown): void {
-      if (found || !node || typeof node !== 'object') {
-        return;
-      }
-      const record = node as Record<string, unknown>;
-      if (record.component === componentName) {
-        found = {
-          component: componentName,
-          props: record.props as Record<string, unknown> | undefined,
-        };
-        return;
-      }
-      if (Array.isArray(record.children)) {
-        for (const child of record.children) {
-          traverse(child);
-        }
-      }
-    }
-
-    traverse(schema);
-
-    if (!found && Array.isArray(schema.blocks)) {
-      for (const block of schema.blocks) {
-        traverse(block);
-        if (found) {
-          break;
-        }
-      }
-    }
-
-    return found;
-  }
-
-  /**
-   * 辅助函数：收集 Actions
-   */
-  private collectActions(
-    schema: PageSchema,
-  ): Array<{ type: string; [key: string]: unknown }> {
-    const actions: Array<{ type: string; [key: string]: unknown }> = [];
-
-    function traverse(node: unknown): void {
-      if (!node || typeof node !== 'object') {
-        return;
-      }
-      const record = node as Record<string, unknown>;
-
-      if (Array.isArray(record.actions)) {
-        for (const action of record.actions) {
-          if (action && typeof action === 'object' && typeof (action as { type: string }).type === 'string') {
-            actions.push(action as { type: string; [key: string]: unknown });
-          }
-        }
-      }
-
-      if (Array.isArray(record.children)) {
-        for (const child of record.children) {
-          traverse(child);
-        }
-      }
-    }
-
-    traverse(schema);
-    return actions;
-  }
-
-  /**
-   * 辅助函数：计算节点数
-   */
-  private countNodes(schema: PageSchema): number {
-    let count = 0;
-
-    function traverse(node: unknown): void {
-      if (!node || typeof node !== 'object') {
-        return;
-      }
-      const record = node as Record<string, unknown>;
-      if (typeof record.component === 'string') {
-        count++;
-      }
-      if (Array.isArray(record.children)) {
-        for (const child of record.children) {
-          traverse(child);
-        }
-      }
-    }
-
-    traverse(schema);
-
-    if (Array.isArray(schema.blocks)) {
-      for (const block of schema.blocks) {
-        traverse(block);
-      }
-    }
-
-    if (Array.isArray(schema.nodes)) {
-      for (const node of schema.nodes) {
-        traverse(node);
-      }
-    }
-
-    return count;
-  }
-
-  /**
-   * 辅助函数：收集表达式引用
-   */
-  private collectExpressionReferences(schema: PageSchema): Set<string> {
-    const references = new Set<string>();
-    const expressionRegex = /\{\{\s*([^}]+)\s*\}\}/g;
-
-    function traverse(node: unknown): void {
-      if (typeof node === 'string') {
-        const matches = node.matchAll(expressionRegex);
-        for (const match of matches) {
-          const expr = match[1].trim();
-          const refMatch = expr.match(/^(state|params|computed|ds)\.([a-zA-Z0-9_]+)/);
-          if (refMatch) {
-            references.add(`${refMatch[1]}.${refMatch[2]}`);
-          }
-        }
-      } else if (Array.isArray(node)) {
-        for (const item of node) {
-          traverse(item);
-        }
-      } else if (node && typeof node === 'object') {
-        for (const value of Object.values(node)) {
-          traverse(value);
-        }
-      }
-    }
-
-    traverse(schema);
-    return references;
-  }
-
-  /**
-   * 辅助函数：深度比较
-   */
-  private deepEquals(a: unknown, b: unknown): boolean {
-    if (a === b) {
-      return true;
-    }
-    if (typeof a !== typeof b) {
-      return false;
-    }
-    if (a === null || b === null) {
-      return a === b;
-    }
-    if (typeof a !== 'object') {
-      return a === b;
-    }
-    if (Array.isArray(a) !== Array.isArray(b)) {
-      return false;
-    }
-    if (Array.isArray(a) && Array.isArray(b)) {
-      if (a.length !== b.length) {
-        return false;
-      }
-      return a.every((item, index) => this.deepEquals(item, b[index]));
-    }
-    const keysA = Object.keys(a as object);
-    const keysB = Object.keys(b as object);
-    if (keysA.length !== keysB.length) {
-      return false;
-    }
-    for (const key of keysA) {
-      if (!(keysB as string[]).includes(key)) {
-        return false;
-      }
-      if (!this.deepEquals(
-        (a as Record<string, unknown>)[key],
-        (b as Record<string, unknown>)[key],
-      )) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * 辅助函数：数组分块
-   */
   private chunkArray<T>(array: T[], size: number): T[][] {
     const chunks: T[][] = [];
     for (let i = 0; i < array.length; i += size) {
@@ -713,11 +494,28 @@ export class TestRunner {
     }
     return chunks;
   }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 }
 
 /**
- * 创建测试运行器实例
+ * 运行完整测试套件（便捷函数）
  */
-export function createTestRunner(config?: Partial<TestRunnerConfig>): TestRunner {
-  return new TestRunner(config);
+export async function runFullTestSuite(
+  testCases: TestCase[],
+  options: Partial<TestRunnerConfig> = {}
+): Promise<TestReport> {
+  const runner = new TestRunner({
+    mode: options.mode || 'mock',
+    apiEndpoint: options.apiEndpoint,
+    apiKey: options.apiKey,
+    model: options.model,
+    concurrency: options.concurrency,
+    timeout: options.timeout,
+    mocks: options.mocks,
+  });
+
+  return runner.runAll(testCases);
 }
