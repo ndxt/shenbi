@@ -9,6 +9,17 @@ import { createMockResolver } from '../__mocks__/resolver';
 import { mockPageSchema } from '../__mocks__/page-schema';
 import { expr } from '../test-utils';
 
+function createOverlayStub(name: string) {
+  return function OverlayStub(props: Record<string, any>) {
+    if (!props.open) {
+      return null;
+    }
+
+    const { children, open, onCancel, onClose, getContainer, ...rest } = props;
+    return createElement('div', { ...rest, 'data-overlay-stub': name }, children);
+  };
+}
+
 function makeSimpleBody(text: string): CompiledNode {
   return {
     Component: 'div',
@@ -33,7 +44,11 @@ function renderPage(
   const resolver = createMockResolver();
   const MockContainer = (props: Record<string, any>) =>
     createElement('div', props, props.children);
+  const MockModal = createOverlayStub('Modal');
+  const MockDrawer = createOverlayStub('Drawer');
   resolver.register('Container', MockContainer as any);
+  resolver.register('Modal', MockModal as any);
+  resolver.register('Drawer', MockDrawer as any);
   const pageProps = {
     schema: overrides.schema ?? mockPageSchema,
     resolver,
@@ -70,7 +85,6 @@ describe('ShenbiPage', () => {
   it('dialog 未打开时不渲染', () => {
     const dialog: CompiledNode = {
       id: 'dlg1',
-      Component: 'div',
       componentType: 'Modal',
       staticProps: {},
       dynamicProps: {},
@@ -89,7 +103,6 @@ describe('ShenbiPage', () => {
   it('dialog 打开时渲染弹窗内容', () => {
     const dialog: CompiledNode = {
       id: 'dlg1',
-      Component: 'div',
       componentType: 'Modal',
       staticProps: {},
       dynamicProps: {},
@@ -108,7 +121,6 @@ describe('ShenbiPage', () => {
   it('Drawer 显隐由 __drawer_{id} 控制', () => {
     const drawer: CompiledNode = {
       id: 'drawer1',
-      Component: 'div',
       componentType: 'Drawer',
       staticProps: {},
       dynamicProps: {},
@@ -150,7 +162,6 @@ describe('ShenbiPage', () => {
   it('dialog 可拿到 payload 上下文', () => {
     const dialog: CompiledNode = {
       id: 'dlg_payload',
-      Component: 'div',
       componentType: 'Modal',
       staticProps: {},
       dynamicProps: {},

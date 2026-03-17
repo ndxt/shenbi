@@ -12,8 +12,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "perf": "vitest run --config vitest.perf.config.ts"
+    "test": "node ./node_modules/vitest/vitest.mjs run --passWithNoTests",
+    "perf": "node ./node_modules/vitest/vitest.mjs run --config vitest.perf.config.ts"
   },
   "dependencies": {
     "@shenbi/schema": "workspace:*"
@@ -33,6 +33,6 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.0"
   }
 }

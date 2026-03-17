@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "node ./node_modules/vitest/vitest.mjs run --passWithNoTests"
   },
   "dependencies": {
     "@shenbi/ai-contracts": "workspace:*",
@@ -19,6 +19,6 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.0"
   }
 }

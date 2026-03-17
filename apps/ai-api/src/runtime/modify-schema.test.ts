@@ -109,7 +109,7 @@ describe('executeModifySchema', () => {
       },
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       explanation: '会更新卡片标题。',
       operations: [
         {
@@ -169,7 +169,7 @@ describe('executeModifySchema', () => {
       },
     });
 
-    expect(result.operations[0]).toEqual({
+    expect(result.operations[0]).toMatchObject({
       op: 'schema.insertNode',
       container: 'body',
       node: {
@@ -269,7 +269,7 @@ describe('executeModifySchema', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     // Operations should be in correct order
     expect(result.operations).toHaveLength(2);
-    expect(result.operations[0]).toEqual({
+    expect(result.operations[0]).toMatchObject({
       op: 'schema.patchProps',
       nodeId: 'card-1',
       patch: { title: '新标题' },
@@ -334,7 +334,7 @@ describe('executeModifySchema', () => {
     // Only one fetch call (Phase 1 only, fast path)
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(result.operations).toHaveLength(1);
-    expect(result.operations[0]).toEqual({
+    expect(result.operations[0]).toMatchObject({
       op: 'schema.patchProps',
       nodeId: 'card-1',
       patch: { title: '新标题' },

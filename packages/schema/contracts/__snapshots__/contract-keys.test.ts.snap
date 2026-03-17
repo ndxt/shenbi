@@ -1,0 +1,2403 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`contract-keys snapshot > Affix keys snapshot 1`] = `
+{
+  "category": "other",
+  "childrenType": "node",
+  "componentType": "Affix",
+  "eventKeys": [
+    "onVisibleChange",
+  ],
+  "propKeys": [
+    "offsetBottom",
+    "offsetTop",
+    "onChange",
+    "target",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Alert keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "none",
+  "componentType": "Alert",
+  "eventKeys": [
+    "afterClose",
+    "onClose",
+  ],
+  "propKeys": [
+    "action",
+    "banner",
+    "closable",
+    "closeIcon",
+    "closeText",
+    "description",
+    "icon",
+    "message",
+    "showIcon",
+    "type",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Anchor keys snapshot 1`] = `
+{
+  "category": "navigation",
+  "childrenType": "none",
+  "componentType": "Anchor",
+  "eventKeys": [
+    "onChange",
+    "onClick",
+  ],
+  "propKeys": [
+    "affix",
+    "bounds",
+    "direction",
+    "items",
+    "offsetTop",
+    "replace",
+    "showInkInFixed",
+    "targetOffset",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > App keys snapshot 1`] = `
+{
+  "category": "other",
+  "childrenType": "nodes",
+  "componentType": "App",
+  "eventKeys": [],
+  "propKeys": [
+    "component",
+    "direction",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > AutoComplete keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "AutoComplete",
+  "eventKeys": [
+    "onBlur",
+    "onChange",
+    "onFocus",
+    "onOpenChange",
+    "onSearch",
+    "onSelect",
+  ],
+  "propKeys": [
+    "allowClear",
+    "autoFocus",
+    "backfill",
+    "defaultActiveFirstOption",
+    "defaultValue",
+    "disabled",
+    "filterOption",
+    "open",
+    "options",
+    "placeholder",
+    "status",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Avatar keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "text",
+  "componentType": "Avatar",
+  "eventKeys": [
+    "onError",
+  ],
+  "propKeys": [
+    "alt",
+    "crossOrigin",
+    "draggable",
+    "gap",
+    "icon",
+    "shape",
+    "size",
+    "src",
+    "srcSet",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Avatar.Group keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "nodes",
+  "componentType": "Avatar.Group",
+  "eventKeys": [],
+  "propKeys": [
+    "maxCount",
+    "maxPopoverPlacement",
+    "maxPopoverTrigger",
+    "maxStyle",
+    "size",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > BackTop keys snapshot 1`] = `
+{
+  "category": "other",
+  "childrenType": "node",
+  "componentType": "BackTop",
+  "eventKeys": [
+    "onClick",
+  ],
+  "propKeys": [
+    "duration",
+    "target",
+    "visibilityHeight",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Badge keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "node",
+  "componentType": "Badge",
+  "eventKeys": [],
+  "propKeys": [
+    "color",
+    "count",
+    "dot",
+    "offset",
+    "overflowCount",
+    "showZero",
+    "size",
+    "status",
+    "styles",
+    "text",
+    "title",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Badge.Ribbon keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "node",
+  "componentType": "Badge.Ribbon",
+  "eventKeys": [],
+  "propKeys": [
+    "color",
+    "placement",
+    "text",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Breadcrumb keys snapshot 1`] = `
+{
+  "category": "navigation",
+  "childrenType": "none",
+  "componentType": "Breadcrumb",
+  "eventKeys": [],
+  "propKeys": [
+    "itemRender",
+    "items",
+    "params",
+    "separator",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Button keys snapshot 1`] = `
+{
+  "category": "general",
+  "childrenType": "mixed",
+  "componentType": "Button",
+  "eventKeys": [
+    "onClick",
+  ],
+  "propKeys": [
+    "block",
+    "danger",
+    "disabled",
+    "htmlType",
+    "icon",
+    "loading",
+    "shape",
+    "size",
+    "style",
+    "type",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Calendar keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "none",
+  "componentType": "Calendar",
+  "eventKeys": [
+    "onPanelChange",
+    "onSelect",
+  ],
+  "propKeys": [
+    "cellRender",
+    "dateFullCellRender",
+    "defaultValue",
+    "disabledDate",
+    "fullscreen",
+    "headerRender",
+    "mode",
+    "validRange",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Card keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "mixed",
+  "componentType": "Card",
+  "eventKeys": [],
+  "propKeys": [
+    "bordered",
+    "extra",
+    "hoverable",
+    "size",
+    "title",
+  ],
+  "slotKeys": [
+    "extra",
+    "title",
+  ],
+}
+`;
+
+exports[`contract-keys snapshot > Carousel keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "nodes",
+  "componentType": "Carousel",
+  "eventKeys": [
+    "afterChange",
+    "beforeChange",
+  ],
+  "propKeys": [
+    "autoplay",
+    "autoplaySpeed",
+    "dotPosition",
+    "dots",
+    "easing",
+    "effect",
+    "infinite",
+    "waitForAnimate",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Cascader keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "Cascader",
+  "eventKeys": [
+    "onChange",
+    "onOpenChange",
+    "onSearch",
+  ],
+  "propKeys": [
+    "allowClear",
+    "autoFocus",
+    "changeOnSelect",
+    "defaultValue",
+    "disabled",
+    "expandTrigger",
+    "fieldNames",
+    "loadData",
+    "maxTagCount",
+    "multiple",
+    "open",
+    "options",
+    "placeholder",
+    "showSearch",
+    "size",
+    "status",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Chart.Area keys snapshot 1`] = `
+{
+  "category": "chart",
+  "childrenType": "none",
+  "componentType": "Chart.Area",
+  "eventKeys": [
+    "onReady",
+  ],
+  "propKeys": [
+    "autoFit",
+    "axis",
+    "colorField",
+    "data",
+    "height",
+    "label",
+    "legend",
+    "slider",
+    "stack",
+    "style",
+    "theme",
+    "title",
+    "tooltip",
+    "xField",
+    "yField",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Chart.Bar keys snapshot 1`] = `
+{
+  "category": "chart",
+  "childrenType": "none",
+  "componentType": "Chart.Bar",
+  "eventKeys": [
+    "onReady",
+  ],
+  "propKeys": [
+    "autoFit",
+    "colorField",
+    "data",
+    "group",
+    "height",
+    "label",
+    "legend",
+    "stack",
+    "style",
+    "theme",
+    "title",
+    "tooltip",
+    "xField",
+    "yField",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Chart.Column keys snapshot 1`] = `
+{
+  "category": "chart",
+  "childrenType": "none",
+  "componentType": "Chart.Column",
+  "eventKeys": [
+    "onReady",
+  ],
+  "propKeys": [
+    "autoFit",
+    "axis",
+    "colorField",
+    "data",
+    "group",
+    "height",
+    "label",
+    "legend",
+    "stack",
+    "style",
+    "theme",
+    "title",
+    "tooltip",
+    "xField",
+    "yField",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Chart.Gauge keys snapshot 1`] = `
+{
+  "category": "chart",
+  "childrenType": "none",
+  "componentType": "Chart.Gauge",
+  "eventKeys": [
+    "onReady",
+  ],
+  "propKeys": [
+    "autoFit",
+    "data",
+    "height",
+    "label",
+    "legend",
+    "style",
+    "theme",
+    "title",
+    "tooltip",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Chart.Line keys snapshot 1`] = `
+{
+  "category": "chart",
+  "childrenType": "none",
+  "componentType": "Chart.Line",
+  "eventKeys": [
+    "onReady",
+  ],
+  "propKeys": [
+    "autoFit",
+    "axis",
+    "colorField",
+    "data",
+    "height",
+    "label",
+    "legend",
+    "scrollbar",
+    "slider",
+    "style",
+    "theme",
+    "title",
+    "tooltip",
+    "xField",
+    "yField",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Chart.Pie keys snapshot 1`] = `
+{
+  "category": "chart",
+  "childrenType": "none",
+  "componentType": "Chart.Pie",
+  "eventKeys": [
+    "onReady",
+  ],
+  "propKeys": [
+    "angleField",
+    "autoFit",
+    "colorField",
+    "data",
+    "height",
+    "innerRadius",
+    "label",
+    "legend",
+    "style",
+    "theme",
+    "title",
+    "tooltip",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Checkbox keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "text",
+  "componentType": "Checkbox",
+  "eventKeys": [
+    "onChange",
+  ],
+  "propKeys": [
+    "checked",
+    "defaultChecked",
+    "disabled",
+    "indeterminate",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Checkbox.Group keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "Checkbox.Group",
+  "eventKeys": [
+    "onChange",
+  ],
+  "propKeys": [
+    "defaultValue",
+    "disabled",
+    "name",
+    "options",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Col keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Col",
+  "eventKeys": [],
+  "propKeys": [
+    "flex",
+    "lg",
+    "md",
+    "offset",
+    "order",
+    "pull",
+    "push",
+    "sm",
+    "span",
+    "xl",
+    "xs",
+    "xxl",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Collapse keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "nodes",
+  "componentType": "Collapse",
+  "eventKeys": [
+    "onChange",
+  ],
+  "propKeys": [
+    "accordion",
+    "activeKey",
+    "bordered",
+    "collapsible",
+    "defaultActiveKey",
+    "destroyInactivePanel",
+    "expandIconPosition",
+    "ghost",
+    "size",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Collapse.Panel keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "nodes",
+  "componentType": "Collapse.Panel",
+  "eventKeys": [],
+  "propKeys": [
+    "collapsible",
+    "extra",
+    "forceRender",
+    "header",
+    "key",
+    "showArrow",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > ColorPicker keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "node",
+  "componentType": "ColorPicker",
+  "eventKeys": [
+    "onChange",
+    "onClear",
+    "onOpenChange",
+  ],
+  "propKeys": [
+    "allowClear",
+    "defaultValue",
+    "disabled",
+    "disabledAlpha",
+    "format",
+    "open",
+    "presets",
+    "showText",
+    "size",
+    "trigger",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > ConfigProvider keys snapshot 1`] = `
+{
+  "category": "other",
+  "childrenType": "nodes",
+  "componentType": "ConfigProvider",
+  "eventKeys": [],
+  "propKeys": [
+    "autoInsertSpaceInButton",
+    "button",
+    "componentDisabled",
+    "componentSize",
+    "csp",
+    "direction",
+    "form",
+    "getPopupContainer",
+    "getTargetContainer",
+    "input",
+    "locale",
+    "pagination",
+    "popupMatchSelectWidth",
+    "popupOverflow",
+    "prefixCls",
+    "renderEmpty",
+    "select",
+    "space",
+    "table",
+    "theme",
+    "virtual",
+    "warning",
+    "wave",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Container keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "mixed",
+  "componentType": "Container",
+  "eventKeys": [],
+  "propKeys": [
+    "direction",
+    "gap",
+    "style",
+    "wrap",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > DatePicker keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "DatePicker",
+  "eventKeys": [
+    "onChange",
+    "onOpenChange",
+    "onPanelChange",
+  ],
+  "propKeys": [
+    "allowClear",
+    "autoFocus",
+    "bordered",
+    "disabled",
+    "disabledDate",
+    "format",
+    "open",
+    "picker",
+    "placeholder",
+    "placement",
+    "showTime",
+    "showToday",
+    "size",
+    "status",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > DatePicker.RangePicker keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "DatePicker.RangePicker",
+  "eventKeys": [
+    "onCalendarChange",
+    "onChange",
+    "onOpenChange",
+  ],
+  "propKeys": [
+    "allowClear",
+    "allowEmpty",
+    "bordered",
+    "disabled",
+    "format",
+    "open",
+    "picker",
+    "placeholder",
+    "presets",
+    "showTime",
+    "size",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Descriptions keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "nodes",
+  "componentType": "Descriptions",
+  "eventKeys": [],
+  "propKeys": [
+    "bordered",
+    "colon",
+    "column",
+    "contentStyle",
+    "extra",
+    "items",
+    "labelStyle",
+    "layout",
+    "size",
+    "title",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Descriptions.Item keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "nodes",
+  "componentType": "Descriptions.Item",
+  "eventKeys": [],
+  "propKeys": [
+    "contentStyle",
+    "label",
+    "labelStyle",
+    "span",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Divider keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "text",
+  "componentType": "Divider",
+  "eventKeys": [],
+  "propKeys": [
+    "dashed",
+    "orientation",
+    "orientationMargin",
+    "plain",
+    "type",
+    "variant",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Drawer keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "nodes",
+  "componentType": "Drawer",
+  "eventKeys": [
+    "afterOpenChange",
+    "onClose",
+  ],
+  "propKeys": [
+    "className",
+    "closable",
+    "destroyOnClose",
+    "destroyOnHidden",
+    "extra",
+    "footer",
+    "getContainer",
+    "headerStyle",
+    "height",
+    "keyboard",
+    "loading",
+    "mask",
+    "maskClosable",
+    "open",
+    "placement",
+    "push",
+    "resizable",
+    "rootClassName",
+    "rootStyle",
+    "size",
+    "style",
+    "title",
+    "width",
+    "zIndex",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Dropdown keys snapshot 1`] = `
+{
+  "category": "navigation",
+  "childrenType": "node",
+  "componentType": "Dropdown",
+  "eventKeys": [
+    "onOpenChange",
+  ],
+  "propKeys": [
+    "arrow",
+    "destroyOnHidden",
+    "disabled",
+    "menu",
+    "open",
+    "placement",
+    "trigger",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Empty keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "node",
+  "componentType": "Empty",
+  "eventKeys": [],
+  "propKeys": [
+    "description",
+    "image",
+    "imageStyle",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Flex keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Flex",
+  "eventKeys": [],
+  "propKeys": [
+    "align",
+    "component",
+    "flex",
+    "gap",
+    "justify",
+    "vertical",
+    "wrap",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > FloatButton keys snapshot 1`] = `
+{
+  "category": "general",
+  "childrenType": "none",
+  "componentType": "FloatButton",
+  "eventKeys": [
+    "onClick",
+  ],
+  "propKeys": [
+    "badge",
+    "content",
+    "href",
+    "icon",
+    "shape",
+    "target",
+    "tooltip",
+    "type",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > FloatButton.BackTop keys snapshot 1`] = `
+{
+  "category": "general",
+  "childrenType": "node",
+  "componentType": "FloatButton.BackTop",
+  "eventKeys": [
+    "onClick",
+  ],
+  "propKeys": [
+    "duration",
+    "target",
+    "visibilityHeight",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > FloatButton.Group keys snapshot 1`] = `
+{
+  "category": "general",
+  "childrenType": "nodes",
+  "componentType": "FloatButton.Group",
+  "eventKeys": [
+    "onClick",
+    "onOpenChange",
+  ],
+  "propKeys": [
+    "closeIcon",
+    "open",
+    "placement",
+    "shape",
+    "trigger",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Form keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "nodes",
+  "componentType": "Form",
+  "eventKeys": [
+    "onFinish",
+    "onFinishFailed",
+    "onValuesChange",
+  ],
+  "propKeys": [
+    "disabled",
+    "initialValues",
+    "layout",
+    "preserve",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Form.Item keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "mixed",
+  "componentType": "Form.Item",
+  "eventKeys": [],
+  "propKeys": [
+    "dependencies",
+    "label",
+    "name",
+    "required",
+    "rules",
+    "tooltip",
+    "valuePropName",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Image keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "none",
+  "componentType": "Image",
+  "eventKeys": [
+    "onError",
+    "onPreview",
+  ],
+  "propKeys": [
+    "alt",
+    "fallback",
+    "height",
+    "placeholder",
+    "preview",
+    "src",
+    "width",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Image.PreviewGroup keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "nodes",
+  "componentType": "Image.PreviewGroup",
+  "eventKeys": [],
+  "propKeys": [
+    "fallback",
+    "items",
+    "preview",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Input keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "Input",
+  "eventKeys": [
+    "onChange",
+    "onPressEnter",
+  ],
+  "propKeys": [
+    "allowClear",
+    "defaultValue",
+    "disabled",
+    "maxLength",
+    "placeholder",
+    "type",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > InputNumber keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "InputNumber",
+  "eventKeys": [
+    "onChange",
+    "onPressEnter",
+    "onStep",
+  ],
+  "propKeys": [
+    "addonAfter",
+    "addonBefore",
+    "autoFocus",
+    "bordered",
+    "controls",
+    "decimalSeparator",
+    "defaultValue",
+    "disabled",
+    "formatter",
+    "keyboard",
+    "max",
+    "min",
+    "parser",
+    "placeholder",
+    "precision",
+    "readOnly",
+    "size",
+    "status",
+    "step",
+    "stringMode",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Layout keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Layout",
+  "eventKeys": [],
+  "propKeys": [
+    "className",
+    "hasSider",
+    "rootClassName",
+    "style",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Layout.Content keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Layout.Content",
+  "eventKeys": [],
+  "propKeys": [
+    "className",
+    "style",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Layout.Footer keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Layout.Footer",
+  "eventKeys": [],
+  "propKeys": [
+    "className",
+    "style",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Layout.Header keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Layout.Header",
+  "eventKeys": [],
+  "propKeys": [
+    "className",
+    "style",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Layout.Sider keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Layout.Sider",
+  "eventKeys": [
+    "onBreakpoint",
+    "onCollapse",
+  ],
+  "propKeys": [
+    "breakpoint",
+    "collapsed",
+    "collapsedWidth",
+    "collapsible",
+    "defaultCollapsed",
+    "reverseArrow",
+    "theme",
+    "trigger",
+    "width",
+    "zeroWidthTriggerStyle",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Masonry keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Masonry",
+  "eventKeys": [
+    "onLayoutChange",
+  ],
+  "propKeys": [
+    "columns",
+    "fresh",
+    "gutter",
+    "items",
+    "sequential",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Mentions keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "Mentions",
+  "eventKeys": [
+    "onBlur",
+    "onChange",
+    "onFocus",
+    "onSearch",
+    "onSelect",
+  ],
+  "propKeys": [
+    "autoFocus",
+    "defaultValue",
+    "disabled",
+    "filterOption",
+    "notFoundContent",
+    "open",
+    "options",
+    "placeholder",
+    "prefix",
+    "split",
+    "status",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Menu keys snapshot 1`] = `
+{
+  "category": "navigation",
+  "childrenType": "none",
+  "componentType": "Menu",
+  "eventKeys": [
+    "onClick",
+    "onDeselect",
+    "onOpenChange",
+    "onSelect",
+  ],
+  "propKeys": [
+    "defaultOpenKeys",
+    "defaultSelectedKeys",
+    "inlineCollapsed",
+    "inlineIndent",
+    "items",
+    "mode",
+    "multiple",
+    "openKeys",
+    "selectable",
+    "selectedKeys",
+    "theme",
+    "triggerSubMenuAction",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Modal keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "mixed",
+  "componentType": "Modal",
+  "eventKeys": [
+    "onCancel",
+    "onOk",
+  ],
+  "propKeys": [
+    "destroyOnClose",
+    "footer",
+    "maskClosable",
+    "open",
+    "title",
+    "width",
+  ],
+  "slotKeys": [
+    "footer",
+  ],
+}
+`;
+
+exports[`contract-keys snapshot > PageEmbed keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "mixed",
+  "componentType": "PageEmbed",
+  "eventKeys": [],
+  "propKeys": [],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Pagination keys snapshot 1`] = `
+{
+  "category": "navigation",
+  "childrenType": "none",
+  "componentType": "Pagination",
+  "eventKeys": [
+    "onChange",
+    "onShowSizeChange",
+  ],
+  "propKeys": [
+    "align",
+    "current",
+    "defaultCurrent",
+    "defaultPageSize",
+    "disabled",
+    "hideOnSinglePage",
+    "pageSize",
+    "pageSizeOptions",
+    "showQuickJumper",
+    "showSizeChanger",
+    "showTotal",
+    "simple",
+    "size",
+    "total",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Popconfirm keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "node",
+  "componentType": "Popconfirm",
+  "eventKeys": [
+    "onCancel",
+    "onConfirm",
+    "onOpenChange",
+  ],
+  "propKeys": [
+    "arrow",
+    "cancelButtonProps",
+    "cancelText",
+    "defaultOpen",
+    "description",
+    "disabled",
+    "icon",
+    "okButtonProps",
+    "okText",
+    "okType",
+    "open",
+    "placement",
+    "showCancel",
+    "title",
+    "trigger",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Popover keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "node",
+  "componentType": "Popover",
+  "eventKeys": [
+    "onOpenChange",
+  ],
+  "propKeys": [
+    "arrow",
+    "content",
+    "defaultOpen",
+    "destroyOnHidden",
+    "mouseEnterDelay",
+    "mouseLeaveDelay",
+    "open",
+    "overlayClassName",
+    "overlayInnerStyle",
+    "overlayStyle",
+    "placement",
+    "title",
+    "trigger",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Progress keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "none",
+  "componentType": "Progress",
+  "eventKeys": [],
+  "propKeys": [
+    "circleWidth",
+    "format",
+    "gapDegree",
+    "gapPosition",
+    "percent",
+    "showInfo",
+    "size",
+    "status",
+    "steps",
+    "strokeColor",
+    "strokeLinecap",
+    "strokeWidth",
+    "success",
+    "trailColor",
+    "type",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > QRCode keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "none",
+  "componentType": "QRCode",
+  "eventKeys": [
+    "onRefresh",
+  ],
+  "propKeys": [
+    "bgColor",
+    "bordered",
+    "color",
+    "errorLevel",
+    "icon",
+    "iconSize",
+    "size",
+    "status",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Radio keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "text",
+  "componentType": "Radio",
+  "eventKeys": [
+    "onChange",
+  ],
+  "propKeys": [
+    "checked",
+    "defaultChecked",
+    "disabled",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Radio.Group keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "nodes",
+  "componentType": "Radio.Group",
+  "eventKeys": [
+    "onChange",
+  ],
+  "propKeys": [
+    "buttonStyle",
+    "defaultValue",
+    "disabled",
+    "name",
+    "optionType",
+    "options",
+    "size",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Rate keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "Rate",
+  "eventKeys": [
+    "onChange",
+    "onHoverChange",
+  ],
+  "propKeys": [
+    "allowClear",
+    "allowHalf",
+    "character",
+    "count",
+    "defaultValue",
+    "disabled",
+    "tooltips",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Result keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "none",
+  "componentType": "Result",
+  "eventKeys": [],
+  "propKeys": [
+    "extra",
+    "icon",
+    "status",
+    "subTitle",
+    "title",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Row keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Row",
+  "eventKeys": [],
+  "propKeys": [
+    "align",
+    "gutter",
+    "justify",
+    "wrap",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Segmented keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "none",
+  "componentType": "Segmented",
+  "eventKeys": [
+    "onChange",
+  ],
+  "propKeys": [
+    "block",
+    "defaultValue",
+    "disabled",
+    "options",
+    "size",
+    "value",
+    "vertical",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Select keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "Select",
+  "eventKeys": [
+    "onChange",
+    "onClear",
+    "onSearch",
+  ],
+  "propKeys": [
+    "allowClear",
+    "defaultValue",
+    "disabled",
+    "mode",
+    "options",
+    "placeholder",
+    "showSearch",
+    "style",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Skeleton keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "nodes",
+  "componentType": "Skeleton",
+  "eventKeys": [],
+  "propKeys": [
+    "active",
+    "avatar",
+    "loading",
+    "paragraph",
+    "round",
+    "title",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Skeleton.Button keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "none",
+  "componentType": "Skeleton.Button",
+  "eventKeys": [],
+  "propKeys": [
+    "active",
+    "block",
+    "shape",
+    "size",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Skeleton.Image keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "none",
+  "componentType": "Skeleton.Image",
+  "eventKeys": [],
+  "propKeys": [
+    "active",
+    "style",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Skeleton.Input keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "none",
+  "componentType": "Skeleton.Input",
+  "eventKeys": [],
+  "propKeys": [
+    "active",
+    "size",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Slider keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "Slider",
+  "eventKeys": [
+    "onAfterChange",
+    "onChange",
+  ],
+  "propKeys": [
+    "defaultValue",
+    "disabled",
+    "dots",
+    "included",
+    "marks",
+    "max",
+    "min",
+    "range",
+    "reverse",
+    "step",
+    "tooltip",
+    "value",
+    "vertical",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Space keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Space",
+  "eventKeys": [],
+  "propKeys": [
+    "align",
+    "direction",
+    "separator",
+    "size",
+    "split",
+    "wrap",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Space.Compact keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Space.Compact",
+  "eventKeys": [],
+  "propKeys": [
+    "block",
+    "direction",
+    "size",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Spin keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "nodes",
+  "componentType": "Spin",
+  "eventKeys": [],
+  "propKeys": [
+    "delay",
+    "fullscreen",
+    "indicator",
+    "percent",
+    "size",
+    "spinning",
+    "tip",
+    "wrapperClassName",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Splitter keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Splitter",
+  "eventKeys": [
+    "onCollapse",
+    "onResize",
+    "onResizeEnd",
+    "onResizeStart",
+  ],
+  "propKeys": [
+    "lazy",
+    "orientation",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Splitter.Panel keys snapshot 1`] = `
+{
+  "category": "layout",
+  "childrenType": "nodes",
+  "componentType": "Splitter.Panel",
+  "eventKeys": [],
+  "propKeys": [
+    "collapsible",
+    "defaultSize",
+    "max",
+    "min",
+    "resizable",
+    "size",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Statistic keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "none",
+  "componentType": "Statistic",
+  "eventKeys": [],
+  "propKeys": [
+    "decimalSeparator",
+    "formatter",
+    "groupSeparator",
+    "loading",
+    "precision",
+    "prefix",
+    "suffix",
+    "title",
+    "value",
+    "valueStyle",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Statistic.Countdown keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "none",
+  "componentType": "Statistic.Countdown",
+  "eventKeys": [
+    "onChange",
+    "onFinish",
+  ],
+  "propKeys": [
+    "format",
+    "prefix",
+    "suffix",
+    "title",
+    "value",
+    "valueStyle",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Steps keys snapshot 1`] = `
+{
+  "category": "navigation",
+  "childrenType": "none",
+  "componentType": "Steps",
+  "eventKeys": [
+    "onChange",
+  ],
+  "propKeys": [
+    "current",
+    "direction",
+    "initial",
+    "items",
+    "labelPlacement",
+    "percent",
+    "progressDot",
+    "responsive",
+    "size",
+    "status",
+    "type",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Switch keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "Switch",
+  "eventKeys": [
+    "onChange",
+    "onClick",
+  ],
+  "propKeys": [
+    "autoFocus",
+    "checked",
+    "checkedChildren",
+    "defaultChecked",
+    "disabled",
+    "loading",
+    "size",
+    "unCheckedChildren",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Table keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "none",
+  "componentType": "Table",
+  "eventKeys": [
+    "onChange",
+    "rowSelection.onChange",
+  ],
+  "propKeys": [
+    "bordered",
+    "columns",
+    "dataSource",
+    "editable",
+    "loading",
+    "pagination",
+    "rowKey",
+    "rowSelection",
+    "size",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Tabs keys snapshot 1`] = `
+{
+  "category": "navigation",
+  "childrenType": "none",
+  "componentType": "Tabs",
+  "eventKeys": [
+    "onChange",
+    "onEdit",
+    "onTabClick",
+    "onTabScroll",
+  ],
+  "propKeys": [
+    "activeKey",
+    "addIcon",
+    "animated",
+    "centered",
+    "defaultActiveKey",
+    "destroyInactiveTabPane",
+    "destroyOnHidden",
+    "hideAdd",
+    "indicator",
+    "items",
+    "more",
+    "removeIcon",
+    "renderTabBar",
+    "size",
+    "tabBarExtraContent",
+    "tabBarGutter",
+    "tabBarStyle",
+    "tabPlacement",
+    "tabPosition",
+    "type",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Tabs.TabPane keys snapshot 1`] = `
+{
+  "category": "navigation",
+  "childrenType": "nodes",
+  "componentType": "Tabs.TabPane",
+  "eventKeys": [],
+  "propKeys": [
+    "closable",
+    "closeIcon",
+    "destroyOnHidden",
+    "disabled",
+    "forceRender",
+    "icon",
+    "key",
+    "label",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Tag keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "text",
+  "componentType": "Tag",
+  "eventKeys": [
+    "onClick",
+    "onClose",
+  ],
+  "propKeys": [
+    "bordered",
+    "closable",
+    "color",
+    "icon",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Tag.CheckableTag keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "text",
+  "componentType": "Tag.CheckableTag",
+  "eventKeys": [
+    "onChange",
+  ],
+  "propKeys": [
+    "checked",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > TimePicker keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "TimePicker",
+  "eventKeys": [
+    "onChange",
+    "onOpenChange",
+  ],
+  "propKeys": [
+    "allowClear",
+    "autoFocus",
+    "bordered",
+    "disabled",
+    "format",
+    "hourStep",
+    "minuteStep",
+    "open",
+    "placeholder",
+    "secondStep",
+    "showNow",
+    "size",
+    "status",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Timeline keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "nodes",
+  "componentType": "Timeline",
+  "eventKeys": [],
+  "propKeys": [
+    "items",
+    "mode",
+    "pending",
+    "pendingDot",
+    "reverse",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Timeline.Item keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "nodes",
+  "componentType": "Timeline.Item",
+  "eventKeys": [],
+  "propKeys": [
+    "color",
+    "dot",
+    "label",
+    "position",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Tooltip keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "node",
+  "componentType": "Tooltip",
+  "eventKeys": [
+    "onOpenChange",
+  ],
+  "propKeys": [
+    "arrow",
+    "color",
+    "defaultOpen",
+    "destroyOnHidden",
+    "mouseEnterDelay",
+    "mouseLeaveDelay",
+    "open",
+    "overlayClassName",
+    "overlayInnerStyle",
+    "overlayStyle",
+    "placement",
+    "title",
+    "trigger",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Tour keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "none",
+  "componentType": "Tour",
+  "eventKeys": [
+    "onChange",
+    "onClose",
+    "onFinish",
+  ],
+  "propKeys": [
+    "arrow",
+    "current",
+    "defaultCurrent",
+    "indicatorsRender",
+    "open",
+    "steps",
+    "type",
+    "zIndex",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Transfer keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "Transfer",
+  "eventKeys": [
+    "onChange",
+    "onScroll",
+    "onSearch",
+    "onSelectChange",
+  ],
+  "propKeys": [
+    "dataSource",
+    "disabled",
+    "filterOption",
+    "listStyle",
+    "locale",
+    "oneWay",
+    "operationStyle",
+    "operations",
+    "pagination",
+    "render",
+    "selectedKeys",
+    "showSearch",
+    "showSelectAll",
+    "status",
+    "targetKeys",
+    "titles",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Tree keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "none",
+  "componentType": "Tree",
+  "eventKeys": [
+    "onCheck",
+    "onDoubleClick",
+    "onDragEnd",
+    "onDragEnter",
+    "onDragLeave",
+    "onDragOver",
+    "onDragStart",
+    "onDrop",
+    "onExpand",
+    "onLoad",
+    "onRightClick",
+    "onSelect",
+  ],
+  "propKeys": [
+    "allowDrop",
+    "autoExpandParent",
+    "blockNode",
+    "checkStrictly",
+    "checkable",
+    "checkedKeys",
+    "defaultCheckedKeys",
+    "defaultExpandAll",
+    "defaultExpandedKeys",
+    "defaultSelectedKeys",
+    "disabled",
+    "draggable",
+    "expandedKeys",
+    "fieldNames",
+    "filterTreeNode",
+    "height",
+    "icon",
+    "loadData",
+    "loadedKeys",
+    "multiple",
+    "selectable",
+    "selectedKeys",
+    "showIcon",
+    "showLine",
+    "switcherIcon",
+    "titleRender",
+    "treeData",
+    "virtual",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Tree.DirectoryTree keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "none",
+  "componentType": "Tree.DirectoryTree",
+  "eventKeys": [
+    "onExpand",
+    "onSelect",
+  ],
+  "propKeys": [
+    "checkable",
+    "expandAction",
+    "expandedKeys",
+    "selectedKeys",
+    "treeData",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Tree.TreeNode keys snapshot 1`] = `
+{
+  "category": "data-display",
+  "childrenType": "nodes",
+  "componentType": "Tree.TreeNode",
+  "eventKeys": [],
+  "propKeys": [
+    "checkable",
+    "disableCheckbox",
+    "disabled",
+    "icon",
+    "isLeaf",
+    "key",
+    "selectable",
+    "title",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > TreeSelect keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "none",
+  "componentType": "TreeSelect",
+  "eventKeys": [
+    "onChange",
+    "onDropdownVisibleChange",
+    "onSearch",
+    "onSelect",
+    "onTreeExpand",
+  ],
+  "propKeys": [
+    "allowClear",
+    "autoClearSearchValue",
+    "defaultValue",
+    "disabled",
+    "dropdownMatchSelectWidth",
+    "dropdownRender",
+    "fieldNames",
+    "filterTreeNode",
+    "labelInValue",
+    "loadData",
+    "maxTagCount",
+    "multiple",
+    "open",
+    "placeholder",
+    "searchValue",
+    "showCheckedStrategy",
+    "showSearch",
+    "size",
+    "status",
+    "treeCheckable",
+    "treeData",
+    "treeDefaultExpandAll",
+    "treeDefaultExpandedKeys",
+    "treeExpandedKeys",
+    "value",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Typography.Paragraph keys snapshot 1`] = `
+{
+  "category": "general",
+  "childrenType": "text",
+  "componentType": "Typography.Paragraph",
+  "eventKeys": [
+    "onClick",
+  ],
+  "propKeys": [
+    "code",
+    "copyable",
+    "delete",
+    "disabled",
+    "editable",
+    "ellipsis",
+    "italic",
+    "mark",
+    "strong",
+    "type",
+    "underline",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Typography.Text keys snapshot 1`] = `
+{
+  "category": "general",
+  "childrenType": "text",
+  "componentType": "Typography.Text",
+  "eventKeys": [
+    "onClick",
+  ],
+  "propKeys": [
+    "code",
+    "copyable",
+    "delete",
+    "disabled",
+    "editable",
+    "ellipsis",
+    "italic",
+    "keyboard",
+    "mark",
+    "strong",
+    "type",
+    "underline",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Typography.Title keys snapshot 1`] = `
+{
+  "category": "general",
+  "childrenType": "text",
+  "componentType": "Typography.Title",
+  "eventKeys": [
+    "onClick",
+  ],
+  "propKeys": [
+    "code",
+    "copyable",
+    "delete",
+    "disabled",
+    "editable",
+    "ellipsis",
+    "italic",
+    "level",
+    "mark",
+    "type",
+    "underline",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Upload keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "node",
+  "componentType": "Upload",
+  "eventKeys": [
+    "onChange",
+    "onDrop",
+    "onPreview",
+    "onRemove",
+  ],
+  "propKeys": [
+    "accept",
+    "action",
+    "beforeUpload",
+    "data",
+    "defaultFileList",
+    "directory",
+    "disabled",
+    "fileList",
+    "headers",
+    "listType",
+    "maxCount",
+    "method",
+    "multiple",
+    "name",
+    "openFileDialogOnClick",
+    "progress",
+    "showUploadList",
+    "withCredentials",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Upload.Dragger keys snapshot 1`] = `
+{
+  "category": "data-entry",
+  "childrenType": "nodes",
+  "componentType": "Upload.Dragger",
+  "eventKeys": [
+    "onChange",
+    "onDrop",
+    "onPreview",
+    "onRemove",
+  ],
+  "propKeys": [
+    "accept",
+    "action",
+    "beforeUpload",
+    "data",
+    "defaultFileList",
+    "disabled",
+    "fileList",
+    "headers",
+    "listType",
+    "maxCount",
+    "multiple",
+    "name",
+    "progress",
+    "showUploadList",
+    "withCredentials",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > Watermark keys snapshot 1`] = `
+{
+  "category": "feedback",
+  "childrenType": "nodes",
+  "componentType": "Watermark",
+  "eventKeys": [],
+  "propKeys": [
+    "content",
+    "font",
+    "gap",
+    "height",
+    "image",
+    "inherit",
+    "offset",
+    "rotate",
+    "width",
+  ],
+  "slotKeys": [],
+}
+`;
+
+exports[`contract-keys snapshot > total component count 1`] = `105`;

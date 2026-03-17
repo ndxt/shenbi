@@ -1,6 +1,59 @@
 import type { PageSchema } from '../../types';
 import type { TestCase, TestCaseResult, TestReport, TestRunnerConfig, LLMRequest, LLMResponse } from './types';
 import { validateSchema } from './validator';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+type LocalEnvMap = Record<string, string>;
+
+let cachedLocalEnv: LocalEnvMap | null = null;
+
+function loadLocalEnv(): LocalEnvMap {
+  if (cachedLocalEnv) {
+    return cachedLocalEnv;
+  }
+
+  const envPath = path.resolve(__dirname, '../../../../.env.local');
+
+  if (!fs.existsSync(envPath)) {
+    cachedLocalEnv = {};
+    return cachedLocalEnv;
+  }
+
+  const parsed: LocalEnvMap = {};
+  const content = fs.readFileSync(envPath, 'utf-8');
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf('=');
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim();
+    const value = line.slice(separatorIndex + 1).trim();
+    parsed[key] = value;
+  }
+
+  cachedLocalEnv = parsed;
+  return parsed;
+}
+
+function getLocalEnvValue(key: string): string | undefined {
+  return process.env[key] || loadLocalEnv()[key];
+}
+
+function resolveDefaultLLMConfig(): Pick<TestRunnerConfig, 'apiEndpoint' | 'apiKey' | 'model'> {
+  return {
+    apiEndpoint: getLocalEnvValue('CENTIT_BASE_URL'),
+    apiKey: getLocalEnvValue('CENTIT_API_KEY'),
+    model: getLocalEnvValue('CENTIT_PLANNER_MODEL') || 'qwq',
+  };
+}
 
 /**
  * LLM 生成测试运行器
@@ -11,8 +64,13 @@ export class TestRunner {
   private results: TestCaseResult[] = [];
 
   constructor(config: TestRunnerConfig) {
+    const defaultLLMConfig = resolveDefaultLLMConfig();
+
     this.config = {
       mode: 'mock',
+      apiEndpoint: defaultLLMConfig.apiEndpoint,
+      apiKey: defaultLLMConfig.apiKey,
+      model: defaultLLMConfig.model,
       concurrency: 5,
       timeout: 30000,
       retries: 1,
@@ -198,7 +256,7 @@ export class TestRunner {
   private async callLLM(prompt: string): Promise<string | null> {
     const endpoint = this.config.apiEndpoint;
     const apiKey = this.config.apiKey;
-    const model = this.config.model || 'claude-sonnet-4-20250514';
+    const model = this.config.model || 'qwq';
 
     if (!endpoint) {
       return null;

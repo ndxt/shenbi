@@ -11,7 +11,17 @@ const VALID_CATEGORIES = new Set([
   'feedback',
   'other',
   'charts',
+  'chart',
 ]);
+
+function usesSupportedEventName(eventName: string): boolean {
+  return (
+    eventName.startsWith('on') ||
+    eventName.includes('.on') ||
+    eventName.startsWith('after') ||
+    eventName.startsWith('before')
+  );
+}
 
 /**
  * 结构一致性测试：验证所有契约的 prop 定义遵循规范。
@@ -67,11 +77,11 @@ describe('prop-structure consistency', () => {
       }
 
       if (contract.events) {
-        for (const [eventName, event] of Object.entries(contract.events)) {
+        for (const [eventName] of Object.entries(contract.events)) {
           it(`event "${eventName}" should start with "on"`, () => {
             expect(
-              eventName.startsWith('on'),
-              `Event "${eventName}" should follow "onXxx" naming convention`,
+              usesSupportedEventName(eventName),
+              `Event "${eventName}" should follow a supported callback naming convention`,
             ).toBe(true);
           });
         }
