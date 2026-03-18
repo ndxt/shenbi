@@ -645,7 +645,18 @@ export function useAgentLoop(
     const session = createBackgroundPageSession(initialSchema);
     let tabReady = false;
     try {
-      const folderParentId = page.group ? (groupFolderMapRef.current.get(page.group) ?? undefined) : undefined;
+      // Ensure the group folder exists (create on first use)
+      let folderParentId: string | undefined;
+      if (page.group && page.group.trim()) {
+        folderParentId = groupFolderMapRef.current.get(page.group);
+        if (!folderParentId) {
+          const folderResult = await bridge.execute('fs.createFolder', { name: page.group });
+          if (folderResult.success && folderResult.data && typeof (folderResult.data as { id?: unknown }).id === 'string') {
+            folderParentId = (folderResult.data as { id: string }).id;
+            groupFolderMapRef.current.set(page.group, folderParentId);
+          }
+        }
+      }
       const createFileResult = await bridge.execute('fs.createFile', {
         parentId: folderParentId ?? null,
         name: input.pageName,
@@ -1010,23 +1021,6 @@ export function useAgentLoop(
     setProgressText('正在执行项目规划');
     void persistLoopState();
     const plan = loopStateRef.current?.approvedPlan;
-
-    // Create folders for each unique group before pages run
-    if (bridge && plan) {
-      const uniqueGroups = [...new Set(plan.pages.map((p) => p.group).filter((g): g is string => Boolean(g && g.trim())))];
-      if (uniqueGroups.length > 0) {
-        groupFolderMapRef.current = new Map();
-        void Promise.all(
-          uniqueGroups.map(async (group) => {
-            const result = await bridge.execute('fs.createFolder', { name: group });
-            if (result.success && result.data && typeof (result.data as { id?: unknown }).id === 'string') {
-              groupFolderMapRef.current.set(group, (result.data as { id: string }).id);
-            }
-          }),
-        );
-      }
-    }
-
     const confirmationMessage = plan && plan.pages.length > 0
       ? (() => {
         const actionablePages = plan.pages.filter((p) => p.action !== 'skip');
