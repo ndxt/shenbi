@@ -1,3 +1,4 @@
+import type { PageSchema } from '@shenbi/schema';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const originalEnv = {
@@ -366,7 +367,7 @@ describe('executeModifySchema', () => {
     }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const schema = {
+    const schema: PageSchema = {
       id: 'page-1',
       body: [
         {
@@ -392,7 +393,7 @@ describe('executeModifySchema', () => {
           ],
         },
       ],
-    } as const;
+    };
 
     const { executeModifySchema } = await import('./modify-schema.ts');
     await executeModifySchema({
@@ -456,7 +457,10 @@ describe('executeModifySchema', () => {
       },
     });
 
-    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+    const firstCall = (fetchMock.mock.calls as unknown as Array<[unknown, { body?: string }?]>)[0];
+    expect(firstCall).toBeDefined();
+    const requestInit = firstCall?.[1];
+    const requestBody = JSON.parse(String(requestInit?.body)) as {
       messages: Array<{ role: string; content: string }>;
     };
     expect(requestBody.messages[0]?.content).toContain('When Focused Node Context is provided');

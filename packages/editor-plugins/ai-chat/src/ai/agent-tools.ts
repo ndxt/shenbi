@@ -45,16 +45,29 @@ export function toProjectPlan(value: Record<string, unknown>): ProjectPlan {
     projectName,
     pages: rawPages.map((page, index) => {
       const record = (page && typeof page === 'object' ? page : {}) as Record<string, unknown>;
-      return {
+      const normalizedPage: ProjectPlan['pages'][number] = {
         pageId: typeof record.pageId === 'string' && record.pageId.trim() ? record.pageId.trim() : `page-${index + 1}`,
         pageName: typeof record.pageName === 'string' && record.pageName.trim() ? record.pageName.trim() : `页面 ${index + 1}`,
         action: record.action === 'modify' || record.action === 'skip' ? record.action : 'create',
         description: typeof record.description === 'string' && record.description.trim() ? record.description.trim() : '',
-        ...(normalizeOptionalText(record.group) ? { group: normalizeOptionalText(record.group) } : {}),
-        ...(normalizeOptionalText(record.prompt) ? { prompt: normalizeOptionalText(record.prompt) } : {}),
-        ...(normalizeOptionalText(record.evidence) ? { evidence: normalizeOptionalText(record.evidence) } : {}),
-        ...(typeof record.reason === 'string' && record.reason.trim() ? { reason: record.reason.trim() } : {}),
       };
+      const group = normalizeOptionalText(record.group);
+      const prompt = normalizeOptionalText(record.prompt);
+      const evidence = normalizeOptionalText(record.evidence);
+      const reason = typeof record.reason === 'string' && record.reason.trim() ? record.reason.trim() : undefined;
+      if (group) {
+        normalizedPage.group = group;
+      }
+      if (prompt) {
+        normalizedPage.prompt = prompt;
+      }
+      if (evidence) {
+        normalizedPage.evidence = evidence;
+      }
+      if (reason) {
+        normalizedPage.reason = reason;
+      }
+      return normalizedPage;
     }),
   };
 }
@@ -147,6 +160,34 @@ function normalizeBackgroundFileId(value: string | undefined): string | undefine
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '');
   return normalized.length > 0 ? normalized : undefined;
+}
+
+function attachOptionalPlanFields<T extends Record<string, unknown>>(
+  target: T,
+  source: Record<string, unknown>,
+): T & {
+  group?: string;
+  prompt?: string;
+  evidence?: string;
+} {
+  const nextTarget = target as T & {
+    group?: string;
+    prompt?: string;
+    evidence?: string;
+  };
+  const group = normalizeOptionalText(source.group);
+  const prompt = normalizeOptionalText(source.prompt);
+  const evidence = normalizeOptionalText(source.evidence);
+  if (group) {
+    nextTarget.group = group;
+  }
+  if (prompt) {
+    nextTarget.prompt = prompt;
+  }
+  if (evidence) {
+    nextTarget.evidence = evidence;
+  }
+  return nextTarget;
 }
 
 function createEphemeralBridge(schema: PageSchema): EditorAIBridge {
@@ -309,16 +350,13 @@ export async function executeAgentTool(
         ?? normalizeBackgroundFileId(pageName)
         ?? `页面-${pageLookup.size + 1}`;
       const prompt = buildCreatePagePrompt(actionInput, pageName);
-      const page = pageLookup.get(pageId) ?? {
+      const page = pageLookup.get(pageId) ?? attachOptionalPlanFields({
         pageId,
         pageName,
-        action: 'create',
+        action: 'create' as const,
         description: prompt,
-        ...(normalizeOptionalText(actionInput.group) ? { group: normalizeOptionalText(actionInput.group) } : {}),
-        ...(normalizeOptionalText(actionInput.prompt) ? { prompt: normalizeOptionalText(actionInput.prompt) } : {}),
-        ...(normalizeOptionalText(actionInput.evidence) ? { evidence: normalizeOptionalText(actionInput.evidence) } : {}),
-        status: 'waiting',
-      };
+        status: 'waiting' as const,
+      }, actionInput);
       return context.executeCreatePage({ pageId, pageName, prompt, fileId }, page);
     }
     case 'modifyPage': {
@@ -327,16 +365,13 @@ export async function executeAgentTool(
         throw new Error('modifyPage requires fileId');
       }
       const prompt = buildModifyPagePrompt(actionInput);
-      const page = pageLookup.get(fileId) ?? {
+      const page = pageLookup.get(fileId) ?? attachOptionalPlanFields({
         pageId: fileId,
         pageName: typeof actionInput.pageName === 'string' && actionInput.pageName.trim() ? actionInput.pageName.trim() : fileId,
-        action: 'modify',
+        action: 'modify' as const,
         description: prompt,
-        ...(normalizeOptionalText(actionInput.group) ? { group: normalizeOptionalText(actionInput.group) } : {}),
-        ...(normalizeOptionalText(actionInput.prompt) ? { prompt: normalizeOptionalText(actionInput.prompt) } : {}),
-        ...(normalizeOptionalText(actionInput.evidence) ? { evidence: normalizeOptionalText(actionInput.evidence) } : {}),
-        status: 'waiting',
-      };
+        status: 'waiting' as const,
+      }, actionInput);
       return context.executeModifyPage({ fileId, prompt, pageName: page.pageName }, page);
     }
     case 'finish':

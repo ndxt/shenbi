@@ -88,15 +88,18 @@ export function resolveSelectedNodeContext(
   if (!matched) {
     return undefined;
   }
+  const resolvedNodeId = getResolvedNodeId(matched.node);
+  const previousSibling = matched.siblingIndex > 0 ? matched.siblings[matched.siblingIndex - 1] : undefined;
+  const nextSibling = matched.siblingIndex < matched.siblings.length - 1 ? matched.siblings[matched.siblingIndex + 1] : undefined;
   return {
     originalSelection: selectedNodeId,
     selectionType: isEditorPath(selectedNodeId) ? 'editor-path' : 'schema-id',
     path: matched.path,
     node: matched.node,
-    resolvedNodeId: getResolvedNodeId(matched.node),
     ancestors: matched.ancestors,
-    previousSibling: matched.siblingIndex > 0 ? matched.siblings[matched.siblingIndex - 1] : undefined,
-    nextSibling: matched.siblingIndex < matched.siblings.length - 1 ? matched.siblings[matched.siblingIndex + 1] : undefined,
+    ...(resolvedNodeId ? { resolvedNodeId } : {}),
+    ...(previousSibling ? { previousSibling } : {}),
+    ...(nextSibling ? { nextSibling } : {}),
   };
 }
 

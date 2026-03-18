@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export interface Env {
   PORT: number;
@@ -135,6 +134,19 @@ function resolveWorkspaceRoot(startDir: string): string {
   }
 }
 
+function resolveRuntimeBaseDir(): string {
+  if (typeof __dirname === 'string' && __dirname.trim()) {
+    return __dirname;
+  }
+
+  const entryScript = process.argv[1];
+  if (typeof entryScript === 'string' && entryScript.trim()) {
+    return path.dirname(path.resolve(entryScript));
+  }
+
+  return process.cwd();
+}
+
 function resolveProviderConfig(
   loaded: Record<string, string>,
   provider: string,
@@ -219,7 +231,7 @@ function resolveProviderConfig(
 }
 
 function loadLocalEnvFiles(): Record<string, string> {
-  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const currentDir = resolveRuntimeBaseDir();
   const cwdRoot = resolveWorkspaceRoot(process.cwd());
   const fallbackRoot = resolveWorkspaceRoot(path.resolve(currentDir, '../../../../'));
   const rootDir = fs.existsSync(path.join(cwdRoot, '.env.local')) || fs.existsSync(path.join(cwdRoot, '.env'))
