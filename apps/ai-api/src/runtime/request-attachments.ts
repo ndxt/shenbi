@@ -34,6 +34,54 @@ function truncateText(text: string, maxChars: number): string {
   return `${text.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
 }
 
+function isLikelyHeading(paragraph: string): boolean {
+  const singleLine = !paragraph.includes('\n');
+  const shortEnough = paragraph.length <= 24;
+  return singleLine && shortEnough && !/[：:；;。.!?]/.test(paragraph);
+}
+
+function normalizeSnippet(snippet: string): string {
+  return snippet
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function extractEvidenceSnippets(text: string): string[] {
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((paragraph) => normalizeSnippet(paragraph))
+    .filter(Boolean);
+
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  const pushCandidate = (value: string) => {
+    const normalized = normalizeSnippet(truncateText(value, 320));
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    candidates.push(normalized);
+  };
+
+  for (let index = 0; index < paragraphs.length; index += 1) {
+    const current = paragraphs[index]!;
+    const next = paragraphs[index + 1];
+    const hasEnumeratedItems = /(?:^|\n)[（(]?\d+[)）]/.test(current) || /(?:^|\n)\d+[.、]/.test(current);
+    if (hasEnumeratedItems) {
+      pushCandidate(current);
+    }
+    if (isLikelyHeading(current) && next) {
+      pushCandidate(`${current}\n${next}`);
+    }
+  }
+
+  for (const paragraph of paragraphs.slice(0, 3)) {
+    pushCandidate(paragraph);
+  }
+
+  return candidates.slice(0, 5);
+}
+
 function parseDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } {
   const match = /^data:([^;]+);base64,(.+)$/s.exec(dataUrl);
   if (!match) {
@@ -79,9 +127,16 @@ async function extractDocumentText(attachment: RunAttachmentInput): Promise<stri
 }
 
 function buildDocumentSection(attachment: RunAttachmentInput, extractedText: string): string {
+  const evidenceSnippets = extractEvidenceSnippets(extractedText);
   return [
     `[Attached Document: ${attachment.name}]`,
     truncateText(extractedText, MAX_DOCUMENT_TEXT_CHARS),
+    ...(evidenceSnippets.length > 0
+      ? [
+          '[Preferred evidence snippets]',
+          ...evidenceSnippets.map((snippet, index) => `Snippet ${index + 1}:\n${snippet}`),
+        ]
+      : []),
   ].join('\n');
 }
 

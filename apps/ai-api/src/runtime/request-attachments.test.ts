@@ -62,7 +62,7 @@ describe('request attachments', () => {
 
   it('extracts document text into the effective prompt and keeps only image attachments for the model', async () => {
     extractRawTextMock.mockResolvedValue({
-      value: 'Line 1\n\nLine 2',
+      value: '看板\n\n分成左上、左下、右侧三个区域：\n（1）左上：全年统计看板：会议数、事项数、完成数、逾期数；\n（2）左下：人员看板，显示所有责任人的事项总数、未完成数、逾期数；\n（3）右侧：最新动态。',
     });
 
     const prepared = await prepareRunRequest({
@@ -85,13 +85,16 @@ describe('request attachments', () => {
 
     expect(prepared.prompt).toContain('Attached document excerpts:');
     expect(prepared.prompt).toContain('[Attached Document: brief.docx]');
-    expect(prepared.prompt).toContain('Line 1');
+    expect(prepared.prompt).toContain('看板');
+    expect(prepared.prompt).toContain('[Preferred evidence snippets]');
+    expect(prepared.prompt).toContain('Snippet 1:');
+    expect(prepared.prompt).toContain('（1）左上：全年统计看板：会议数、事项数、完成数、逾期数；');
     expect(prepared.attachments).toBeUndefined();
     expect(prepared._memoryAttachments).toEqual([
       expect.objectContaining({
         id: 'doc-1',
         kind: 'document',
-        extractedTextPreview: 'Line 1\n\nLine 2',
+        extractedTextPreview: expect.stringContaining('看板'),
       }),
     ]);
   });
