@@ -182,11 +182,14 @@ export function createEditorAIBridgeFromPluginContext(
           return { success: true, data: { id: fileId } };
         }
 
-        if (filesystem && commandId === 'fs.createFolder') {
+        if (commandId === 'fs.createFolder') {
           const name = typeof commandArgs?.name === 'string' ? commandArgs.name : '';
           const parentId = typeof commandArgs?.parentId === 'string' ? commandArgs.parentId : undefined;
-          const folderId = await filesystem.createFile(name, 'directory', {}, parentId);
-          return { success: true, data: { id: folderId } };
+          const result = await executePluginCommand(options.context, 'fs.createDirectory', { name, parentId: parentId ?? null });
+          const nodeId = result && typeof result === 'object' && typeof (result as { id?: unknown }).id === 'string'
+            ? (result as { id: string }).id
+            : typeof result === 'string' ? result : undefined;
+          return { success: true, data: { id: nodeId } };
         }
 
         if (filesystem && commandId === 'file.readSchema') {
