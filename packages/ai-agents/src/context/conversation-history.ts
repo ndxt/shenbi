@@ -12,6 +12,67 @@ interface ConversationTurn {
   assistantMessages: AgentMemoryMessage[];
 }
 
+function stringifyValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return `"${value}"`;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    const items = value.slice(0, 4).map((item) => stringifyValue(item));
+    return `[${items.join(', ')}${value.length > 4 ? ', ...' : ''}]`;
+  }
+  if (value && typeof value === 'object') {
+    try {
+      const json = JSON.stringify(value);
+      return json.length > 80 ? `${json.slice(0, 77)}...` : json;
+    } catch {
+      return '[object]';
+    }
+  }
+  return String(value);
+}
+
+function summarizePatchEntries(patch: Record<string, unknown> | undefined): string {
+  if (!patch) {
+    return '无明确变更内容';
+  }
+  const entries = Object.entries(patch)
+    .slice(0, 3)
+    .map(([key, value]) => `${key}=${stringifyValue(value)}`);
+  if (entries.length === 0) {
+    return '无明确变更内容';
+  }
+  return entries.join(', ');
+}
+
+function summarizeColumns(columns: unknown): string {
+  if (!Array.isArray(columns) || columns.length === 0) {
+    return '空列配置';
+  }
+  const titles = columns
+    .slice(0, 6)
+    .map((column) => {
+      if (!column || typeof column !== 'object') {
+        return '';
+      }
+      const title = (column as { title?: unknown }).title;
+      return typeof title === 'string' || typeof title === 'number' ? String(title).trim() : '';
+    })
+    .filter(Boolean);
+  if (titles.length === 0) {
+    return `共 ${columns.length} 列`;
+  }
+  return `[${titles.join(', ')}${columns.length > titles.length ? ', ...' : ''}]`;
+}
+
+function summarizeInsertedNode(operation: Extract<AgentOperation, { op: 'schema.insertNode' }>): string {
+  const nodeId = typeof operation.node.id === 'string' && operation.node.id.trim() ? `#${operation.node.id}` : '';
+  const target = operation.parentId ? `节点 ${operation.parentId}` : operation.container === 'dialogs' ? 'dialogs 容器' : 'body 容器';
+  return `在 ${target} 下插入 ${operation.node.component}${nodeId}`;
+}
+
 function truncateText(text: string, maxChars: number): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (normalized.length <= maxChars) {
@@ -38,25 +99,30 @@ function groupConversationTurns(messages: AgentMemoryMessage[]): ConversationTur
   return turns;
 }
 
-function summarizeOperation(operation: AgentOperation): string {
+export function summarizeOperation(operation: AgentOperation): string {
+  const prefix = operation.label ? `${operation.label}: ` : '';
   switch (operation.op) {
     case 'schema.patchProps':
+      return `${prefix}修改节点 ${operation.nodeId} 的属性 ${summarizePatchEntries(operation.patch)}`;
     case 'schema.patchStyle':
+      return `${prefix}调整节点 ${operation.nodeId} 的样式 ${summarizePatchEntries(operation.patch)}`;
     case 'schema.patchEvents':
+      return `${prefix}更新节点 ${operation.nodeId} 的事件 ${summarizePatchEntries(operation.patch)}`;
     case 'schema.patchLogic':
+      return `${prefix}更新节点 ${operation.nodeId} 的逻辑 ${summarizePatchEntries(operation.patch)}`;
     case 'schema.patchColumns':
-      return `${operation.op}(${operation.nodeId})`;
+      return `${prefix}更新节点 ${operation.nodeId} 的表格列 ${summarizeColumns(operation.columns)}`;
     case 'schema.insertNode':
-      return `${operation.op}(${operation.parentId})`;
+      return `${prefix}${summarizeInsertedNode(operation)}`;
     case 'schema.removeNode':
-      return `${operation.op}(${operation.nodeId})`;
+      return `${prefix}删除节点 ${operation.nodeId}`;
     case 'schema.replace':
-      return 'schema.replace -> full page';
+      return `${prefix}替换整页 schema`;
   }
 }
 
-function summarizeOperations(operations: AgentOperation[]): string {
-  return operations.map((operation) => summarizeOperation(operation)).join(', ');
+export function summarizeOperations(operations: AgentOperation[]): string {
+  return operations.map((operation) => summarizeOperation(operation)).join('；');
 }
 
 function formatAttachmentSize(sizeBytes: number): string {

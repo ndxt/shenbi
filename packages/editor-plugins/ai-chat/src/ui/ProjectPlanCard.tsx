@@ -20,6 +20,28 @@ export interface ProjectPlanCardProps {
   onSubmitRevision: (text: string) => void;
 }
 
+const UNGROUPED_KEY = '__ungrouped__';
+
+function groupProjectPlanPages(pages: ProjectPlan['pages']) {
+  const groups = new Map<string, { title: string; pages: ProjectPlan['pages'] }>();
+  for (const page of pages) {
+    const normalizedGroup = typeof page.group === 'string' && page.group.trim() ? page.group.trim() : undefined;
+    const key = normalizedGroup ?? UNGROUPED_KEY;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        title: normalizedGroup ?? '未分组',
+        pages: [],
+      });
+    }
+    groups.get(key)!.pages.push(page);
+  }
+  return Array.from(groups.entries()).map(([key, value]) => ({
+    key,
+    title: value.title,
+    pages: value.pages,
+  }));
+}
+
 function getActionClass(action: 'create' | 'modify' | 'skip'): string {
   switch (action) {
     case 'create':
@@ -63,6 +85,7 @@ export function ProjectPlanCard({
   const { t } = useTranslation('pluginAiChat');
   const [revisionText, setRevisionText] = React.useState('');
   const [expandedPages, setExpandedPages] = React.useState<Record<string, boolean>>({});
+  const [expandedEvidence, setExpandedEvidence] = React.useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
     if (!planRevisionRequested) {
@@ -85,6 +108,8 @@ export function ProjectPlanCard({
   const awaitingConfirmation = phase === 'awaiting_confirmation';
   const showInlineStatus = !embedded && !awaitingConfirmation && phase !== 'done';
   const pageProgressMap = new Map((pages ?? []).map((page) => [page.pageId, page]));
+  const groupedPages = groupProjectPlanPages(projectPlan.pages);
+  const showGroupHeading = groupedPages.length > 1 || groupedPages.some((group) => group.key !== UNGROUPED_KEY);
   const wrapperClassName = embedded
     ? 'flex flex-col gap-2'
     : 'bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-3 shadow-sm';
@@ -136,63 +161,95 @@ export function ProjectPlanCard({
       )}
 
       <div className="flex flex-col gap-2">
-        {projectPlan.pages.map((page) => {
-          const pageProgress = pageProgressMap.get(page.pageId);
-          const isExpanded = expandedPages[page.pageId] ?? false;
-          const canExpand = !awaitingConfirmation && Boolean(pageProgress?.execution);
-          return (
-          <div key={page.pageId} className="group rounded-md border border-border-ide bg-bg-panel/70 px-3 py-2 flex flex-col gap-1.5 transition-colors hover:bg-bg-panel hover:border-blue-500/30">
-            <div className="flex items-center gap-2 flex-wrap">
-              {canExpand && (
-                <button
-                  type="button"
-                  className="rounded p-0.5 text-text-secondary hover:text-text-primary transition-colors"
-                  onClick={() => setExpandedPages((current) => ({
-                    ...current,
-                    [page.pageId]: !isExpanded,
-                  }))}
-                  aria-label={isExpanded ? 'collapse page execution' : 'expand page execution'}
-                >
-                  {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                </button>
-              )}
-              <span className="font-semibold text-text-primary" style={{ fontSize: '13px' }}>{page.pageName}</span>
-              {awaitingConfirmation ? (
-                <span className={`px-1.5 py-0.5 rounded uppercase tracking-wider font-medium ${getActionClass(page.action)}`} style={{ fontSize: '10px' }}>
-                  {page.action}
-                </span>
-              ) : pageProgress ? (
-                <span className={`px-1.5 py-0.5 rounded uppercase tracking-wider font-medium ${getProgressClass(pageProgress.status)}`} style={{ fontSize: '10px' }}>
-                  {pageProgress.status}
-                </span>
-              ) : null}
-              <span className="text-text-secondary font-mono" style={{ fontSize: '11px' }}>{page.pageId}</span>
-              {!awaitingConfirmation && pageProgress?.fileId && (
-                <span className="text-text-secondary ml-1" style={{ fontSize: '11px' }}>
-                  {t('loop.fileIdLabel')}: <span className="font-mono">{pageProgress.fileId}</span>
-                </span>
-              )}
-            </div>
-            <div className="text-text-secondary whitespace-pre-wrap" style={{ fontSize: '11px' }}>{page.description}</div>
-            {page.reason && (
-              <div className="text-text-secondary/80" style={{ fontSize: '10px' }}>
-                {t('loop.reasonLabel')}: {page.reason}
+        {groupedPages.map((group) => (
+          <div key={group.key} className="flex flex-col gap-2">
+            {showGroupHeading && (
+              <div className="px-1 pt-1 text-text-secondary font-semibold tracking-wide" style={{ fontSize: '11px' }}>
+                {group.title}
               </div>
             )}
-            {!awaitingConfirmation && pageProgress?.execution && isExpanded && (
-              <PageExecutionDetails
-                snapshot={pageProgress.execution}
-                variant="embedded"
-                isRunning={pageProgress.status === 'running'}
-              />
-            )}
-            {!awaitingConfirmation && pageProgress?.error && (
-              <div className="rounded bg-red-500/10 border border-red-500/20 px-2 py-1.5 text-red-400" style={{ fontSize: '11px' }}>
-                {pageProgress.error}
-              </div>
-            )}
+            {group.pages.map((page) => {
+              const pageProgress = pageProgressMap.get(page.pageId);
+              const isExpanded = expandedPages[page.pageId] ?? false;
+              const canExpand = !awaitingConfirmation && Boolean(pageProgress?.execution);
+              const isEvidenceExpanded = expandedEvidence[page.pageId] ?? false;
+              return (
+                <div key={page.pageId} className="group rounded-md border border-border-ide bg-bg-panel/70 px-3 py-2 flex flex-col gap-1.5 transition-colors hover:bg-bg-panel hover:border-blue-500/30">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {canExpand && (
+                      <button
+                        type="button"
+                        className="rounded p-0.5 text-text-secondary hover:text-text-primary transition-colors"
+                        onClick={() => setExpandedPages((current) => ({
+                          ...current,
+                          [page.pageId]: !isExpanded,
+                        }))}
+                        aria-label={isExpanded ? 'collapse page execution' : 'expand page execution'}
+                      >
+                        {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      </button>
+                    )}
+                    <span className="font-semibold text-text-primary" style={{ fontSize: '13px' }}>{page.pageName}</span>
+                    {awaitingConfirmation ? (
+                      <span className={`px-1.5 py-0.5 rounded uppercase tracking-wider font-medium ${getActionClass(page.action)}`} style={{ fontSize: '10px' }}>
+                        {page.action}
+                      </span>
+                    ) : pageProgress ? (
+                      <span className={`px-1.5 py-0.5 rounded uppercase tracking-wider font-medium ${getProgressClass(pageProgress.status)}`} style={{ fontSize: '10px' }}>
+                        {pageProgress.status}
+                      </span>
+                    ) : null}
+                    <span className="text-text-secondary font-mono" style={{ fontSize: '11px' }}>{page.pageId}</span>
+                    {!awaitingConfirmation && pageProgress?.fileId && (
+                      <span className="text-text-secondary ml-1" style={{ fontSize: '11px' }}>
+                        {t('loop.fileIdLabel')}: <span className="font-mono">{pageProgress.fileId}</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-text-secondary whitespace-pre-wrap" style={{ fontSize: '11px' }}>{page.description}</div>
+                  {page.evidence && (
+                    <div className="flex flex-col gap-1">
+                      <button
+                        type="button"
+                        className="self-start rounded border border-border-ide px-2 py-1 text-text-secondary hover:text-text-primary hover:border-blue-500/40 transition-colors"
+                        style={{ fontSize: '10px' }}
+                        onClick={() => setExpandedEvidence((current) => ({
+                          ...current,
+                          [page.pageId]: !isEvidenceExpanded,
+                        }))}
+                        aria-label={isEvidenceExpanded ? 'hide evidence' : 'show evidence'}
+                      >
+                        {isEvidenceExpanded ? '收起依据摘录' : '查看依据摘录'}
+                      </button>
+                      {isEvidenceExpanded && (
+                        <div className="rounded border border-border-ide bg-bg-canvas/70 px-2 py-1.5 text-text-secondary whitespace-pre-wrap" style={{ fontSize: '10px' }}>
+                          {page.evidence}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {page.reason && (
+                    <div className="text-text-secondary/80" style={{ fontSize: '10px' }}>
+                      {t('loop.reasonLabel')}: {page.reason}
+                    </div>
+                  )}
+                  {!awaitingConfirmation && pageProgress?.execution && isExpanded && (
+                    <PageExecutionDetails
+                      snapshot={pageProgress.execution}
+                      variant="embedded"
+                      isRunning={pageProgress.status === 'running'}
+                    />
+                  )}
+                  {!awaitingConfirmation && pageProgress?.error && (
+                    <div className="rounded bg-red-500/10 border border-red-500/20 px-2 py-1.5 text-red-400" style={{ fontSize: '11px' }}>
+                      {pageProgress.error}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )})}
+        ))}
       </div>
 
       {awaitingConfirmation && (

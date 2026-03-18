@@ -673,6 +673,8 @@ describe('useAgentLoop', () => {
             pageName: '订单详情页',
             action: 'create',
             description: '展示订单详情和商品信息',
+            prompt: '订单详情页完整建页说明',
+            evidence: '文档要求展示基础信息与物流信息。',
           },
         ],
       },
@@ -690,6 +692,8 @@ describe('useAgentLoop', () => {
         pageName: '订单详情页',
         action: 'create',
         description: '展示订单详情和商品信息',
+        prompt: '订单详情页完整建页说明',
+        evidence: '文档要求展示基础信息与物流信息。',
         status: 'waiting',
       },
     ]);
@@ -700,9 +704,10 @@ describe('useAgentLoop', () => {
       actionInput: {
         pageId: 'order-detail',
         pageName: '订单详情页',
-        description: '展示订单详情和商品信息',
+        prompt: '订单详情页完整建页说明',
+        evidence: '文档要求展示基础信息与物流信息。',
       },
-      rawActionInput: '{"pageId":"order-detail","pageName":"订单详情页","description":"展示订单详情和商品信息"}',
+      rawActionInput: '{"pageId":"order-detail","pageName":"订单详情页","prompt":"订单详情页完整建页说明","evidence":"文档要求展示基础信息与物流信息。"}',
     });
 
     const fallbackFinish = buildExecutionFallbackAction({
@@ -884,6 +889,77 @@ describe('useAgentLoop', () => {
     expect(onError).not.toHaveBeenCalled();
     expect(onDone).toHaveBeenCalled();
     expect(result.current.phase).toBe('done');
+  });
+
+  it('preserves group, prompt, and evidence on confirmed project plans', async () => {
+    const { bridge } = createBridge();
+    const persistence = createPersistence();
+    const client = new LoopScenarioAIClient([
+      { content: '{"action":"listWorkspaceFiles","actionInput":{}}' },
+      {
+        content: JSON.stringify({
+          action: 'proposeProjectPlan',
+          actionInput: {
+            projectName: '订单管理后台',
+            pages: [
+              {
+                pageId: 'order-list',
+                pageName: '订单列表页',
+                action: 'create',
+                group: '订单管理',
+                description: '展示订单列表',
+                prompt: '订单列表页完整建页说明',
+                evidence: '文档要求支持筛选、导出与行内编辑。',
+              },
+            ],
+          },
+        }),
+      },
+    ], []);
+    setAIClient(client);
+
+    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
+    let runPromise!: Promise<void>;
+
+    await act(async () => {
+      runPromise = result.current.runAgent(
+        '根据文档生成订单管理后台',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-plan-metadata',
+        () => 'msg-plan-metadata',
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.phase).toBe('awaiting_confirmation');
+      expect(result.current.pages[0]).toMatchObject({
+        pageId: 'order-list',
+        group: '订单管理',
+        prompt: '订单列表页完整建页说明',
+        evidence: '文档要求支持筛选、导出与行内编辑。',
+      });
+    });
+
+    const persisted = persistence.store.get('ai-chat:agent-loop-state') as {
+      pages: Array<Record<string, unknown>>;
+    };
+    expect(persisted.pages[0]).toMatchObject({
+      group: '订单管理',
+      prompt: '订单列表页完整建页说明',
+      evidence: '文档要求支持筛选、导出与行内编辑。',
+    });
+
+    await act(async () => {
+      await result.current.cancelRun();
+      await runPromise;
+    });
+
+    expect(result.current.phase).toBe('idle');
   });
 
   it('surfaces fs.createFile failures before writing schema', async () => {

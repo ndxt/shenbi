@@ -21,6 +21,9 @@ export interface AgentLoopPageProgress {
   pageName: string;
   action: 'create' | 'modify' | 'skip';
   description: string;
+  group?: string;
+  prompt?: string;
+  evidence?: string;
   status: AgentLoopPageStatus;
   reason?: string;
   fileId?: string;

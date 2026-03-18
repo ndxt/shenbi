@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildAgentLoopSystemPrompt, executeAgentTool, type ToolContext } from './agent-tools';
+import {
+  buildAgentLoopSystemPrompt,
+  buildCreatePagePrompt,
+  buildModifyPagePrompt,
+  executeAgentTool,
+  toProjectPlan,
+  type ToolContext,
+} from './agent-tools';
 import type { AgentLoopPageProgress } from './agent-loop-types';
 
 describe('buildAgentLoopSystemPrompt', () => {
@@ -15,7 +22,47 @@ describe('buildAgentLoopSystemPrompt', () => {
     expect(prompt).toContain('createPage');
     expect(prompt).toContain('项目规划一旦确认，后续按已确认计划继续执行');
     expect(prompt).toContain('不要返回数组');
+    expect(prompt).toContain('文档分析规则');
+    expect(prompt).toContain('group（所属模块）');
+    expect(prompt).toContain('evidence（文档关键摘录）');
     expect(prompt).not.toContain('错误示例');
+  });
+});
+
+describe('project plan helpers', () => {
+  it('parses group, prompt, and evidence from project plan pages', () => {
+    const plan = toProjectPlan({
+      projectName: '订单管理后台',
+      pages: [
+        {
+          pageId: 'order-list',
+          pageName: '订单列表页',
+          action: 'create',
+          description: '展示订单列表',
+          group: '订单管理',
+          prompt: '完整的建页 prompt',
+          evidence: '文档要求支持搜索、筛选和导出。',
+        },
+      ],
+    });
+
+    expect(plan.pages[0]).toMatchObject({
+      group: '订单管理',
+      prompt: '完整的建页 prompt',
+      evidence: '文档要求支持搜索、筛选和导出。',
+    });
+  });
+
+  it('prefers explicit prompts for create and modify actions', () => {
+    expect(buildCreatePagePrompt({
+      prompt: '使用完整 prompt 建页',
+      description: '这段描述不应被使用',
+    }, '订单列表页')).toBe('使用完整 prompt 建页');
+
+    expect(buildModifyPagePrompt({
+      prompt: '使用完整 prompt 修改页面',
+      description: '这段描述不应被使用',
+    })).toBe('使用完整 prompt 修改页面');
   });
 });
 
@@ -95,6 +142,40 @@ describe('executeAgentTool', () => {
     }, expect.objectContaining({
       pageId: 'order-list-page',
       pageName: '订单列表页',
+    }));
+  });
+
+  it('passes parsed project plan metadata to proposeProjectPlan', async () => {
+    const proposeProjectPlan = vi.fn(async () => 'ok');
+    await executeAgentTool(
+      createContext({ proposeProjectPlan }),
+      'proposeProjectPlan',
+      {
+        projectName: '订单管理后台',
+        pages: [
+          {
+            pageId: 'order-list',
+            pageName: '订单列表页',
+            action: 'create',
+            description: '展示订单列表',
+            group: '订单管理',
+            prompt: '订单列表页详细建页说明',
+            evidence: '文档明确要求支持筛选与导出。',
+          },
+        ],
+      },
+      new Map<string, AgentLoopPageProgress>(),
+    );
+
+    expect(proposeProjectPlan).toHaveBeenCalledWith(expect.objectContaining({
+      projectName: '订单管理后台',
+      pages: [
+        expect.objectContaining({
+          group: '订单管理',
+          prompt: '订单列表页详细建页说明',
+          evidence: '文档明确要求支持筛选与导出。',
+        }),
+      ],
     }));
   });
 });

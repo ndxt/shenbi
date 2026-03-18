@@ -28,6 +28,7 @@ const AGENT_LOOP_PERSISTENCE_KEY = 'agent-loop-state';
 const MAX_LOOP_ITERATIONS = 30;
 const TOOL_IDLE_TIMEOUT_MS = 90_000;
 const AI_DEBUG_API_BASE = import.meta.env.PROD ? '/locode/shenbi/api/ai/debug' : '/api/ai/debug';
+const AGENT_LOOP_ABORTED_ERROR = 'Agent Loop aborted';
 
 function summarizeSchema(schema: PageSchema): string {
   const bodyCount = Array.isArray(schema.body) ? schema.body.length : schema.body ? 1 : 0;
@@ -190,6 +191,10 @@ function formatParsedReActMessage(parsed: ParsedReActResponse): string {
   return JSON.stringify(obj);
 }
 
+function isAgentLoopAbortError(error: unknown): boolean {
+  return error instanceof Error && error.message === AGENT_LOOP_ABORTED_ERROR;
+}
+
 export function buildExecutionFallbackAction(
   loopState: LoopSessionState | undefined,
   pages: AgentLoopPageProgress[],
@@ -204,7 +209,8 @@ export function buildExecutionFallbackAction(
       const actionInput = {
         pageId: nextPage.pageId,
         pageName: nextPage.pageName,
-        description: nextPage.description,
+        ...(nextPage.prompt ? { prompt: nextPage.prompt } : { description: nextPage.description }),
+        ...(nextPage.evidence ? { evidence: nextPage.evidence } : {}),
       };
       return {
         reasoningSummary: '按已确认规划继续执行下一页',
@@ -217,7 +223,8 @@ export function buildExecutionFallbackAction(
     const actionInput = {
       fileId: nextPage.fileId ?? nextPage.pageId,
       pageName: nextPage.pageName,
-      description: nextPage.description,
+      ...(nextPage.prompt ? { prompt: nextPage.prompt } : { description: nextPage.description }),
+      ...(nextPage.evidence ? { evidence: nextPage.evidence } : {}),
     };
     return {
       reasoningSummary: '按已确认规划继续执行下一页',
@@ -915,6 +922,9 @@ export function useAgentLoop(
       pageName: page.pageName,
       action: page.action,
       description: page.description,
+      ...(page.group ? { group: page.group } : {}),
+      ...(page.prompt ? { prompt: page.prompt } : {}),
+      ...(page.evidence ? { evidence: page.evidence } : {}),
       status: page.action === 'skip' ? 'skipped' : 'waiting',
       expanded: false,
       ...(page.reason ? { reason: page.reason } : {}),
@@ -969,7 +979,8 @@ export function useAgentLoop(
       return;
     }
     abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
+    confirmResolverRef.current?.('用户已取消本轮项目规划');
+    confirmResolverRef.current = null;
     setIsLoopRunning(false);
     setProgressText('已取消');
     setPhase('idle');
@@ -1176,7 +1187,7 @@ export function useAgentLoop(
     try {
       for (let iteration = 0; iteration < MAX_LOOP_ITERATIONS; iteration += 1) {
         if (abortControllerRef.current?.signal.aborted) {
-          throw new Error('Agent Loop aborted');
+          throw new Error(AGENT_LOOP_ABORTED_ERROR);
         }
         setPhase(loopStateRef.current?.status === 'executing' ? 'executing' : 'thinking');
 
@@ -1273,6 +1284,9 @@ export function useAgentLoop(
           executeCreatePage,
           executeModifyPage,
         }, parsed.action, parsed.actionInput, pageLookupRef.current);
+        if (abortControllerRef.current?.signal.aborted) {
+          throw new Error(AGENT_LOOP_ABORTED_ERROR);
+        }
         let observation = typeof observationValue === 'string'
           ? observationValue
           : JSON.stringify(observationValue, null, 2);
@@ -1356,6 +1370,14 @@ export function useAgentLoop(
 
       throw new Error(`Agent Loop exceeded ${MAX_LOOP_ITERATIONS} iterations`);
     } catch (error) {
+      if (isAgentLoopAbortError(error)) {
+        abortControllerRef.current = null;
+        setIsLoopRunning(false);
+        setPhase('idle');
+        setErrorMessage(undefined);
+        setProgressText('已取消');
+        return;
+      }
       let message = error instanceof Error ? error.message : String(error);
       tracerRef.current?.updateLastError(message);
       const failedSteps = tracerRef.current?.snapshot() ?? [];

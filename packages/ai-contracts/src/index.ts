@@ -36,6 +36,9 @@ export interface ProjectPlanPage {
   pageName: string;
   action: ProjectPlanPageAction;
   description: string;
+  group?: string;
+  prompt?: string;
+  evidence?: string;
   reason?: string;
 }
 
