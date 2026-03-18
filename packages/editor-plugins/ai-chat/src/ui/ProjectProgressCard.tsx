@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { FileStack } from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
 import type { AgentLoopPageProgress } from '../ai/agent-loop-types';
@@ -25,6 +25,15 @@ function getStatusClass(status: AgentLoopPageProgress['status']): string {
 
 export function ProjectProgressCard({ pages }: ProjectProgressCardProps) {
   const { t } = useTranslation('pluginAiChat');
+  const runningRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to the running page item
+  const runningPageId = pages.find((p) => p.status === 'running')?.pageId;
+  useEffect(() => {
+    if (runningRef.current) {
+      runningRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [runningPageId]);
 
   if (pages.length === 0) {
     return null;
@@ -47,7 +56,11 @@ export function ProjectProgressCard({ pages }: ProjectProgressCardProps) {
 
       <div className="flex flex-col gap-2">
         {pages.map((page) => (
-          <div key={page.pageId} className="rounded-md border border-border-ide bg-bg-panel/70 p-3 flex flex-col gap-2">
+          <div
+            key={page.pageId}
+            ref={page.status === 'running' ? runningRef : undefined}
+            className="rounded-md border border-border-ide bg-bg-panel/70 p-3 flex flex-col gap-2"
+          >
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-text-primary" style={{ fontSize: '12px' }}>{page.pageName}</span>
               <span className={`px-1.5 py-0.5 rounded border uppercase tracking-wider ${getStatusClass(page.status)}`} style={{ fontSize: '10px' }}>

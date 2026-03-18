@@ -26,7 +26,7 @@ import { useAgentRun, type LastRunResult } from './useAgentRun';
 const PERSISTENCE_NAMESPACE = 'ai-chat';
 const AGENT_LOOP_PERSISTENCE_KEY = 'agent-loop-state';
 const MAX_LOOP_ITERATIONS = 30;
-const TOOL_IDLE_TIMEOUT_MS = 90_000;
+const TOOL_IDLE_TIMEOUT_MS = 0; // disabled: no timeout for page creation
 const AI_DEBUG_API_BASE = import.meta.env.PROD ? '/locode/shenbi/api/ai/debug' : '/api/ai/debug';
 const AGENT_LOOP_ABORTED_ERROR = 'Agent Loop aborted';
 
@@ -86,7 +86,8 @@ function createIdleTimeoutSignal(parentSignal?: AbortSignal, timeoutMs = TOOL_ID
   };
 
   const armTimer = () => {
-    clearTimer();
+    if (timeoutMs <= 0) return; // timeout disabled
+    if (timeoutMs <= 0) return; // timeout disabled
     timeoutId = window.setTimeout(() => {
       timedOut = true;
       controller.abort();
