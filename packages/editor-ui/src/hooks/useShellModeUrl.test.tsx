@@ -13,6 +13,11 @@ describe('useShellModeUrl', () => {
     expect(getInitialShellMode()).toBe('shell');
   });
 
+  it('优先从 URL query 读取 scenarios 模式', () => {
+    window.history.replaceState(null, '', '/?mode=scenarios');
+    expect(getInitialShellMode()).toBe('scenarios');
+  });
+
   it('URL 未命中时可回退到全局 flag', () => {
     (window as unknown as Record<string, unknown>).__SHENBI_SHELL_MODE__ = true;
     expect(getInitialShellMode()).toBe('shell');
@@ -24,7 +29,7 @@ describe('useShellModeUrl', () => {
     vi.unstubAllGlobals();
   });
 
-  it('syncShellModeToUrl 可写入并删除 mode 查询参数', () => {
+  it('syncShellModeToUrl 可写入 mode 查询参数', () => {
     window.history.replaceState(null, '', '/?page=1');
     syncShellModeToUrl('shell');
     expect(window.location.search).toContain('page=1');
@@ -32,6 +37,7 @@ describe('useShellModeUrl', () => {
 
     syncShellModeToUrl('scenarios');
     expect(window.location.search).toContain('page=1');
+    expect(window.location.search).toContain('mode=scenarios');
     expect(window.location.search).not.toContain('mode=shell');
   });
 
@@ -39,7 +45,7 @@ describe('useShellModeUrl', () => {
     window.history.replaceState(null, '', '/');
     const { result } = renderHook(() => useShellModeUrl());
 
-    expect(result.current[0]).toBe('scenarios');
+    expect(result.current[0]).toBe('shell');
 
     act(() => {
       result.current[1]('shell');
@@ -49,6 +55,6 @@ describe('useShellModeUrl', () => {
     act(() => {
       result.current[1]('scenarios');
     });
-    expect(window.location.search).toBe('');
+    expect(window.location.search).toContain('mode=scenarios');
   });
 });

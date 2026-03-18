@@ -440,7 +440,7 @@ describe('preview/App integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    window.history.replaceState(null, '', '/');
+    window.history.replaceState(null, '', '/?mode=scenarios');
     window.localStorage.clear();
     clearShellModeFlag();
     fetchMock.mockResolvedValue({
@@ -484,7 +484,7 @@ describe('preview/App integration', () => {
   });
 
   it('syncToUrl: 首次加载会从 URL 恢复查询条件', async () => {
-    window.history.replaceState(null, '', '/?keyword=User+2&page=1');
+    window.history.replaceState(null, '', '/?mode=scenarios&keyword=User+2&page=1');
     render(createElement(App));
 
     const input = screen.getByPlaceholderText('搜索关键词...') as HTMLInputElement;

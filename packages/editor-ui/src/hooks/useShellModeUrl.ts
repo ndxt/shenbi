@@ -27,8 +27,12 @@ export function getInitialShellMode(options?: ShellModeUrlOptions): ShellMode {
   }
 
   const search = new URLSearchParams(window.location.search);
-  if (search.get(resolved.queryKey) === resolved.shellValue) {
+  const modeValue = search.get(resolved.queryKey);
+  if (modeValue === resolved.shellValue) {
     return 'shell';
+  }
+  if (modeValue === 'scenarios') {
+    return 'scenarios';
   }
 
   const globalFlag = (window as unknown as Record<string, unknown>)[resolved.globalFlagKey];
@@ -36,7 +40,7 @@ export function getInitialShellMode(options?: ShellModeUrlOptions): ShellMode {
     return 'shell';
   }
 
-  return 'scenarios';
+  return 'shell';
 }
 
 export function syncShellModeToUrl(mode: ShellMode, options?: ShellModeUrlOptions): void {
@@ -49,7 +53,7 @@ export function syncShellModeToUrl(mode: ShellMode, options?: ShellModeUrlOption
   if (mode === 'shell') {
     url.searchParams.set(resolved.queryKey, resolved.shellValue);
   } else {
-    url.searchParams.delete(resolved.queryKey);
+    url.searchParams.set(resolved.queryKey, 'scenarios');
   }
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }

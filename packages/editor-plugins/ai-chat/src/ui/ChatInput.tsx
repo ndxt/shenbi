@@ -113,13 +113,20 @@ function DropdownMenu({
                         items.map((item, idx) => (
                             <div
                                 key={idx}
-                                className="flex items-center justify-between border-b border-border-ide last:border-b-0 px-3 py-2"
+                                className="flex items-center justify-between border-b border-border-ide last:border-b-0 px-3 py-2 transition-colors hover:bg-bg-activity-bar cursor-pointer"
                                 style={{ fontSize: '12px' }}
                             >
                                 <button
                                     type="button"
-                                    className="text-left text-text-primary whitespace-normal break-words leading-relaxed flex-1 pr-2"
-                                    style={{ transition: 'background-color 0.15s ease' }}
+                                    className="text-left text-text-primary flex-1 pr-2 overflow-hidden"
+                                    style={{
+                                        transition: 'background-color 0.15s ease',
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden',
+                                        lineHeight: '1.6',
+                                    }}
                                     title={item.title || item.value}
                                     onClick={() => {
                                         onSelect(item.value);
@@ -131,7 +138,7 @@ function DropdownMenu({
                                 {item.onRemove && (
                                     <button
                                         type="button"
-                                        className="ml-2 text-text-secondary hover:text-text-primary"
+                                        className="ml-2 text-text-secondary hover:text-text-primary shrink-0"
                                         onClick={(event) => {
                                             event.stopPropagation();
                                             item.onRemove?.(item.value);
@@ -312,29 +319,28 @@ export function ChatInput({
                         onKeyDown={handleKeyDown}
                         disabled={disabled || isRunning}
                     />
-                    <div
-                        className="pointer-events-none absolute inset-0 flex items-end justify-end p-2"
-                        style={{ zIndex: 1 }}
-                    >
-                        {isRunning ? (
-                            <button
-                                onClick={onCancel}
-                                className="pointer-events-auto p-1.5 text-text-primary hover:bg-bg-panel rounded transition-colors border border-border-ide bg-bg-canvas"
-                                title="Cancel"
-                            >
-                                <Square size={13} fill="currentColor" />
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleSend}
-                                disabled={(!text.trim() && attachments.length === 0) || disabled}
-                                className="pointer-events-auto p-1.5 text-white bg-blue-600 hover:bg-blue-500 disabled:bg-bg-canvas disabled:text-text-secondary disabled:border disabled:border-border-ide rounded transition-colors shadow-sm flex items-center justify-center h-[28px] w-[28px]"
-                                title="Send"
-                            >
-                                <Send size={13} className="-ml-0.5 mt-0.5" />
-                            </button>
-                        )}
-                    </div>
+                    {isRunning ? (
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="absolute bottom-2 right-2 p-1.5 text-text-primary hover:bg-bg-panel rounded transition-colors border border-border-ide bg-bg-canvas"
+                            style={{ zIndex: 1 }}
+                            title="Cancel"
+                        >
+                            <Square size={13} fill="currentColor" />
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleSend}
+                            disabled={(!text.trim() && attachments.length === 0) || disabled}
+                            className="absolute bottom-2 right-2 p-1.5 text-white bg-blue-600 hover:bg-blue-500 disabled:bg-bg-canvas disabled:text-text-secondary disabled:border disabled:border-border-ide rounded transition-colors shadow-sm flex items-center justify-center h-[28px] w-[28px]"
+                            style={{ zIndex: 1 }}
+                            title="Send"
+                        >
+                            <Send size={13} className="-ml-0.5 mt-0.5" />
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
