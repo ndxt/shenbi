@@ -1,6 +1,7 @@
 import {
-  buildSelectedNodeHint,
+  buildFocusedNodeContext,
   formatConversationHistory,
+  summarizeOperations,
   type ModifyResult,
   type ModifySchemaInput,
 } from '@shenbi/ai-agents';
@@ -508,15 +509,32 @@ function needsPhase2(op: PlanOperation): op is PlanInsertNodeSkeleton {
 //  Phase 1: Plan prompt
 // ---------------------------------------------------------------------------
 
+function formatLastSuccessfulOperations(operations: AgentOperation[] | undefined): {
+  summary: string;
+  rawJson: string;
+} {
+  if (!operations || operations.length === 0) {
+    return {
+      summary: '[none]',
+      rawJson: '[]',
+    };
+  }
+  return {
+    summary: summarizeOperations(operations),
+    rawJson: JSON.stringify(operations, null, 2),
+  };
+}
+
 function createPlanMessages(input: ModifySchemaInput): OpenAICompatibleMessage[] {
   const conversationHistory = formatConversationHistory(input.context.conversation.history, {
     ...(input.context.document.schemaDigest ? { schemaDigest: input.context.document.schemaDigest } : {}),
   });
-  const selectedNodeHint = buildSelectedNodeHint(input.request.selectedNodeId);
+  const focusedNodeContext = buildFocusedNodeContext(
+    input.request.context.schemaJson ?? input.context.document.schema,
+    input.request.selectedNodeId,
+  );
   const documentTree = input.context.document.tree ?? '[schema tree unavailable]';
-  const lastOperations = input.context.conversation.lastOperations?.length
-    ? JSON.stringify(input.context.conversation.lastOperations, null, 2)
-    : '[]';
+  const lastOperations = formatLastSuccessfulOperations(input.context.conversation.lastOperations);
 
   return [
     {
@@ -554,6 +572,9 @@ function createPlanMessages(input: ModifySchemaInput): OpenAICompatibleMessage[]
         'Rules:',
         '- nodeId and parentId must reference schema node ids from the provided schema tree.',
         '- Prefer patch operations over schema.replace when a local edit is enough.',
+        '- When Focused Node Context is provided, prioritize it before scanning the full schema tree.',
+        '- For references like "这个", "刚才那个", "上面的第三列", "左边那个按钮", first resolve them with Focused Node Context, adjacent siblings, local subtree, and last successful operations. Only fall back to the full schema tree when local context is insufficient.',
+        '- If Focused Node Context resolves an editor path to a schema nodeId, use the resolved schema nodeId rather than the raw path string.',
         '- For insertNode: include index when the user specifies a position (e.g. "上面/之前/before", "下面/之后/after", "第一个/最前"). To compute index, count the target sibling\'s position in the parent\'s children list (0-based). Example: if siblings are [A, B, Table], inserting "above Table" means index=2. Omit index ONLY when no position is specified (append to end).',
         '- explanation should be a short Chinese sentence summarizing what will change.',
         '- Do not invent node ids that are not grounded in the schema tree.',
@@ -571,13 +592,15 @@ function createPlanMessages(input: ModifySchemaInput): OpenAICompatibleMessage[]
       content: buildUserMessageContentFromLines([
         `Prompt: ${input.request.prompt}`,
         `Schema Summary: ${input.context.document.summary}`,
-        ...(selectedNodeHint ? [selectedNodeHint] : []),
+        ...(focusedNodeContext ? ['Focused Node Context:', focusedNodeContext] : []),
         'Schema Tree:',
         documentTree,
         'Conversation History:',
         conversationHistory,
-        'Last Successful Operations:',
-        lastOperations,
+        'Last Successful Operations Summary:',
+        lastOperations.summary,
+        'Last Successful Operations Raw JSON (secondary reference):',
+        lastOperations.rawJson,
       ], input.request.attachments),
     },
   ];

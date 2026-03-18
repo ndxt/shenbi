@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PageSchema } from '@shenbi/schema';
-import { serializeSchemaTree } from './schema-tree';
+import { serializeSchemaSubtree, serializeSchemaTree, summarizeSchemaNode } from './schema-tree';
 
 function createSchema(): PageSchema {
   return {
@@ -39,6 +39,16 @@ function createSchema(): PageSchema {
             component: 'Col',
             props: { span: 12 },
             children: [
+              {
+                id: 'search-input',
+                component: 'Input',
+                props: { placeholder: '请输入姓名关键词' },
+              },
+              {
+                id: 'plain-text',
+                component: 'Typography.Text',
+                children: ['最近7天新增用户'],
+              },
               {
                 id: 'table-1',
                 component: 'Table',
@@ -83,6 +93,8 @@ describe('serializeSchemaTree', () => {
     expect(tree).toContain('[body]');
     expect(tree).toContain('Card#card-1(title="用户统计")');
     expect(tree).toContain('Statistic#stat-1(title="总用户数", value="{{state.total}}")');
+    expect(tree).toContain('Input#search-input(placeholder="请输入姓名关键词")');
+    expect(tree).toContain('Typography.Text#plain-text(text="最近7天新增用户")');
     expect(tree).toContain('Table#table-1(columns=["姓名", "年龄"], dataSource="{{state.users}}")');
     expect(tree).toContain('[dialogs]');
     expect(tree).toContain('Form.Item#fi-1(label="姓名", name="name") -> Input#input-1');
@@ -118,5 +130,18 @@ describe('serializeSchemaTree', () => {
     expect(tree).toContain('Container#root');
     expect(tree).toContain('  Container#nested-1');
     expect(tree).toContain('    -> 1 children');
+  });
+
+  it('summarizes individual nodes and serializes focused subtrees', () => {
+    const schema = createSchema();
+    const rootRow = Array.isArray(schema.body) ? schema.body[0] : schema.body;
+    const col1 = Array.isArray(rootRow?.children) ? rootRow.children[0] : undefined;
+    const col2 = Array.isArray(rootRow?.children) ? rootRow.children[1] : undefined;
+    const card = Array.isArray(col1?.children) ? col1.children[0] : undefined;
+    const searchInput = Array.isArray(col2?.children) ? col2.children[0] : undefined;
+
+    expect(searchInput && summarizeSchemaNode(searchInput)).toBe('Input#search-input(placeholder="请输入姓名关键词")');
+    expect(card && serializeSchemaSubtree(card)).toContain('Card#card-1(title="用户统计")');
+    expect(card && serializeSchemaSubtree(card)).toContain('Statistic#stat-1(title="总用户数", value="{{state.total}}")');
   });
 });

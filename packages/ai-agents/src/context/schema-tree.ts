@@ -5,6 +5,8 @@ export interface SerializeOptions {
   maxNodes?: number;
 }
 
+const MAX_TEXT_PREVIEW_CHARS = 40;
+
 interface SerializeState {
   readonly maxDepth: number;
   readonly maxNodes: number;
@@ -19,8 +21,15 @@ function getIndent(depth: number): string {
   return '  '.repeat(depth);
 }
 
+function truncateText(value: string, maxChars = MAX_TEXT_PREVIEW_CHARS): string {
+  if (value.length <= maxChars) {
+    return value;
+  }
+  return `${value.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
+}
+
 function quoteString(value: string): string {
-  return `"${value.replace(/\s+/g, ' ').trim()}"`;
+  return `"${truncateText(value.replace(/\s+/g, ' ').trim())}"`;
 }
 
 function formatPrimitive(value: unknown): string {
@@ -46,17 +55,29 @@ function formatPrimitive(value: unknown): string {
   return String(value);
 }
 
-function collectText(value: unknown): string {
+function collectText(value: unknown, includeNestedSchemaNodes = true): string {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return String(value).trim();
   }
   if (Array.isArray(value)) {
-    return value.map((item) => collectText(item)).filter(Boolean).join(' ').trim();
+    return value
+      .map((item) => collectText(item, includeNestedSchemaNodes))
+      .filter(Boolean)
+      .join(' ')
+      .trim();
   }
-  if (isSchemaNode(value)) {
+  if (includeNestedSchemaNodes && isSchemaNode(value)) {
     return collectText(value.children);
   }
   return '';
+}
+
+function getNodeTextSummary(node: SchemaNode): string | undefined {
+  const text = collectText(node.children, false);
+  if (!text) {
+    return undefined;
+  }
+  return quoteString(text);
 }
 
 function getDirectChildNodes(node: SchemaNode): SchemaNode[] {
@@ -123,7 +144,7 @@ function getKeyProps(node: SchemaNode): Array<[string, string]> {
       if (props.type !== undefined) {
         entries.push(['type', formatPrimitive(props.type)]);
       }
-      const text = collectText(node.children);
+      const text = collectText(node.children, false);
       if (text) {
         entries.push(['text', quoteString(text)]);
       }
@@ -149,6 +170,19 @@ function getKeyProps(node: SchemaNode): Array<[string, string]> {
       if (props.label !== undefined) {
         entries.push(['label', formatPrimitive(props.label)]);
       }
+      if (props.placeholder !== undefined) {
+        entries.push(['placeholder', formatPrimitive(props.placeholder)]);
+      }
+      if (props.name !== undefined) {
+        entries.push(['name', formatPrimitive(props.name)]);
+      }
+      if (props.dataIndex !== undefined) {
+        entries.push(['dataIndex', formatPrimitive(props.dataIndex)]);
+      }
+      const textSummary = getNodeTextSummary(node);
+      if (textSummary) {
+        entries.push(['text', textSummary]);
+      }
       return entries;
     }
   }
@@ -161,6 +195,10 @@ function formatNodeLabel(node: SchemaNode): string {
     return `${node.component}${idSuffix}`;
   }
   return `${node.component}${idSuffix}(${keyProps.map(([key, value]) => `${key}=${value}`).join(', ')})`;
+}
+
+export function summarizeSchemaNode(node: SchemaNode): string {
+  return formatNodeLabel(node);
 }
 
 function appendFoldLine(lines: string[], depth: number, childCount: number): void {
@@ -252,6 +290,17 @@ function appendStateSection(lines: string[], schema: PageSchema): void {
   for (const [key, value] of stateEntries) {
     lines.push(`  ${key}: ${inferStateType(value)}`);
   }
+}
+
+export function serializeSchemaSubtree(node: SchemaNode, options: SerializeOptions = {}): string {
+  const lines: string[] = [];
+  const state: SerializeState = {
+    maxDepth: options.maxDepth ?? 2,
+    maxNodes: options.maxNodes ?? 24,
+    visitedNodes: 0,
+  };
+  serializeNode(node, 0, lines, state);
+  return lines.join('\n');
 }
 
 export function serializeSchemaTree(schema: PageSchema, options: SerializeOptions = {}): string {

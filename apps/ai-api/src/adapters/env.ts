@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export interface Env {
   PORT: number;
@@ -115,6 +116,25 @@ function mergeModelLists(...lists: Array<string[] | undefined>): string[] | unde
   return merged.length > 0 ? Array.from(new Set(merged)) : undefined;
 }
 
+function resolveWorkspaceRoot(startDir: string): string {
+  let currentDir = startDir;
+  while (true) {
+    if (
+      fs.existsSync(path.join(currentDir, 'pnpm-workspace.yaml'))
+      || fs.existsSync(path.join(currentDir, '.env.local'))
+      || fs.existsSync(path.join(currentDir, '.env'))
+    ) {
+      return currentDir;
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      return startDir;
+    }
+    currentDir = parentDir;
+  }
+}
+
 function resolveProviderConfig(
   loaded: Record<string, string>,
   provider: string,
@@ -199,9 +219,12 @@ function resolveProviderConfig(
 }
 
 function loadLocalEnvFiles(): Record<string, string> {
-  const cwdRoot = process.cwd();
-  const fallbackRoot = path.resolve(__dirname, '../../../../');
-  const rootDir = fs.existsSync(path.join(cwdRoot, 'package.json')) ? cwdRoot : fallbackRoot;
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const cwdRoot = resolveWorkspaceRoot(process.cwd());
+  const fallbackRoot = resolveWorkspaceRoot(path.resolve(currentDir, '../../../../'));
+  const rootDir = fs.existsSync(path.join(cwdRoot, '.env.local')) || fs.existsSync(path.join(cwdRoot, '.env'))
+    ? cwdRoot
+    : fallbackRoot;
   return {
     ...parseEnvFile(path.join(rootDir, '.env')),
     ...parseEnvFile(path.join(rootDir, '.env.local')),

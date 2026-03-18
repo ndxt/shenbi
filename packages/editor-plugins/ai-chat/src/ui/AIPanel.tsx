@@ -162,8 +162,8 @@ export function AIPanel({
     if (!target || typeof target.scrollIntoView !== 'function') {
       return;
     }
-    target.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, progressText]);
+    target.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, progressText, phase, pages]);
 
   useEffect(() => {
     if (!persistence || !uiHydrated) {
@@ -377,7 +377,7 @@ export function AIPanel({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
+        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-10 flex flex-col gap-6">
           {messages.length === 0 && (
             <div className="text-text-secondary text-center py-10 opacity-60 whitespace-pre-line" style={{ fontSize: '12px' }}>
               {t('message.welcome')}
@@ -387,13 +387,13 @@ export function AIPanel({
           <ChatMessageList messages={messages} onDismissRunResult={dismissRunResult} />
 
           {mode !== 'loop' && isRunning && (
-            <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col shadow-sm relative overflow-hidden mt-2">
+            <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex w-full min-w-0 self-stretch flex-col shadow-sm relative overflow-hidden mt-2">
               <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-400 to-blue-500 animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
-              <div className="flex items-center gap-2 text-text-primary pb-2 mb-2" style={{ fontSize: '11px' }}>
-                <LoaderCircle size={12} className="text-blue-500 shrink-0" style={{ animation: 'spin 1s linear infinite' }} />
-                <span className="font-semibold text-blue-500 shrink-0">{t('status.generating')}</span>
-                <span className="opacity-70 ml-1 truncate flex-1">{progressText}</span>
-                <span className="text-text-secondary font-mono shrink-0 tabular-nums" style={{ fontSize: '10px' }}>
+              <div className="flex items-start gap-2 text-text-primary pb-2 mb-2" style={{ fontSize: '11px' }}>
+                <LoaderCircle size={12} className="text-blue-500 shrink-0 mt-0.5" style={{ animation: 'spin 1s linear infinite' }} />
+                <span className="font-semibold text-blue-500 shrink-0 leading-5">{t('status.generating')}</span>
+                <span className="opacity-70 ml-1 flex-1 min-w-0 whitespace-pre-wrap break-words leading-5">{progressText}</span>
+                <span className="text-text-secondary font-mono shrink-0 tabular-nums leading-5 pt-0.5" style={{ fontSize: '10px' }}>
                   {Math.floor(elapsedMs / 1000)}s
                 </span>
               </div>
@@ -423,7 +423,7 @@ export function AIPanel({
 
 
 
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="h-8 shrink-0" />
         </div>
 
         <div className="border-t border-border-ide shrink-0 bg-bg-panel flex flex-col gap-2" style={{ padding: '8px' }}>
