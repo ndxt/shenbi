@@ -115,7 +115,6 @@ function createInitialScenarioSnapshots(): Record<ScenarioKey, EditorStateSnapsh
 function createEmptyShellSchema(): PageSchema {
   return {
     id: 'shell-page',
-    name: 'Shell Page',
     body: [],
   };
 }
@@ -295,6 +294,9 @@ export function App() {
   }, [fileEditor.eventBus]);
 
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : activeScenarioSnapshot.schema;
+  const shellSchemaName = appMode === 'shell' && tabSnapshot.tabs.length === 0
+    ? undefined
+    : activeSchema.name;
   const {
     activeFileName,
     filesPrimaryPanelOptions,
@@ -1121,7 +1123,7 @@ export function App() {
       onCanvasDeselectNode={handleCanvasDeselectNode}
       {...(selectedNode?.id ? { selectedNodeSchemaId: selectedNode.id } : {})}
       {...(breadcrumbHoveredSchemaId ? { hoveredNodeSchemaId: breadcrumbHoveredSchemaId } : {})}
-      schemaName={activeSchema.name}
+      schemaName={shellSchemaName}
       breadcrumbItems={breadcrumbItems}
       onBreadcrumbSelect={handleBreadcrumbSelect}
       onBreadcrumbHover={handleBreadcrumbHover}

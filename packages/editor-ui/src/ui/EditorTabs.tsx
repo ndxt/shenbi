@@ -326,7 +326,10 @@ export function EditorTabs({
   }
 
   // Legacy single-tab mode
-  const displayLabel = label || t('editorTabs.untitled');
+  const displayLabel = label?.trim();
+  if (!displayLabel) {
+    return null;
+  }
   return (
     <div className="h-9 bg-bg-editor border-b border-border-ide flex items-center shrink-0 overflow-x-auto scrollbar-hide">
       <TabItem label={displayLabel} icon={FileCode} active t={t} />
