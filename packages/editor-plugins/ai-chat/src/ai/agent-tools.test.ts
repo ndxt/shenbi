@@ -25,6 +25,9 @@ describe('buildAgentLoopSystemPrompt', () => {
     expect(prompt).toContain('文档分析规则');
     expect(prompt).toContain('group（所属模块）');
     expect(prompt).toContain('evidence（文档关键摘录）');
+    expect(prompt).toContain('description 只能是一句简明摘要');
+    expect(prompt).toContain('evidence 必须尽量逐字引用文档原文');
+    expect(prompt).toContain('禁止把 evidence 写成概括性改写');
     expect(prompt).not.toContain('错误示例');
   });
 });
@@ -63,6 +66,16 @@ describe('project plan helpers', () => {
       prompt: '使用完整 prompt 修改页面',
       description: '这段描述不应被使用',
     })).toBe('使用完整 prompt 修改页面');
+
+    expect(buildCreatePagePrompt({
+      description: '展示订单列表',
+      evidence: '（1）左上：全年统计看板；（2）左下：人员看板；（3）右侧：最新动态。',
+    }, '系统看板')).toContain('原文依据: （1）左上：全年统计看板；（2）左下：人员看板；（3）右侧：最新动态。');
+
+    expect(buildModifyPagePrompt({
+      description: '请按文档调整页面',
+      evidence: '（1）左上：全年统计看板；（2）左下：人员看板；（3）右侧：最新动态。',
+    })).toContain('原文依据: （1）左上：全年统计看板；（2）左下：人员看板；（3）右侧：最新动态。');
   });
 });
 

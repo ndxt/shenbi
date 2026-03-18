@@ -108,7 +108,7 @@ export function buildCreatePagePrompt(actionInput: Record<string, unknown>, page
     promptParts.push(`用户: ${targetUser}`);
   }
   if (evidence) {
-    promptParts.push(`依据: ${evidence}`);
+    promptParts.push(`原文依据: ${evidence}`);
   }
 
   return promptParts.join('\n');
@@ -131,7 +131,7 @@ export function buildModifyPagePrompt(actionInput: Record<string, unknown>): str
     parts.push(`交互调整: ${actionInput.interactions.trim()}`);
   }
   if (typeof actionInput.evidence === 'string' && actionInput.evidence.trim()) {
-    parts.push(`依据: ${actionInput.evidence.trim()}`);
+    parts.push(`原文依据: ${actionInput.evidence.trim()}`);
   }
   return parts.join('\n');
 }
@@ -216,7 +216,7 @@ export function buildAgentLoopSystemPrompt(): string {
     '## 正确示例',
     '{"action":"listWorkspaceFiles","actionInput":{}}',
     '',
-    '{"reasoningSummary":"根据用户需求规划项目","action":"proposeProjectPlan","actionInput":{"projectName":"订单管理后台","pages":[{"pageId":"order-list","pageName":"订单列表页","action":"create","group":"订单管理","description":"展示订单列表、筛选和分页","prompt":"订单列表页。\\n目标：展示订单列表，支持搜索、筛选、分页和导出。\\n筛选：订单状态、日期范围、客户关键词。\\n表格列：订单编号、客户名称、订单金额、下单时间、订单状态、操作。\\n操作：新建订单、查看详情、编辑、删除。","evidence":"文档要求订单列表支持状态筛选、日期筛选、导出和行内编辑。"},{"pageId":"order-detail","pageName":"订单详情页","action":"create","group":"订单管理","description":"展示订单基础信息、商品明细和物流信息","prompt":"订单详情页。\\n展示订单基础信息、商品明细、金额汇总、物流信息和操作记录。","evidence":"文档详细页章节要求展示基础信息、商品信息、物流和操作日志。"}]}}',
+    '{"reasoningSummary":"根据用户需求规划项目","action":"proposeProjectPlan","actionInput":{"projectName":"订单管理后台","pages":[{"pageId":"order-list","pageName":"订单列表页","action":"create","group":"订单管理","description":"展示订单列表、筛选和分页","prompt":"订单列表页。\\n目标：展示订单列表，支持搜索、筛选、分页和导出。\\n筛选：订单状态、日期范围、客户关键词。\\n表格列：订单编号、客户名称、订单金额、下单时间、订单状态、操作。\\n操作：新建订单、查看详情、编辑、删除。","evidence":"订单列表：支持订单状态筛选、日期筛选、导出和行内编辑。"},{"pageId":"order-detail","pageName":"订单详情页","action":"create","group":"订单管理","description":"展示订单基础信息、商品明细和物流信息","prompt":"订单详情页。\\n展示订单基础信息、商品明细、金额汇总、物流信息和操作记录。","evidence":"订单详情：展示基础信息、商品信息、物流信息和操作日志。"}]}}',
     '',
     '{"action":"createPage","actionInput":{"pageId":"order-list","pageName":"订单列表页","prompt":"订单列表页。\\n目标：展示订单列表，支持搜索、筛选、分页和导出。\\n筛选：订单状态、日期范围、客户关键词。\\n表格列：订单编号、客户名称、订单金额、下单时间、订单状态、操作。\\n操作：新建订单、查看详情、编辑、删除。"}}',
     '',
@@ -233,7 +233,10 @@ export function buildAgentLoopSystemPrompt(): string {
     '## 文档分析规则',
     '当用户上传了需求文档时，先从文档里提取功能模块、页面列表、字段、交互和权限信息，再生成项目计划。',
     'proposeProjectPlan 的每个页面应尽量包含：group（所属模块）、description（短摘要）、prompt（详细建页说明）、evidence（文档关键摘录）。',
-    'description 用于简明展示，prompt 用于后续 createPage / modifyPage 执行，evidence 用于保留文档依据。',
+    'description 只能是一句简明摘要，用于展示，不要把 description 写成完整需求。',
+    'evidence 必须尽量逐字引用文档原文，优先保留编号、括号、冒号、分号和关键字段名，禁止把 evidence 写成概括性改写。',
+    '如果原文过长，可以截取最关键的连续原文片段，并用省略号表示裁剪，但不要改变原句含义。',
+    'prompt 用于后续 createPage / modifyPage 执行，必须吸收 evidence 中的原文细节，而不是只重复 description。',
     '如果用户在多轮里继续修改或补充文档要求，新的页面 prompt 必须保留这些新增细节，不要退化成一句笼统描述。',
   ].join('\n');
 }

@@ -111,19 +111,19 @@ export function ProjectPlanCard({
   const groupedPages = groupProjectPlanPages(projectPlan.pages);
   const showGroupHeading = groupedPages.length > 1 || groupedPages.some((group) => group.key !== UNGROUPED_KEY);
   const wrapperClassName = embedded
-    ? 'flex flex-col gap-2'
-    : 'bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-3 shadow-sm';
+    ? 'flex w-full min-w-0 self-stretch flex-col gap-2'
+    : 'bg-bg-canvas border border-border-ide rounded-md p-3 flex w-full min-w-0 self-stretch flex-col gap-3 shadow-sm';
 
   return (
     <section className={wrapperClassName}>
       {!embedded && (
-        <div className="flex items-center justify-between gap-2 px-1">
-          <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2 px-1">
+          <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-1">
             <div className="flex items-center gap-2 shrink-0">
               <ClipboardList size={14} className="text-blue-500" />
               <span className="font-semibold text-text-primary" style={{ fontSize: '12px' }}>{t('loop.planTitle')}</span>
             </div>
-            <span className="text-text-primary font-medium truncate shrink-0" style={{ fontSize: '12px' }}>
+            <span className="text-text-primary font-medium min-w-0 break-words" style={{ fontSize: '12px' }}>
               {projectPlan.projectName}
             </span>
             {!awaitingConfirmation && !showInlineStatus && (
@@ -136,14 +136,14 @@ export function ProjectPlanCard({
                 <span className={`shrink-0 ${phase === 'error' ? 'text-red-400' : 'text-blue-500'}`} style={{ fontSize: '11px' }}>
                   {phase === 'error' ? t('loop.loopError') : t('loop.loopRunning')}
                 </span>
-                <span className="text-text-secondary truncate min-w-0" style={{ fontSize: '11px' }}>
+                <span className="text-text-secondary min-w-0 whitespace-pre-wrap break-words" style={{ fontSize: '11px' }}>
                   {progressText}
                 </span>
               </>
             )}
           </div>
           {showInlineStatus ? (
-            <span className="text-text-secondary font-mono tabular-nums shrink-0" style={{ fontSize: '10px' }}>
+            <span className="text-text-secondary font-mono tabular-nums shrink-0 pt-0.5" style={{ fontSize: '10px' }}>
               {Math.floor(elapsedMs / 1000)}s
             </span>
           ) : (
