@@ -654,6 +654,8 @@ export function useAgentLoop(
           if (folderResult.success && folderResult.data && typeof (folderResult.data as { id?: unknown }).id === 'string') {
             folderParentId = (folderResult.data as { id: string }).id;
             groupFolderMapRef.current.set(page.group, folderParentId);
+            // Ask host to expand the new folder in the file tree
+            void bridge.execute('fileTree.expand', { fileId: folderParentId }).catch(() => undefined);
           }
         }
       }
