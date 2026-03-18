@@ -11,6 +11,8 @@ export const SUPPORTED_DOCUMENT_MIME_TYPES = new Set([
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
 ]);
 
 type PreparedRunRequest = RunRequest & {
@@ -45,6 +47,62 @@ function parseDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } {
   };
 }
 
+const MAX_SHEET_ROWS = 200;
+const MAX_SHEET_COLS = 12;
+
+function cellValueToString(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
+}
+
+async function extractSpreadsheetText(buffer: Buffer): Promise<string> {
+  const XLSX = await import('xlsx');
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellText: true, cellDates: true });
+  const sections: string[] = [];
+
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) continue;
+
+    const rows: string[][] = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: '',
+      range: 0,
+    }) as string[][];
+
+    if (rows.length === 0) continue;
+
+    // Cap columns and rows
+    const colCount = Math.min(Math.max(...rows.map((r) => r.length), 0), MAX_SHEET_COLS);
+    const dataRows = rows.slice(0, MAX_SHEET_ROWS);
+
+    if (colCount === 0) continue;
+
+    const header = dataRows[0]?.slice(0, colCount).map((cell) => cellValueToString(cell)) ?? [];
+    const separator = header.map(() => '---');
+    const body = dataRows.slice(1).map((row) =>
+      row.slice(0, colCount).map((cell) => cellValueToString(cell))
+    );
+
+    const tableLines = [
+      `| ${header.join(' | ')} |`,
+      `| ${separator.join(' | ')} |`,
+      ...body.map((row) => `| ${row.join(' | ')} |`),
+    ];
+
+    if (rows.length > MAX_SHEET_ROWS) {
+      tableLines.push(`... (${rows.length - MAX_SHEET_ROWS} more rows omitted)`);
+    }
+    if (colCount < Math.max(...rows.map((r) => r.length), 0)) {
+      tableLines.push(`... (some columns omitted, max ${MAX_SHEET_COLS} shown)`);
+    }
+
+    sections.push(`[Sheet: ${sheetName}]\n${tableLines.join('\n')}`);
+  }
+
+  return sections.join('\n\n');
+}
+
 async function extractDocumentText(attachment: RunAttachmentInput): Promise<string> {
   const { mimeType, buffer } = parseDataUrl(attachment.dataUrl);
   if (mimeType !== attachment.mimeType) {
@@ -73,6 +131,13 @@ async function extractDocumentText(attachment: RunAttachmentInput): Promise<stri
     const wordExtractor = new WordExtractor();
     const document = await wordExtractor.extract(buffer);
     return normalizeWhitespace(document.getBody());
+  }
+
+  if (
+    attachment.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    || attachment.mimeType === 'application/vnd.ms-excel'
+  ) {
+    return extractSpreadsheetText(buffer);
   }
 
   throw new ValidationError(`Unsupported document mimeType: ${attachment.mimeType}`);

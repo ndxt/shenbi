@@ -34,7 +34,7 @@ const DB_VERSION = 1;
 const STORE_NAME = 'attachments';
 const memoryFallback = new Map<string, StoredAttachmentRecord>();
 
-export const CHAT_ATTACHMENT_ACCEPT = 'image/*,.pdf,.doc,.docx';
+export const CHAT_ATTACHMENT_ACCEPT = 'image/*,.pdf,.doc,.docx,.xls,.xlsx';
 
 function createAttachmentId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -49,7 +49,8 @@ function getExtension(name: string): string {
 }
 
 function isDocumentExtension(extension: string): boolean {
-  return extension === '.pdf' || extension === '.doc' || extension === '.docx';
+  return extension === '.pdf' || extension === '.doc' || extension === '.docx'
+    || extension === '.xls' || extension === '.xlsx';
 }
 
 function supportsIndexedDb(): boolean {
@@ -130,6 +131,8 @@ export function getAttachmentKind(file: Pick<File, 'name' | 'type'>): RunAttachm
     file.type === 'application/pdf'
     || file.type === 'application/msword'
     || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    || file.type === 'application/vnd.ms-excel'
     || isDocumentExtension(getExtension(file.name))
   ) {
     return 'document';

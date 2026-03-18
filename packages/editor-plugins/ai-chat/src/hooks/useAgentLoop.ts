@@ -328,6 +328,7 @@ export function useAgentLoop(
   const activeBlockModelRef = useRef<string>('');
   const activeThinkingEnabledRef = useRef(false);
   const activeBlockConcurrencyRef = useRef(3);
+  const groupFolderMapRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (!persistence) {
@@ -411,6 +412,7 @@ export function useAgentLoop(
     activeBlockModelRef.current = '';
     activeThinkingEnabledRef.current = false;
     activeBlockConcurrencyRef.current = 3;
+    groupFolderMapRef.current = new Map();
     setMode(null);
     setPhase('idle');
     setProgressText('');
@@ -643,8 +645,9 @@ export function useAgentLoop(
     const session = createBackgroundPageSession(initialSchema);
     let tabReady = false;
     try {
+      const folderParentId = page.group ? (groupFolderMapRef.current.get(page.group) ?? undefined) : undefined;
       const createFileResult = await bridge.execute('fs.createFile', {
-        parentId: null,
+        parentId: folderParentId ?? null,
         name: input.pageName,
         fileType: 'page',
         content: initialSchema,
@@ -734,15 +737,15 @@ export function useAgentLoop(
       });
       const finalSchema = executionResult.finalSchema
         ? {
-            ...executionResult.finalSchema,
-            id: fileId,
-            name: input.pageName,
-          }
+          ...executionResult.finalSchema,
+          id: fileId,
+          name: input.pageName,
+        }
         : {
-            ...session.getSchema(),
-            id: fileId,
-            name: input.pageName,
-          };
+          ...session.getSchema(),
+          id: fileId,
+          name: input.pageName,
+        };
       const metadata = executionResult.metadata;
 
       await syncPageTabState(fileId, input.pageName, {
@@ -960,9 +963,9 @@ export function useAgentLoop(
     });
     const finalizedSummary = traceFile
       ? {
-          ...summary,
-          traceFile,
-        }
+        ...summary,
+        traceFile,
+      }
       : summary;
     setPhase('done');
     setProgressText('Agent Loop 已完成');
@@ -1007,14 +1010,31 @@ export function useAgentLoop(
     setProgressText('正在执行项目规划');
     void persistLoopState();
     const plan = loopStateRef.current?.approvedPlan;
+
+    // Create folders for each unique group before pages run
+    if (bridge && plan) {
+      const uniqueGroups = [...new Set(plan.pages.map((p) => p.group).filter((g): g is string => Boolean(g && g.trim())))];
+      if (uniqueGroups.length > 0) {
+        groupFolderMapRef.current = new Map();
+        void Promise.all(
+          uniqueGroups.map(async (group) => {
+            const result = await bridge.execute('fs.createFolder', { name: group });
+            if (result.success && result.data && typeof (result.data as { id?: unknown }).id === 'string') {
+              groupFolderMapRef.current.set(group, (result.data as { id: string }).id);
+            }
+          }),
+        );
+      }
+    }
+
     const confirmationMessage = plan && plan.pages.length > 0
       ? (() => {
-          const actionablePages = plan.pages.filter((p) => p.action !== 'skip');
-          const pageList = actionablePages
-            .map((p, i) => `${i + 1}. pageId=${p.pageId} pageName=${p.pageName}`)
-            .join('\n');
-          return `用户已确认项目规划，共 ${actionablePages.length} 个页面，请按顺序依次创建：\n${pageList}`;
-        })()
+        const actionablePages = plan.pages.filter((p) => p.action !== 'skip');
+        const pageList = actionablePages
+          .map((p, i) => `${i + 1}. pageId=${p.pageId} pageName=${p.pageName}`)
+          .join('\n');
+        return `用户已确认项目规划，共 ${actionablePages.length} 个页面，请按顺序依次创建：\n${pageList}`;
+      })()
       : '用户已确认项目规划';
     confirmResolverRef.current?.(confirmationMessage);
     confirmResolverRef.current = null;

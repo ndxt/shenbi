@@ -182,6 +182,13 @@ export function createEditorAIBridgeFromPluginContext(
           return { success: true, data: { id: fileId } };
         }
 
+        if (filesystem && commandId === 'fs.createFolder') {
+          const name = typeof commandArgs?.name === 'string' ? commandArgs.name : '';
+          const parentId = typeof commandArgs?.parentId === 'string' ? commandArgs.parentId : undefined;
+          const folderId = await filesystem.createFile(name, 'folder', {}, parentId);
+          return { success: true, data: { id: folderId } };
+        }
+
         if (filesystem && commandId === 'file.readSchema') {
           const fileId = typeof commandArgs?.fileId === 'string' ? commandArgs.fileId : '';
           const schema = await filesystem.readFile(fileId);
