@@ -277,7 +277,7 @@ export function ChatInput({
                                 aria-hidden="true"
                                 tabIndex={-1}
                                 multiple
-                                accept="image/*,.pdf,.doc,.docx"
+                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
                                 onChange={handleFileChange}
                                 disabled={disabled || isRunning}
                             />

@@ -26,7 +26,7 @@ import { useAgentRun, type LastRunResult } from './useAgentRun';
 const PERSISTENCE_NAMESPACE = 'ai-chat';
 const AGENT_LOOP_PERSISTENCE_KEY = 'agent-loop-state';
 const MAX_LOOP_ITERATIONS = 30;
-const TOOL_IDLE_TIMEOUT_MS = 90_000;
+const TOOL_IDLE_TIMEOUT_MS = 0; // disabled: no timeout for page creation
 const AI_DEBUG_API_BASE = import.meta.env.PROD ? '/locode/shenbi/api/ai/debug' : '/api/ai/debug';
 const AGENT_LOOP_ABORTED_ERROR = 'Agent Loop aborted';
 
@@ -86,7 +86,8 @@ function createIdleTimeoutSignal(parentSignal?: AbortSignal, timeoutMs = TOOL_ID
   };
 
   const armTimer = () => {
-    clearTimer();
+    if (timeoutMs <= 0) return; // timeout disabled
+    if (timeoutMs <= 0) return; // timeout disabled
     timeoutId = window.setTimeout(() => {
       timedOut = true;
       controller.abort();
@@ -328,6 +329,7 @@ export function useAgentLoop(
   const activeBlockModelRef = useRef<string>('');
   const activeThinkingEnabledRef = useRef(false);
   const activeBlockConcurrencyRef = useRef(3);
+  const groupFolderMapRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (!persistence) {
@@ -411,6 +413,7 @@ export function useAgentLoop(
     activeBlockModelRef.current = '';
     activeThinkingEnabledRef.current = false;
     activeBlockConcurrencyRef.current = 3;
+    groupFolderMapRef.current = new Map();
     setMode(null);
     setPhase('idle');
     setProgressText('');
@@ -643,8 +646,22 @@ export function useAgentLoop(
     const session = createBackgroundPageSession(initialSchema);
     let tabReady = false;
     try {
+      // Ensure the group folder exists (create on first use)
+      let folderParentId: string | undefined;
+      if (page.group && page.group.trim()) {
+        folderParentId = groupFolderMapRef.current.get(page.group);
+        if (!folderParentId) {
+          const folderResult = await bridge.execute('fs.createFolder', { name: page.group });
+          if (folderResult.success && folderResult.data && typeof (folderResult.data as { id?: unknown }).id === 'string') {
+            folderParentId = (folderResult.data as { id: string }).id;
+            groupFolderMapRef.current.set(page.group, folderParentId);
+            // Ask host to expand the new folder in the file tree
+            void bridge.execute('fileTree.expand', { fileId: folderParentId }).catch(() => undefined);
+          }
+        }
+      }
       const createFileResult = await bridge.execute('fs.createFile', {
-        parentId: null,
+        parentId: folderParentId ?? null,
         name: input.pageName,
         fileType: 'page',
         content: initialSchema,
@@ -734,15 +751,15 @@ export function useAgentLoop(
       });
       const finalSchema = executionResult.finalSchema
         ? {
-            ...executionResult.finalSchema,
-            id: fileId,
-            name: input.pageName,
-          }
+          ...executionResult.finalSchema,
+          id: fileId,
+          name: input.pageName,
+        }
         : {
-            ...session.getSchema(),
-            id: fileId,
-            name: input.pageName,
-          };
+          ...session.getSchema(),
+          id: fileId,
+          name: input.pageName,
+        };
       const metadata = executionResult.metadata;
 
       await syncPageTabState(fileId, input.pageName, {
@@ -960,9 +977,9 @@ export function useAgentLoop(
     });
     const finalizedSummary = traceFile
       ? {
-          ...summary,
-          traceFile,
-        }
+        ...summary,
+        traceFile,
+      }
       : summary;
     setPhase('done');
     setProgressText('Agent Loop 已完成');
@@ -1009,12 +1026,12 @@ export function useAgentLoop(
     const plan = loopStateRef.current?.approvedPlan;
     const confirmationMessage = plan && plan.pages.length > 0
       ? (() => {
-          const actionablePages = plan.pages.filter((p) => p.action !== 'skip');
-          const pageList = actionablePages
-            .map((p, i) => `${i + 1}. pageId=${p.pageId} pageName=${p.pageName}`)
-            .join('\n');
-          return `用户已确认项目规划，共 ${actionablePages.length} 个页面，请按顺序依次创建：\n${pageList}`;
-        })()
+        const actionablePages = plan.pages.filter((p) => p.action !== 'skip');
+        const pageList = actionablePages
+          .map((p, i) => `${i + 1}. pageId=${p.pageId} pageName=${p.pageName}`)
+          .join('\n');
+        return `用户已确认项目规划，共 ${actionablePages.length} 个页面，请按顺序依次创建：\n${pageList}`;
+      })()
       : '用户已确认项目规划';
     confirmResolverRef.current?.(confirmationMessage);
     confirmResolverRef.current = null;
