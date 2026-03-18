@@ -185,7 +185,7 @@ export function createEditorAIBridgeFromPluginContext(
         if (filesystem && commandId === 'fs.createFolder') {
           const name = typeof commandArgs?.name === 'string' ? commandArgs.name : '';
           const parentId = typeof commandArgs?.parentId === 'string' ? commandArgs.parentId : undefined;
-          const folderId = await filesystem.createFile(name, 'folder', {}, parentId);
+          const folderId = await filesystem.createFile(name, 'directory', {}, parentId);
           return { success: true, data: { id: folderId } };
         }
 
