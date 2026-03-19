@@ -566,49 +566,6 @@ export function GitLabSyncPanel({
 
   return (
     <div style={S.panel}>
-      {/* ── Header: Project + Branch | User ── */}
-      <div style={S.header}>
-        <div style={S.headerLeft}>
-          <FolderGit2 size={14} style={{ color: color.accent, flexShrink: 0 }} />
-          <span
-            style={{ ...S.projectLabel, cursor: 'pointer' }}
-            onClick={handleChangeProject}
-            title="切换项目"
-          >
-            {state.project.name}
-          </span>
-          {branches.length > 0 ? (
-            <select
-              style={{
-                ...S.branchBadge, border: 'none', cursor: 'pointer', outline: 'none',
-                background: color.bgInput, appearance: 'none', paddingRight: 4,
-              }}
-              value={state.branch}
-              onChange={(e) => handleBranchChange(e.target.value)}
-            >
-              {branches.map((b) => (
-                <option key={b.name} value={b.name}>{b.name}</option>
-              ))}
-            </select>
-          ) : (
-            <span style={S.branchBadge}>
-              <GitBranch size={10} /> {state.branch}
-            </span>
-          )}
-        </div>
-        <div style={S.headerRight}>
-          <a
-            href={state.project.web_url}
-            target="_blank"
-            rel="noreferrer"
-            style={{ ...S.iconBtn(), color: color.textDim }}
-            title="在 GitLab 中打开"
-          >
-            <ExternalLink size={13} />
-          </a>
-        </div>
-      </div>
-
       {/* ── Action bar: Refresh + Pull ── */}
       <div style={S.actionBar}>
         <button
