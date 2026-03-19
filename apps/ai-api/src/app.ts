@@ -16,6 +16,7 @@ import { createChatRoute } from './routes/chat.ts';
 import { createDebugRoute } from './routes/debug.ts';
 import { createModelsRoute } from './routes/models.ts';
 import { createClassifyRouteRoute } from './routes/classify-route.ts';
+import { createGitLabRoute } from './routes/gitlab.ts';
 import { loadEnv } from './adapters/env.ts';
 import { agentRuntime } from './runtime/agent-runtime.ts';
 import type { AgentRuntime } from './runtime/types.ts';
@@ -55,6 +56,17 @@ export function createApp(options: AppOptions = {}): Hono {
   app.route('/api/ai/classify-route', createClassifyRouteRoute());
   app.route('/api/ai/debug', createDebugRoute());
   app.route('/api/ai/models', createModelsRoute());
+
+  // GitLab integration
+  if (env.GITLAB_OAUTH_CLIENT_ID) {
+    app.route('/api/gitlab', createGitLabRoute({
+      clientId: env.GITLAB_OAUTH_CLIENT_ID,
+      clientSecret: env.GITLAB_OAUTH_CLIENT_SECRET,
+      redirectUri: env.GITLAB_OAUTH_REDIRECT_URI,
+      defaultInstanceUrl: env.GITLAB_DEFAULT_URL,
+      defaultGroupId: env.GITLAB_DEFAULT_GROUP_ID,
+    }));
+  }
 
   app.get('/health', (c) => c.json({ status: 'ok' }));
 

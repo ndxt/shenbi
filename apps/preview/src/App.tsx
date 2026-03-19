@@ -55,6 +55,7 @@ import {
 import { createAIChatPlugin } from '@shenbi/editor-plugin-ai-chat';
 import { createFilesPlugin, useFileWorkspace, FileExplorer } from '@shenbi/editor-plugin-files';
 import { createSetterPlugin } from '@shenbi/editor-plugin-setter';
+import { createGitLabSyncPlugin } from '@shenbi/editor-plugin-gitlab-sync';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
 
 type ScenarioKey =
@@ -1016,6 +1017,84 @@ export function App() {
             },
           ],
         },
+      }));
+
+      // GitLab Sync plugin
+      registeredPlugins.push(createGitLabSyncPlugin({
+        getLocalFiles: async () => {
+          const nodes = await vfs.listTree(PREVIEW_PROJECT_ID);
+          const files = new Map<string, string>();
+          for (const node of nodes) {
+            if (node.type === 'file') {
+              try {
+                const content = await vfs.readFile(PREVIEW_PROJECT_ID, node.id);
+                if (content && typeof content === 'object') {
+                  files.set(node.path, JSON.stringify(content, null, 2));
+                }
+              } catch { /* skip unreadable files */ }
+            }
+          }
+          return files;
+        },
+        writeLocalFile: async (path: string, content: string) => {
+          try {
+            const parsed = JSON.parse(content);
+            // Strip leading slash for VFS lookup
+            const cleanPath = path.replace(/^\/+/, '');
+
+            // Determine file type and base name from extension
+            const knownExts = ['.page.json', '.api.json', '.flow.json', '.db.json', '.dict.json'] as const;
+            const extTypeMap: Record<string, string> = {
+              '.page.json': 'page', '.api.json': 'api', '.flow.json': 'flow',
+              '.db.json': 'db', '.dict.json': 'dict',
+            };
+            let baseName = cleanPath;
+            let fileType = 'page';
+            for (const ext of knownExts) {
+              if (cleanPath.endsWith(ext)) {
+                baseName = cleanPath.slice(0, -ext.length);
+                fileType = extTypeMap[ext] ?? 'page';
+                break;
+              }
+            }
+
+            // Try to find existing file by multiple path patterns
+            let node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, cleanPath).catch(() => null);
+            if (!node) node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, `/${cleanPath}`).catch(() => null);
+            if (!node) node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, baseName).catch(() => null);
+            if (!node) node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, `/${baseName}`).catch(() => null);
+
+            if (node) {
+              await vfs.writeFile(PREVIEW_PROJECT_ID, node.id, parsed);
+            } else {
+              // Create new file with base name (no extension — VFS manages type separately)
+              await vfs.createFile(PREVIEW_PROJECT_ID, null, baseName, fileType as 'page', parsed);
+            }
+          } catch { /* skip invalid JSON */ }
+        },
+        deleteLocalFile: async (path: string) => {
+          try {
+            const cleanPath = path.replace(/^\/+/, '');
+            // Strip known extension for VFS lookup
+            const knownExts = ['.page.json', '.api.json', '.flow.json', '.db.json', '.dict.json'];
+            let baseName = cleanPath;
+            for (const ext of knownExts) {
+              if (cleanPath.endsWith(ext)) {
+                baseName = cleanPath.slice(0, -ext.length);
+                break;
+              }
+            }
+
+            let node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, cleanPath).catch(() => null);
+            if (!node) node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, baseName).catch(() => null);
+            if (!node) node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, `/${baseName}`).catch(() => null);
+
+            if (node) {
+              await vfs.deleteFile(PREVIEW_PROJECT_ID, node.id);
+            }
+          } catch { /* ignore */ }
+        },
+        refreshFileTree: () => refreshFsTreeRef.current(),
       }));
     } else if (appMode === 'shell' && filesPrimaryPanelOptions) {
       // Fallback to legacy file panel if VFS not ready
