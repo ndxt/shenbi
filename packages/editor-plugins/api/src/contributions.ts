@@ -108,6 +108,19 @@ export interface AuxiliaryPanelContribution extends OrderedContribution {
   render: (context: PluginContext) => React.ReactNode;
 }
 
+export interface CanvasRendererRenderContext {
+  activeFileId?: string;
+  activeFileName?: string;
+  activeFileType?: string;
+  pluginContext?: PluginContext;
+}
+
+export interface CanvasRendererContribution extends OrderedContribution {
+  /** File types this renderer handles (e.g. ['api']) */
+  fileTypes: string[];
+  render: (context: CanvasRendererRenderContext) => React.ReactNode;
+}
+
 export interface MenuContribution extends OrderedContribution {
   label: string;
   commandId: string;
