@@ -551,6 +551,6 @@
 
 /* Adjust MiniMap position - closer to zoom controls */
 .gateway-canvas .react-flow__minimap {
-  bottom: 56px;
+  bottom: 60px;
   right: 16px;
 }
