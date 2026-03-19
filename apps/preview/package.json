@@ -21,6 +21,7 @@
     "@shenbi/editor-plugin-ai-chat": "workspace:*",
     "@shenbi/editor-plugin-files": "workspace:*",
     "@shenbi/editor-ui": "workspace:*",
+    "@shenbi/editor-plugin-gateway": "workspace:*",
     "@shenbi/engine": "workspace:*",
     "@shenbi/i18n": "workspace:*",
     "@shenbi/schema": "workspace:*",

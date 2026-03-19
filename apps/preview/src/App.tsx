@@ -55,6 +55,7 @@ import {
 import { createAIChatPlugin } from '@shenbi/editor-plugin-ai-chat';
 import { createFilesPlugin, useFileWorkspace, FileExplorer } from '@shenbi/editor-plugin-files';
 import { createSetterPlugin } from '@shenbi/editor-plugin-setter';
+import { createGatewayPlugin } from '@shenbi/editor-plugin-gateway';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
 
 type ScenarioKey =
@@ -956,6 +957,7 @@ export function App() {
         defaultWidth: 300,
         getAvailableComponents: () => builtinContracts,
       }),
+      createGatewayPlugin(),
     ];
 
     // VFS-based file explorer in shell mode (render function uses refs for live data)
