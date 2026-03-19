@@ -46,9 +46,10 @@ export function NodeSelectorPanel({ position, onSelectNode, onClose }: NodeSelec
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    // Use capture phase to ensure we catch the event before React Flow
+    document.addEventListener('mousedown', handleClickOutside, true);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside, true);
     };
   }, [onClose]);
 
@@ -82,6 +83,13 @@ export function NodeSelectorPanel({ position, onSelectNode, onClose }: NodeSelec
           Nodes
         </button>
         <button className="node-selector-panel__tab">Tools</button>
+        <button 
+          className="node-selector-panel__close"
+          onClick={onClose}
+          title="关闭"
+        >
+          ×
+        </button>
       </div>
 
       <input
