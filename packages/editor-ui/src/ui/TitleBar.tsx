@@ -35,6 +35,8 @@ interface TitleBarProps {
   isMaximized: boolean;
   onToggleMaximize: () => void;
   onOpenCommandPalette?: () => void;
+  title?: string | undefined;
+  subtitle?: string | undefined;
 }
 
 export function TitleBar({ 
@@ -54,6 +56,8 @@ export function TitleBar({
   isMaximized,
   onToggleMaximize,
   onOpenCommandPalette,
+  title,
+  subtitle,
 }: TitleBarProps) {
   const { t } = useTranslation('editorUi');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -92,9 +96,9 @@ export function TitleBar({
         <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center">
           <Command size={14} className="text-white" />
         </div>
-        <span className="text-[13px] font-bold tracking-tight text-text-primary">Shenbi IDE</span>
+        <span className="text-[13px] font-bold tracking-tight text-text-primary">{title ?? 'Shenbi IDE'}</span>
         <span className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary">
-          Editor UI Package
+          {subtitle ?? 'Editor UI Package'}
         </span>
       </div>
       

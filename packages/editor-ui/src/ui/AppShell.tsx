@@ -90,6 +90,10 @@ interface AppShellProps {
   onCloseAllTabs?: (() => void) | undefined;
   onCloseSavedTabs?: (() => void) | undefined;
   onMoveTab?: ((fromIndex: number, toIndex: number) => void) | undefined;
+  /** Title displayed in the title bar (defaults to 'Shenbi IDE') */
+  title?: string;
+  /** Subtitle displayed in the title bar (defaults to 'Editor UI Package') */
+  subtitle?: string;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -173,6 +177,8 @@ export function AppShell({
   onCloseAllTabs,
   onCloseSavedTabs,
   onMoveTab,
+  title,
+  subtitle,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const canvasContentRef = React.useRef<HTMLDivElement | null>(null);
@@ -1058,6 +1064,8 @@ export function AppShell({
         isMaximized={isMaximized}
         onToggleMaximize={toggleMaximize}
         onOpenCommandPalette={() => setShowCommandPalette(true)}
+        title={title}
+        subtitle={subtitle}
       />
       
       {/* Main Container */}

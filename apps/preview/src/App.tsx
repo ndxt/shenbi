@@ -1210,6 +1210,8 @@ export function App() {
     <AppShell
       workspaceId={PREVIEW_WORKSPACE_ID}
       persistenceAdapter={persistenceAdapter}
+      title={activeProjectConfig?.projectName ?? 'Shenbi IDE'}
+      subtitle={activeProjectConfig?.branch ?? undefined}
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,
