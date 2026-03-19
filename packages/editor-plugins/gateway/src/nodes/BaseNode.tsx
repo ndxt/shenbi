@@ -29,6 +29,7 @@ export interface BaseNodeProps extends NodeProps {
 
 export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodeProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [mouseDownTime, setMouseDownTime] = useState<number>(0);
   const contract = NODE_CONTRACTS[data.kind as GatewayNodeKind];
   
   if (!contract) {
@@ -36,6 +37,18 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
   }
 
   const hasOutputs = contract.outputs.length > 0;
+
+  const handleMouseDown = () => {
+    setMouseDownTime(Date.now());
+  };
+
+  const handleMouseUp = (portId: string) => {
+    const clickDuration = Date.now() - mouseDownTime;
+    // If click duration is less than 200ms, treat as click (not drag)
+    if (clickDuration < 200 && onAddNode) {
+      onAddNode(id!, portId);
+    }
+  };
 
   return (
     <div
@@ -77,27 +90,23 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
 
       {/* Output Handles with Add Button */}
       {contract.outputs.map((port, index) => (
-        <React.Fragment key={port.id}>
+        <div key={port.id} className="gateway-node__handle-wrapper">
           <Handle
             type="source"
             position={Position.Right}
             id={port.id}
             className="gateway-node__handle gateway-node__handle--output"
             style={{ backgroundColor: PORT_TYPE_COLORS[port.dataType] }}
-          />
-          {isHovered && hasOutputs && index === 0 && onAddNode && (
-            <button
-              className="gateway-node__add-button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddNode(id!, port.id);
-              }}
-              title="添加节点"
-            >
-              <Plus size={14} className="gateway-node__add-icon" />
-            </button>
-          )}
-        </React.Fragment>
+            onMouseDown={handleMouseDown}
+            onMouseUp={() => handleMouseUp(port.id)}
+          >
+            {isHovered && index === 0 && (
+              <div className="gateway-node__handle-plus">
+                <Plus size={12} strokeWidth={3} />
+              </div>
+            )}
+          </Handle>
+        </div>
       ))}
     </div>
   );
