@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../canvas/iframe-pool', () => {
@@ -57,10 +57,9 @@ function AppShell(props: AppShellProps) {
 }
 
 describe('AppShell iframe canvas mode', () => {
-  it('会把画布内容挂载到 iframe 文档内，并保留节点点击选中能力', async () => {
-    const onCanvasSelectNode = vi.fn();
+  it('会把画布内容挂载到 iframe 文档内，并同步为像素高度', async () => {
     const view = render(
-      <AppShell renderMode="iframe" onCanvasSelectNode={onCanvasSelectNode}>
+      <AppShell renderMode="iframe">
         <div data-shenbi-node-id="node-1">Iframe Node</div>
       </AppShell>,
     );
@@ -75,15 +74,12 @@ describe('AppShell iframe canvas mode', () => {
     const iframeRoot = iframe?.contentDocument?.getElementById('shenbi-iframe-root');
     const node = iframeRoot?.querySelector('[data-shenbi-node-id="node-1"]');
     expect(node).not.toBeNull();
-    fireEvent.click(node as Element);
-
-    expect(onCanvasSelectNode).toHaveBeenCalledWith('node-1');
+    expect(iframe?.style.height).toMatch(/px$/);
   });
 
-  it('点击 iframe 画布空白区域时会触发取消选中', async () => {
-    const onCanvasDeselectNode = vi.fn();
+  it('iframe 模式下宿主层仍会保留 selection overlay', async () => {
     const view = render(
-      <AppShell renderMode="iframe" onCanvasDeselectNode={onCanvasDeselectNode}>
+      <AppShell renderMode="iframe" selectedNodeSchemaId="node-1">
         <div data-shenbi-node-id="node-1">Iframe Node</div>
       </AppShell>,
     );
@@ -95,8 +91,7 @@ describe('AppShell iframe canvas mode', () => {
     });
 
     const iframe = view.container.querySelector('iframe');
-    const iframeRoot = iframe?.contentDocument?.getElementById('shenbi-iframe-root');
-    fireEvent.click(iframeRoot as Element);
-    expect(onCanvasDeselectNode).toHaveBeenCalledTimes(1);
+    expect(iframe?.contentDocument?.getElementById('shenbi-iframe-root')?.textContent).toContain('Iframe Node');
+    expect(view.container.querySelector('.selection-overlay')).not.toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import type { CanvasSurfaceHandle } from './types';
-import { acquireIframeFromPool, disposePooledIframe } from './iframe-pool';
+import { acquireIframeFromPool, disposePooledIframe, IFRAME_SRC_DOC } from './iframe-pool';
 
 interface CanvasSurfaceProps {
   mode: 'direct' | 'iframe';
@@ -10,6 +10,8 @@ interface CanvasSurfaceProps {
   pointerEventsDisabled?: boolean;
   onReady?: (surface: CanvasSurfaceHandle | null) => void;
 }
+
+const DEFAULT_IFRAME_MIN_HEIGHT = 800;
 
 function createDirectHandle(hostElement: HTMLElement): CanvasSurfaceHandle {
   return {
@@ -98,6 +100,66 @@ function syncIframeStyles(targetDocument: Document, themeClassName?: string): vo
     clone.setAttribute('data-shenbi-iframe-style', 'true');
     targetDocument.head.appendChild(clone);
   });
+
+  targetDocument.head.querySelectorAll('[data-shenbi-iframe-adopted-style="true"]').forEach((node) => node.remove());
+  const adoptedSheets = Array.from(sourceDocument.adoptedStyleSheets ?? []);
+  adoptedSheets.forEach((sheet) => {
+    try {
+      const cssText = Array.from(sheet.cssRules ?? []).map((rule) => rule.cssText).join('\n');
+      if (!cssText.trim()) {
+        return;
+      }
+      const styleElement = targetDocument.createElement('style');
+      styleElement.setAttribute('data-shenbi-iframe-adopted-style', 'true');
+      styleElement.textContent = cssText;
+      targetDocument.head.appendChild(styleElement);
+    } catch {
+      // Ignore cross-origin or unreadable stylesheet rules.
+    }
+  });
+}
+
+function getIframeMarkup(iframe: HTMLIFrameElement): string {
+  const liveMarkup = iframe.contentDocument?.documentElement?.outerHTML;
+  return liveMarkup ? `<!doctype html>${liveMarkup}` : IFRAME_SRC_DOC;
+}
+
+function writeIframeDocument(iframe: HTMLIFrameElement, markup: string): Document | null {
+  const targetDocument = iframe.contentDocument;
+  if (!targetDocument) {
+    return null;
+  }
+  targetDocument.open();
+  targetDocument.write(markup);
+  targetDocument.close();
+  return targetDocument;
+}
+
+function syncIframeHeight(
+  iframe: HTMLIFrameElement,
+  rootElement: HTMLElement,
+): void {
+  const targetDocument = iframe.contentDocument;
+  const pageRoot = targetDocument?.querySelector('[data-shenbi-page-root]') as HTMLElement | null;
+  const candidateElements = [
+    pageRoot,
+    rootElement.firstElementChild instanceof HTMLElement ? rootElement.firstElementChild : null,
+    ...[...rootElement.children].filter((element): element is HTMLElement => element instanceof HTMLElement),
+  ].filter((element, index, array): element is HTMLElement => Boolean(element) && array.indexOf(element) === index);
+
+  const measuredContentHeight = candidateElements.reduce((maxHeight, element) => (
+    Math.max(
+      maxHeight,
+      element.scrollHeight,
+      element.getBoundingClientRect().height,
+    )
+  ), 0);
+
+  const nextHeight = Math.max(
+    DEFAULT_IFRAME_MIN_HEIGHT,
+    measuredContentHeight,
+  );
+  iframe.style.height = `${Math.ceil(nextHeight)}px`;
 }
 
 function DirectCanvasSurface({ children, onReady, pointerEventsDisabled }: CanvasSurfaceProps) {
@@ -131,35 +193,43 @@ function IframeCanvasSurface({
   const hostRef = React.useRef<HTMLDivElement | null>(null);
   const [iframeElement, setIframeElement] = React.useState<HTMLIFrameElement | null>(null);
   const [portalRoot, setPortalRoot] = React.useState<HTMLElement | null>(null);
+  const syncHeightRef = React.useRef<(() => void) | null>(null);
 
   React.useEffect(() => {
     let disposed = false;
     let mountedIframe: HTMLIFrameElement | null = null;
+    let warmIframe: HTMLIFrameElement | null = null;
 
     void acquireIframeFromPool().then((iframe) => {
+      warmIframe = iframe;
       if (disposed || !hostRef.current) {
         disposePooledIframe(iframe);
         return;
       }
-      mountedIframe = iframe;
-      Object.assign(iframe.style, {
+
+      const visibleIframe = document.createElement('iframe');
+      mountedIframe = visibleIframe;
+      Object.assign(visibleIframe.style, {
         width: '100%',
-        height: '100%',
         border: '0',
         display: 'block',
         background: '#ffffff',
         pointerEvents: pointerEventsDisabled ? 'none' : 'auto',
       });
-      hostRef.current.appendChild(iframe);
-      const targetDocument = iframe.contentDocument;
+      hostRef.current.appendChild(visibleIframe);
+
+      const targetDocument = writeIframeDocument(visibleIframe, getIframeMarkup(iframe));
       const rootElement = targetDocument?.getElementById('shenbi-iframe-root') as HTMLElement | null;
       if (!targetDocument || !rootElement) {
+        disposePooledIframe(iframe);
         return;
       }
       syncIframeStyles(targetDocument, themeClassName);
-      setIframeElement(iframe);
+      syncIframeHeight(visibleIframe, rootElement);
+      setIframeElement(visibleIframe);
       setPortalRoot(rootElement);
-      onReady?.(createIframeHandle(iframe, rootElement));
+      onReady?.(createIframeHandle(visibleIframe, rootElement));
+      disposePooledIframe(iframe);
     });
 
     return () => {
@@ -168,6 +238,9 @@ function IframeCanvasSurface({
       setPortalRoot(null);
       setIframeElement(null);
       disposePooledIframe(mountedIframe);
+      if (warmIframe !== mountedIframe) {
+        disposePooledIframe(warmIframe);
+      }
     };
   }, [onReady, themeClassName]);
 
@@ -178,6 +251,105 @@ function IframeCanvasSurface({
     iframeElement.style.pointerEvents = pointerEventsDisabled ? 'none' : 'auto';
     syncIframeStyles(iframeElement.contentDocument, themeClassName);
   }, [iframeElement, pointerEventsDisabled, themeClassName]);
+
+  React.useEffect(() => {
+    if (!iframeElement?.contentDocument) {
+      return;
+    }
+
+    const sync = () => {
+      if (!iframeElement.contentDocument) {
+        return;
+      }
+      syncIframeStyles(iframeElement.contentDocument, themeClassName);
+    };
+
+    sync();
+
+    const sourceHeadObserver = typeof MutationObserver === 'function'
+      ? new MutationObserver(() => {
+          sync();
+        })
+      : null;
+    sourceHeadObserver?.observe(document.head, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+    });
+
+    const sourceRootObserver = typeof MutationObserver === 'function'
+      ? new MutationObserver(() => {
+          sync();
+        })
+      : null;
+    sourceRootObserver?.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    return () => {
+      sourceHeadObserver?.disconnect();
+      sourceRootObserver?.disconnect();
+    };
+  }, [iframeElement, themeClassName]);
+
+  React.useEffect(() => {
+    if (!iframeElement || !portalRoot) {
+      syncHeightRef.current = null;
+      return;
+    }
+
+    const sync = () => {
+      syncIframeHeight(iframeElement, portalRoot);
+    };
+    syncHeightRef.current = sync;
+    sync();
+
+    const resizeObserver = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => {
+          sync();
+        })
+      : null;
+    resizeObserver?.observe(portalRoot);
+    const pageRoot = iframeElement.contentDocument?.querySelector('[data-shenbi-page-root]');
+    if (pageRoot instanceof HTMLElement) {
+      resizeObserver?.observe(pageRoot);
+    }
+
+    const mutationObserver = typeof MutationObserver === 'function'
+      ? new MutationObserver(() => {
+          sync();
+        })
+      : null;
+    mutationObserver?.observe(portalRoot, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true,
+    });
+
+    const handleWindowResize = () => {
+      sync();
+    };
+    window.addEventListener('resize', handleWindowResize);
+    iframeElement.contentWindow?.addEventListener('resize', handleWindowResize);
+
+    return () => {
+      syncHeightRef.current = null;
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+      window.removeEventListener('resize', handleWindowResize);
+      iframeElement.contentWindow?.removeEventListener('resize', handleWindowResize);
+    };
+  }, [iframeElement, portalRoot]);
+
+  React.useEffect(() => {
+    if (iframeElement?.contentDocument) {
+      syncIframeStyles(iframeElement.contentDocument, themeClassName);
+    }
+    syncHeightRef.current?.();
+  }, [children, iframeElement, themeClassName]);
 
   return (
     <div ref={hostRef} className="relative h-full w-full bg-white overflow-hidden">

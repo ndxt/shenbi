@@ -1,4 +1,4 @@
-const IFRAME_SRC_DOC = `
+export const IFRAME_SRC_DOC = `
 <!doctype html>
 <html>
   <head>

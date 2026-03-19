@@ -75,7 +75,7 @@ export function ShenbiPage({
   });
 
   // 页面根容器：position: relative 使浮层能够正确相对于页面定位
-  const containerStyle = { position: 'relative' as const, height: '100%' };
+  const containerStyle = { position: 'relative' as const, minHeight: '100%' };
 
   // React 19: 直接用 <ShenbiContext> 作为 Provider
   return createElement(
