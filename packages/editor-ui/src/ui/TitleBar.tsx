@@ -11,6 +11,9 @@ import {
   Maximize,
   Minimize,
   Languages,
+  GitBranch,
+  LogOut,
+  ExternalLink,
 } from 'lucide-react';
 import {
   type SupportedLocale,
@@ -39,6 +42,14 @@ interface TitleBarProps {
   subtitle?: string | undefined;
   userAvatarUrl?: string | undefined;
   userName?: string | undefined;
+  /** List of branch names for the branch switcher */
+  branches?: string[] | undefined;
+  /** Called when user selects a different branch */
+  onBranchChange?: ((branch: string) => void) | undefined;
+  /** Called when user clicks logout */
+  onLogout?: (() => void) | undefined;
+  /** URL to open the project on GitLab */
+  gitlabUrl?: string | undefined;
 }
 
 export function TitleBar({ 
@@ -62,6 +73,10 @@ export function TitleBar({
   subtitle,
   userAvatarUrl,
   userName,
+  branches,
+  onBranchChange,
+  onLogout,
+  gitlabUrl,
 }: TitleBarProps) {
   const { t } = useTranslation('editorUi');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -101,9 +116,26 @@ export function TitleBar({
           <Command size={14} className="text-white" />
         </div>
         <span className="text-[13px] font-bold tracking-tight text-text-primary">{title ?? 'Shenbi IDE'}</span>
-        <span className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary">
-          {subtitle ?? 'Editor UI Package'}
-        </span>
+        {branches && branches.length > 0 && onBranchChange ? (
+          <select
+            className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary bg-transparent cursor-pointer outline-none"
+            value={subtitle ?? ''}
+            onChange={(e) => onBranchChange(e.target.value)}
+          >
+            {branches.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary flex items-center gap-1">
+            {subtitle ? <><GitBranch size={10} /> {subtitle}</> : 'Editor UI Package'}
+          </span>
+        )}
+        {gitlabUrl && (
+          <a href={gitlabUrl} target="_blank" rel="noreferrer" className="text-text-secondary hover:text-text-primary transition-colors" title="在 GitLab 中打开">
+            <ExternalLink size={12} />
+          </a>
+        )}
       </div>
       
       <div className="flex-1 text-center text-[11px] text-text-secondary font-medium">
@@ -233,6 +265,15 @@ export function TitleBar({
           <div className="flex items-center gap-1.5 pl-2 border-l border-border-ide ml-1">
             <img src={userAvatarUrl} alt="" className="w-5 h-5 rounded-full" />
             {userName && <span className="text-[11px] text-text-secondary">{userName}</span>}
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="p-1 rounded transition-colors text-text-secondary hover:text-text-primary hover:bg-bg-panel"
+                title="退出登录"
+              >
+                <LogOut size={13} />
+              </button>
+            )}
           </div>
         ) : null}
       </div>

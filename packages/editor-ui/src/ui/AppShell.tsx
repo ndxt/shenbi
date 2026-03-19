@@ -98,6 +98,14 @@ interface AppShellProps {
   userAvatarUrl?: string | undefined;
   /** Username to show in title bar */
   userName?: string | undefined;
+  /** Branch names for branch switcher */
+  branches?: string[] | undefined;
+  /** Called when user switches branch */
+  onBranchChange?: ((branch: string) => void) | undefined;
+  /** Called when user logs out */
+  onLogout?: (() => void) | undefined;
+  /** GitLab project URL */
+  gitlabUrl?: string | undefined;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -185,6 +193,10 @@ export function AppShell({
   subtitle,
   userAvatarUrl,
   userName,
+  branches,
+  onBranchChange,
+  onLogout,
+  gitlabUrl,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const canvasContentRef = React.useRef<HTMLDivElement | null>(null);
@@ -1074,6 +1086,10 @@ export function AppShell({
         subtitle={subtitle}
         userAvatarUrl={userAvatarUrl}
         userName={userName}
+        branches={branches}
+        onBranchChange={onBranchChange}
+        onLogout={onLogout}
+        gitlabUrl={gitlabUrl}
       />
       
       {/* Main Container */}

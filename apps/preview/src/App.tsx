@@ -166,6 +166,7 @@ export function App() {
   const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig | null>(() => loadActiveProject());
   const activeProjectId = activeProjectConfig?.vfsProjectId ?? PREVIEW_PROJECT_ID;
   const [gitlabUser, setGitlabUser] = useState<{ username: string; avatarUrl: string } | null>(null);
+  const [gitlabBranches, setGitlabBranches] = useState<string[]>([]);
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const persistenceAdapter = useMemo(() => new LocalWorkspacePersistenceAdapter(), []);
   const workspacePersistence = useMemo(
@@ -226,6 +227,38 @@ export function App() {
         }
       })
       .catch(() => { /* not logged in */ });
+  }, []);
+
+  // Fetch branches when project is active
+  useEffect(() => {
+    if (!activeProjectConfig?.gitlabProjectId) return;
+    fetch(`/api/gitlab/projects/${activeProjectConfig.gitlabProjectId}/branches`, { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : [])
+      .then((data: Array<{ name: string }>) => {
+        setGitlabBranches(data.map((b) => b.name));
+      })
+      .catch(() => setGitlabBranches([]));
+  }, [activeProjectConfig?.gitlabProjectId]);
+
+  // Handle branch change from header
+  const handleBranchChange = useCallback((branch: string) => {
+    if (!activeProjectConfig) return;
+    const updated = { ...activeProjectConfig, branch };
+    saveActiveProject(updated);
+    setActiveProjectConfig(updated);
+  }, [activeProjectConfig]);
+
+  // Handle logout
+  const handleLogout = useCallback(() => {
+    fetch('/api/gitlab/oauth/logout', { method: 'POST', credentials: 'include' })
+      .then(() => {
+        setGitlabUser(null);
+        clearActiveProject();
+        setActiveProjectConfig(null);
+        setVfsInitialized(false);
+        setFsTree([]);
+      })
+      .catch(() => { /* ignore */ });
   }, []);
 
   const {
@@ -1227,6 +1260,10 @@ export function App() {
       subtitle={activeProjectConfig?.branch ?? undefined}
       userAvatarUrl={gitlabUser?.avatarUrl}
       userName={gitlabUser?.username}
+      branches={gitlabBranches.length > 0 ? gitlabBranches : undefined}
+      onBranchChange={handleBranchChange}
+      onLogout={gitlabUser ? handleLogout : undefined}
+      gitlabUrl={activeProjectConfig?.gitlabUrl}
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,

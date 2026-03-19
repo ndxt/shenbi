@@ -17,6 +17,7 @@ export interface ActiveProjectConfig {
   projectName: string;
   branch: string;
   lastOpenedAt: number;
+  gitlabUrl?: string;
 }
 
 const ACTIVE_PROJECT_KEY = 'shenbi_active_project';

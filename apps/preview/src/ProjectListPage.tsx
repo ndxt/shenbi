@@ -243,6 +243,7 @@ export function ProjectListPage({ onSelectProject }: ProjectListPageProps) {
       projectName: project.name,
       branch: project.default_branch || 'main',
       lastOpenedAt: Date.now(),
+      gitlabUrl: project.web_url,
     };
     onSelectProject(config);
   }, [onSelectProject]);
