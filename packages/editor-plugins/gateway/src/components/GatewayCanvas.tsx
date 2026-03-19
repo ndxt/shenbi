@@ -326,8 +326,8 @@ export function GatewayCanvas({
           pannable
           zoomable
           style={{
-            width: 160,
-            height: 120,
+            width: 120,
+            height: 90,
           }}
         />
       </ReactFlow>
@@ -339,7 +339,7 @@ export function GatewayCanvas({
           onClick={handleZoomOut}
           title="缩小"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
             <line x1="4" y1="7" x2="10" y2="7" stroke="currentColor" strokeWidth="1.5" />
             <line x1="11" y1="11" x2="15" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -384,7 +384,7 @@ export function GatewayCanvas({
           onClick={handleZoomIn}
           title="放大"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
             <line x1="7" y1="4" x2="7" y2="10" stroke="currentColor" strokeWidth="1.5" />
             <line x1="4" y1="7" x2="10" y2="7" stroke="currentColor" strokeWidth="1.5" />
