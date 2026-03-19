@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { X, FileCode, FileJson, Workflow, Database, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, FileCode, FileJson, Workflow, Database, BookOpen, ChevronLeft, ChevronRight, Plug } from 'lucide-react';
 import type { FileType, TabState } from '@shenbi/editor-core';
 import { useTranslation } from '@shenbi/i18n';
 
 function getTabIcon(fileType?: FileType) {
   switch (fileType) {
     case 'page': return FileCode;
-    case 'api': return FileJson;
+    case 'api': return Plug;
     case 'flow': return Workflow;
     case 'db': return Database;
     case 'dict': return BookOpen;
