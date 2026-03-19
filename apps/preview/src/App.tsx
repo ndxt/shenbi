@@ -1039,56 +1039,37 @@ export function App() {
         writeLocalFile: async (path: string, content: string) => {
           try {
             const parsed = JSON.parse(content);
-            // Strip leading slash for VFS lookup
-            const cleanPath = path.replace(/^\/+/, '');
+            // GitLab path: "系统看板.page.json" → VFS path: "/系统看板.page.json"
+            const vfsPath = `/${path.replace(/^\/+/, '')}`;
 
-            // Determine file type and base name from extension
-            const knownExts = ['.page.json', '.api.json', '.flow.json', '.db.json', '.dict.json'] as const;
-            const extTypeMap: Record<string, string> = {
-              '.page.json': 'page', '.api.json': 'api', '.flow.json': 'flow',
-              '.db.json': 'db', '.dict.json': 'dict',
-            };
-            let baseName = cleanPath;
-            let fileType = 'page';
-            for (const ext of knownExts) {
-              if (cleanPath.endsWith(ext)) {
-                baseName = cleanPath.slice(0, -ext.length);
-                fileType = extTypeMap[ext] ?? 'page';
-                break;
-              }
-            }
-
-            // Try to find existing file by multiple path patterns
-            let node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, cleanPath).catch(() => null);
-            if (!node) node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, `/${cleanPath}`).catch(() => null);
-            if (!node) node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, baseName).catch(() => null);
-            if (!node) node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, `/${baseName}`).catch(() => null);
-
+            const node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, vfsPath).catch(() => null);
             if (node) {
+              // Update existing file
               await vfs.writeFile(PREVIEW_PROJECT_ID, node.id, parsed);
             } else {
-              // Create new file with base name (no extension — VFS manages type separately)
+              // Create new file: strip extension for name (VFS auto-appends it)
+              const knownExts: [string, string][] = [
+                ['.page.json', 'page'], ['.api.json', 'api'], ['.flow.json', 'flow'],
+                ['.db.json', 'db'], ['.dict.json', 'dict'],
+              ];
+              const cleanPath = path.replace(/^\/+/, '');
+              let baseName = cleanPath;
+              let fileType = 'page';
+              for (const [ext, ft] of knownExts) {
+                if (cleanPath.endsWith(ext)) {
+                  baseName = cleanPath.slice(0, -ext.length);
+                  fileType = ft;
+                  break;
+                }
+              }
               await vfs.createFile(PREVIEW_PROJECT_ID, null, baseName, fileType as 'page', parsed);
             }
           } catch { /* skip invalid JSON */ }
         },
         deleteLocalFile: async (path: string) => {
           try {
-            const cleanPath = path.replace(/^\/+/, '');
-            // Strip known extension for VFS lookup
-            const knownExts = ['.page.json', '.api.json', '.flow.json', '.db.json', '.dict.json'];
-            let baseName = cleanPath;
-            for (const ext of knownExts) {
-              if (cleanPath.endsWith(ext)) {
-                baseName = cleanPath.slice(0, -ext.length);
-                break;
-              }
-            }
-
-            let node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, cleanPath).catch(() => null);
-            if (!node) node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, baseName).catch(() => null);
-            if (!node) node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, `/${baseName}`).catch(() => null);
-
+            const vfsPath = `/${path.replace(/^\/+/, '')}`;
+            const node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, vfsPath).catch(() => null);
             if (node) {
               await vfs.deleteFile(PREVIEW_PROJECT_ID, node.id);
             }
