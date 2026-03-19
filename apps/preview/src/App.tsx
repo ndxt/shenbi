@@ -35,7 +35,9 @@ import {
   treeManagementSkeletonSchema,
   userManagementSchema,
 } from './schemas';
-import { PREVIEW_PROJECT_ID, PREVIEW_WORKSPACE_ID } from './constants';
+import { PREVIEW_PROJECT_ID, PREVIEW_WORKSPACE_ID, loadActiveProject, saveActiveProject, clearActiveProject } from './constants';
+import type { ActiveProjectConfig } from './constants';
+import { ProjectListPage } from './ProjectListPage';
 import { ScenarioRuntimeView } from './runtime/ScenarioRuntimeView';
 
 import {
@@ -161,6 +163,8 @@ export function App() {
   const { t: filesT } = useTranslation('pluginFiles');
   const currentLocale = useCurrentLocale();
   const [appMode, setAppMode] = useShellModeUrl();
+  const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig | null>(() => loadActiveProject());
+  const activeProjectId = activeProjectConfig?.vfsProjectId ?? PREVIEW_PROJECT_ID;
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const persistenceAdapter = useMemo(() => new LocalWorkspacePersistenceAdapter(), []);
   const workspacePersistence = useMemo(
@@ -202,14 +206,14 @@ export function App() {
       setShellSessionHydrated(true);
       return;
     }
-    void vfs.initialize(PREVIEW_PROJECT_ID)
+    void vfs.initialize(activeProjectId)
       .then(() => {
         setVfsInitialized(true);
       })
       .catch(() => {
         setShellSessionHydrated(true);
       });
-  }, [vfs]);
+  }, [vfs, activeProjectId]);
 
   const {
     activeScenarioSnapshot,
@@ -239,7 +243,7 @@ export function App() {
         initialSchema: createEmptyShellSchema(),
         vfs,
         tabManager,
-        projectId: PREVIEW_PROJECT_ID,
+        projectId: activeProjectId,
       });
     },
   });
@@ -256,7 +260,7 @@ export function App() {
   // Refresh file tree
   const refreshFsTree = useCallback(() => {
     if (!vfsInitialized) return;
-    void vfs.listTree(PREVIEW_PROJECT_ID).then((nodes) => {
+    void vfs.listTree(activeProjectId).then((nodes) => {
       setFsTree(buildFSTree(nodes));
     });
   }, [vfs, vfsInitialized]);
@@ -370,7 +374,7 @@ export function App() {
           return;
         }
 
-        const nodes = await vfs.listTree(PREVIEW_PROJECT_ID);
+        const nodes = await vfs.listTree(activeProjectId);
         if (cancelled) {
           return;
         }
@@ -387,7 +391,7 @@ export function App() {
           let schema = persistedTab.schema;
           if (!persistedTab.isDirty) {
             try {
-              schema = await vfs.readFile(PREVIEW_PROJECT_ID, persistedTab.fileId) as PageSchema;
+              schema = await vfs.readFile(activeProjectId, persistedTab.fileId) as PageSchema;
             } catch {
               continue;
             }
@@ -704,15 +708,15 @@ export function App() {
     if (!vfsInitialized) return undefined;
     return {
       createFile: async (name: string, fileType: string, content: Record<string, unknown>, parentId?: string) => {
-        const node = await vfs.createFile(PREVIEW_PROJECT_ID, parentId ?? null, name, fileType as any, content);
+        const node = await vfs.createFile(activeProjectId, parentId ?? null, name, fileType as any, content);
         refreshFsTree();
         return node.id;
       },
       readFile: async (fileId: string) => {
-        return await vfs.readFile(PREVIEW_PROJECT_ID, fileId) as Record<string, unknown>;
+        return await vfs.readFile(activeProjectId, fileId) as Record<string, unknown>;
       },
       writeFile: async (fileId: string, content: Record<string, unknown>) => {
-        await vfs.writeFile(PREVIEW_PROJECT_ID, fileId, content);
+        await vfs.writeFile(activeProjectId, fileId, content);
       },
     };
   }, [refreshFsTree, vfs, vfsInitialized]);
@@ -1022,12 +1026,12 @@ export function App() {
       // GitLab Sync plugin
       registeredPlugins.push(createGitLabSyncPlugin({
         getLocalFiles: async () => {
-          const nodes = await vfs.listTree(PREVIEW_PROJECT_ID);
+          const nodes = await vfs.listTree(activeProjectId);
           const files = new Map<string, string>();
           for (const node of nodes) {
             if (node.type === 'file') {
               try {
-                const content = await vfs.readFile(PREVIEW_PROJECT_ID, node.id);
+                const content = await vfs.readFile(activeProjectId, node.id);
                 if (content && typeof content === 'object') {
                   files.set(node.path, JSON.stringify(content, null, 2));
                 }
@@ -1042,10 +1046,10 @@ export function App() {
             // GitLab path: "系统看板.page.json" → VFS path: "/系统看板.page.json"
             const vfsPath = `/${path.replace(/^\/+/, '')}`;
 
-            const node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, vfsPath).catch(() => null);
+            const node = await vfs.getNodeByPath(activeProjectId, vfsPath).catch(() => null);
             if (node) {
               // Update existing file
-              await vfs.writeFile(PREVIEW_PROJECT_ID, node.id, parsed);
+              await vfs.writeFile(activeProjectId, node.id, parsed);
             } else {
               // Create new file: strip extension for name (VFS auto-appends it)
               const knownExts: [string, string][] = [
@@ -1062,16 +1066,16 @@ export function App() {
                   break;
                 }
               }
-              await vfs.createFile(PREVIEW_PROJECT_ID, null, baseName, fileType as 'page', parsed);
+              await vfs.createFile(activeProjectId, null, baseName, fileType as 'page', parsed);
             }
           } catch { /* skip invalid JSON */ }
         },
         deleteLocalFile: async (path: string) => {
           try {
             const vfsPath = `/${path.replace(/^\/+/, '')}`;
-            const node = await vfs.getNodeByPath(PREVIEW_PROJECT_ID, vfsPath).catch(() => null);
+            const node = await vfs.getNodeByPath(activeProjectId, vfsPath).catch(() => null);
             if (node) {
-              await vfs.deleteFile(PREVIEW_PROJECT_ID, node.id);
+              await vfs.deleteFile(activeProjectId, node.id);
             }
           } catch { /* ignore */ }
         },
@@ -1162,6 +1166,27 @@ export function App() {
       )
       .catch(() => undefined);
   }, [activeScenario, scenarioPersistenceHydrated, workspacePersistence]);
+
+  // ── Project selection handler ──
+  const handleSelectProject = useCallback((config: ActiveProjectConfig) => {
+    saveActiveProject(config);
+    setActiveProjectConfig(config);
+    // Reset editor state for new project
+    setVfsInitialized(false);
+    setFsTree([]);
+  }, []);
+
+  const handleBackToProjects = useCallback(() => {
+    clearActiveProject();
+    setActiveProjectConfig(null);
+    setVfsInitialized(false);
+    setFsTree([]);
+  }, []);
+
+  // ── Project selection gate ──
+  if (!activeProjectConfig) {
+    return <ProjectListPage onSelectProject={handleSelectProject} />;
+  }
 
   return (
     <AppShell
