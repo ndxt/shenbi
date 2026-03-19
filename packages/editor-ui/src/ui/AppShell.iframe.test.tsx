@@ -1,6 +1,7 @@
 import React from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { defineEditorPlugin } from '@shenbi/editor-plugin-api';
 
 vi.mock('../canvas/iframe-pool', () => {
   function createMockIframe(): HTMLIFrameElement {
@@ -80,7 +81,7 @@ describe('AppShell iframe canvas mode', () => {
   it('iframe 模式下宿主层仍会保留 selection overlay', async () => {
     const view = render(
       <AppShell renderMode="iframe" selectedNodeSchemaId="node-1">
-        <div data-shenbi-node-id="node-1">Iframe Node</div>
+        <div data-shenbi-node-id="node-1" data-shenbi-component-type="Card">Iframe Node</div>
       </AppShell>,
     );
 
@@ -91,8 +92,120 @@ describe('AppShell iframe canvas mode', () => {
     });
 
     const iframe = view.container.querySelector('iframe');
+    const iframeNode = iframe?.contentDocument?.querySelector('[data-shenbi-node-id="node-1"]');
+    Object.defineProperty(iframeNode ?? {}, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        top: 96,
+        left: 128,
+        right: 288,
+        bottom: 180,
+        width: 160,
+        height: 84,
+        x: 128,
+        y: 96,
+        toJSON: () => undefined,
+      }),
+    });
+    fireEvent(window, new Event('resize'));
     expect(iframe?.contentDocument?.getElementById('shenbi-iframe-root')?.textContent).toContain('Iframe Node');
     expect(view.container.querySelector('.selection-overlay')).not.toBeNull();
+  });
+
+  it('iframe 模式下点击节点选中，点击空白取消选中', async () => {
+    const onCanvasSelectNode = vi.fn();
+    const onCanvasDeselectNode = vi.fn();
+    const view = render(
+      <AppShell
+        renderMode="iframe"
+        onCanvasSelectNode={onCanvasSelectNode}
+        onCanvasDeselectNode={onCanvasDeselectNode}
+      >
+        <div data-shenbi-node-id="node-1">Iframe Node</div>
+      </AppShell>,
+    );
+
+    await waitFor(() => {
+      const iframe = view.container.querySelector('iframe');
+      expect(iframe?.contentDocument?.getElementById('shenbi-iframe-root')?.textContent).toContain('Iframe Node');
+    });
+
+    const iframe = view.container.querySelector('iframe');
+    const iframeNode = iframe?.contentDocument?.querySelector('[data-shenbi-node-id="node-1"]');
+    expect(iframeNode).not.toBeNull();
+
+    fireEvent.click(iframeNode as Element);
+    expect(onCanvasSelectNode).toHaveBeenCalledWith('node-1');
+
+    fireEvent.click(iframe?.contentDocument?.body as HTMLBodyElement);
+    expect(onCanvasDeselectNode).toHaveBeenCalled();
+  });
+
+  it('iframe 模式下宿主 action 条点击不会误触发取消选中', async () => {
+    const duplicateExecute = vi.fn();
+    const onCanvasDeselectNode = vi.fn();
+    const view = render(
+      <AppShell
+        renderMode="iframe"
+        selectedNodeSchemaId="node-1"
+        selectedNodeTreeId="body.0"
+        canDuplicateSelectedNode
+        canDeleteSelectedNode
+        onCanvasDeselectNode={onCanvasDeselectNode}
+        pluginContext={{
+          selection: {
+            getSelectedNodeId: () => 'body.0',
+          },
+        }}
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.canvas-actions',
+            name: 'Canvas Actions',
+            contributes: {
+              commands: [
+                { id: 'canvas.duplicateSelectedNode', title: 'Duplicate', execute: duplicateExecute },
+                { id: 'canvas.moveSelectedNodeUp', title: 'Move Up', enabledWhen: 'canCanvasMoveSelectionUp', execute: () => undefined },
+                { id: 'canvas.moveSelectedNodeDown', title: 'Move Down', enabledWhen: 'canCanvasMoveSelectionDown', execute: () => undefined },
+                { id: 'canvas.deleteSelectedNode', title: 'Delete', enabledWhen: 'canCanvasDeleteSelection', execute: () => undefined },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div data-shenbi-node-id="node-1" data-shenbi-component-type="Card">Iframe Node</div>
+      </AppShell>,
+    );
+
+    await waitFor(() => {
+      const iframe = view.container.querySelector('iframe');
+      expect(iframe?.contentDocument?.getElementById('shenbi-iframe-root')?.textContent).toContain('Iframe Node');
+    });
+
+    const iframe = view.container.querySelector('iframe');
+    const iframeNode = iframe?.contentDocument?.querySelector('[data-shenbi-node-id="node-1"]');
+    Object.defineProperty(iframeNode ?? {}, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        top: 72,
+        left: 96,
+        right: 256,
+        bottom: 144,
+        width: 160,
+        height: 72,
+        x: 96,
+        y: 72,
+        toJSON: () => undefined,
+      }),
+    });
+    fireEvent(window, new Event('resize'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('toolbar', { name: 'Selected Node Actions' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle('Duplicate'));
+    expect(duplicateExecute).toHaveBeenCalled();
+    expect(onCanvasDeselectNode).not.toHaveBeenCalled();
   });
 
   it('iframe 模式下支持通过 Ctrl 滚轮缩放画布', async () => {
@@ -123,4 +236,5 @@ describe('AppShell iframe canvas mode', () => {
       expect(zoomButton?.textContent).not.toBe('100%');
     });
   });
+
 });

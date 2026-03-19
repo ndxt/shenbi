@@ -6,6 +6,10 @@ export interface ShortcutRuntimeContext {
   inspectorVisible: boolean;
   hasSelection: boolean;
   hasCanvasSelection: boolean;
+  canCanvasDeleteSelection?: boolean;
+  canCanvasDuplicateSelection?: boolean;
+  canCanvasMoveSelectionUp?: boolean;
+  canCanvasMoveSelectionDown?: boolean;
   inputFocused: boolean;
   canvasFocused: boolean;
   sidebarFocused: boolean;

@@ -2,6 +2,14 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import type { CanvasSurfaceHandle } from '../canvas/types';
 
+export interface SelectionOverlayAction {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+  onRun: () => void;
+}
+
 export interface SelectionOverlayProps {
   /** 当前画布 surface（支持 direct / iframe） */
   surface: CanvasSurfaceHandle | null;
@@ -18,6 +26,7 @@ export interface SelectionOverlayProps {
   /** hover 到节点时回调（可选，用于扩展） */
   onHoverNode?: (nodeId: string | null) => void;
   hoverEnabled?: boolean;
+  actions?: SelectionOverlayAction[] | undefined;
   dragSelectedEnabled?: boolean;
   onStartDragSelected?: (event: React.DragEvent<HTMLDivElement>) => void;
   onEndDragSelected?: () => void;
@@ -31,6 +40,13 @@ interface OverlayRect {
 }
 
 const EMPTY_RECT: OverlayRect = { top: 0, left: 0, width: 0, height: 0 };
+
+function isElementTarget(target: EventTarget | null): target is Element {
+  return Boolean(target)
+    && typeof (target as Node).nodeType === 'number'
+    && (target as Node).nodeType === 1
+    && typeof (target as Element).closest === 'function';
+}
 
 function isRectEmpty(rect: OverlayRect): boolean {
   return rect.width === 0 && rect.height === 0;
@@ -67,6 +83,7 @@ export function SelectionOverlay({
   onHoverAncestor,
   onHoverNode,
   hoverEnabled = true,
+  actions,
   dragSelectedEnabled = false,
   onStartDragSelected,
   onEndDragSelected,
@@ -178,7 +195,7 @@ export function SelectionOverlay({
       }
       rafRef.current = requestAnimationFrame(() => {
         const target = event.target;
-        if (!(target instanceof Element)) {
+        if (!isElementTarget(target)) {
           setHoverRect(EMPTY_RECT);
           setMouseHoveredNodeId(null);
           onHoverNode?.(null);
@@ -269,9 +286,10 @@ export function SelectionOverlay({
   // hover 和 selected 相同节点时隐藏 hover 框
   const showHover = !isRectEmpty(effectiveHoverRect) && effectiveHoveredNodeId !== selectedNodeSchemaId;
   const showSelected = !isRectEmpty(selectedRect);
+  const visibleActions = actions?.filter((action) => action) ?? [];
 
   return (
-    <div className="selection-overlay" aria-hidden="true">
+    <div className="selection-overlay" {...(visibleActions.length === 0 ? { 'aria-hidden': true } : {})}>
       {/* Hover 框 */}
       {showHover && (
         <div
@@ -302,7 +320,7 @@ export function SelectionOverlay({
             height: selectedRect.height,
           }}
         >
-          {selectedComponentType && (
+          {(selectedComponentType || visibleActions.length > 0) && (
             <div
               className="selection-overlay__label-group"
               ref={dropdownRef}
@@ -328,20 +346,45 @@ export function SelectionOverlay({
                 }, 150);
               }}
             >
-              <span className="selection-overlay__label-btn">
-                <span>{selectedComponentType}</span>
-                {ancestorItems && ancestorItems.length > 1 && onSelectAncestor && (
-                  <svg
-                    width="8"
-                    height="8"
-                    viewBox="0 0 8 8"
-                    fill="none"
-                    className={`selection-overlay__chevron ${showAncestorDropdown ? 'selection-overlay__chevron--open' : ''}`}
-                  >
-                    <path d="M2 3L4 5L6 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </span>
+              {selectedComponentType ? (
+                <span className="selection-overlay__label-btn">
+                  <span>{selectedComponentType}</span>
+                  {ancestorItems && ancestorItems.length > 1 && onSelectAncestor && (
+                    <svg
+                      width="8"
+                      height="8"
+                      viewBox="0 0 8 8"
+                      fill="none"
+                      className={`selection-overlay__chevron ${showAncestorDropdown ? 'selection-overlay__chevron--open' : ''}`}
+                    >
+                      <path d="M2 3L4 5L6 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
+              ) : null}
+              {visibleActions.length > 0 ? (
+                <div className="selection-overlay__actions" role="toolbar" aria-label="Selected Node Actions">
+                  {visibleActions.map((action) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      className="selection-overlay__action-btn"
+                      title={action.title}
+                      aria-label={action.title}
+                      disabled={action.disabled}
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        action.onRun();
+                      }}
+                    >
+                      {action.icon}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {showAncestorDropdown && ancestorItems && ReactDOM.createPortal(
                 <AncestorDropdown
                   items={ancestorItems}

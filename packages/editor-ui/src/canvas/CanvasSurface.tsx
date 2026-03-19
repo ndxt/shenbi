@@ -52,11 +52,12 @@ function createIframeHandle(
     ownerWindow: contentWindow,
     ownerDocument: contentDocument,
     getRelativeRect(target) {
-      const frameRect = iframe.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
       return {
-        top: targetRect.top - frameRect.top,
-        left: targetRect.left - frameRect.left,
+        // Elements inside the iframe already report rects in the iframe viewport's
+        // coordinate space, which matches the overlay mounted over the iframe host.
+        top: targetRect.top,
+        left: targetRect.left,
         width: targetRect.width,
         height: targetRect.height,
       };

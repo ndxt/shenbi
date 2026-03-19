@@ -6,6 +6,7 @@ import {
   createSchemaNodeFromContract,
   getBuiltinContract,
   type PageSchema,
+  type SchemaNode,
 } from '@shenbi/schema';
 import { defineEditorPlugin } from '@shenbi/editor-plugin-api';
 import {
@@ -194,6 +195,53 @@ export function canSchemaNodeAcceptCanvasChildren(
     return false;
   }
   return canDropInsideComponent(targetNode.component);
+}
+
+function createClonedNodeId(componentType: string): string {
+  const normalized = componentType
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'node';
+  const randomSuffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID().slice(0, 8)
+    : Math.random().toString(36).slice(2, 10);
+  return `${normalized}-${randomSuffix}`;
+}
+
+function cloneSchemaNodeWithFreshIds(node: SchemaNode): SchemaNode {
+  const cloned = typeof structuredClone === 'function'
+    ? structuredClone(node)
+    : JSON.parse(JSON.stringify(node)) as SchemaNode;
+
+  const walk = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      return value.map((item) => walk(item));
+    }
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+    const record = value as Record<string, unknown>;
+    const nextRecord = Object.fromEntries(
+      Object.entries(record).map(([key, nested]) => [key, walk(nested)]),
+    );
+    if (typeof nextRecord.component === 'string') {
+      nextRecord.id = createClonedNodeId(nextRecord.component);
+    }
+    return nextRecord;
+  };
+
+  return walk(cloned) as SchemaNode;
+}
+
+function getContainerNodeCount(schema: PageSchema, parentTreeId?: string): number {
+  if (!parentTreeId) {
+    return Array.isArray(schema.body) ? schema.body.length : (schema.body ? 1 : 0);
+  }
+  if (parentTreeId === 'dialogs') {
+    return Array.isArray(schema.dialogs) ? schema.dialogs.length : (schema.dialogs ? 1 : 0);
+  }
+  const parentNode = getSchemaNodeByTreeId(schema, parentTreeId);
+  return Array.isArray(parentNode?.children) ? parentNode.children.length : 0;
 }
 
 export function resolveCanvasDropPosition(
@@ -636,6 +684,30 @@ export function App() {
   const selectedContract = useMemo(
     () => (selectedNode ? getBuiltinContract(selectedNode.component) : undefined),
     [selectedNode],
+  );
+  const selectedNodePosition = useMemo(
+    () => getTreeArrayPosition(selectedNodeId),
+    [selectedNodeId],
+  );
+  const selectedNodeSiblingCount = useMemo(
+    () => (
+      selectedNodePosition
+        ? getContainerNodeCount(activeSchema, selectedNodePosition.targetParentTreeId)
+        : 0
+    ),
+    [activeSchema, selectedNodePosition],
+  );
+  const canDeleteSelectedNode = Boolean(selectedNodeId) && !shellGenerationLock;
+  const canDuplicateSelectedNode = Boolean(selectedNodeId && selectedNode) && !shellGenerationLock;
+  const canMoveSelectedNodeUp = Boolean(
+    selectedNodePosition
+    && selectedNodePosition.index > 0
+    && !shellGenerationLock,
+  );
+  const canMoveSelectedNodeDown = Boolean(
+    selectedNodePosition
+    && selectedNodePosition.index < selectedNodeSiblingCount - 1
+    && !shellGenerationLock,
   );
   const breadcrumbItems = useMemo(
     () => getAncestorChain(treeNodes, selectedNodeId),
@@ -1130,6 +1202,27 @@ export function App() {
     });
   }, [activeSchema, executeSchemaCommand, notifyGenerationLock, selectTreeNode, selectedNodeId]);
 
+  const handleDuplicateSelectedNode = useCallback(() => {
+    if (!selectedNodeId || !selectedNode || notifyGenerationLock()) {
+      return;
+    }
+    const position = getTreeArrayPosition(selectedNodeId);
+    if (!position) {
+      return;
+    }
+    const duplicatedNode = cloneSchemaNodeWithFreshIds(selectedNode);
+    executeSchemaCommand('node.insertAt', {
+      node: duplicatedNode,
+      ...(position.targetParentTreeId ? { parentTreeId: position.targetParentTreeId } : {}),
+      index: position.index + 1,
+    });
+    if (duplicatedNode.id) {
+      requestAnimationFrame(() => {
+        selectSchemaNode(duplicatedNode.id!);
+      });
+    }
+  }, [executeSchemaCommand, notifyGenerationLock, selectSchemaNode, selectedNode, selectedNodeId]);
+
   const moveSelectedNode = useCallback((direction: -1 | 1) => {
     if (!selectedNodeId || notifyGenerationLock()) {
       return;
@@ -1207,16 +1300,25 @@ export function App() {
               id: 'canvas.deleteSelectedNode',
               title: 'Delete Selected Node',
               category: 'Canvas',
-              enabledWhen: 'hasSelection && !canvasReadOnly',
+              enabledWhen: 'hasSelection && !canvasReadOnly && canCanvasDeleteSelection',
               execute: () => {
                 handleDeleteSelectedNode();
+              },
+            },
+            {
+              id: 'canvas.duplicateSelectedNode',
+              title: 'Duplicate Selected Node',
+              category: 'Canvas',
+              enabledWhen: 'hasSelection && !canvasReadOnly && canCanvasDuplicateSelection',
+              execute: () => {
+                handleDuplicateSelectedNode();
               },
             },
             {
               id: 'canvas.moveSelectedNodeUp',
               title: 'Move Selected Node Up',
               category: 'Canvas',
-              enabledWhen: 'hasSelection && !canvasReadOnly',
+              enabledWhen: 'hasSelection && !canvasReadOnly && canCanvasMoveSelectionUp',
               execute: () => {
                 moveSelectedNode(-1);
               },
@@ -1225,7 +1327,7 @@ export function App() {
               id: 'canvas.moveSelectedNodeDown',
               title: 'Move Selected Node Down',
               category: 'Canvas',
-              enabledWhen: 'hasSelection && !canvasReadOnly',
+              enabledWhen: 'hasSelection && !canvasReadOnly && canCanvasMoveSelectionDown',
               execute: () => {
                 moveSelectedNode(1);
               },
@@ -1262,6 +1364,13 @@ export function App() {
               id: 'canvas.moveSelectedNodeUp.context',
               label: 'Move Up',
               commandId: 'canvas.moveSelectedNodeUp',
+              area: 'canvas',
+              group: 'edit',
+            },
+            {
+              id: 'canvas.duplicateSelectedNode.context',
+              label: 'Duplicate',
+              commandId: 'canvas.duplicateSelectedNode',
               area: 'canvas',
               group: 'edit',
             },
@@ -1377,6 +1486,7 @@ export function App() {
     filesPrimaryPanelOptions,
     filesT,
     handleDeleteSelectedNode,
+    handleDuplicateSelectedNode,
     moveSelectedNode,
     previewT,
     vfsInitialized,
@@ -1479,6 +1589,10 @@ export function App() {
       canCanvasDropInsideNode={(nodeSchemaId) => canSchemaNodeAcceptCanvasChildren(activeSchema, nodeSchemaId)}
       onCanvasInsertComponent={handleCanvasInsertComponent}
       onCanvasMoveSelectedNode={handleCanvasMoveSelectedNode}
+      canDeleteSelectedNode={canDeleteSelectedNode}
+      canDuplicateSelectedNode={canDuplicateSelectedNode}
+      canMoveSelectedNodeUp={canMoveSelectedNodeUp}
+      canMoveSelectedNodeDown={canMoveSelectedNodeDown}
       {...(selectedNode?.id ? { selectedNodeSchemaId: selectedNode.id } : {})}
       {...(breadcrumbHoveredSchemaId ? { hoveredNodeSchemaId: breadcrumbHoveredSchemaId } : {})}
       schemaName={shellSchemaName}

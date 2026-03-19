@@ -294,6 +294,22 @@ body {
   scrollbar-width: none;
 }
 
+.canvas-surface--panning,
+.canvas-surface--panning * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  cursor: grabbing !important;
+}
+
+.shenbi-canvas-panning,
+.shenbi-canvas-panning * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-user-drag: none !important;
+  cursor: grabbing !important;
+}
+
 /* ===== Selection Overlay ===== */
 
 .selection-overlay {
@@ -353,12 +369,18 @@ body {
 
 .selection-overlay__label-group {
   position: absolute;
-  top: -22px;
+  top: -24px;
   left: -2px;
   display: flex;
   align-items: center;
+  gap: 0;
   pointer-events: auto;
   z-index: 60;
+  min-height: 22px;
+  border-radius: 6px 6px 0 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, #4f8dfb 0%, #3b82f6 100%);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
 }
 
 .selection-overlay__label-group > .selection-overlay__label {
@@ -369,18 +391,59 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 20px;
-  padding: 0 6px;
+  height: 22px;
+  padding: 0 8px;
   border: none;
-  background: #3b82f6;
+  background: transparent;
   color: #ffffff;
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 600;
   font-family: 'Inter', system-ui, sans-serif;
-  line-height: 20px;
+  line-height: 22px;
   white-space: nowrap;
-  border-radius: 3px 3px 0 0;
+  border-radius: 0;
   cursor: default;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+}
+
+.selection-overlay__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  padding: 0 4px 0 3px;
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(20, 55, 124, 0.18);
+}
+
+.selection-overlay__action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.selection-overlay__action-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  transform: translateY(-0.5px);
+}
+
+.selection-overlay__action-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.selection-overlay__action-btn:disabled:hover {
+  background: transparent;
+  transform: none;
 }
 
 .selection-overlay__label-group[draggable="true"] .selection-overlay__label-btn {
