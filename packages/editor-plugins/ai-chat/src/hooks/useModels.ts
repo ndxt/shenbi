@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { PluginPersistenceService } from '@shenbi/editor-plugin-api';
+import { isProductionEnvironment } from '../utils/env';
 
 const FALLBACK_PLANNER_MODELS = ['openai-compatible::GLM-4.7', 'openai-compatible::GLM-4.6', 'openai-compatible::GLM-5'];
 const FALLBACK_BLOCK_MODELS = ['openai-compatible::GLM-4.6', 'openai-compatible::GLM-4.7', 'openai-compatible::GLM-5'];
@@ -7,7 +8,7 @@ const DEFAULT_PLANNER_MODEL = FALLBACK_PLANNER_MODELS[0]!;
 const DEFAULT_BLOCK_MODEL = FALLBACK_BLOCK_MODELS[0]!;
 const PERSISTENCE_NAMESPACE = 'ai-chat';
 const PERSISTENCE_KEY = 'model-selection';
-const AI_MODELS_ENDPOINT = import.meta.env.PROD ? '/locode/shenbi/api/ai/models' : '/api/ai/models';
+const AI_MODELS_ENDPOINT = isProductionEnvironment() ? '/locode/shenbi/api/ai/models' : '/api/ai/models';
 
 interface ModelInfo {
     id: string;

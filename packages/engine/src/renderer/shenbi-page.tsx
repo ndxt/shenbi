@@ -10,6 +10,7 @@ export interface ShenbiPageProps {
   runtime: PageRuntime;
   compiledBody: CompiledNode | CompiledNode[];
   compiledDialogs?: CompiledNode[];
+  onRootReady?: (element: HTMLDivElement | null) => void;
 }
 
 export function ShenbiPage({
@@ -18,8 +19,13 @@ export function ShenbiPage({
   runtime,
   compiledBody,
   compiledDialogs,
+  onRootReady,
 }: ShenbiPageProps): ReactElement | null {
   const containerRef = useRef<HTMLDivElement>(null);
+  const handleContainerRef = useCallback((element: HTMLDivElement | null) => {
+    containerRef.current = element;
+    onRootReady?.(element);
+  }, [onRootReady]);
 
   const getPopupContainer = useCallback((): HTMLElement => {
     return containerRef.current ?? document.body;
@@ -80,7 +86,7 @@ export function ShenbiPage({
       { value: contextValue },
       createElement(
         'div',
-        { ref: containerRef, style: containerStyle, 'data-shenbi-page-root': true },
+        { ref: handleContainerRef, style: containerStyle, 'data-shenbi-page-root': true },
         bodyElements,
         dialogElements,
       ),

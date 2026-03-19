@@ -1,9 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import type { CanvasSurfaceHandle } from '../canvas/types';
 
 export interface SelectionOverlayProps {
-  /** 画布内容容器的 ref（用于事件委托和位置计算） */
-  containerRef: React.RefObject<HTMLDivElement | null>;
+  /** 当前画布 surface（支持 direct / iframe） */
+  surface: CanvasSurfaceHandle | null;
   /** 当前选中的 schema node id */
   selectedNodeSchemaId?: string | undefined;
   /** 外部控制的 hover 目标（如面包屑 hover），优先于鼠标 hover */
@@ -16,6 +17,9 @@ export interface SelectionOverlayProps {
   onHoverAncestor?: ((nodeId: string | null) => void) | undefined;
   /** hover 到节点时回调（可选，用于扩展） */
   onHoverNode?: (nodeId: string | null) => void;
+  dragSelectedEnabled?: boolean;
+  onStartDragSelected?: (event: React.DragEvent<HTMLDivElement>) => void;
+  onEndDragSelected?: () => void;
 }
 
 interface OverlayRect {
@@ -36,26 +40,17 @@ function isRectEmpty(rect: OverlayRect): boolean {
  */
 function computeRelativeRect(
   target: Element,
-  container: HTMLElement,
+  surface: CanvasSurfaceHandle,
 ): OverlayRect {
-  const targetRect = target.getBoundingClientRect();
-  const containerRect = container.getBoundingClientRect();
-
-  // 宽高为 0 表示元素不可见（display: none 等）
-  if (targetRect.width === 0 && targetRect.height === 0) {
+  const rect = surface.getRelativeRect(target);
+  if (rect.width === 0 && rect.height === 0) {
     return EMPTY_RECT;
   }
-
-  return {
-    top: targetRect.top - containerRect.top + container.scrollTop,
-    left: targetRect.left - containerRect.left + container.scrollLeft,
-    width: targetRect.width,
-    height: targetRect.height,
-  };
+  return rect;
 }
 
-function findNodeElement(container: HTMLElement, nodeId: string): Element | null {
-  return container.querySelector(`[data-shenbi-node-id="${CSS.escape(nodeId)}"]`);
+function findNodeElement(surface: CanvasSurfaceHandle, nodeId: string): Element | null {
+  return surface.findNodeElement(nodeId);
 }
 
 function getComponentType(element: Element): string {
@@ -63,13 +58,16 @@ function getComponentType(element: Element): string {
 }
 
 export function SelectionOverlay({
-  containerRef,
+  surface,
   selectedNodeSchemaId,
   externalHoverNodeSchemaId,
   ancestorItems,
   onSelectAncestor,
   onHoverAncestor,
   onHoverNode,
+  dragSelectedEnabled = false,
+  onStartDragSelected,
+  onEndDragSelected,
 }: SelectionOverlayProps) {
   const [hoverRect, setHoverRect] = React.useState<OverlayRect>(EMPTY_RECT);
   const [hoverComponentType, setHoverComponentType] = React.useState('');
@@ -92,34 +90,32 @@ export function SelectionOverlay({
 
   // 更新选中框位置
   const updateSelectedRect = React.useCallback(() => {
-    const container = containerRef.current;
-    if (!container || !selectedNodeSchemaId) {
+    if (!surface || !selectedNodeSchemaId) {
       setSelectedRect(EMPTY_RECT);
       setSelectedComponentType('');
       return;
     }
 
-    const element = findNodeElement(container, selectedNodeSchemaId);
+    const element = findNodeElement(surface, selectedNodeSchemaId);
     if (!element) {
       setSelectedRect(EMPTY_RECT);
       setSelectedComponentType('');
       return;
     }
 
-    setSelectedRect(computeRelativeRect(element, container));
+    setSelectedRect(computeRelativeRect(element, surface));
     setSelectedComponentType(getComponentType(element));
-  }, [containerRef, selectedNodeSchemaId]);
+  }, [selectedNodeSchemaId, surface]);
 
   // 监听选中节点变化
   React.useEffect(() => {
     updateSelectedRect();
 
-    const container = containerRef.current;
-    if (!container || !selectedNodeSchemaId) {
+    if (!surface || !selectedNodeSchemaId) {
       return;
     }
 
-    const element = findNodeElement(container, selectedNodeSchemaId);
+    const element = findNodeElement(surface, selectedNodeSchemaId);
     if (!element) {
       return;
     }
@@ -135,17 +131,15 @@ export function SelectionOverlay({
       observer.disconnect();
       resizeObserverRef.current = null;
     };
-  }, [containerRef, selectedNodeSchemaId, updateSelectedRect]);
+  }, [selectedNodeSchemaId, surface, updateSelectedRect]);
 
   // 监听画布滚动和窗口 resize，更新选中框位置
   React.useEffect(() => {
-    const container = containerRef.current;
-    if (!container || !selectedNodeSchemaId) {
+    if (!surface || !selectedNodeSchemaId) {
       return;
     }
 
-    // 找到可滚动的祖先（canvas main 区域）
-    const scrollParent = container.closest('[data-shenbi-shortcut-area="canvas"]');
+    const scrollParent = surface.hostElement?.closest?.('[data-shenbi-shortcut-area="canvas"]');
 
     const handleUpdate = () => {
       updateSelectedRect();
@@ -153,17 +147,18 @@ export function SelectionOverlay({
 
     scrollParent?.addEventListener('scroll', handleUpdate);
     window.addEventListener('resize', handleUpdate);
+    surface.ownerWindow?.addEventListener('resize', handleUpdate);
 
     return () => {
       scrollParent?.removeEventListener('scroll', handleUpdate);
       window.removeEventListener('resize', handleUpdate);
+      surface.ownerWindow?.removeEventListener('resize', handleUpdate);
     };
-  }, [containerRef, selectedNodeSchemaId, updateSelectedRect]);
+  }, [selectedNodeSchemaId, surface, updateSelectedRect]);
 
   // 鼠标悬浮事件处理（事件委托）
   React.useEffect(() => {
-    const container = containerRef.current;
-    if (!container) {
+    if (!surface?.rootElement) {
       return;
     }
 
@@ -198,7 +193,7 @@ export function SelectionOverlay({
         }
 
         setMouseHoveredNodeId(nodeId);
-        setHoverRect(computeRelativeRect(hit, container));
+        setHoverRect(computeRelativeRect(hit, surface));
         setHoverComponentType(getComponentType(hit));
         onHoverNode?.(nodeId);
       });
@@ -213,37 +208,36 @@ export function SelectionOverlay({
       onHoverNode?.(null);
     };
 
-    container.addEventListener('mousemove', handleMouseMove);
-    container.addEventListener('mouseleave', handleMouseLeave);
+    surface.rootElement.addEventListener('mousemove', handleMouseMove);
+    surface.rootElement.addEventListener('mouseleave', handleMouseLeave);
 
     return () => {
-      container.removeEventListener('mousemove', handleMouseMove);
-      container.removeEventListener('mouseleave', handleMouseLeave);
+      surface.rootElement?.removeEventListener('mousemove', handleMouseMove);
+      surface.rootElement?.removeEventListener('mouseleave', handleMouseLeave);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [containerRef, onHoverNode]);
+  }, [onHoverNode, surface]);
 
   // 外部 hover（面包屑等）位置计算
   React.useEffect(() => {
-    const container = containerRef.current;
-    if (!container || !externalHoverNodeSchemaId) {
+    if (!surface || !externalHoverNodeSchemaId) {
       setExternalHoverRect(EMPTY_RECT);
       setExternalHoverComponentType('');
       return;
     }
 
-    const element = findNodeElement(container, externalHoverNodeSchemaId);
+    const element = findNodeElement(surface, externalHoverNodeSchemaId);
     if (!element) {
       setExternalHoverRect(EMPTY_RECT);
       setExternalHoverComponentType('');
       return;
     }
 
-    setExternalHoverRect(computeRelativeRect(element, container));
+    setExternalHoverRect(computeRelativeRect(element, surface));
     setExternalHoverComponentType(getComponentType(element));
-  }, [containerRef, externalHoverNodeSchemaId]);
+  }, [externalHoverNodeSchemaId, surface]);
 
   // 选中节点变化时关闭下拉
   React.useEffect(() => {
@@ -303,6 +297,13 @@ export function SelectionOverlay({
             <div
               className="selection-overlay__label-group"
               ref={dropdownRef}
+              draggable={dragSelectedEnabled}
+              onDragStart={(event) => {
+                onStartDragSelected?.(event);
+              }}
+              onDragEnd={() => {
+                onEndDragSelected?.();
+              }}
               onMouseEnter={() => {
                 if (hoverCloseTimerRef.current) {
                   clearTimeout(hoverCloseTimerRef.current);

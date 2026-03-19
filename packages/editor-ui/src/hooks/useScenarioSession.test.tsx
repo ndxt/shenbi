@@ -14,6 +14,23 @@ function createSchema(name: string): PageSchema {
   };
 }
 
+function createNestedSchema(name: string): PageSchema {
+  return {
+    id: name,
+    name,
+    body: [
+      {
+        id: 'root',
+        component: 'Container',
+        children: [
+          { id: 'first', component: 'Button' },
+          { id: 'second', component: 'Button' },
+        ],
+      },
+    ],
+  };
+}
+
 function createSnapshot(name: string): EditorStateSnapshot {
   return {
     schema: createSchema(name),
@@ -151,5 +168,60 @@ describe('useScenarioSession', () => {
 
     expect(result.current.activeScenarioSnapshot.selectedNodeId).toBe('body.0');
     expect(result.current.scenarioSnapshots.orders.selectedNodeId).toBeUndefined();
+  });
+
+  it('executeScenarioCommand 支持 node.insertAt / node.remove / node.move', async () => {
+    const { result } = renderHook(() => useScenarioSession<ScenarioKey>({
+      activeScenario: 'users',
+      initialSnapshots: {
+        users: {
+          schema: createNestedSchema('users'),
+          isDirty: false,
+          canUndo: false,
+          canRedo: false,
+          selectedNodeId: 'body.0.children.0',
+        },
+        orders: createSnapshot('orders'),
+      },
+    }));
+
+    await act(async () => {
+      await result.current.executeScenarioCommand('node.insertAt', {
+        parentTreeId: 'body.0',
+        index: 1,
+        node: {
+          id: 'inserted',
+          component: 'Button',
+        },
+      });
+    });
+
+    expect(
+      (result.current.activeScenarioSnapshot.schema.body as any[])[0].children.map((node: { id: string }) => node.id),
+    ).toEqual(['first', 'inserted', 'second']);
+
+    await act(async () => {
+      await result.current.executeScenarioCommand('node.move', {
+        sourceTreeId: 'body.0.children.0',
+        targetParentTreeId: 'body.0',
+        index: 3,
+      });
+    });
+
+    expect(
+      (result.current.activeScenarioSnapshot.schema.body as any[])[0].children.map((node: { id: string }) => node.id),
+    ).toEqual(['inserted', 'second', 'first']);
+    expect(result.current.activeScenarioSnapshot.selectedNodeId).toBe('body.0.children.2');
+
+    await act(async () => {
+      await result.current.executeScenarioCommand('node.remove', {
+        treeId: 'body.0.children.2',
+      });
+    });
+
+    expect(
+      (result.current.activeScenarioSnapshot.schema.body as any[])[0].children.map((node: { id: string }) => node.id),
+    ).toEqual(['inserted', 'second']);
+    expect(result.current.activeScenarioSnapshot.selectedNodeId).toBeUndefined();
   });
 });

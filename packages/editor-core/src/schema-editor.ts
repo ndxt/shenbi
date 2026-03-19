@@ -150,6 +150,19 @@ function clampIndex(index: number, length: number): number {
   return index;
 }
 
+function getParentArrayInfo(treeId: string): { parentPath: string; index: number } | undefined {
+  const tokens = treeId.split('.').filter(Boolean);
+  const lastToken = tokens[tokens.length - 1];
+  const index = Number(lastToken);
+  if (!Number.isInteger(index)) {
+    return undefined;
+  }
+  return {
+    parentPath: tokens.slice(0, -1).join('.'),
+    index,
+  };
+}
+
 export function getSchemaNodeByTreeId(schema: PageSchema, treeId?: string): SchemaNode | undefined {
   if (!treeId) {
     return undefined;
@@ -255,6 +268,57 @@ export function removeSchemaNode(schema: PageSchema, treeId: string | undefined)
   }
 
   parentValue.splice(index, 1);
+  return nextSchema;
+}
+
+export function moveSchemaNode(
+  schema: PageSchema,
+  sourceTreeId: string | undefined,
+  targetParentTreeId: string | undefined,
+  targetIndex: number,
+): PageSchema {
+  if (!sourceTreeId) {
+    return schema;
+  }
+
+  const sourceInfo = getParentArrayInfo(sourceTreeId);
+  if (!sourceInfo) {
+    return schema;
+  }
+
+  const nextSchema = deepCloneSchema(schema);
+  const sourceContainer = getValueByPath(nextSchema, sourceInfo.parentPath);
+  if (!Array.isArray(sourceContainer) || sourceInfo.index < 0 || sourceInfo.index >= sourceContainer.length) {
+    return schema;
+  }
+
+  const [movedNode] = sourceContainer.splice(sourceInfo.index, 1);
+  if (!isSchemaNode(movedNode)) {
+    return schema;
+  }
+
+  let targetContainer: SchemaNode[] | undefined;
+  if (!targetParentTreeId) {
+    targetContainer = getRootContainer(nextSchema, 'body');
+  } else if (targetParentTreeId === 'dialogs') {
+    targetContainer = getRootContainer(nextSchema, 'dialogs');
+  } else {
+    const targetParentNode = getSchemaNodeByTreeId(nextSchema, targetParentTreeId);
+    if (!targetParentNode) {
+      return schema;
+    }
+    targetContainer = getNodeChildrenContainer(targetParentNode, true);
+  }
+
+  if (!targetContainer) {
+    return schema;
+  }
+
+  const sameContainer = sourceContainer === targetContainer;
+  const resolvedTargetIndex = sameContainer && sourceInfo.index < targetIndex
+    ? targetIndex - 1
+    : targetIndex;
+  targetContainer.splice(clampIndex(resolvedTargetIndex, targetContainer.length), 0, movedNode);
   return nextSchema;
 }
 

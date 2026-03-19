@@ -225,6 +225,14 @@ body {
   cursor: default;
 }
 
+.selection-overlay__label-group[draggable="true"] .selection-overlay__label-btn {
+  cursor: grab;
+}
+
+.selection-overlay__label-group[draggable="true"]:active .selection-overlay__label-btn {
+  cursor: grabbing;
+}
+
 .selection-overlay__chevron {
   transition: transform 0.2s ease;
   opacity: 0.8;

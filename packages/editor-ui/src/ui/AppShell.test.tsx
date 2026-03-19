@@ -1597,4 +1597,31 @@ describe('AppShell', () => {
       Element.prototype.scrollIntoView = original;
     }
   });
+
+  it('会让当前选中的画布节点支持直接拖拽移动', async () => {
+    const view = render(
+      <AppShell selectedNodeSchemaId="node-1" selectedNodeTreeId="body:0">
+        <div data-shenbi-node-id="node-1" data-shenbi-component-type="Button">
+          Node Content
+        </div>
+      </AppShell>,
+    );
+
+    const selectedNode = screen.getByText('Node Content');
+    await waitFor(() => {
+      expect(selectedNode).toHaveAttribute('draggable', 'true');
+    });
+
+    view.rerender(
+      <AppShell selectedNodeSchemaId={undefined} selectedNodeTreeId={undefined}>
+        <div data-shenbi-node-id="node-1" data-shenbi-component-type="Button">
+          Node Content
+        </div>
+      </AppShell>,
+    );
+
+    await waitFor(() => {
+      expect(selectedNode).not.toHaveAttribute('draggable');
+    });
+  });
 });

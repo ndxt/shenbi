@@ -19,6 +19,8 @@ export interface SidebarProps {
   selectedNodeId?: string;
   onSelectNode?: (nodeId: string) => void;
   onInsertComponent?: (componentType: string) => void;
+  onStartDragComponent?: (componentType: string) => void;
+  onEndDragComponent?: () => void;
   activeTabId?: string;
   onChangeActiveTab?: (tabId: string) => void;
   tabs?: SidebarTabContribution[];
@@ -31,6 +33,8 @@ export function Sidebar({
   selectedNodeId,
   onSelectNode,
   onInsertComponent,
+  onStartDragComponent,
+  onEndDragComponent,
   activeTabId,
   onChangeActiveTab,
   tabs,
@@ -43,8 +47,19 @@ export function Sidebar({
     ...(selectedNodeId ? { selectedNodeId } : {}),
     ...(onSelectNode ? { onSelectNode } : {}),
     ...(onInsertComponent ? { onInsertComponent } : {}),
+    ...(onStartDragComponent ? { onStartDragComponent } : {}),
+    ...(onEndDragComponent ? { onEndDragComponent } : {}),
     ...(pluginContext ? { pluginContext } : {}),
-  }), [contracts, onInsertComponent, onSelectNode, pluginContext, selectedNodeId, treeNodes]);
+  }), [
+    contracts,
+    onEndDragComponent,
+    onInsertComponent,
+    onSelectNode,
+    onStartDragComponent,
+    pluginContext,
+    selectedNodeId,
+    treeNodes,
+  ]);
   const resolvedTabs = useMemo(() => resolveSidebarTabs(tabs), [tabs]);
   const activeTab = activeTabId ?? innerActiveTab;
   const setActiveTab = (nextTabId: string) => {

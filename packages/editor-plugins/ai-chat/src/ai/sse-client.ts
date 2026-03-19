@@ -1,6 +1,7 @@
 import type { AIClient, AgentEvent, ChatRequest, ChatResponse, ClassifyRouteRequest, ClassifyRouteResponse, FinalizeRequest, FinalizeResult, RunRequest, RunStreamOptions } from './api-types';
+import { isProductionEnvironment } from '../utils/env';
 
-const AI_API_BASE = import.meta.env.PROD ? '/locode/shenbi/api/ai' : '/api/ai';
+const AI_API_BASE = isProductionEnvironment() ? '/locode/shenbi/api/ai' : '/api/ai';
 const DEFAULT_STREAM_ENDPOINT = `${AI_API_BASE}/run/stream`;
 const DEFAULT_FINALIZE_ENDPOINT = `${AI_API_BASE}/run/finalize`;
 const DEFAULT_CHAT_ENDPOINT = `${AI_API_BASE}/chat`;

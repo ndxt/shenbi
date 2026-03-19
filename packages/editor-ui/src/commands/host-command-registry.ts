@@ -29,6 +29,11 @@ export interface HostCommandRegistryOptions {
   setShowAssistantPanel: (value: boolean) => void;
   setShowCommandPalette: (value: boolean) => void;
   toggleMaximize: () => void;
+  zoomCanvasIn: () => void;
+  zoomCanvasOut: () => void;
+  resetCanvasZoom: () => void;
+  fitCanvasToViewport: () => void;
+  canvasScale: number;
   t: (key: string) => string;
 }
 
@@ -188,6 +193,62 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
         options.toggleMaximize();
       },
     },
+    {
+      id: 'canvas.zoomIn',
+      title: `Zoom In (${Math.round(options.canvasScale * 100)}%)`,
+      category: t('hostCommands.category.layout'),
+      aliases: ['zoom in canvas'],
+      keywords: ['canvas', 'zoom', 'scale'],
+      description: 'Zoom in the canvas viewport.',
+      shortcut: 'Mod+=',
+      when: '!inputFocused',
+      priority: 10,
+      execute: () => {
+        options.zoomCanvasIn();
+      },
+    },
+    {
+      id: 'canvas.zoomOut',
+      title: 'Zoom Out',
+      category: t('hostCommands.category.layout'),
+      aliases: ['zoom out canvas'],
+      keywords: ['canvas', 'zoom', 'scale'],
+      description: 'Zoom out the canvas viewport.',
+      shortcut: 'Mod+-',
+      when: '!inputFocused',
+      priority: 10,
+      execute: () => {
+        options.zoomCanvasOut();
+      },
+    },
+    {
+      id: 'canvas.resetZoom',
+      title: 'Reset Zoom',
+      category: t('hostCommands.category.layout'),
+      aliases: ['canvas 100 percent'],
+      keywords: ['canvas', 'zoom', 'reset'],
+      description: 'Reset the canvas zoom to 100%.',
+      shortcut: 'Mod+0',
+      when: '!inputFocused',
+      priority: 10,
+      execute: () => {
+        options.resetCanvasZoom();
+      },
+    },
+    {
+      id: 'canvas.fitView',
+      title: 'Fit Canvas',
+      category: t('hostCommands.category.layout'),
+      aliases: ['fit canvas', 'fit view'],
+      keywords: ['canvas', 'fit', 'viewport'],
+      description: 'Fit the page into the current canvas viewport.',
+      shortcut: 'Shift+1',
+      when: '!inputFocused',
+      priority: 10,
+      execute: () => {
+        options.fitCanvasToViewport();
+      },
+    },
   ];
 
   return commands.filter((command): command is HostCommandDefinition => Boolean(command));
@@ -244,6 +305,12 @@ export function hostCommandsToContextMenus(hostCommands: readonly HostCommandDef
           break;
         case 'layout.toggleConsole':
           menus.push({ ...base, area: 'activity-bar' });
+          break;
+        case 'canvas.zoomIn':
+        case 'canvas.zoomOut':
+        case 'canvas.resetZoom':
+        case 'canvas.fitView':
+          menus.push({ ...base, area: 'canvas' });
           break;
         default:
           break;

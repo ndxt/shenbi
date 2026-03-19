@@ -59,6 +59,8 @@ export interface SidebarTabRenderContext {
   selectedNodeId?: string;
   onSelectNode?: (nodeId: string) => void;
   onInsertComponent?: (componentType: string) => void;
+  onStartDragComponent?: (componentType: string) => void;
+  onEndDragComponent?: () => void;
   pluginContext?: PluginContext;
 }
 

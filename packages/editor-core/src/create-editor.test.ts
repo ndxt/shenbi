@@ -174,6 +174,7 @@ describe('createEditor', () => {
     expect(editor.commands.has('node.append')).toBe(true);
     expect(editor.commands.has('node.insertAt')).toBe(true);
     expect(editor.commands.has('node.remove')).toBe(true);
+    expect(editor.commands.has('node.move')).toBe(true);
     expect(editor.commands.has('node.patchProps')).toBe(true);
     expect(editor.commands.has('node.patchEvents')).toBe(true);
     expect(editor.commands.has('node.patchStyle')).toBe(true);
@@ -687,6 +688,52 @@ describe('createEditor', () => {
     expect(editor.state.getSchema().body).toEqual([
       { id: 'mid', component: 'Button' },
       { id: 'b', component: 'Text' },
+    ]);
+  });
+
+  it('node.move reorders siblings and moves across containers without recording history', async () => {
+    const editor = createEditor({
+      initialSchema: {
+        id: 'move-id',
+        name: 'move-target',
+        body: [
+          {
+            id: 'container-1',
+            component: 'Container',
+            children: [
+              { id: 'child-a', component: 'Text' },
+              { id: 'child-b', component: 'Text' },
+            ],
+          },
+          { id: 'root-c', component: 'Button' },
+        ],
+      },
+      fileStorage: createMemoryStorage(),
+    });
+
+    await editor.commands.execute('node.move', {
+      sourceTreeId: 'body.0.children.0',
+      targetParentTreeId: 'body.0',
+      index: 2,
+    });
+
+    await editor.commands.execute('node.move', {
+      sourceTreeId: 'body.1',
+      targetParentTreeId: 'body.0',
+      index: 1,
+    });
+
+    expect(editor.history.getSize()).toBe(0);
+    expect(editor.state.getSchema().body).toEqual([
+      {
+        id: 'container-1',
+        component: 'Container',
+        children: [
+          { id: 'child-b', component: 'Text' },
+          { id: 'root-c', component: 'Button' },
+          { id: 'child-a', component: 'Text' },
+        ],
+      },
     ]);
   });
 
