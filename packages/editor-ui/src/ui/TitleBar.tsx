@@ -37,6 +37,8 @@ interface TitleBarProps {
   onOpenCommandPalette?: () => void;
   title?: string | undefined;
   subtitle?: string | undefined;
+  userAvatarUrl?: string | undefined;
+  userName?: string | undefined;
 }
 
 export function TitleBar({ 
@@ -58,6 +60,8 @@ export function TitleBar({
   onOpenCommandPalette,
   title,
   subtitle,
+  userAvatarUrl,
+  userName,
 }: TitleBarProps) {
   const { t } = useTranslation('editorUi');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -225,6 +229,12 @@ export function TitleBar({
           </div>
         )}
       </div>
+        {userAvatarUrl ? (
+          <div className="flex items-center gap-1.5 pl-2 border-l border-border-ide ml-1">
+            <img src={userAvatarUrl} alt="" className="w-5 h-5 rounded-full" />
+            {userName && <span className="text-[11px] text-text-secondary">{userName}</span>}
+          </div>
+        ) : null}
       </div>
     </div>
   );

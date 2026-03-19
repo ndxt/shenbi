@@ -93,7 +93,11 @@ interface AppShellProps {
   /** Title displayed in the title bar (defaults to 'Shenbi IDE') */
   title?: string;
   /** Subtitle displayed in the title bar (defaults to 'Editor UI Package') */
-  subtitle?: string;
+  subtitle?: string | undefined;
+  /** User avatar URL to show in title bar */
+  userAvatarUrl?: string | undefined;
+  /** Username to show in title bar */
+  userName?: string | undefined;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -179,6 +183,8 @@ export function AppShell({
   onMoveTab,
   title,
   subtitle,
+  userAvatarUrl,
+  userName,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const canvasContentRef = React.useRef<HTMLDivElement | null>(null);
@@ -1066,6 +1072,8 @@ export function AppShell({
         onOpenCommandPalette={() => setShowCommandPalette(true)}
         title={title}
         subtitle={subtitle}
+        userAvatarUrl={userAvatarUrl}
+        userName={userName}
       />
       
       {/* Main Container */}

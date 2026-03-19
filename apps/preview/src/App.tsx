@@ -165,6 +165,7 @@ export function App() {
   const [appMode, setAppMode] = useShellModeUrl();
   const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig | null>(() => loadActiveProject());
   const activeProjectId = activeProjectConfig?.vfsProjectId ?? PREVIEW_PROJECT_ID;
+  const [gitlabUser, setGitlabUser] = useState<{ username: string; avatarUrl: string } | null>(null);
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const persistenceAdapter = useMemo(() => new LocalWorkspacePersistenceAdapter(), []);
   const workspacePersistence = useMemo(
@@ -214,6 +215,18 @@ export function App() {
         setShellSessionHydrated(true);
       });
   }, [vfs, activeProjectId]);
+
+  // Fetch GitLab user info for header display
+  useEffect(() => {
+    fetch('/api/gitlab/oauth/status', { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { authenticated?: boolean; user?: { username: string; avatarUrl: string } } | null) => {
+        if (data?.authenticated && data.user) {
+          setGitlabUser({ username: data.user.username, avatarUrl: data.user.avatarUrl });
+        }
+      })
+      .catch(() => { /* not logged in */ });
+  }, []);
 
   const {
     activeScenarioSnapshot,
@@ -1212,6 +1225,8 @@ export function App() {
       persistenceAdapter={persistenceAdapter}
       title={activeProjectConfig?.projectName ?? 'Shenbi IDE'}
       subtitle={activeProjectConfig?.branch ?? undefined}
+      userAvatarUrl={gitlabUser?.avatarUrl}
+      userName={gitlabUser?.username}
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,
