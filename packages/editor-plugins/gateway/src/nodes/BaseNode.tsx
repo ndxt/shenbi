@@ -65,7 +65,11 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
           position={Position.Left}
           id={port.id}
           className="gateway-node__handle gateway-node__handle--input"
-          style={{ backgroundColor: PORT_TYPE_COLORS[port.dataType] }}
+          style={{ 
+            backgroundColor: PORT_TYPE_COLORS[port.dataType],
+            top: '50%',
+            transform: 'translateY(-50%)',
+          }}
         />
       ))}
 
@@ -96,7 +100,11 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
             position={Position.Right}
             id={port.id}
             className="gateway-node__handle gateway-node__handle--output"
-            style={{ backgroundColor: PORT_TYPE_COLORS[port.dataType] }}
+            style={{ 
+              backgroundColor: PORT_TYPE_COLORS[port.dataType],
+              top: '50%',
+              transform: 'translateY(-50%)',
+            }}
             onMouseDown={handleMouseDown}
             onMouseUp={() => handleMouseUp(port.id)}
           >
