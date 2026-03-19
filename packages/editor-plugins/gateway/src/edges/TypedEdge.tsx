@@ -24,7 +24,7 @@ export function TypedEdge({
     targetX,
     targetY,
     targetPosition,
-    borderRadius: 8,
+    borderRadius: 12,
   });
 
   return (
@@ -34,9 +34,9 @@ export function TypedEdge({
       markerEnd={markerEnd}
       style={{
         ...style,
-        strokeWidth: selected ? 2.5 : 1.5,
-        stroke: selected ? '#3b82f6' : '#64748b',
-        transition: 'stroke 0.15s, stroke-width 0.15s',
+        strokeWidth: selected ? 2 : 1.5,
+        stroke: selected ? '#3b82f6' : '#6b7280',
+        transition: 'stroke 0.2s, stroke-width 0.2s',
       }}
     />
   );

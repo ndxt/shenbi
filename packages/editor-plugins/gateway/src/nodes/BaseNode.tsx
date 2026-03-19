@@ -2,105 +2,102 @@
 // BaseNode — shared node shell component for all gateway nodes
 // ---------------------------------------------------------------------------
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { GatewayNodeData, GatewayNodeKind } from '../types';
 import { NODE_CONTRACTS, PORT_TYPE_COLORS } from '../types';
-import * as Icons from 'lucide-react';
+import { Play, Square, Variable, FileJson, Database, GitBranch, Repeat, Plus } from 'lucide-react';
 
-type LucideIconName = keyof typeof Icons;
+const iconMap = {
+  Play,
+  Square,
+  Variable,
+  FileJson,
+  Database,
+  GitBranch,
+  Repeat,
+  Plus,
+} as const;
 
-function getIcon(name: string, size = 16) {
-  const IconComp = Icons[name as LucideIconName] as React.ComponentType<{ size?: number; className?: string }> | undefined;
-  if (!IconComp || typeof IconComp !== 'function') {
-    return null;
-  }
-  return <IconComp size={size} className="gateway-node__icon" />;
-}
+type IconName = keyof typeof iconMap;
 
 export interface BaseNodeProps extends NodeProps {
   data: GatewayNodeData;
   children?: React.ReactNode;
+  onAddNode?: (sourceNodeId: string, sourceHandle: string) => void;
 }
 
-export function BaseNode({ data, selected, children }: BaseNodeProps) {
+export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodeProps) {
+  const [isHovered, setIsHovered] = useState(false);
   const contract = NODE_CONTRACTS[data.kind as GatewayNodeKind];
+  
   if (!contract) {
     return <div className="gateway-node gateway-node--unknown">Unknown node</div>;
   }
+
+  const hasOutputs = contract.outputs.length > 0;
 
   return (
     <div
       className={`gateway-node ${selected ? 'gateway-node--selected' : ''}`}
       style={{ '--node-color': contract.color } as React.CSSProperties}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Header */}
-      <div className="gateway-node__header">
-        <div className="gateway-node__icon-wrapper" style={{ backgroundColor: contract.color }}>
-          {getIcon(contract.icon)}
-        </div>
-        <span className="gateway-node__label">{data.label}</span>
-      </div>
-
       {/* Input Handles */}
-      {contract.inputs.map((port, index) => (
-        <div
+      {contract.inputs.map((port) => (
+        <Handle
           key={port.id}
-          className="gateway-node__port gateway-node__port--input"
-          style={{ top: `${44 + index * 28}px` }}
-        >
-          <Handle
-            type="target"
-            position={Position.Left}
-            id={port.id}
-            className="gateway-node__handle"
-            style={{
-              backgroundColor: PORT_TYPE_COLORS[port.dataType],
-              top: `${44 + index * 28 + 10}px`,
-            }}
-          />
-          <span className="gateway-node__port-label gateway-node__port-label--left">
-            {port.label}
-            <span
-              className="gateway-node__port-type"
-              style={{ color: PORT_TYPE_COLORS[port.dataType] }}
-            >
-              {port.dataType}
-            </span>
-          </span>
-        </div>
+          type="target"
+          position={Position.Left}
+          id={port.id}
+          className="gateway-node__handle gateway-node__handle--input"
+          style={{ backgroundColor: PORT_TYPE_COLORS[port.dataType] }}
+        />
       ))}
+
+      {/* Node Content */}
+      <div className="gateway-node__content">
+        <div className="gateway-node__icon-wrapper" style={{ backgroundColor: contract.color }}>
+          {(() => {
+            const Icon = iconMap[contract.icon as IconName];
+            return Icon ? <Icon size={14} className="gateway-node__icon" /> : null;
+          })()}
+        </div>
+        <div className="gateway-node__text">
+          <div className="gateway-node__label">{data.label.toUpperCase()}</div>
+          {typeof data.config?.description === 'string' && data.config.description && (
+            <div className="gateway-node__description">{data.config.description}</div>
+          )}
+        </div>
+      </div>
 
       {/* Custom body content */}
       {children ? <div className="gateway-node__body">{children}</div> : null}
 
-      {/* Output Handles */}
+      {/* Output Handles with Add Button */}
       {contract.outputs.map((port, index) => (
-        <div
-          key={port.id}
-          className="gateway-node__port gateway-node__port--output"
-          style={{ top: `${44 + index * 28}px` }}
-        >
-          <span className="gateway-node__port-label gateway-node__port-label--right">
-            <span
-              className="gateway-node__port-type"
-              style={{ color: PORT_TYPE_COLORS[port.dataType] }}
-            >
-              {port.dataType}
-            </span>
-            {port.label}
-          </span>
+        <React.Fragment key={port.id}>
           <Handle
             type="source"
             position={Position.Right}
             id={port.id}
-            className="gateway-node__handle"
-            style={{
-              backgroundColor: PORT_TYPE_COLORS[port.dataType],
-              top: `${44 + index * 28 + 10}px`,
-            }}
+            className="gateway-node__handle gateway-node__handle--output"
+            style={{ backgroundColor: PORT_TYPE_COLORS[port.dataType] }}
           />
-        </div>
+          {isHovered && hasOutputs && index === 0 && onAddNode && (
+            <button
+              className="gateway-node__add-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddNode(id!, port.id);
+              }}
+              title="添加节点"
+            >
+              <Plus size={14} className="gateway-node__add-icon" />
+            </button>
+          )}
+        </React.Fragment>
       ))}
     </div>
   );

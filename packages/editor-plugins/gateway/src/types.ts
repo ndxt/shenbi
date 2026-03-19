@@ -85,7 +85,7 @@ export const NODE_CONTRACTS: Record<GatewayNodeKind, GatewayNodeContract> = {
     label: '开始',
     description: 'API 入口节点，接收请求参数',
     icon: 'Play',
-    color: '#22c55e',
+    color: '#10b981',
     inputs: [],
     outputs: [
       { id: 'request', label: '请求参数', dataType: 'object' },
@@ -109,7 +109,7 @@ export const NODE_CONTRACTS: Record<GatewayNodeKind, GatewayNodeContract> = {
     label: '数据定义',
     description: '定义变量、常量或数据转换',
     icon: 'Variable',
-    color: '#8b5cf6',
+    color: '#a855f7',
     inputs: [
       { id: 'input', label: '输入', dataType: 'any' },
     ],

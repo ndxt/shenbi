@@ -2,7 +2,7 @@
 // GatewayCanvas — React Flow canvas wrapper with drag-drop support
 // ---------------------------------------------------------------------------
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -20,7 +20,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { nodeTypes } from '../nodes/node-registry';
+import { nodeTypes as baseNodeTypes } from '../nodes/node-registry';
 import { TypedEdge } from '../edges/TypedEdge';
 import { isValidConnection } from '../validation';
 import type {
@@ -30,6 +30,7 @@ import type {
   GatewayNodeData,
 } from '../types';
 import { NODE_CONTRACTS } from '../types';
+import { NodeSelectorPanel } from './NodeSelectorPanel';
 import '../styles/gateway.css';
 
 const edgeTypes = {
@@ -57,6 +58,12 @@ export function GatewayCanvas({
 }: GatewayCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  const [selectorPanel, setSelectorPanel] = useState<{
+    visible: boolean;
+    position: { x: number; y: number };
+    sourceNodeId: string;
+    sourceHandle: string;
+  } | null>(null);
 
   const handleNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -156,6 +163,86 @@ export function GatewayCanvas({
     animated: false,
   }), []);
 
+  // Handle add node button click
+  const handleAddNode = useCallback((sourceNodeId: string, sourceHandle: string) => {
+    const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+    if (!sourceNode || !reactFlowInstance.current) {
+      return;
+    }
+
+    // Get the position of the source node in screen coordinates
+    const nodeElement = document.querySelector(`[data-id="${sourceNodeId}"]`);
+    if (!nodeElement) {
+      return;
+    }
+
+    const rect = nodeElement.getBoundingClientRect();
+    setSelectorPanel({
+      visible: true,
+      position: {
+        x: rect.right + 40,
+        y: rect.top + rect.height / 2 - 200,
+      },
+      sourceNodeId,
+      sourceHandle,
+    });
+  }, [nodes]);
+
+  // Handle node selection from panel
+  const handleSelectNodeFromPanel = useCallback((kind: GatewayNodeKind) => {
+    if (!selectorPanel || !reactFlowInstance.current) {
+      return;
+    }
+
+    const contract = NODE_CONTRACTS[kind];
+    const sourceNode = nodes.find((n) => n.id === selectorPanel.sourceNodeId);
+    
+    if (!sourceNode) {
+      return;
+    }
+
+    // Create new node to the right of source node
+    const newNodePosition = {
+      x: sourceNode.position.x + 280,
+      y: sourceNode.position.y,
+    };
+
+    const newNode: GatewayNode = {
+      id: createNodeId(),
+      type: kind,
+      position: newNodePosition,
+      data: {
+        kind,
+        label: contract.label,
+        config: {},
+      },
+    };
+
+    // Create edge connecting source to new node
+    const newEdge: GatewayEdge = {
+      id: `edge_${Date.now()}`,
+      type: 'typed',
+      source: selectorPanel.sourceNodeId,
+      sourceHandle: selectorPanel.sourceHandle,
+      target: newNode.id,
+      targetHandle: contract.inputs[0]?.id || 'input',
+    };
+
+    onNodesChangeProp([...nodes, newNode]);
+    onEdgesChangeProp([...edges, newEdge]);
+    onDirty?.();
+    setSelectorPanel(null);
+  }, [selectorPanel, nodes, edges, onNodesChangeProp, onEdgesChangeProp, onDirty]);
+
+  // Create node types with add node handler
+  const nodeTypes = useMemo(() => {
+    const types: Record<string, React.ComponentType<any>> = {};
+    for (const [key, Component] of Object.entries(baseNodeTypes)) {
+      types[key] = (props: any) => <Component {...props} onAddNode={handleAddNode} />;
+    }
+    return types;
+  }, [handleAddNode]);
+
   return (
     <div ref={reactFlowWrapper} className="gateway-canvas">
       <ReactFlow
@@ -180,7 +267,7 @@ export function GatewayCanvas({
         multiSelectionKeyCode="Shift"
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#1e293b" />
+        <Background color="#333333" />
         <Controls />
         <MiniMap
           nodeColor={minimapNodeColor}
@@ -189,6 +276,14 @@ export function GatewayCanvas({
           zoomable
         />
       </ReactFlow>
+
+      {selectorPanel?.visible && (
+        <NodeSelectorPanel
+          position={selectorPanel.position}
+          onSelectNode={handleSelectNodeFromPanel}
+          onClose={() => setSelectorPanel(null)}
+        />
+      )}
     </div>
   );
 }
