@@ -606,8 +606,6 @@ export function GitLabSyncPanel({
           >
             <ExternalLink size={13} />
           </a>
-          <img src={state.user.avatarUrl} alt="" style={S.avatar} title={state.user.username} />
-          <button style={S.iconBtn()} onClick={handleLogout} title="登出"><LogOut size={13} /></button>
         </div>
       </div>
 
