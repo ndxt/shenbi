@@ -1624,4 +1624,90 @@ describe('AppShell', () => {
       expect(selectedNode).not.toHaveAttribute('draggable');
     });
   });
+
+  it('会渲染画布浮动工具栏和缩放 HUD', () => {
+    render(
+      <AppShell>
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole('toolbar', { name: 'Canvas Tools' })).toBeInTheDocument();
+    expect(screen.getByTitle('Selection Tool (V)')).toBeInTheDocument();
+    expect(screen.getByTitle('Hand Tool (H)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Canvas Zoom Controls')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '100%' })).toBeInTheDocument();
+  });
+
+  it('支持通过快捷键切换画布工具模式', () => {
+    render(
+      <AppShell>
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    const canvas = document.querySelector('[data-shenbi-shortcut-area="canvas"]');
+    expect(canvas).not.toBeNull();
+    canvas?.focus?.();
+
+    const selectButton = screen.getByTitle('Selection Tool (V)');
+    const panButton = screen.getByTitle('Hand Tool (H)');
+    expect(selectButton.className).toContain('canvas-chrome-button--active');
+
+    fireEvent.keyDown(canvas as Element, { key: 'H' });
+    expect(panButton.className).toContain('canvas-chrome-button--active');
+
+    fireEvent.keyDown(canvas as Element, { key: 'V' });
+    expect(selectButton.className).toContain('canvas-chrome-button--active');
+  });
+
+  it('手型模式下点击页面节点不会触发选中', () => {
+    const onCanvasSelectNode = vi.fn();
+    render(
+      <AppShell onCanvasSelectNode={onCanvasSelectNode}>
+        <div data-shenbi-node-id="node-1">Canvas Node</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Hand Tool (H)'));
+    fireEvent.click(screen.getByText('Canvas Node'));
+
+    expect(onCanvasSelectNode).not.toHaveBeenCalled();
+  });
+
+  it('手型模式下画布会切换为抓手光标语义', async () => {
+    render(
+      <AppShell>
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    const canvas = document.querySelector('[data-shenbi-shortcut-area="canvas"]') as HTMLElement | null;
+    expect(canvas).not.toBeNull();
+    expect(canvas?.className).toContain('cursor-default');
+
+    await act(async () => {
+      fireEvent.click(screen.getByTitle('Hand Tool (H)'));
+    });
+    await waitFor(() => {
+      expect(screen.getByTitle('Hand Tool (H)').className).toContain('canvas-chrome-button--active');
+    });
+    expect(canvas?.className).toContain('cursor-grab');
+  });
+
+  it('会在缩放 HUD 中展示固定缩放选项，并在没有选中节点时禁用聚焦按钮', () => {
+    render(
+      <AppShell>
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    const focusButton = screen.getByTitle('Focus Selected Node (Shift+3)');
+    expect(focusButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '100%' }));
+    expect(screen.getByRole('menu', { name: 'Canvas Zoom Presets' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '25%' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fit' })).toBeInTheDocument();
+  });
 });

@@ -5,11 +5,14 @@ export interface ShortcutRuntimeContext {
   sidebarVisible: boolean;
   inspectorVisible: boolean;
   hasSelection: boolean;
+  hasCanvasSelection: boolean;
   inputFocused: boolean;
   canvasFocused: boolean;
   sidebarFocused: boolean;
   inspectorFocused: boolean;
   activityBarFocused: boolean;
+  canvasSelectToolActive: boolean;
+  canvasPanToolActive: boolean;
 }
 
 type ShortcutArea = 'canvas' | 'sidebar' | 'inspector' | 'activity-bar';

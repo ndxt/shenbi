@@ -11,6 +11,8 @@ export interface CanvasViewportState {
   scrollTop: number;
 }
 
+export type CanvasToolMode = 'select' | 'pan';
+
 export type CanvasDropPlacement = 'before' | 'after' | 'inside' | 'root';
 
 export interface CanvasDropTarget {

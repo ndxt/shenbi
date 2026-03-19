@@ -177,7 +177,12 @@ function DirectCanvasSurface({ children, onReady, pointerEventsDisabled }: Canva
     <div
       ref={hostRef}
       className="relative h-full w-full bg-white overflow-hidden"
-      style={pointerEventsDisabled ? { pointerEvents: 'none' } : undefined}
+      style={{
+        transform: 'translateZ(0)',
+        willChange: 'transform',
+        backfaceVisibility: 'hidden',
+        ...(pointerEventsDisabled ? { pointerEvents: 'none' } : {}),
+      }}
     >
       {children}
     </div>
@@ -215,6 +220,9 @@ function IframeCanvasSurface({
         display: 'block',
         background: '#ffffff',
         pointerEvents: pointerEventsDisabled ? 'none' : 'auto',
+        transform: 'translateZ(0)',
+        willChange: 'transform',
+        backfaceVisibility: 'hidden',
       });
       hostRef.current.appendChild(visibleIframe);
 
@@ -352,7 +360,15 @@ function IframeCanvasSurface({
   }, [children, iframeElement, themeClassName]);
 
   return (
-    <div ref={hostRef} className="relative h-full w-full bg-white overflow-hidden">
+    <div
+      ref={hostRef}
+      className="relative h-full w-full bg-white overflow-hidden"
+      style={{
+        transform: 'translateZ(0)',
+        willChange: 'transform',
+        backfaceVisibility: 'hidden',
+      }}
+    >
       {portalRoot ? ReactDOM.createPortal(children, portalRoot) : null}
     </div>
   );

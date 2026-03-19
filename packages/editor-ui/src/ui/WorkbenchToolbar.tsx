@@ -1,10 +1,5 @@
 import React from 'react';
 import { 
-  MousePointer2, 
-  Hand, 
-  Monitor, 
-  Tablet, 
-  Smartphone, 
   Play, 
   Code2, 
   ChevronRight,
@@ -35,14 +30,8 @@ export function WorkbenchToolbar({ extra, menus, onRunMenuCommand, breadcrumbIte
   return (
     <div className="h-9 bg-bg-sidebar border-b border-border-ide flex items-center justify-between px-2 shrink-0">
       <div className="flex items-center gap-2">
-        <ToolbarButton icon={MousePointer2} active />
-        <ToolbarButton icon={Hand} />
-        <div className="w-[1px] h-4 bg-border-ide mx-1" />
-        <ToolbarButton icon={Monitor} />
-        <ToolbarButton icon={Tablet} />
-        <ToolbarButton icon={Smartphone} />
         {startMenus.length > 0 && onRunMenuCommand ? (
-          <div className="ml-2 flex items-center gap-1 border-l border-border-ide pl-2">
+          <div className="flex items-center gap-1">
             <ToolbarMenus menus={startMenus} onRunCommand={onRunMenuCommand} />
           </div>
         ) : null}

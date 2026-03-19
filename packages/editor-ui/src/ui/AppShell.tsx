@@ -1,5 +1,13 @@
 import React from 'react';
 import {
+  Focus,
+  Hand,
+  LocateFixed,
+  Minus,
+  MousePointer2,
+  Plus,
+} from 'lucide-react';
+import {
   collectPluginContributes,
   type ContextMenuArea,
   type EditorPluginActivateResult,
@@ -61,6 +69,7 @@ import { resolveNodeDropIndicator, type CanvasDropIndicator } from '../canvas/dr
 import type {
   CanvasDropTarget,
   CanvasSurfaceHandle,
+  CanvasToolMode,
   CanvasViewportState,
 } from '../canvas/types';
 
@@ -125,6 +134,8 @@ const CANVAS_STAGE_LEFT = Math.round((CANVAS_WORKSPACE_WIDTH - STAGE_WIDTH) / 2)
 const CANVAS_STAGE_TOP = 320;
 const MIN_CANVAS_SCALE = 0.25;
 const MAX_CANVAS_SCALE = 2;
+const CANVAS_ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
+const CANVAS_WHEEL_ZOOM_SENSITIVITY = 0.0015;
 
 function isPromiseLike(value: unknown): value is Promise<unknown> {
   return Boolean(value) && typeof (value as Promise<unknown>).then === 'function';
@@ -151,6 +162,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+function resolveWheelZoomScale(currentScale: number, deltaY: number): number {
+  const zoomFactor = Math.exp(-deltaY * CANVAS_WHEEL_ZOOM_SENSITIVITY);
+  return clamp(currentScale * zoomFactor, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
+}
+
 interface StoredLayoutState {
   showSidebar?: boolean;
   showInspector?: boolean;
@@ -175,6 +191,10 @@ interface StoredWorkbenchPreferences {
 interface CanvasDragSession {
   source: 'component' | 'selected-node';
   componentType?: string;
+}
+
+interface ZoomMenuState {
+  open: boolean;
 }
 
 export function AppShell({
@@ -216,6 +236,9 @@ export function AppShell({
   const stageRef = React.useRef<HTMLDivElement | null>(null);
   const [canvasSurface, setCanvasSurface] = React.useState<CanvasSurfaceHandle | null>(null);
   const [canvasScale, setCanvasScale] = React.useState(1);
+  const canvasScaleRef = React.useRef(1);
+  canvasScaleRef.current = canvasScale;
+  const [activeCanvasTool, setActiveCanvasTool] = React.useState<CanvasToolMode>('select');
   const [canvasViewportState, setCanvasViewportState] = React.useState<CanvasViewportState>({
     scale: 1,
     scrollLeft: 0,
@@ -224,6 +247,10 @@ export function AppShell({
   const [isCanvasPanning, setIsCanvasPanning] = React.useState(false);
   const [canvasDragSession, setCanvasDragSession] = React.useState<CanvasDragSession | null>(null);
   const [canvasDropIndicator, setCanvasDropIndicator] = React.useState<CanvasDropIndicator | null>(null);
+  const [zoomMenuState, setZoomMenuState] = React.useState<ZoomMenuState>({ open: false });
+  const canvasChromeRef = React.useRef<HTMLDivElement | null>(null);
+  const zoomMenuRef = React.useRef<HTMLDivElement | null>(null);
+  const canvasScaleRafRef = React.useRef<number | null>(null);
   const spacePressedRef = React.useRef(false);
   const panSessionRef = React.useRef<{
     pointerId: number;
@@ -339,6 +366,11 @@ export function AppShell({
       scrollTop: element.scrollTop,
     });
   }, [canvasScale]);
+  React.useEffect(() => () => {
+    if (canvasScaleRafRef.current !== null) {
+      cancelAnimationFrame(canvasScaleRafRef.current);
+    }
+  }, []);
 
   const centerCanvasOnStage = React.useCallback((nextScale: number) => {
     const element = canvasScrollRef.current;
@@ -369,17 +401,24 @@ export function AppShell({
     anchor?: { clientX: number; clientY: number },
   ) => {
     const element = canvasScrollRef.current;
-    const previousScale = canvasScale;
+    const previousScale = canvasScaleRef.current;
     const nextScale = clamp(nextScaleInput, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
     if (!element || nextScale === previousScale) {
+      canvasScaleRef.current = nextScale;
       setCanvasScale(nextScale);
       return;
     }
+    if (canvasScaleRafRef.current !== null) {
+      cancelAnimationFrame(canvasScaleRafRef.current);
+      canvasScaleRafRef.current = null;
+    }
 
     if (!anchor) {
+      canvasScaleRef.current = nextScale;
       setCanvasScale(nextScale);
-      requestAnimationFrame(() => {
+      canvasScaleRafRef.current = requestAnimationFrame(() => {
         centerCanvasOnStage(nextScale);
+        canvasScaleRafRef.current = null;
       });
       return;
     }
@@ -392,8 +431,9 @@ export function AppShell({
     const scaledX = (stageRelativeX / previousScale) * nextScale;
     const scaledY = (stageRelativeY / previousScale) * nextScale;
 
+    canvasScaleRef.current = nextScale;
     setCanvasScale(nextScale);
-    requestAnimationFrame(() => {
+    canvasScaleRafRef.current = requestAnimationFrame(() => {
       const nextScrollLeft = CANVAS_STAGE_LEFT + scaledX - pointerX;
       const nextScrollTop = CANVAS_STAGE_TOP + scaledY - pointerY;
       element.scrollLeft = Math.max(0, nextScrollLeft);
@@ -403,8 +443,9 @@ export function AppShell({
         scrollLeft: element.scrollLeft,
         scrollTop: element.scrollTop,
       });
+      canvasScaleRafRef.current = null;
     });
-  }, [canvasScale, centerCanvasOnStage]);
+  }, [centerCanvasOnStage]);
 
   const zoomCanvasIn = React.useCallback(() => {
     updateCanvasScale(canvasScale + 0.1);
@@ -435,6 +476,31 @@ export function AppShell({
       centerCanvasOnStage(nextScale);
     });
   }, [centerCanvasOnStage]);
+  const centerCanvasStage = React.useCallback(() => {
+    centerCanvasOnStage(canvasScale);
+  }, [canvasScale, centerCanvasOnStage]);
+  const focusCanvasSelection = React.useCallback(() => {
+    const element = canvasScrollRef.current;
+    if (!element || !canvasSurface || !selectedNodeSchemaId) {
+      return;
+    }
+
+    const selectedElement = canvasSurface.findNodeElement(selectedNodeSchemaId);
+    if (!selectedElement) {
+      return;
+    }
+
+    const rect = canvasSurface.getRelativeRect(selectedElement);
+    const nextScrollLeft = CANVAS_STAGE_LEFT + (rect.left + rect.width / 2) * canvasScale - element.clientWidth / 2;
+    const nextScrollTop = CANVAS_STAGE_TOP + (rect.top + rect.height / 2) * canvasScale - element.clientHeight / 2;
+    element.scrollLeft = Math.max(0, nextScrollLeft);
+    element.scrollTop = Math.max(0, nextScrollTop);
+    syncCanvasViewportState();
+  }, [canvasScale, canvasSurface, selectedNodeSchemaId, syncCanvasViewportState]);
+  const updateCanvasScalePreset = React.useCallback((nextScale: number) => {
+    updateCanvasScale(nextScale);
+    setZoomMenuState({ open: false });
+  }, [updateCanvasScale]);
   const pluginContributes = React.useMemo(
     () => collectPluginContributes(plugins),
     [plugins],
@@ -603,15 +669,24 @@ export function AppShell({
     zoomCanvasOut,
     resetCanvasZoom,
     fitCanvasToViewport,
+    centerCanvasStage,
+    focusCanvasSelection,
+    activeCanvasTool,
+    setActiveCanvasTool,
+    hasCanvasSelection: Boolean(selectedNodeSchemaId),
     canvasScale,
     t,
   }), [
+    activeCanvasTool,
     canvasScale,
     auxiliaryPanels.length,
+    centerCanvasStage,
     fitCanvasToViewport,
+    focusCanvasSelection,
     isMaximized,
     pluginContext,
     resetCanvasZoom,
+    selectedNodeSchemaId,
     showAssistantPanel,
     showConsole,
     showInspector,
@@ -664,6 +739,9 @@ export function AppShell({
       sidebarVisible: showSidebar,
       inspectorVisible: showInspector,
       hasSelection: Boolean(pluginContext?.selection?.getSelectedNodeId?.()),
+      hasCanvasSelection: Boolean(selectedNodeSchemaId),
+      canvasSelectToolActive: activeCanvasTool === 'select',
+      canvasPanToolActive: activeCanvasTool === 'pan',
     });
     const paletteInputFocused = Boolean(
       activeElement instanceof Element
@@ -695,7 +773,7 @@ export function AppShell({
       inspectorFocused: area === 'inspector',
       activityBarFocused: area === 'activity-bar',
     };
-  }, [canvasReadOnly, focusVersion, pluginContext?.selection, showInspector, showSidebar]);
+  }, [activeCanvasTool, canvasReadOnly, focusVersion, pluginContext?.selection, selectedNodeSchemaId, showInspector, showSidebar]);
   const resolveCommandState = React.useCallback((commandId: string, area?: ContextMenuArea) => {
     const context = getRuntimeContext(area);
     const hostCommand = hostCommandMap.get(commandId);
@@ -1080,6 +1158,9 @@ export function AppShell({
           sidebarVisible: showSidebar,
           inspectorVisible: showInspector,
           hasSelection: Boolean(pluginContext?.selection?.getSelectedNodeId?.()),
+          hasCanvasSelection: Boolean(selectedNodeSchemaId),
+          canvasSelectToolActive: activeCanvasTool === 'select',
+          canvasPanToolActive: activeCanvasTool === 'pan',
         }),
       );
       if (!shortcut) {
@@ -1099,9 +1180,11 @@ export function AppShell({
     };
   }, [
     allShortcuts,
+    activeCanvasTool,
     pluginContext?.selection,
     resolveCommandState,
     runCommand,
+    selectedNodeSchemaId,
     showInspector,
     showSidebar,
   ]);
@@ -1210,6 +1293,9 @@ export function AppShell({
     if (contextMenuState.open) {
       setContextMenuState((current) => ({ ...current, open: false }));
     }
+    if (activeCanvasTool === 'pan' || spacePressedRef.current) {
+      return;
+    }
     if (!(target instanceof HTMLElement)) {
       return;
     }
@@ -1228,7 +1314,7 @@ export function AppShell({
       setShowInspector(true);
       setIsMaximized(false);
     }
-  }, [contextMenuState.open, onCanvasDeselectNode, onCanvasSelectNode, showInspector]);
+  }, [activeCanvasTool, contextMenuState.open, onCanvasDeselectNode, onCanvasSelectNode, showInspector]);
 
   const openContextMenuAt = React.useCallback((area: ContextMenuArea, x: number, y: number) => {
     const items = getContextMenuItems(area);
@@ -1302,63 +1388,192 @@ export function AppShell({
   const handleChangeLocale = React.useCallback((nextLocale: SupportedLocale) => {
     void changeLanguage(nextLocale);
   }, []);
-  const handleCanvasWheel = React.useCallback((event: React.WheelEvent<HTMLElement>) => {
+  React.useEffect(() => {
+    if (!zoomMenuState.open) {
+      return;
+    }
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (
+        zoomMenuRef.current?.contains(target)
+        || canvasChromeRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setZoomMenuState({ open: false });
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setZoomMenuState({ open: false });
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [zoomMenuState.open]);
+  const shouldStartCanvasPan = React.useCallback((button: number) => (
+    button === 1
+    || (button === 0 && (spacePressedRef.current || activeCanvasTool === 'pan'))
+  ), [activeCanvasTool]);
+  const startCanvasPan = React.useCallback((
+    pointerId: number,
+    clientX: number,
+    clientY: number,
+  ) => {
+    const element = canvasScrollRef.current;
+    if (!element) {
+      return false;
+    }
+    setIsCanvasPanning(true);
+    setZoomMenuState({ open: false });
+    panSessionRef.current = {
+      pointerId,
+      startX: clientX,
+      startY: clientY,
+      startScrollLeft: element.scrollLeft,
+      startScrollTop: element.scrollTop,
+    };
+    return true;
+  }, []);
+  const moveCanvasPan = React.useCallback((pointerId: number, clientX: number, clientY: number) => {
+    const session = panSessionRef.current;
+    const element = canvasScrollRef.current;
+    if (!session || !element || session.pointerId !== pointerId) {
+      return;
+    }
+    element.scrollLeft = session.startScrollLeft - (clientX - session.startX);
+    element.scrollTop = session.startScrollTop - (clientY - session.startY);
+    syncCanvasViewportState();
+  }, [syncCanvasViewportState]);
+  const endCanvasPan = React.useCallback((pointerId: number) => {
+    if (panSessionRef.current?.pointerId !== pointerId) {
+      return false;
+    }
+    setIsCanvasPanning(false);
+    panSessionRef.current = null;
+    return true;
+  }, []);
+  const handleCanvasWheelEvent = React.useCallback((event: {
+    ctrlKey: boolean;
+    metaKey: boolean;
+    deltaY: number;
+    clientX: number;
+    clientY: number;
+    preventDefault: () => void;
+    stopPropagation?: () => void;
+  }) => {
     if (!(event.ctrlKey || event.metaKey)) {
       return;
     }
     event.preventDefault();
-    const delta = event.deltaY < 0 ? 0.1 : -0.1;
-    updateCanvasScale(canvasScale + delta, {
+    event.stopPropagation?.();
+    updateCanvasScale(resolveWheelZoomScale(canvasScale, event.deltaY), {
       clientX: event.clientX,
       clientY: event.clientY,
     });
   }, [canvasScale, updateCanvasScale]);
 
   const handleCanvasPointerDown = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
-    const shouldStartPan = event.button === 1 || (event.button === 0 && spacePressedRef.current);
-    if (!shouldStartPan) {
+    if (!shouldStartCanvasPan(event.button)) {
       return;
     }
+    if (!startCanvasPan(event.pointerId, event.clientX, event.clientY)) {
+      return;
+    }
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+  }, [shouldStartCanvasPan, startCanvasPan]);
+
+  const handleCanvasPointerMove = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
+    moveCanvasPan(event.pointerId, event.clientX, event.clientY);
+  }, [moveCanvasPan]);
+
+  const handleCanvasPointerUp = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
+    if (!endCanvasPan(event.pointerId)) {
+      return;
+    }
+    (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+  }, [endCanvasPan]);
+  React.useEffect(() => {
+    if (canvasSurface?.mode !== 'iframe' || !canvasSurface.rootElement) {
+      return;
+    }
+    const rootElement = canvasSurface.rootElement;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!shouldStartCanvasPan(event.button)) {
+        return;
+      }
+      if (!startCanvasPan(event.pointerId, event.clientX, event.clientY)) {
+        return;
+      }
+      event.preventDefault();
+      rootElement.setPointerCapture?.(event.pointerId);
+    };
+    const handlePointerMove = (event: PointerEvent) => {
+      moveCanvasPan(event.pointerId, event.clientX, event.clientY);
+    };
+    const handlePointerUp = (event: PointerEvent) => {
+      if (!endCanvasPan(event.pointerId)) {
+        return;
+      }
+      rootElement.releasePointerCapture?.(event.pointerId);
+    };
+
+    rootElement.addEventListener('pointerdown', handlePointerDown, true);
+    rootElement.addEventListener('pointermove', handlePointerMove, true);
+    rootElement.addEventListener('pointerup', handlePointerUp, true);
+    rootElement.addEventListener('pointercancel', handlePointerUp, true);
+    return () => {
+      rootElement.removeEventListener('pointerdown', handlePointerDown, true);
+      rootElement.removeEventListener('pointermove', handlePointerMove, true);
+      rootElement.removeEventListener('pointerup', handlePointerUp, true);
+      rootElement.removeEventListener('pointercancel', handlePointerUp, true);
+    };
+  }, [canvasSurface, endCanvasPan, moveCanvasPan, shouldStartCanvasPan, startCanvasPan]);
+  React.useEffect(() => {
     const element = canvasScrollRef.current;
     if (!element) {
       return;
     }
-    event.preventDefault();
-    setIsCanvasPanning(true);
-    panSessionRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      startScrollLeft: element.scrollLeft,
-      startScrollTop: element.scrollTop,
+
+    const handleWheel = (event: WheelEvent) => {
+      handleCanvasWheelEvent(event);
     };
-    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
-  }, []);
 
-  const handleCanvasPointerMove = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
-    const session = panSessionRef.current;
-    const element = canvasScrollRef.current;
-    if (!session || !element || session.pointerId !== event.pointerId) {
+    element.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    return () => {
+      element.removeEventListener('wheel', handleWheel, true);
+    };
+  }, [handleCanvasWheelEvent]);
+  React.useEffect(() => {
+    if (canvasSurface?.mode !== 'iframe' || !canvasSurface.ownerDocument) {
       return;
     }
-    element.scrollLeft = session.startScrollLeft - (event.clientX - session.startX);
-    element.scrollTop = session.startScrollTop - (event.clientY - session.startY);
-    syncCanvasViewportState();
-  }, [syncCanvasViewportState]);
 
-  const handleCanvasPointerUp = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
-    if (panSessionRef.current?.pointerId !== event.pointerId) {
-      return;
-    }
-    setIsCanvasPanning(false);
-    panSessionRef.current = null;
-    (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
-  }, []);
+    const ownerDocument = canvasSurface.ownerDocument;
+    const handleWheel = (event: WheelEvent) => {
+      handleCanvasWheelEvent(event);
+    };
+
+    ownerDocument.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    return () => {
+      ownerDocument.removeEventListener('wheel', handleWheel, true);
+    };
+  }, [canvasSurface, handleCanvasWheelEvent]);
 
   const clearCanvasDragState = React.useCallback(() => {
     setCanvasDragSession(null);
     setCanvasDropIndicator(null);
   }, []);
+  React.useEffect(() => {
+    if (activeCanvasTool === 'pan') {
+      clearCanvasDragState();
+    }
+  }, [activeCanvasTool, clearCanvasDragState]);
 
   const resolveCanvasDropIndicator = React.useCallback((
     clientX: number,
@@ -1431,21 +1646,21 @@ export function AppShell({
   }, [resolveCanvasDropIndicator]);
 
   const handleSidebarStartDragComponent = React.useCallback((componentType: string) => {
-    if (canvasReadOnly) {
+    if (canvasReadOnly || activeCanvasTool === 'pan') {
       return;
     }
     setCanvasDragSession({
       source: 'component',
       componentType,
     });
-  }, [canvasReadOnly]);
+  }, [activeCanvasTool, canvasReadOnly]);
 
   const handleSidebarEndDragComponent = React.useCallback(() => {
     clearCanvasDragState();
   }, [clearCanvasDragState]);
 
   const startSelectedNodeDrag = React.useCallback((dataTransfer: DataTransfer | null): boolean => {
-    if (canvasReadOnly || !selectedNodeTreeId || !dataTransfer) {
+    if (canvasReadOnly || activeCanvasTool === 'pan' || !selectedNodeTreeId || !dataTransfer) {
       return false;
     }
     dataTransfer.effectAllowed = 'move';
@@ -1455,7 +1670,7 @@ export function AppShell({
       source: 'selected-node',
     });
     return true;
-  }, [canvasReadOnly, selectedNodeTreeId]);
+  }, [activeCanvasTool, canvasReadOnly, selectedNodeTreeId]);
 
   const handleSelectedDragStart = React.useCallback((event: React.DragEvent<HTMLDivElement>) => {
     if (!startSelectedNodeDrag(event.dataTransfer)) {
@@ -1483,7 +1698,7 @@ export function AppShell({
       clearCanvasDragState();
     };
 
-    selectedElement.setAttribute('draggable', (!canvasReadOnly && selectedNodeTreeId) ? 'true' : 'false');
+    selectedElement.setAttribute('draggable', (!canvasReadOnly && activeCanvasTool !== 'pan' && selectedNodeTreeId) ? 'true' : 'false');
     selectedElement.addEventListener('dragstart', handleDragStart);
     selectedElement.addEventListener('dragend', handleDragEnd);
 
@@ -1497,6 +1712,7 @@ export function AppShell({
       }
     };
   }, [
+    activeCanvasTool,
     canvasReadOnly,
     canvasSurface,
     clearCanvasDragState,
@@ -1506,13 +1722,13 @@ export function AppShell({
   ]);
 
   const handleCanvasDragOver = React.useCallback((event: React.DragEvent<HTMLElement>) => {
-    if (!canvasDragSession || canvasReadOnly) {
+    if (!canvasDragSession || canvasReadOnly || activeCanvasTool === 'pan') {
       return;
     }
     event.preventDefault();
     event.dataTransfer.dropEffect = canvasDragSession.source === 'component' ? 'copy' : 'move';
     updateCanvasDropIndicator(event.clientX, event.clientY);
-  }, [canvasDragSession, canvasReadOnly, updateCanvasDropIndicator]);
+  }, [activeCanvasTool, canvasDragSession, canvasReadOnly, updateCanvasDropIndicator]);
 
   const handleCanvasDragLeave = React.useCallback((event: React.DragEvent<HTMLElement>) => {
     const nextTarget = event.relatedTarget;
@@ -1523,7 +1739,7 @@ export function AppShell({
   }, []);
 
   const handleCanvasDrop = React.useCallback((event: React.DragEvent<HTMLElement>) => {
-    if (!canvasDragSession || canvasReadOnly) {
+    if (!canvasDragSession || canvasReadOnly || activeCanvasTool === 'pan') {
       clearCanvasDragState();
       return;
     }
@@ -1540,6 +1756,7 @@ export function AppShell({
     }
     clearCanvasDragState();
   }, [
+    activeCanvasTool,
     canvasDragSession,
     canvasReadOnly,
     clearCanvasDragState,
@@ -1547,6 +1764,13 @@ export function AppShell({
     onCanvasMoveSelectedNode,
     resolveCanvasDropIndicator,
   ]);
+
+  const canvasCursorClassName = isCanvasPanning
+    ? 'cursor-grabbing'
+    : activeCanvasTool === 'pan'
+      ? 'cursor-grab'
+      : 'cursor-default';
+  const canFocusCanvasSelection = Boolean(selectedNodeSchemaId && canvasSurface);
 
   const shouldRenderFileContextPanel = activeEditorTab?.fileType === 'page' && showFileContextPanel;
 
@@ -1663,14 +1887,39 @@ export function AppShell({
             ) : null}
             {/* Editor/Canvas Area Container */}
             <div className="flex-1 min-w-[320px] flex flex-col overflow-hidden relative bg-bg-canvas">
+              <div ref={canvasChromeRef} className="canvas-toolbar-layer">
+                <CanvasToolRail
+                  activeTool={activeCanvasTool}
+                  focusSelectionDisabled={!canFocusCanvasSelection}
+                  onSelectTool={() => { void runCommand('canvas.tool.select'); }}
+                  onPanTool={() => { void runCommand('canvas.tool.pan'); }}
+                  onFit={() => { void runCommand('canvas.fitView'); }}
+                  onCenter={() => { void runCommand('canvas.centerStage'); }}
+                  onFocusSelection={() => { void runCommand('canvas.focusSelection'); }}
+                />
+                <CanvasZoomHud
+                  scale={canvasScale}
+                  menuOpen={zoomMenuState.open}
+                  menuRef={zoomMenuRef}
+                  onZoomOut={() => { void runCommand('canvas.zoomOut'); }}
+                  onZoomIn={() => { void runCommand('canvas.zoomIn'); }}
+                  onToggleMenu={() => setZoomMenuState((current) => ({ open: !current.open }))}
+                  onSelectScale={(nextScale) => {
+                    updateCanvasScalePreset(nextScale);
+                  }}
+                  onFit={() => {
+                    void runCommand('canvas.fitView');
+                    setZoomMenuState({ open: false });
+                  }}
+                />
+              </div>
               <main
                 data-shenbi-shortcut-area="canvas"
                 ref={(node) => {
                   canvasScrollRef.current = node;
                 }}
-                className={`flex-1 overflow-auto scrollbar-hide relative canvas-grid ${isCanvasPanning ? 'cursor-grabbing' : 'cursor-default'}`}
+                className={`flex-1 overflow-auto scrollbar-hide relative canvas-grid ${canvasCursorClassName}`}
                 onContextMenu={(event) => openContextMenu('canvas', event)}
-                onWheel={handleCanvasWheel}
                 onPointerDown={handleCanvasPointerDown}
                 onPointerMove={handleCanvasPointerMove}
                 onPointerUp={handleCanvasPointerUp}
@@ -1696,8 +1945,10 @@ export function AppShell({
                       top: `${CANVAS_STAGE_TOP}px`,
                       width: `${STAGE_WIDTH}px`,
                       minHeight: `${STAGE_MIN_HEIGHT}px`,
-                      transform: `scale(${canvasScale})`,
+                      transform: `translate3d(0, 0, 0) scale(${canvasScale})`,
                       transformOrigin: 'top left',
+                      willChange: 'transform',
+                      backfaceVisibility: 'hidden',
                     }}
                   >
                     <div className="relative z-10 stage-viewport min-h-[800px] w-[1200px] rounded-sm overflow-hidden border border-border-ide">
@@ -1712,11 +1963,12 @@ export function AppShell({
                       <SelectionOverlay
                         surface={canvasSurface}
                         selectedNodeSchemaId={selectedNodeSchemaId}
-                        externalHoverNodeSchemaId={hoveredNodeSchemaId}
+                        externalHoverNodeSchemaId={activeCanvasTool === 'pan' ? undefined : hoveredNodeSchemaId}
                         ancestorItems={breadcrumbItems}
                         onSelectAncestor={onBreadcrumbSelect}
                         onHoverAncestor={onBreadcrumbHover}
-                        dragSelectedEnabled={!canvasReadOnly && Boolean(selectedNodeTreeId)}
+                        hoverEnabled={activeCanvasTool !== 'pan'}
+                        dragSelectedEnabled={!canvasReadOnly && activeCanvasTool !== 'pan' && Boolean(selectedNodeTreeId)}
                         onStartDragSelected={handleSelectedDragStart}
                         onEndDragSelected={clearCanvasDragState}
                       />
@@ -1808,5 +2060,147 @@ export function AppShell({
 
       <StatusBar />
     </div>
+  );
+}
+
+function CanvasToolRail({
+  activeTool,
+  focusSelectionDisabled,
+  onSelectTool,
+  onPanTool,
+  onFit,
+  onCenter,
+  onFocusSelection,
+}: {
+  activeTool: CanvasToolMode;
+  focusSelectionDisabled: boolean;
+  onSelectTool: () => void;
+  onPanTool: () => void;
+  onFit: () => void;
+  onCenter: () => void;
+  onFocusSelection: () => void;
+}) {
+  return (
+    <div className="canvas-tool-rail" role="toolbar" aria-label="Canvas Tools">
+      <CanvasChromeButton
+        title="Selection Tool (V)"
+        active={activeTool === 'select'}
+        onClick={onSelectTool}
+      >
+        <MousePointer2 size={16} />
+      </CanvasChromeButton>
+      <CanvasChromeButton
+        title="Hand Tool (H)"
+        active={activeTool === 'pan'}
+        onClick={onPanTool}
+      >
+        <Hand size={16} />
+      </CanvasChromeButton>
+      <div className="canvas-tool-rail__divider" />
+      <CanvasChromeButton title="Fit View (Shift+1)" onClick={onFit}>
+        <Focus size={16} />
+      </CanvasChromeButton>
+      <CanvasChromeButton title="Center Stage (Shift+2)" onClick={onCenter}>
+        <LocateFixed size={16} />
+      </CanvasChromeButton>
+      <CanvasChromeButton
+        title="Focus Selected Node (Shift+3)"
+        disabled={focusSelectionDisabled}
+        onClick={onFocusSelection}
+      >
+        <span className="canvas-tool-rail__focus-dot" aria-hidden="true" />
+      </CanvasChromeButton>
+    </div>
+  );
+}
+
+function CanvasZoomHud({
+  scale,
+  menuOpen,
+  menuRef,
+  onZoomOut,
+  onZoomIn,
+  onToggleMenu,
+  onSelectScale,
+  onFit,
+}: {
+  scale: number;
+  menuOpen: boolean;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  onZoomOut: () => void;
+  onZoomIn: () => void;
+  onToggleMenu: () => void;
+  onSelectScale: (nextScale: number) => void;
+  onFit: () => void;
+}) {
+  return (
+    <div className="canvas-zoom-hud" aria-label="Canvas Zoom Controls">
+      {menuOpen ? (
+        <div ref={menuRef} className="canvas-zoom-hud__menu" role="menu" aria-label="Canvas Zoom Presets">
+          {CANVAS_ZOOM_PRESETS.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              className="canvas-zoom-hud__menu-item"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => onSelectScale(preset)}
+            >
+              {Math.round(preset * 100)}%
+            </button>
+          ))}
+          <button
+            type="button"
+            className="canvas-zoom-hud__menu-item"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onFit}
+          >
+            Fit
+          </button>
+        </div>
+      ) : null}
+      <CanvasChromeButton title="Zoom Out" onClick={onZoomOut}>
+        <Minus size={16} />
+      </CanvasChromeButton>
+      <button
+        type="button"
+        className="canvas-zoom-hud__scale"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={onToggleMenu}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+      >
+        {Math.round(scale * 100)}%
+      </button>
+      <CanvasChromeButton title="Zoom In" onClick={onZoomIn}>
+        <Plus size={16} />
+      </CanvasChromeButton>
+    </div>
+  );
+}
+
+function CanvasChromeButton({
+  title,
+  active = false,
+  disabled = false,
+  onClick,
+  children,
+}: {
+  title: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      className={`canvas-chrome-button${active ? ' canvas-chrome-button--active' : ''}`}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }

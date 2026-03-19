@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../canvas/iframe-pool', () => {
@@ -93,5 +93,34 @@ describe('AppShell iframe canvas mode', () => {
     const iframe = view.container.querySelector('iframe');
     expect(iframe?.contentDocument?.getElementById('shenbi-iframe-root')?.textContent).toContain('Iframe Node');
     expect(view.container.querySelector('.selection-overlay')).not.toBeNull();
+  });
+
+  it('iframe 模式下支持通过 Ctrl 滚轮缩放画布', async () => {
+    const view = render(
+      <AppShell renderMode="iframe">
+        <div data-shenbi-node-id="node-1">Iframe Node</div>
+      </AppShell>,
+    );
+
+    await waitFor(() => {
+      const iframe = view.container.querySelector('iframe');
+      expect(iframe).not.toBeNull();
+      expect(iframe?.contentDocument?.getElementById('shenbi-iframe-root')?.textContent).toContain('Iframe Node');
+    });
+
+    const zoomButton = view.container.querySelector('.canvas-zoom-hud__scale') as HTMLButtonElement | null;
+    expect(zoomButton?.textContent).toBe('100%');
+
+    const iframe = view.container.querySelector('iframe');
+    fireEvent.wheel(iframe?.contentDocument as Document, {
+      ctrlKey: true,
+      deltaY: -120,
+      clientX: 320,
+      clientY: 240,
+    });
+
+    await waitFor(() => {
+      expect(zoomButton?.textContent).not.toBe('100%');
+    });
   });
 });

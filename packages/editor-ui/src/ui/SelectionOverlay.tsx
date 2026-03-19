@@ -17,6 +17,7 @@ export interface SelectionOverlayProps {
   onHoverAncestor?: ((nodeId: string | null) => void) | undefined;
   /** hover 到节点时回调（可选，用于扩展） */
   onHoverNode?: (nodeId: string | null) => void;
+  hoverEnabled?: boolean;
   dragSelectedEnabled?: boolean;
   onStartDragSelected?: (event: React.DragEvent<HTMLDivElement>) => void;
   onEndDragSelected?: () => void;
@@ -65,6 +66,7 @@ export function SelectionOverlay({
   onSelectAncestor,
   onHoverAncestor,
   onHoverNode,
+  hoverEnabled = true,
   dragSelectedEnabled = false,
   onStartDragSelected,
   onEndDragSelected,
@@ -158,6 +160,13 @@ export function SelectionOverlay({
 
   // 鼠标悬浮事件处理（事件委托）
   React.useEffect(() => {
+    if (!hoverEnabled) {
+      setHoverRect(EMPTY_RECT);
+      setHoverComponentType('');
+      setMouseHoveredNodeId(null);
+      onHoverNode?.(null);
+      return;
+    }
     if (!surface?.rootElement) {
       return;
     }
@@ -218,7 +227,7 @@ export function SelectionOverlay({
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [onHoverNode, surface]);
+  }, [hoverEnabled, onHoverNode, surface]);
 
   // 外部 hover（面包屑等）位置计算
   React.useEffect(() => {
@@ -252,7 +261,7 @@ export function SelectionOverlay({
   }, [showAncestorDropdown, onHoverAncestor]);
 
   // 确定最终的 hover 显示：外部 hover 优先于鼠标 hover
-  const hasExternalHover = externalHoverNodeSchemaId != null && !isRectEmpty(externalHoverRect);
+  const hasExternalHover = hoverEnabled && externalHoverNodeSchemaId != null && !isRectEmpty(externalHoverRect);
   const effectiveHoverRect = hasExternalHover ? externalHoverRect : hoverRect;
   const effectiveHoverComponentType = hasExternalHover ? externalHoverComponentType : hoverComponentType;
   const effectiveHoveredNodeId = hasExternalHover ? externalHoverNodeSchemaId : mouseHoveredNodeId;
