@@ -1043,7 +1043,7 @@ export function App() {
         writeLocalFile: async (path: string, content: string) => {
           try {
             const parsed = JSON.parse(content);
-            // GitLab path: "系统看板.page.json" → VFS path: "/系统看板.page.json"
+            // GitLab path: "待办跟踪/待办看板.page.json" → VFS path: "/待办跟踪/待办看板.page.json"
             const vfsPath = `/${path.replace(/^\/+/, '')}`;
 
             const node = await vfs.getNodeByPath(activeProjectId, vfsPath).catch(() => null);
@@ -1057,16 +1057,34 @@ export function App() {
                 ['.db.json', 'db'], ['.dict.json', 'dict'],
               ];
               const cleanPath = path.replace(/^\/+/, '');
-              let baseName = cleanPath;
+              let basePath = cleanPath;
               let fileType = 'page';
               for (const [ext, ft] of knownExts) {
                 if (cleanPath.endsWith(ext)) {
-                  baseName = cleanPath.slice(0, -ext.length);
+                  basePath = cleanPath.slice(0, -ext.length);
                   fileType = ft;
                   break;
                 }
               }
-              await vfs.createFile(activeProjectId, null, baseName, fileType as 'page', parsed);
+
+              // Handle nested paths: "待办跟踪/待办看板" → create dir "待办跟踪", then file "待办看板" inside it
+              const parts = basePath.split('/');
+              const fileName = parts.pop()!;
+              let parentId: string | null = null;
+
+              // Create directories recursively
+              for (let i = 0; i < parts.length; i++) {
+                const dirPath = `/${parts.slice(0, i + 1).join('/')}`;
+                const dirNode = await vfs.getNodeByPath(activeProjectId, dirPath).catch(() => null);
+                if (dirNode) {
+                  parentId = dirNode.id;
+                } else {
+                  const newDir = await vfs.createDirectory(activeProjectId, parentId, parts[i]!);
+                  parentId = newDir.id;
+                }
+              }
+
+              await vfs.createFile(activeProjectId, parentId, fileName, fileType as 'page', parsed);
             }
           } catch { /* skip invalid JSON */ }
         },
