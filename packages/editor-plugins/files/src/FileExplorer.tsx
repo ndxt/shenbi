@@ -676,7 +676,7 @@ function ContextMenuPanel({
   const submenuTimer = useRef<number | undefined>(undefined);
 
   const openSubmenu = () => { clearTimeout(submenuTimer.current); setSubmenuOpen(true); };
-  const closeSubmenu = () => { submenuTimer.current = window.setTimeout(() => setSubmenuOpen(false), 150); };
+  const closeSubmenu = () => { submenuTimer.current = window.setTimeout(() => setSubmenuOpen(false), 300); };
   const keepSubmenu = () => { clearTimeout(submenuTimer.current); };
 
   const panelStyle: React.CSSProperties = {
@@ -687,7 +687,7 @@ function ContextMenuPanel({
   };
 
   const subStyle: React.CSSProperties = {
-    position: 'absolute', left: 'calc(100% - 2px)', top: 0, minWidth: 200, borderRadius: 5,
+    position: 'absolute', left: 'calc(100% - 4px)', top: 0, minWidth: 200, borderRadius: 5,
     border: '1px solid #454545', background: '#252526',
     padding: '4px 0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
   };
@@ -844,6 +844,7 @@ export function FileExplorer({
 
   const handleRootContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     setContextMenu({ open: true, x: event.clientX, y: event.clientY, node: null, targetParentId: null });
   }, []);
 
@@ -1085,7 +1086,14 @@ export function FileExplorer({
           {t('title')}
         </span>
         <span className="flex items-center gap-0.5">
-          <ToolbarBtn icon={FilePlus} title={t('toolbar.newFile')} onClick={() => startCreating(null, 'file', 'page')} />
+          <ToolbarBtn
+            icon={FilePlus}
+            title={t('toolbar.newFile')}
+            onClick={(e: unknown) => {
+              const rect = ((e as React.MouseEvent<HTMLButtonElement>).currentTarget).getBoundingClientRect();
+              setTypeDropdown({ top: rect.bottom + 4, left: rect.left, parentId: null });
+            }}
+          />
           <ToolbarBtn icon={FolderPlus} title={t('toolbar.newFolder')} onClick={() => startCreating(null, 'directory')} />
           <ToolbarBtn icon={Save} title={t('toolbar.saveCurrentFile')} onClick={onSaveActiveFile} disabled={!canSaveActiveFile || !onSaveActiveFile} />
           <ToolbarBtn icon={RefreshCw} title={t('toolbar.refresh')} onClick={onRefresh} />
