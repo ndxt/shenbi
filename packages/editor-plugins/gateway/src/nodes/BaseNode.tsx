@@ -58,20 +58,22 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Input Handles */}
-      {contract.inputs.map((port) => (
-        <Handle
-          key={port.id}
-          type="target"
-          position={Position.Left}
-          id={port.id}
-          className="gateway-node__handle gateway-node__handle--input"
-          style={{ 
-            backgroundColor: PORT_TYPE_COLORS[port.dataType],
-            top: '50%',
-            transform: 'translateY(-50%)',
-          }}
-        />
-      ))}
+      {contract.inputs.map((port) => {
+        const isSingleInput = contract.inputs.length === 1;
+        return (
+          <Handle
+            key={port.id}
+            type="target"
+            position={Position.Left}
+            id={port.id}
+            className="gateway-node__handle gateway-node__handle--input"
+            style={{ 
+              backgroundColor: PORT_TYPE_COLORS[port.dataType],
+              ...(isSingleInput ? { top: '50%', transform: 'translateY(-50%)' } : {}),
+            }}
+          />
+        );
+      })}
 
       {/* Node Content */}
       <div className="gateway-node__content">
@@ -93,29 +95,31 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
       {children ? <div className="gateway-node__body">{children}</div> : null}
 
       {/* Output Handles with Add Button */}
-      {contract.outputs.map((port, index) => (
-        <div key={port.id} className="gateway-node__handle-wrapper">
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={port.id}
-            className="gateway-node__handle gateway-node__handle--output"
-            style={{ 
-              backgroundColor: PORT_TYPE_COLORS[port.dataType],
-              top: '50%',
-              transform: 'translateY(-50%)',
-            }}
-            onMouseDown={handleMouseDown}
-            onMouseUp={() => handleMouseUp(port.id)}
-          >
-            {isHovered && index === 0 && (
-              <div className="gateway-node__handle-plus">
-                <Plus size={12} strokeWidth={3} />
-              </div>
-            )}
-          </Handle>
-        </div>
-      ))}
+      {contract.outputs.map((port, index) => {
+        const isSingleOutput = contract.outputs.length === 1;
+        return (
+          <div key={port.id} className="gateway-node__handle-wrapper">
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={port.id}
+              className="gateway-node__handle gateway-node__handle--output"
+              style={{ 
+                backgroundColor: PORT_TYPE_COLORS[port.dataType],
+                ...(isSingleOutput ? { top: '50%', transform: 'translateY(-50%)' } : {}),
+              }}
+              onMouseDown={handleMouseDown}
+              onMouseUp={() => handleMouseUp(port.id)}
+            >
+              {isHovered && index === 0 && (
+                <div className="gateway-node__handle-plus">
+                  <Plus size={12} strokeWidth={3} />
+                </div>
+              )}
+            </Handle>
+          </div>
+        );
+      })}
     </div>
   );
 }
