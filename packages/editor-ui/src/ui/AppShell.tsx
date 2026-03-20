@@ -2394,6 +2394,8 @@ export function AppShell({
                         }}
                         onChangeWidth={setCustomStageWidth}
                         onToggleFrame={() => setShowDeviceFrame((v) => !v)}
+                        onSelectScale={updateCanvasScalePreset}
+                        onFit={fitCanvasToViewport}
                       />
                     </div>
                       );
@@ -2705,6 +2707,8 @@ function DevicePreviewBar({
   onSelectDevice,
   onChangeWidth,
   onToggleFrame,
+  onSelectScale,
+  onFit,
 }: {
   presets: DevicePreset[];
   activeDeviceId: string;
@@ -2716,9 +2720,13 @@ function DevicePreviewBar({
   onSelectDevice: (id: string) => void;
   onChangeWidth: (w: number) => void;
   onToggleFrame: () => void;
+  onSelectScale: (s: number) => void;
+  onFit: () => void;
 }) {
   const [editingWidth, setEditingWidth] = React.useState(false);
   const [widthInput, setWidthInput] = React.useState(String(stageWidth));
+  const [zoomMenuOpen, setZoomMenuOpen] = React.useState(false);
+  const zoomMenuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (!editingWidth) {
@@ -2788,7 +2796,35 @@ function DevicePreviewBar({
           )}
           <span>×</span>
           <span>{stageMinHeight}</span>
-          <span style={{ marginLeft: 4, opacity: 0.6 }}>{Math.round(scale * 100)}%</span>
+          <span
+            style={{ marginLeft: 4, opacity: 0.6, cursor: 'pointer', position: 'relative' }}
+            onClick={() => setZoomMenuOpen((v) => !v)}
+          >
+            {Math.round(scale * 100)}%
+            {zoomMenuOpen ? (
+              <div ref={zoomMenuRef} className="canvas-zoom-hud__menu" role="menu" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 'calc(100% + 8px)', bottom: 'auto', right: 'auto' }}>
+                {CANVAS_ZOOM_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className="canvas-zoom-hud__menu-item"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); onSelectScale(preset); setZoomMenuOpen(false); }}
+                  >
+                    {Math.round(preset * 100)}%
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="canvas-zoom-hud__menu-item"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); onFit(); setZoomMenuOpen(false); }}
+                >
+                  Fit
+                </button>
+              </div>
+            ) : null}
+          </span>
         </div>
         {hasFrame ? (
           <>
