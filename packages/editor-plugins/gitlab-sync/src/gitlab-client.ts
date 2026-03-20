@@ -151,12 +151,20 @@ export function getProject(projectId: number): Promise<GitLabProject> {
 
 // ── Repository ──
 
-export function getTree(projectId: number, ref?: string, recursive = true): Promise<GitLabTreeItem[]> {
+export async function getTree(projectId: number, ref?: string, recursive = true): Promise<GitLabTreeItem[]> {
   const params = new URLSearchParams();
   if (ref) params.set('ref', ref);
   if (recursive) params.set('recursive', 'true');
   const qs = params.toString();
-  return apiRequest<GitLabTreeItem[]>(`/projects/${projectId}/tree${qs ? `?${qs}` : ''}`);
+  try {
+    return await apiRequest<GitLabTreeItem[]>(`/projects/${projectId}/tree${qs ? `?${qs}` : ''}`);
+  } catch (err) {
+    // Empty repos (no commits) return 404 from GitLab — treat as empty tree
+    if (err instanceof Error && err.message.includes('404')) {
+      return [];
+    }
+    throw err;
+  }
 }
 
 export function getFile(projectId: number, filePath: string, ref?: string): Promise<GitLabFileContent> {
