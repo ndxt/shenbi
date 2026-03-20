@@ -2732,7 +2732,7 @@ function DevicePreviewBar({
   return (
     <div
       className="absolute flex items-center justify-center"
-      style={{ left: 0, top: -36, width: '100%', pointerEvents: 'none' }}
+      style={{ left: 0, top: -48, width: '100%', pointerEvents: 'none' }}
     >
       <div className="device-preview-bar">
         <div className="device-preview-bar__devices">
