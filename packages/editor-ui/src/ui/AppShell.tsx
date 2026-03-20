@@ -90,6 +90,22 @@ interface AppShellProps {
   onCloseAllTabs?: (() => void) | undefined;
   onCloseSavedTabs?: (() => void) | undefined;
   onMoveTab?: ((fromIndex: number, toIndex: number) => void) | undefined;
+  /** Title displayed in the title bar (defaults to 'Shenbi IDE') */
+  title?: string;
+  /** Subtitle displayed in the title bar (defaults to 'Editor UI Package') */
+  subtitle?: string | undefined;
+  /** User avatar URL to show in title bar */
+  userAvatarUrl?: string | undefined;
+  /** Username to show in title bar */
+  userName?: string | undefined;
+  /** Branch names for branch switcher */
+  branches?: string[] | undefined;
+  /** Called when user switches branch */
+  onBranchChange?: ((branch: string) => void) | undefined;
+  /** Called when user logs out */
+  onLogout?: (() => void) | undefined;
+  /** GitLab project URL */
+  gitlabUrl?: string | undefined;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -173,6 +189,14 @@ export function AppShell({
   onCloseAllTabs,
   onCloseSavedTabs,
   onMoveTab,
+  title,
+  subtitle,
+  userAvatarUrl,
+  userName,
+  branches,
+  onBranchChange,
+  onLogout,
+  gitlabUrl,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const canvasContentRef = React.useRef<HTMLDivElement | null>(null);
@@ -1058,6 +1082,14 @@ export function AppShell({
         isMaximized={isMaximized}
         onToggleMaximize={toggleMaximize}
         onOpenCommandPalette={() => setShowCommandPalette(true)}
+        title={title}
+        subtitle={subtitle}
+        userAvatarUrl={userAvatarUrl}
+        userName={userName}
+        branches={branches}
+        onBranchChange={onBranchChange}
+        onLogout={onLogout}
+        gitlabUrl={gitlabUrl}
       />
       
       {/* Main Container */}

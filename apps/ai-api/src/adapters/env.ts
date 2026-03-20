@@ -12,6 +12,13 @@ export interface Env {
   AI_RATE_LIMIT_WINDOW_MS: number;
   AI_RATE_LIMIT_MAX_REQUESTS: number;
   providers: ProviderEnvConfig[];
+
+  // GitLab OAuth
+  GITLAB_OAUTH_CLIENT_ID: string;
+  GITLAB_OAUTH_CLIENT_SECRET: string;
+  GITLAB_OAUTH_REDIRECT_URI: string;
+  GITLAB_DEFAULT_URL: string;
+  GITLAB_DEFAULT_GROUP_ID: number | undefined;
 }
 
 export interface ProviderEnvConfig {
@@ -255,6 +262,8 @@ export function loadEnv(): Env {
     ? providers.find((item) => item.provider === provider) ?? resolveProviderConfig(loaded, provider, true)
     : undefined;
 
+  const gitlabGroupIdRaw = readEnvValue(loaded, ['GITLAB_DEFAULT_GROUP_ID']);
+
   return {
     PORT: parseInt(readEnvValue(loaded, ['PORT']) ?? '3100', 10),
     AI_PROVIDER: provider,
@@ -266,5 +275,12 @@ export function loadEnv(): Env {
     AI_RATE_LIMIT_WINDOW_MS: parseInt(readEnvValue(loaded, ['AI_RATE_LIMIT_WINDOW_MS']) ?? '60000', 10),
     AI_RATE_LIMIT_MAX_REQUESTS: parseInt(readEnvValue(loaded, ['AI_RATE_LIMIT_MAX_REQUESTS']) ?? '60', 10),
     providers,
+
+    // GitLab OAuth
+    GITLAB_OAUTH_CLIENT_ID: readEnvValue(loaded, ['GITLAB_OAUTH_CLIENT_ID']) ?? '',
+    GITLAB_OAUTH_CLIENT_SECRET: readEnvValue(loaded, ['GITLAB_OAUTH_CLIENT_SECRET']) ?? '',
+    GITLAB_OAUTH_REDIRECT_URI: readEnvValue(loaded, ['GITLAB_OAUTH_REDIRECT_URI']) ?? 'http://localhost:5173/api/gitlab/oauth/callback',
+    GITLAB_DEFAULT_URL: readEnvValue(loaded, ['GITLAB_DEFAULT_URL']) ?? 'https://gitlab.com',
+    GITLAB_DEFAULT_GROUP_ID: gitlabGroupIdRaw ? parseInt(gitlabGroupIdRaw, 10) : undefined,
   };
 }
