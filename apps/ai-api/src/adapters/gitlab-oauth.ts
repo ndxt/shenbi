@@ -159,8 +159,11 @@ export async function handleOAuthCallback(
     logger.error('gitlab.oauth.token_exchange_failed', {
       status: tokenResponse.status,
       body: body.slice(0, 500),
+      tokenUrl: `${instance}/oauth/token`,
+      redirectUri: config.redirectUri,
+      clientIdPrefix: config.clientId.slice(0, 8) + '...',
     });
-    throw new Error(`OAuth token exchange failed: ${tokenResponse.status}`);
+    throw new Error(`OAuth token exchange failed: ${tokenResponse.status} — ${body.slice(0, 200)}`);
   }
 
   const tokenData = (await tokenResponse.json()) as {
