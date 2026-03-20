@@ -199,7 +199,7 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
     const now = Date.now();
     const nodeId = generateId();
     const parentPath = parentId ? await this.getNodePath(db, parentId) : '';
-    const ext = EXTENSIONS[fileType];
+    const ext = EXTENSIONS[fileType] ?? EXTENSIONS.page;
     const path = `${parentPath}/${name}${ext}`;
     const size = JSON.stringify(content).length;
 
@@ -378,7 +378,7 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
     let newPath: string;
 
     if (node.type === 'file' && node.fileType) {
-      const ext = EXTENSIONS[node.fileType];
+      const ext = EXTENSIONS[node.fileType] ?? EXTENSIONS.page;
       const parentPath = oldPath.slice(0, oldPath.lastIndexOf('/'));
       newPath = `${parentPath}/${newName}${ext}`;
     } else {
@@ -493,7 +493,7 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
 
     const oldPath = node.path;
     const fileName = node.type === 'file' && node.fileType
-      ? `${node.name}${EXTENSIONS[node.fileType]}`
+      ? `${node.name}${EXTENSIONS[node.fileType] ?? EXTENSIONS.page}`
       : node.name;
     const newPath = `${newParentPath}/${fileName}`;
     const now = Date.now();
