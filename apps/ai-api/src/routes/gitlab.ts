@@ -52,13 +52,18 @@ export function createGitLabRoute(config: GitLabOAuthConfig): Hono {
         maxAge: 30 * 24 * 60 * 60,
       });
 
-      // Redirect back to the app
-      return c.redirect('/');
+      // Redirect back to the app — derive base path from redirectUri
+      const redirectUrl = new URL(config.redirectUri);
+      const appBase = redirectUrl.pathname.replace(/api\/gitlab\/oauth\/callback$/, '') || '/';
+      return c.redirect(appBase);
     } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
       logger.error('gitlab.oauth.callback_error', {
-        error: error instanceof Error ? error.message : String(error),
+        error: errMsg,
+        code: code?.slice(0, 8) + '...',
+        state: state?.slice(0, 8) + '...',
       });
-      return c.json({ error: 'OAuth authentication failed' }, 500);
+      return c.json({ error: `OAuth authentication failed: ${errMsg}` }, 500);
     }
   });
 
