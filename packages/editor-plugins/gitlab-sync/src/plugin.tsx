@@ -46,6 +46,9 @@ export function createGitLabSyncPlugin(options: CreateGitLabSyncPluginOptions): 
           order: 40,
           render: () => (
             <GitLabSyncPanel
+              activeProjectId={options.activeProjectId}
+              activeBranch={options.activeBranch}
+              onSelectProject={options.onSelectProject}
               getLocalFiles={options.getLocalFiles}
               writeLocalFile={options.writeLocalFile}
               deleteLocalFile={options.deleteLocalFile}
