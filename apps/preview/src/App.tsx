@@ -323,6 +323,20 @@ export function App() {
     try { indexedDB.deleteDatabase(`shenbi-vfs-${projectId}`); } catch { /* ignore */ }
   }, []);
 
+  // Unbind GitLab remote from current project (keep VFS, just remove GitLab binding)
+  const handleUnbindProject = useCallback(() => {
+    const updated = {
+      ...activeProjectConfig,
+      gitlabProjectId: undefined,
+      gitlabUrl: undefined,
+      branch: undefined,
+    };
+    saveActiveProject(updated);
+    setActiveProjectConfig(updated);
+    upsertProjectInList(updated);
+    setGitlabBranches([]);
+  }, [activeProjectConfig]);
+
   const {
     activeScenarioSnapshot,
     updateScenarioSnapshot,
@@ -1136,6 +1150,8 @@ export function App() {
         activeProjectId: activeProjectConfig.gitlabProjectId ?? lastGitLabProjectConfig?.gitlabProjectId,
         activeBranch: activeProjectConfig.branch ?? lastGitLabProjectConfig?.branch,
         onSelectProject: handleSelectGitLabProject,
+        onUnbindProject: activeProjectConfig.gitlabProjectId ? handleUnbindProject : undefined,
+        projectName: activeProjectConfig.projectName,
         getLocalFiles: async () => {
           const nodes = await vfs.listTree(activeProjectId);
           const files = new Map<string, string>();

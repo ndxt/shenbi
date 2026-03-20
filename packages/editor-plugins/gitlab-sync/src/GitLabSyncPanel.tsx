@@ -34,6 +34,7 @@ import {
   ChevronDown,
   ChevronRight,
   MoreHorizontal,
+  Unlink2,
 } from 'lucide-react';
 import * as client from './gitlab-client';
 import type { FileDiffItem } from './diff-utils';
@@ -50,6 +51,10 @@ export interface GitLabSyncPanelProps {
   writeLocalFile: (path: string, content: string) => Promise<void>;
   deleteLocalFile: (path: string) => Promise<void>;
   refreshFileTree: () => void;
+  /** Called when user wants to unbind the GitLab remote from the current project */
+  onUnbindProject?: (() => void) | undefined;
+  /** Name of the active project (for display in not-logged-in state) */
+  projectName?: string | undefined;
 }
 
 type PanelState =
@@ -221,6 +226,8 @@ export function GitLabSyncPanel({
   writeLocalFile,
   deleteLocalFile,
   refreshFileTree,
+  onUnbindProject,
+  projectName,
 }: GitLabSyncPanelProps) {
   const [state, setState] = useState<PanelState>({ kind: 'loading' });
   const [instanceUrl, setInstanceUrl] = useState('');
@@ -474,7 +481,18 @@ export function GitLabSyncPanel({
       <div style={S.panel}>
         <div style={S.loginSection}>
           <FolderGit2 size={28} style={{ color: color.accent }} />
-          <div style={{ fontSize: 13, color: color.textDim, textAlign: 'center' }}>连接 GitLab 同步代码</div>
+          {activeProjectId && projectName ? (
+            <>
+              <div style={{ fontSize: 13, color: color.textBright, textAlign: 'center', fontWeight: 500 }}>
+                {projectName}
+              </div>
+              <div style={{ fontSize: 11, color: color.textDim, textAlign: 'center' }}>
+                已绑定 GitLab · 登录以同步
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 13, color: color.textDim, textAlign: 'center' }}>连接 GitLab 同步代码</div>
+          )}
           <div style={{ width: '100%', maxWidth: 200 }}>
             <input
               style={{ ...S.input, marginBottom: 8 }}
@@ -602,6 +620,17 @@ export function GitLabSyncPanel({
         >
           <Download size={14} />
         </button>
+        {onUnbindProject && (
+          <button
+            style={S.iconBtn()}
+            onClick={onUnbindProject}
+            title="解绑 GitLab 远程仓库"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = color.red; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = color.textDim; }}
+          >
+            <Unlink2 size={14} />
+          </button>
+        )}
         <div style={{ flex: 1 }} />
         {/* Status */}
         {(statusMsg || isBusy) && (
