@@ -38,9 +38,12 @@ import {
 import {
   PREVIEW_PROJECT_ID,
   PREVIEW_WORKSPACE_ID,
+  clearLastGitLabProject,
   createLocalProjectConfig,
+  loadLastGitLabProject,
   loadActiveProject,
   saveActiveProject,
+  saveLastGitLabProject,
   clearActiveProject,
 } from './constants';
 import type { ActiveProjectConfig } from './constants';
@@ -171,6 +174,7 @@ export function App() {
   const currentLocale = useCurrentLocale();
   const [appMode, setAppMode] = useShellModeUrl();
   const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig>(() => loadActiveProject() ?? createLocalProjectConfig());
+  const [lastGitLabProjectConfig, setLastGitLabProjectConfig] = useState<ActiveProjectConfig | null>(() => loadLastGitLabProject());
   const activeProjectId = activeProjectConfig.vfsProjectId;
   const [gitlabUser, setGitlabUser] = useState<{ username: string; avatarUrl: string } | null>(null);
   const [gitlabBranches, setGitlabBranches] = useState<string[]>([]);
@@ -260,7 +264,9 @@ export function App() {
       .then(() => {
         setGitlabUser(null);
         clearActiveProject();
+        clearLastGitLabProject();
         setActiveProjectConfig(createLocalProjectConfig());
+        setLastGitLabProjectConfig(null);
         setVfsInitialized(false);
         setFsTree([]);
       })
@@ -270,6 +276,10 @@ export function App() {
   const handleSelectProject = useCallback((config: ActiveProjectConfig) => {
     saveActiveProject(config);
     setActiveProjectConfig(config);
+    if (config.gitlabProjectId) {
+      saveLastGitLabProject(config);
+      setLastGitLabProjectConfig(config);
+    }
     // Reset editor state for new project
     setVfsInitialized(false);
     setFsTree([]);
@@ -1096,8 +1106,8 @@ export function App() {
 
       // GitLab Sync plugin
       registeredPlugins.push(createGitLabSyncPlugin({
-        activeProjectId: activeProjectConfig?.gitlabProjectId,
-        activeBranch: activeProjectConfig?.branch,
+        activeProjectId: activeProjectConfig.gitlabProjectId ?? lastGitLabProjectConfig?.gitlabProjectId,
+        activeBranch: activeProjectConfig.branch ?? lastGitLabProjectConfig?.branch,
         onSelectProject: handleSelectGitLabProject,
         getLocalFiles: async () => {
           const nodes = await vfs.listTree(activeProjectId);
@@ -1179,13 +1189,20 @@ export function App() {
     }
     return registeredPlugins;
   }, [
+    activeProjectConfig?.branch,
+    activeProjectConfig?.gitlabProjectId,
+    activeProjectId,
     appMode,
     currentLocale,
     executeAppCommand,
     fileExplorerStatusText,
     filesPrimaryPanelOptions,
     filesT,
+    handleSelectGitLabProject,
+    lastGitLabProjectConfig?.branch,
+    lastGitLabProjectConfig?.gitlabProjectId,
     previewT,
+    vfs,
     vfsInitialized,
   ]);
 

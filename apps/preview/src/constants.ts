@@ -29,6 +29,7 @@ export function createLocalProjectConfig(): ActiveProjectConfig {
 }
 
 const ACTIVE_PROJECT_KEY = 'shenbi_active_project';
+const LAST_GITLAB_PROJECT_KEY = 'shenbi_last_gitlab_project';
 
 export function loadActiveProject(): ActiveProjectConfig | null {
   try {
@@ -46,4 +47,22 @@ export function saveActiveProject(config: ActiveProjectConfig): void {
 
 export function clearActiveProject(): void {
   localStorage.removeItem(ACTIVE_PROJECT_KEY);
+}
+
+export function loadLastGitLabProject(): ActiveProjectConfig | null {
+  try {
+    const raw = localStorage.getItem(LAST_GITLAB_PROJECT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as ActiveProjectConfig;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastGitLabProject(config: ActiveProjectConfig): void {
+  localStorage.setItem(LAST_GITLAB_PROJECT_KEY, JSON.stringify(config));
+}
+
+export function clearLastGitLabProject(): void {
+  localStorage.removeItem(LAST_GITLAB_PROJECT_KEY);
 }
