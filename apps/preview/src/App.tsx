@@ -230,7 +230,7 @@ export function App() {
 
   // Fetch GitLab user info for header display
   useEffect(() => {
-    fetch('/api/gitlab/oauth/status', { credentials: 'include' })
+    fetch(`${import.meta.env.BASE_URL}api/gitlab/oauth/status`, { credentials: 'include' })
       .then((res) => res.ok ? res.json() : null)
       .then((data: { authenticated?: boolean; user?: { username: string; avatarUrl: string } } | null) => {
         if (data?.authenticated && data.user) {
@@ -243,7 +243,7 @@ export function App() {
   // Fetch branches when project is active
   useEffect(() => {
     if (!activeProjectConfig?.gitlabProjectId) return;
-    fetch(`/api/gitlab/projects/${activeProjectConfig.gitlabProjectId}/branches`, { credentials: 'include' })
+    fetch(`${import.meta.env.BASE_URL}api/gitlab/projects/${activeProjectConfig.gitlabProjectId}/branches`, { credentials: 'include' })
       .then((res) => res.ok ? res.json() : [])
       .then((data: Array<{ name: string }>) => {
         setGitlabBranches(data.map((b) => b.name));
@@ -260,7 +260,7 @@ export function App() {
 
   // Handle logout
   const handleLogout = useCallback(() => {
-    fetch('/api/gitlab/oauth/logout', { method: 'POST', credentials: 'include' })
+    fetch(`${import.meta.env.BASE_URL}api/gitlab/oauth/logout`, { method: 'POST', credentials: 'include' })
       .then(() => {
         setGitlabUser(null);
         clearActiveProject();

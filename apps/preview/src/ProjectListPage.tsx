@@ -38,13 +38,13 @@ interface GitLabProject {
 // ---------------------------------------------------------------------------
 
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`/api/gitlab${path}`, { credentials: 'include' });
+  const res = await fetch(`${import.meta.env.BASE_URL}api/gitlab${path}`, { credentials: 'include' });
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return (await res.json()) as T;
 }
 
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`/api/gitlab${path}`, {
+  const res = await fetch(`${import.meta.env.BASE_URL}api/gitlab${path}`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -233,7 +233,7 @@ export function ProjectListPage({ onSelectProject }: ProjectListPageProps) {
   }, [auth?.authenticated, auth?.defaultGroupId, search]);
 
   const handleLogin = useCallback(() => {
-    window.location.href = '/api/gitlab/oauth/login';
+    window.location.href = `${import.meta.env.BASE_URL}api/gitlab/oauth/login`;
   }, []);
 
   const handleSelectProject = useCallback((project: GitLabProject) => {

@@ -84,8 +84,19 @@ export class GitLabClientError extends Error {
 // Client functions
 // ---------------------------------------------------------------------------
 
+/** Vite injects BASE_URL from vite.config `base`. Strip trailing slash. */
+const API_BASE = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const base = (import.meta as any).env?.BASE_URL as string | undefined;
+    return base ? base.replace(/\/+$/, '') : '';
+  } catch {
+    return '';
+  }
+})();
+
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api/gitlab${path}`, {
+  const response = await fetch(`${API_BASE}/api/gitlab${path}`, {
     credentials: 'include', // send session cookie
     ...init,
     headers: {
@@ -112,7 +123,7 @@ export function getAuthStatus(): Promise<GitLabAuthStatus> {
 
 export function getLoginUrl(instanceUrl?: string): string {
   const params = instanceUrl ? `?instance=${encodeURIComponent(instanceUrl)}` : '';
-  return `/api/gitlab/oauth/login${params}`;
+  return `${API_BASE}/api/gitlab/oauth/login${params}`;
 }
 
 export async function logout(): Promise<void> {
