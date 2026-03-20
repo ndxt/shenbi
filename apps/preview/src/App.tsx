@@ -35,9 +35,15 @@ import {
   treeManagementSkeletonSchema,
   userManagementSchema,
 } from './schemas';
-import { PREVIEW_PROJECT_ID, PREVIEW_WORKSPACE_ID, loadActiveProject, saveActiveProject, clearActiveProject } from './constants';
+import {
+  PREVIEW_PROJECT_ID,
+  PREVIEW_WORKSPACE_ID,
+  createLocalProjectConfig,
+  loadActiveProject,
+  saveActiveProject,
+  clearActiveProject,
+} from './constants';
 import type { ActiveProjectConfig } from './constants';
-import { ProjectListPage } from './ProjectListPage';
 import { ScenarioRuntimeView } from './runtime/ScenarioRuntimeView';
 
 import {
@@ -164,8 +170,8 @@ export function App() {
   const { t: filesT } = useTranslation('pluginFiles');
   const currentLocale = useCurrentLocale();
   const [appMode, setAppMode] = useShellModeUrl();
-  const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig | null>(() => loadActiveProject());
-  const activeProjectId = activeProjectConfig?.vfsProjectId ?? PREVIEW_PROJECT_ID;
+  const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig>(() => loadActiveProject() ?? createLocalProjectConfig());
+  const activeProjectId = activeProjectConfig.vfsProjectId;
   const [gitlabUser, setGitlabUser] = useState<{ username: string; avatarUrl: string } | null>(null);
   const [gitlabBranches, setGitlabBranches] = useState<string[]>([]);
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
@@ -243,7 +249,6 @@ export function App() {
 
   // Handle branch change from header
   const handleBranchChange = useCallback((branch: string) => {
-    if (!activeProjectConfig) return;
     const updated = { ...activeProjectConfig, branch };
     saveActiveProject(updated);
     setActiveProjectConfig(updated);
@@ -255,7 +260,7 @@ export function App() {
       .then(() => {
         setGitlabUser(null);
         clearActiveProject();
-        setActiveProjectConfig(null);
+        setActiveProjectConfig(createLocalProjectConfig());
         setVfsInitialized(false);
         setFsTree([]);
       })
@@ -1266,28 +1271,24 @@ export function App() {
 
   const handleBackToProjects = useCallback(() => {
     clearActiveProject();
-    setActiveProjectConfig(null);
+    setActiveProjectConfig(createLocalProjectConfig());
     setVfsInitialized(false);
     setFsTree([]);
   }, []);
 
   // ── Project selection gate ──
-  if (!activeProjectConfig) {
-    return <ProjectListPage onSelectProject={handleSelectProject} />;
-  }
-
   return (
     <AppShell
       workspaceId={PREVIEW_WORKSPACE_ID}
       persistenceAdapter={persistenceAdapter}
-      title={activeProjectConfig?.projectName ?? 'Shenbi IDE'}
-      subtitle={activeProjectConfig?.branch ?? undefined}
+      title={activeProjectConfig.projectName}
+      subtitle={activeProjectConfig.branch}
       userAvatarUrl={gitlabUser?.avatarUrl}
       userName={gitlabUser?.username}
       branches={gitlabBranches.length > 0 ? gitlabBranches : undefined}
       onBranchChange={handleBranchChange}
       onLogout={gitlabUser ? handleLogout : undefined}
-      gitlabUrl={activeProjectConfig?.gitlabUrl}
+      gitlabUrl={activeProjectConfig.gitlabUrl}
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,

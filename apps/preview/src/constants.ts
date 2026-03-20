@@ -12,12 +12,20 @@ export function projectIdFromGitLab(gitlabProjectId: number): string {
 
 /** Persisted state for the currently active project. */
 export interface ActiveProjectConfig {
-  gitlabProjectId: number;
+  gitlabProjectId?: number | undefined;
   vfsProjectId: string;
   projectName: string;
-  branch: string;
+  branch?: string | undefined;
   lastOpenedAt: number;
-  gitlabUrl?: string;
+  gitlabUrl?: string | undefined;
+}
+
+export function createLocalProjectConfig(): ActiveProjectConfig {
+  return {
+    vfsProjectId: PREVIEW_PROJECT_ID,
+    projectName: 'Shenbi IDE',
+    lastOpenedAt: Date.now(),
+  };
 }
 
 const ACTIVE_PROJECT_KEY = 'shenbi_active_project';
