@@ -9,6 +9,8 @@ export interface CanvasViewportState {
   scale: number;
   scrollLeft: number;
   scrollTop: number;
+  viewportWidth: number;
+  viewportHeight: number;
 }
 
 export type CanvasToolMode = 'select' | 'pan';

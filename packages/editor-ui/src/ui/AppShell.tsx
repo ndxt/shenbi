@@ -287,6 +287,8 @@ export function AppShell({
     scale: 1,
     scrollLeft: 0,
     scrollTop: 0,
+    viewportWidth: 0,
+    viewportHeight: 0,
   });
   const [isCanvasPanning, setIsCanvasPanning] = React.useState(false);
   const [canvasDragSession, setCanvasDragSession] = React.useState<CanvasDragSession | null>(null);
@@ -296,6 +298,7 @@ export function AppShell({
   const zoomMenuRef = React.useRef<HTMLDivElement | null>(null);
   const canvasScaleRafRef = React.useRef<number | null>(null);
   const spacePressedRef = React.useRef(false);
+  const [isSpacePressed, setIsSpacePressed] = React.useState(false);
   const panSessionRef = React.useRef<{
     pointerId: number;
     startX: number;
@@ -424,6 +427,8 @@ export function AppShell({
       scale: canvasScale,
       scrollLeft: element.scrollLeft,
       scrollTop: element.scrollTop,
+      viewportWidth: element.clientWidth,
+      viewportHeight: element.clientHeight,
     });
   }, [canvasScale]);
   React.useEffect(() => () => {
@@ -493,6 +498,8 @@ export function AppShell({
       scale: nextScale,
       scrollLeft: nextScrollLeft,
       scrollTop: nextScrollTop,
+      viewportWidth: element.clientWidth,
+      viewportHeight: element.clientHeight,
     });
   }, []);
 
@@ -545,6 +552,8 @@ export function AppShell({
         scale: nextScale,
         scrollLeft: element.scrollLeft,
         scrollTop: element.scrollTop,
+        viewportWidth: element.clientWidth,
+        viewportHeight: element.clientHeight,
       });
       canvasScaleRafRef.current = null;
     });
@@ -1346,6 +1355,7 @@ export function AppShell({
         event.preventDefault();
         if (!event.repeat) {
           spacePressedRef.current = true;
+          setIsSpacePressed(true);
         }
       }
     };
@@ -1355,10 +1365,12 @@ export function AppShell({
           event.preventDefault();
         }
         spacePressedRef.current = false;
+        setIsSpacePressed(false);
       }
     };
     const handleBlur = () => {
       spacePressedRef.current = false;
+      setIsSpacePressed(false);
       setIsCanvasPanning(false);
       panSessionRef.current = null;
       clearCanvasPanInteractionGuards();
@@ -1990,8 +2002,8 @@ export function AppShell({
 
   const canvasCursorClassName = isCanvasPanning
     ? 'cursor-grabbing'
-    : activeCanvasTool === 'pan'
-      ? 'cursor-grab'
+    : (isSpacePressed || activeCanvasTool === 'pan')
+      ? 'canvas-cursor-grab'
       : 'cursor-default';
   const canFocusCanvasSelection = Boolean(selectedNodeSchemaId && canvasSurface);
   const selectionOverlayActions = React.useMemo<SelectionOverlayAction[]>(() => {
@@ -2177,6 +2189,7 @@ export function AppShell({
                 <div ref={canvasChromeRef} className="canvas-toolbar-layer">
                   <CanvasToolRail
                     activeTool={activeCanvasTool}
+                    spacePanActive={isSpacePressed}
                     focusSelectionDisabled={!canFocusCanvasSelection}
                     onSelectTool={() => { void runCommand('canvas.tool.select'); }}
                     onPanTool={() => { void runCommand('canvas.tool.pan'); }}
@@ -2186,6 +2199,13 @@ export function AppShell({
                   />
                   <CanvasZoomHud
                     scale={canvasScale}
+                    viewportState={canvasViewportState}
+                    stageWidth={STAGE_WIDTH}
+                    stageHeight={Math.max(stageContentHeight, STAGE_MIN_HEIGHT)}
+                    stageLeft={canvasStageLeft}
+                    stageTop={CANVAS_WS_STAGE_TOP}
+                    workspaceWidth={canvasWorkspaceWidth}
+                    workspaceHeight={canvasWorkspaceHeight}
                     menuOpen={zoomMenuState.open}
                     menuRef={zoomMenuRef}
                     onZoomOut={() => { void runCommand('canvas.zoomOut'); }}
@@ -2354,6 +2374,7 @@ export function AppShell({
 
 function CanvasToolRail({
   activeTool,
+  spacePanActive,
   focusSelectionDisabled,
   onSelectTool,
   onPanTool,
@@ -2362,6 +2383,7 @@ function CanvasToolRail({
   onFocusSelection,
 }: {
   activeTool: CanvasToolMode;
+  spacePanActive: boolean;
   focusSelectionDisabled: boolean;
   onSelectTool: () => void;
   onPanTool: () => void;
@@ -2369,28 +2391,30 @@ function CanvasToolRail({
   onCenter: () => void;
   onFocusSelection: () => void;
 }) {
+  const effectivePan = spacePanActive || activeTool === 'pan';
+  const effectiveSelect = !spacePanActive && activeTool === 'select';
   return (
     <div className="canvas-tool-rail" role="toolbar" aria-label="Canvas Tools">
       <CanvasChromeButton
         title="Selection Tool (V)"
-        active={activeTool === 'select'}
+        active={effectiveSelect}
         onClick={onSelectTool}
       >
-        <MousePointer2 size={16} />
+        <MousePointer2 size={14} />
       </CanvasChromeButton>
       <CanvasChromeButton
         title="Hand Tool (H)"
-        active={activeTool === 'pan'}
+        active={effectivePan}
         onClick={onPanTool}
       >
-        <Hand size={16} />
+        <Hand size={14} />
       </CanvasChromeButton>
       <div className="canvas-tool-rail__divider" />
       <CanvasChromeButton title="Fit View (Shift+1)" onClick={onFit}>
-        <Focus size={16} />
+        <Focus size={14} />
       </CanvasChromeButton>
       <CanvasChromeButton title="Center Stage (Shift+2)" onClick={onCenter}>
-        <LocateFixed size={16} />
+        <LocateFixed size={14} />
       </CanvasChromeButton>
       <CanvasChromeButton
         title="Focus Selected Node (Shift+3)"
@@ -2405,6 +2429,13 @@ function CanvasToolRail({
 
 function CanvasZoomHud({
   scale,
+  viewportState,
+  stageWidth,
+  stageHeight,
+  stageLeft,
+  stageTop,
+  workspaceWidth,
+  workspaceHeight,
   menuOpen,
   menuRef,
   onZoomOut,
@@ -2414,6 +2445,13 @@ function CanvasZoomHud({
   onFit,
 }: {
   scale: number;
+  viewportState: CanvasViewportState;
+  stageWidth: number;
+  stageHeight: number;
+  stageLeft: number;
+  stageTop: number;
+  workspaceWidth: number;
+  workspaceHeight: number;
   menuOpen: boolean;
   menuRef: React.RefObject<HTMLDivElement | null>;
   onZoomOut: () => void;
@@ -2422,6 +2460,59 @@ function CanvasZoomHud({
   onSelectScale: (nextScale: number) => void;
   onFit: () => void;
 }) {
+  // Minimap calculations — focus on a region around stage + viewport,
+  // not the entire 20000px workspace, so the stage is actually visible.
+  const MINIMAP_W = 120;
+  const MINIMAP_H = 72;
+
+  const stageVisualW = stageWidth * scale;
+  const stageVisualH = stageHeight * scale;
+  const stageCenterX = stageLeft + stageVisualW / 2;
+  const stageCenterY = stageTop + stageVisualH / 2;
+
+  // Viewport rect in workspace coordinates
+  const vpX = viewportState.scrollLeft;
+  const vpY = viewportState.scrollTop;
+  const vpW = viewportState.viewportWidth ?? 1200;
+  const vpH = viewportState.viewportHeight ?? 800;
+
+  // Compute bounding box that contains both stage and viewport, with padding
+  const regionLeft = Math.min(stageLeft, vpX);
+  const regionTop = Math.min(stageTop, vpY);
+  const regionRight = Math.max(stageLeft + stageVisualW, vpX + vpW);
+  const regionBottom = Math.max(stageTop + stageVisualH, vpY + vpH);
+  const regionW = regionRight - regionLeft;
+  const regionH = regionBottom - regionTop;
+  // Add 30% padding so content doesn't sit at minimap edges
+  const pad = Math.max(regionW, regionH) * 0.3;
+  const focusX = regionLeft - pad;
+  const focusY = regionTop - pad;
+  const focusW = regionW + pad * 2;
+  const focusH = regionH + pad * 2;
+
+  // Fit focus region into minimap
+  const focusAspect = focusW / focusH;
+  const mmAspect = MINIMAP_W / MINIMAP_H;
+  const mmScale = focusAspect >= mmAspect
+    ? MINIMAP_W / focusW
+    : MINIMAP_H / focusH;
+  const mmOffsetX = (MINIMAP_W - focusW * mmScale) / 2 - focusX * mmScale;
+  const mmOffsetY = (MINIMAP_H - focusH * mmScale) / 2 - focusY * mmScale;
+
+  const mmStage = {
+    left: stageLeft * mmScale + mmOffsetX,
+    top: stageTop * mmScale + mmOffsetY,
+    width: Math.max(stageVisualW * mmScale, 2),
+    height: Math.max(stageVisualH * mmScale, 2),
+  };
+
+  const mmViewport = {
+    left: vpX * mmScale + mmOffsetX,
+    top: vpY * mmScale + mmOffsetY,
+    width: Math.max(vpW * mmScale, 4),
+    height: Math.max(vpH * mmScale, 4),
+  };
+
   return (
     <div className="canvas-zoom-hud" aria-label="Canvas Zoom Controls">
       {menuOpen ? (
@@ -2447,22 +2538,34 @@ function CanvasZoomHud({
           </button>
         </div>
       ) : null}
-      <CanvasChromeButton title="Zoom Out" onClick={onZoomOut}>
-        <Minus size={16} />
-      </CanvasChromeButton>
-      <button
-        type="button"
-        className="canvas-zoom-hud__scale"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={onToggleMenu}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-      >
-        {Math.round(scale * 100)}%
-      </button>
-      <CanvasChromeButton title="Zoom In" onClick={onZoomIn}>
-        <Plus size={16} />
-      </CanvasChromeButton>
+      <div className="canvas-zoom-hud__minimap">
+        <div
+          className="canvas-zoom-hud__minimap-stage"
+          style={{ left: mmStage.left, top: mmStage.top, width: mmStage.width, height: mmStage.height }}
+        />
+        <div
+          className="canvas-zoom-hud__minimap-viewport"
+          style={{ left: mmViewport.left, top: mmViewport.top, width: mmViewport.width, height: mmViewport.height }}
+        />
+      </div>
+      <div className="canvas-zoom-hud__controls">
+        <CanvasChromeButton title="Zoom Out" onClick={onZoomOut}>
+          <Minus size={14} />
+        </CanvasChromeButton>
+        <button
+          type="button"
+          className="canvas-zoom-hud__scale"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={onToggleMenu}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+        >
+          {Math.round(scale * 100)}%
+        </button>
+        <CanvasChromeButton title="Zoom In" onClick={onZoomIn}>
+          <Plus size={14} />
+        </CanvasChromeButton>
+      </div>
     </div>
   );
 }
