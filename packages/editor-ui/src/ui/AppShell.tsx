@@ -7,9 +7,14 @@ import {
   Hand,
   LocateFixed,
   Minus,
+  Monitor,
   MousePointer2,
+  MoveHorizontal,
   Plus,
+  Smartphone,
+  Tablet,
   Trash2,
+  Frame,
 } from 'lucide-react';
 import {
   collectPluginContributes,
@@ -152,12 +157,27 @@ const THEME_CLASSES = [
   'theme-webstorm-dark',
 ] as const;
 
-const STAGE_WIDTH = 1200;
+const STAGE_DEFAULT_WIDTH = 1200;
 const STAGE_MIN_HEIGHT = 800;
 const MIN_CANVAS_SCALE = 0.25;
 const MAX_CANVAS_SCALE = 2;
 const CANVAS_ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
 const CANVAS_WHEEL_ZOOM_SENSITIVITY = 0.0015;
+
+interface DevicePreset {
+  id: string;
+  label: string;
+  width: number;
+  icon: React.FC<{ size?: number }>;
+  frame?: 'phone' | 'tablet' | 'monitor';
+}
+
+const DEVICE_PRESETS: DevicePreset[] = [
+  { id: 'phone', label: 'Phone', width: 375, icon: Smartphone, frame: 'phone' },
+  { id: 'tablet', label: 'Tablet', width: 768, icon: Tablet, frame: 'tablet' },
+  { id: 'desktop', label: 'Desktop', width: 1200, icon: Monitor, frame: 'monitor' },
+  { id: 'responsive', label: 'Responsive', width: 1200, icon: MoveHorizontal },
+];
 
 function isPromiseLike(value: unknown): value is Promise<unknown> {
   return Boolean(value) && typeof (value as Promise<unknown>).then === 'function';
@@ -283,6 +303,13 @@ export function AppShell({
   const [stageContentHeight, setStageContentHeight] = React.useState(STAGE_MIN_HEIGHT);
   const stageContentHeightRef = React.useRef(STAGE_MIN_HEIGHT);
   const [activeCanvasTool, setActiveCanvasTool] = React.useState<CanvasToolMode>('select');
+  const [activeDeviceId, setActiveDeviceId] = React.useState('desktop');
+  const [showDeviceFrame, setShowDeviceFrame] = React.useState(false);
+  const [customStageWidth, setCustomStageWidth] = React.useState(STAGE_DEFAULT_WIDTH);
+  const activeDevice = DEVICE_PRESETS.find((p) => p.id === activeDeviceId) ?? DEVICE_PRESETS[2]!;
+  const stageWidth = activeDeviceId === 'responsive' ? customStageWidth : activeDevice.width;
+  const stageWidthRef = React.useRef(stageWidth);
+  stageWidthRef.current = stageWidth;
   const [canvasViewportState, setCanvasViewportState] = React.useState<CanvasViewportState>({
     scale: 1,
     scrollLeft: 0,
@@ -410,7 +437,7 @@ export function AppShell({
   const CANVAS_WS_STAGE_TOP = 5000;  // stage Y offset inside workspace (lots of room above)
 
   const canvasWorkspaceWidth = CANVAS_WS_BASE;
-  const canvasStageLeft = Math.round((CANVAS_WS_BASE - STAGE_WIDTH * canvasScale) / 2);
+  const canvasStageLeft = Math.round((CANVAS_WS_BASE - stageWidth * canvasScale) / 2);
 
   const canvasWorkspaceHeight = React.useMemo(() => {
     const stageVisualBottom = CANVAS_WS_STAGE_TOP
@@ -480,7 +507,7 @@ export function AppShell({
     if (!element) {
       return;
     }
-    const scaledWidth = STAGE_WIDTH * nextScale;
+    const scaledWidth = stageWidth * nextScale;
     const stageHeight = Math.max(stageContentHeightRef.current, STAGE_MIN_HEIGHT);
     const scaledHeight = stageHeight * nextScale;
     const wsStageLeft = Math.round((CANVAS_WS_BASE - scaledWidth) / 2);
@@ -542,7 +569,7 @@ export function AppShell({
     setCanvasScale(nextScale);
     canvasScaleRafRef.current = requestAnimationFrame(() => {
       const nextStageCenterX = Math.round(
-        (CANVAS_WS_BASE - STAGE_WIDTH * nextScale) / 2,
+        (CANVAS_WS_BASE - stageWidth * nextScale) / 2,
       );
       const nextScrollLeft = nextStageCenterX + scaledX - pointerX;
       const nextScrollTop = CANVAS_WS_STAGE_TOP + scaledY - pointerY;
@@ -579,7 +606,7 @@ export function AppShell({
     const availableWidth = Math.max(element.clientWidth - 160, 320);
     const availableHeight = Math.max(element.clientHeight - 160, 240);
     const nextScale = clamp(
-      Math.min(availableWidth / STAGE_WIDTH, availableHeight / STAGE_MIN_HEIGHT),
+      Math.min(availableWidth / stageWidth, availableHeight / STAGE_MIN_HEIGHT),
       MIN_CANVAS_SCALE,
       MAX_CANVAS_SCALE,
     );
@@ -1853,7 +1880,7 @@ export function AppShell({
         target: { placement: 'root' },
         top: 0,
         left: 0,
-        width: STAGE_WIDTH,
+        width: stageWidth,
         height: Math.max(stageContentHeightRef.current, STAGE_MIN_HEIGHT),
         variant: 'frame',
       };
@@ -2200,7 +2227,7 @@ export function AppShell({
                   <CanvasZoomHud
                     scale={canvasScale}
                     viewportState={canvasViewportState}
-                    stageWidth={STAGE_WIDTH}
+                    stageWidth={stageWidth}
                     stageHeight={Math.max(stageContentHeight, STAGE_MIN_HEIGHT)}
                     stageLeft={canvasStageLeft}
                     stageTop={CANVAS_WS_STAGE_TOP}
@@ -2250,7 +2277,7 @@ export function AppShell({
                       style={{
                         left: `${canvasStageLeft}px`,
                         top: `${CANVAS_WS_STAGE_TOP}px`,
-                        width: `${STAGE_WIDTH}px`,
+                        width: `${stageWidth}px`,
                         minHeight: `${STAGE_MIN_HEIGHT}px`,
                         transform: `translate3d(0, 0, 0) scale(${canvasScale})`,
                         transformOrigin: 'top left',
@@ -2258,30 +2285,59 @@ export function AppShell({
                         backfaceVisibility: 'hidden',
                       }}
                     >
-                      <div className="relative z-10 stage-viewport min-h-[800px] w-[1200px] rounded-sm overflow-hidden border border-border-ide">
-                        <CanvasSurface
-                          mode={renderMode}
-                          themeClassName={`theme-${theme}`}
-                          pointerEventsDisabled={Boolean(canvasDragSession)}
-                          onReady={setCanvasSurface}
-                        >
-                          {children}
-                        </CanvasSurface>
-                        {canvasDropIndicator ? (
-                          <div
-                            className={`absolute z-[55] ${canvasDropIndicator.variant === 'line' ? 'bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]' : 'border-2 border-dashed border-blue-500 bg-blue-500/8'}`}
-                            style={{
-                              top: canvasDropIndicator.top,
-                              left: canvasDropIndicator.left,
-                              width: canvasDropIndicator.width,
-                              height: canvasDropIndicator.variant === 'line'
-                                ? 2
-                                : Math.max(canvasDropIndicator.height, 24),
-                              pointerEvents: 'none',
-                            }}
-                          />
-                        ) : null}
-                      </div>
+                      {showDeviceFrame && activeDevice.frame ? (
+                        <div className={`device-frame device-frame--${activeDevice.frame}`}>
+                          <div className="relative z-10 stage-viewport rounded-sm overflow-hidden border border-border-ide" style={{ width: `${stageWidth}px`, minHeight: `${STAGE_MIN_HEIGHT}px` }}>
+                            <CanvasSurface
+                              mode={renderMode}
+                              themeClassName={`theme-${theme}`}
+                              pointerEventsDisabled={Boolean(canvasDragSession)}
+                              onReady={setCanvasSurface}
+                            >
+                              {children}
+                            </CanvasSurface>
+                            {canvasDropIndicator ? (
+                              <div
+                                className={`absolute z-[55] ${canvasDropIndicator.variant === 'line' ? 'bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]' : 'border-2 border-dashed border-blue-500 bg-blue-500/8'}`}
+                                style={{
+                                  top: canvasDropIndicator.top,
+                                  left: canvasDropIndicator.left,
+                                  width: canvasDropIndicator.width,
+                                  height: canvasDropIndicator.variant === 'line'
+                                    ? 2
+                                    : Math.max(canvasDropIndicator.height, 24),
+                                  pointerEvents: 'none',
+                                }}
+                              />
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative z-10 stage-viewport rounded-sm overflow-hidden border border-border-ide" style={{ width: `${stageWidth}px`, minHeight: `${STAGE_MIN_HEIGHT}px` }}>
+                          <CanvasSurface
+                            mode={renderMode}
+                            themeClassName={`theme-${theme}`}
+                            pointerEventsDisabled={Boolean(canvasDragSession)}
+                            onReady={setCanvasSurface}
+                          >
+                            {children}
+                          </CanvasSurface>
+                          {canvasDropIndicator ? (
+                            <div
+                              className={`absolute z-[55] ${canvasDropIndicator.variant === 'line' ? 'bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]' : 'border-2 border-dashed border-blue-500 bg-blue-500/8'}`}
+                              style={{
+                                top: canvasDropIndicator.top,
+                                left: canvasDropIndicator.left,
+                                width: canvasDropIndicator.width,
+                                height: canvasDropIndicator.variant === 'line'
+                                  ? 2
+                                  : Math.max(canvasDropIndicator.height, 24),
+                                pointerEvents: 'none',
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                      )}
                     </div>
 
                     {/* Selection overlay — rendered OUTSIDE the scaled stage at native 1x.
@@ -2291,7 +2347,7 @@ export function AppShell({
                       style={{
                         left: `${canvasStageLeft}px`,
                         top: `${CANVAS_WS_STAGE_TOP}px`,
-                        width: `${STAGE_WIDTH * canvasScale}px`,
+                        width: `${stageWidth * canvasScale}px`,
                         height: `${Math.max(stageContentHeight, STAGE_MIN_HEIGHT) * canvasScale}px`,
                         pointerEvents: 'none',
                         zIndex: 20,
@@ -2312,14 +2368,25 @@ export function AppShell({
                         canvasScale={canvasScale}
                       />
 
-                      {/* Viewport Meta Info — rendered at native 1x, no counter-scaling needed */}
-                      <div
-                        className="absolute text-[10px] text-text-secondary font-mono flex gap-3"
-                        style={{ left: 0, top: -24, pointerEvents: 'none' }}
-                      >
-                        <span>{STAGE_WIDTH} x {STAGE_MIN_HEIGHT}</span>
-                        <span>{Math.round(canvasViewportState.scale * 100)}%</span>
-                      </div>
+                      {/* Device Preview Bar — replaces old dimension label */}
+                      <DevicePreviewBar
+                        presets={DEVICE_PRESETS}
+                        activeDeviceId={activeDeviceId}
+                        stageWidth={stageWidth}
+                        stageMinHeight={STAGE_MIN_HEIGHT}
+                        scale={canvasViewportState.scale}
+                        showDeviceFrame={showDeviceFrame}
+                        hasFrame={Boolean(activeDevice.frame)}
+                        onSelectDevice={(id) => {
+                          setActiveDeviceId(id);
+                          const preset = DEVICE_PRESETS.find((p) => p.id === id);
+                          if (preset && id !== 'responsive') {
+                            setCustomStageWidth(preset.width);
+                          }
+                        }}
+                        onChangeWidth={setCustomStageWidth}
+                        onToggleFrame={() => setShowDeviceFrame((v) => !v)}
+                      />
                     </div>
                   </div>
                 </main>
@@ -2613,5 +2680,121 @@ function CanvasChromeButton({
     >
       {children}
     </button>
+  );
+}
+
+/** Device preview bar: device preset switcher + dimensions + frame toggle */
+function DevicePreviewBar({
+  presets,
+  activeDeviceId,
+  stageWidth,
+  stageMinHeight,
+  scale,
+  showDeviceFrame,
+  hasFrame,
+  onSelectDevice,
+  onChangeWidth,
+  onToggleFrame,
+}: {
+  presets: DevicePreset[];
+  activeDeviceId: string;
+  stageWidth: number;
+  stageMinHeight: number;
+  scale: number;
+  showDeviceFrame: boolean;
+  hasFrame: boolean;
+  onSelectDevice: (id: string) => void;
+  onChangeWidth: (w: number) => void;
+  onToggleFrame: () => void;
+}) {
+  const [editingWidth, setEditingWidth] = React.useState(false);
+  const [widthInput, setWidthInput] = React.useState(String(stageWidth));
+
+  React.useEffect(() => {
+    if (!editingWidth) {
+      setWidthInput(String(stageWidth));
+    }
+  }, [stageWidth, editingWidth]);
+
+  const commitWidth = () => {
+    const parsed = parseInt(widthInput, 10);
+    if (!Number.isNaN(parsed) && parsed >= 200 && parsed <= 3840) {
+      onChangeWidth(parsed);
+      if (activeDeviceId !== 'responsive') {
+        onSelectDevice('responsive');
+      }
+    } else {
+      setWidthInput(String(stageWidth));
+    }
+    setEditingWidth(false);
+  };
+
+  return (
+    <div
+      className="absolute flex items-center justify-center"
+      style={{ left: 0, top: -36, width: '100%', pointerEvents: 'none' }}
+    >
+      <div className="device-preview-bar">
+        <div className="device-preview-bar__devices">
+          {presets.map((preset) => {
+            const Icon = preset.icon;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                className={`device-preview-bar__device-btn${activeDeviceId === preset.id ? ' device-preview-bar__device-btn--active' : ''}`}
+                title={`${preset.label} (${preset.width}px)`}
+                onClick={() => onSelectDevice(preset.id)}
+              >
+                <Icon size={13} />
+              </button>
+            );
+          })}
+        </div>
+        <div className="device-preview-bar__sep" />
+        <div className="device-preview-bar__dims">
+          {editingWidth ? (
+            <input
+              className="device-preview-bar__dim-input"
+              value={widthInput}
+              autoFocus
+              onChange={(e) => setWidthInput(e.target.value)}
+              onBlur={commitWidth}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitWidth();
+                if (e.key === 'Escape') {
+                  setWidthInput(String(stageWidth));
+                  setEditingWidth(false);
+                }
+              }}
+            />
+          ) : (
+            <span
+              style={{ cursor: 'text' }}
+              onClick={() => setEditingWidth(true)}
+            >
+              {stageWidth}
+            </span>
+          )}
+          <span>×</span>
+          <span>{stageMinHeight}</span>
+          <span style={{ marginLeft: 4, opacity: 0.6 }}>{Math.round(scale * 100)}%</span>
+        </div>
+        {hasFrame ? (
+          <>
+            <div className="device-preview-bar__sep" />
+            <button
+              type="button"
+              className={`device-preview-bar__frame-toggle${showDeviceFrame ? ' device-preview-bar__frame-toggle--active' : ''}`}
+              onClick={onToggleFrame}
+              title="Toggle Device Frame"
+            >
+              <Frame size={11} />
+              <span>Frame</span>
+            </button>
+          </>
+        ) : null}
+      </div>
+    </div>
   );
 }
