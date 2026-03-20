@@ -20,6 +20,7 @@ export interface GitLabAuthStatus {
   authenticated: boolean;
   user?: GitLabUser | undefined;
   defaultGroupId?: number | undefined;
+  defaultInstanceUrl?: string | undefined;
 }
 
 export interface GitLabProject {

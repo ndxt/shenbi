@@ -76,11 +76,11 @@ export function createGitLabRoute(config: GitLabOAuthConfig): Hono {
   app.get('/oauth/status', async (c) => {
     const sessionId = getCookie(c, GITLAB_SESSION_COOKIE);
     if (!sessionId) {
-      return c.json({ authenticated: false });
+      return c.json({ authenticated: false, defaultInstanceUrl: config.defaultInstanceUrl });
     }
     const session = await getSession(config, sessionId);
     if (!session) {
-      return c.json({ authenticated: false });
+      return c.json({ authenticated: false, defaultInstanceUrl: config.defaultInstanceUrl });
     }
     return c.json({
       authenticated: true,
@@ -91,6 +91,7 @@ export function createGitLabRoute(config: GitLabOAuthConfig): Hono {
         instanceUrl: session.instanceUrl,
       },
       defaultGroupId: config.defaultGroupId,
+      defaultInstanceUrl: config.defaultInstanceUrl,
     });
   });
 

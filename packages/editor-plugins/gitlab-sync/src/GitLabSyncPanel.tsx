@@ -266,6 +266,9 @@ export function GitLabSyncPanel({
           }
           setState({ kind: 'project-picker', user, groupId: status.defaultGroupId ?? 0 });
         } else {
+          if (status.defaultInstanceUrl) {
+            setInstanceUrl(status.defaultInstanceUrl);
+          }
           setState({ kind: 'not-logged-in' });
         }
       })
@@ -475,7 +478,7 @@ export function GitLabSyncPanel({
           <div style={{ width: '100%', maxWidth: 200 }}>
             <input
               style={{ ...S.input, marginBottom: 8 }}
-              placeholder="https://gitlab.com"
+              placeholder="GitLab URL"
               value={instanceUrl}
               onChange={(e) => setInstanceUrl(e.target.value)}
             />
