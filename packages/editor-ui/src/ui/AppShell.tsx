@@ -106,6 +106,8 @@ interface AppShellProps {
   onLogout?: (() => void) | undefined;
   /** GitLab project URL */
   gitlabUrl?: string | undefined;
+  /** Called when user clicks project name to open project manager */
+  onOpenProjectManager?: (() => void) | undefined;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -197,6 +199,7 @@ export function AppShell({
   onBranchChange,
   onLogout,
   gitlabUrl,
+  onOpenProjectManager,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const canvasContentRef = React.useRef<HTMLDivElement | null>(null);
@@ -1090,6 +1093,7 @@ export function AppShell({
         onBranchChange={onBranchChange}
         onLogout={onLogout}
         gitlabUrl={gitlabUrl}
+        onOpenProjectManager={onOpenProjectManager}
       />
       
       {/* Main Container */}

@@ -14,6 +14,7 @@ import {
   GitBranch,
   LogOut,
   ExternalLink,
+  FolderOpen,
 } from 'lucide-react';
 import {
   type SupportedLocale,
@@ -50,6 +51,8 @@ interface TitleBarProps {
   onLogout?: (() => void) | undefined;
   /** URL to open the project on GitLab */
   gitlabUrl?: string | undefined;
+  /** Called when user clicks project name to open project manager */
+  onOpenProjectManager?: (() => void) | undefined;
 }
 
 export function TitleBar({ 
@@ -77,6 +80,7 @@ export function TitleBar({
   onBranchChange,
   onLogout,
   gitlabUrl,
+  onOpenProjectManager,
 }: TitleBarProps) {
   const { t } = useTranslation('editorUi');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -115,7 +119,14 @@ export function TitleBar({
         <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center">
           <Command size={14} className="text-white" />
         </div>
-        <span className="text-[13px] font-bold tracking-tight text-text-primary">{title ?? 'Shenbi IDE'}</span>
+        <span
+          className={`text-[13px] font-bold tracking-tight text-text-primary ${onOpenProjectManager ? 'cursor-pointer hover:text-blue-400 transition-colors' : ''}`}
+          onClick={onOpenProjectManager}
+          title={onOpenProjectManager ? '管理项目' : undefined}
+        >
+          <FolderOpen size={13} className="inline mr-1 opacity-60" />
+          {title ?? 'Shenbi IDE'}
+        </span>
         {branches && branches.length > 0 && onBranchChange ? (
           <select
             className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary bg-transparent cursor-pointer outline-none"

@@ -47,6 +47,8 @@ import {
   clearActiveProject,
 } from './constants';
 import type { ActiveProjectConfig } from './constants';
+import { upsertProjectInList, loadProjectList } from './constants';
+import { ProjectManagerDialog } from './ProjectManagerDialog';
 import { ScenarioRuntimeView } from './runtime/ScenarioRuntimeView';
 
 import {
@@ -213,6 +215,7 @@ export function App() {
   const [shellSaveSources, setShellSaveSources] = useState<Record<string, 'manual' | 'auto'>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingMigrationRef = useRef<{ sourceProjectId: string; targetProjectId: string } | null>(null);
+  const [showProjectManager, setShowProjectManager] = useState(false);
 
   // Initialize VFS (and migrate files from old project if needed)
   useEffect(() => {
@@ -287,6 +290,7 @@ export function App() {
 
   const handleSelectProject = useCallback((config: ActiveProjectConfig) => {
     saveActiveProject(config);
+    upsertProjectInList(config);
     setActiveProjectConfig(config);
     if (config.gitlabProjectId) {
       saveLastGitLabProject(config);
@@ -313,6 +317,11 @@ export function App() {
       gitlabUrl: project.web_url,
     });
   }, [handleSelectProject, activeProjectId]);
+
+  const handleDeleteProject = useCallback((projectId: string) => {
+    // Delete the VFS database for the project
+    try { indexedDB.deleteDatabase(`shenbi-vfs-${projectId}`); } catch { /* ignore */ }
+  }, []);
 
   const {
     activeScenarioSnapshot,
@@ -1324,6 +1333,7 @@ export function App() {
       onBranchChange={handleBranchChange}
       onLogout={gitlabUser ? handleLogout : undefined}
       gitlabUrl={activeProjectConfig.gitlabUrl}
+      onOpenProjectManager={() => setShowProjectManager(true)}
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,
@@ -1465,6 +1475,15 @@ export function App() {
           <ScenarioRuntimeView key={`${appMode}:${activeScenario}`} schema={activeSchema} />
         </div>
       </div>
+    
+      <ProjectManagerDialog
+        open={showProjectManager}
+        activeProjectId={activeProjectId}
+        gitlabUser={gitlabUser}
+        onClose={() => setShowProjectManager(false)}
+        onSelectProject={handleSelectProject}
+        onDeleteProject={handleDeleteProject}
+      />
     </AppShell>
   );
 }
