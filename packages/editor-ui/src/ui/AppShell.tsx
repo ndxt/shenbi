@@ -179,6 +179,13 @@ const DEVICE_PRESETS: DevicePreset[] = [
   { id: 'responsive', label: 'Responsive', width: 1200, icon: MoveHorizontal },
 ];
 
+/** Frame padding: [top, right, bottom, left] */
+const DEVICE_FRAME_PADDING: Record<string, [number, number, number, number]> = {
+  phone: [48, 12, 40, 12],
+  tablet: [28, 20, 28, 20],
+  monitor: [20, 20, 56, 20],
+};
+
 function isPromiseLike(value: unknown): value is Promise<unknown> {
   return Boolean(value) && typeof (value as Promise<unknown>).then === 'function';
 }
@@ -2277,8 +2284,8 @@ export function AppShell({
                       style={{
                         left: `${canvasStageLeft}px`,
                         top: `${CANVAS_WS_STAGE_TOP}px`,
-                        width: `${stageWidth}px`,
-                        minHeight: `${STAGE_MIN_HEIGHT}px`,
+                        width: `${stageWidth + (showDeviceFrame && activeDevice.frame ? (DEVICE_FRAME_PADDING[activeDevice.frame]?.[1] ?? 0) + (DEVICE_FRAME_PADDING[activeDevice.frame]?.[3] ?? 0) : 0)}px`,
+                        minHeight: `${STAGE_MIN_HEIGHT + (showDeviceFrame && activeDevice.frame ? (DEVICE_FRAME_PADDING[activeDevice.frame]?.[0] ?? 0) + (DEVICE_FRAME_PADDING[activeDevice.frame]?.[2] ?? 0) : 0)}px`,
                         transform: `translate3d(0, 0, 0) scale(${canvasScale})`,
                         transformOrigin: 'top left',
                         willChange: 'transform',
