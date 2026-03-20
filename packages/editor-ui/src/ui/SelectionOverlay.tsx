@@ -291,11 +291,9 @@ export function SelectionOverlay({
   const showSelected = !isRectEmpty(selectedRect);
   const visibleActions = actions?.filter((action) => action) ?? [];
 
-  // Counter-scale factor: undo the parent stage's transform: scale(canvasScale)
-  const inverseScale = 1 / canvasScale;
-
-  // Scale rect positions: the overlay counter-scales the parent, so content-space
-  // coordinates need to be multiplied by canvasScale to stay correctly positioned.
+  // Scale rect positions from content-space to canvas-space.
+  // The overlay is rendered outside the scaled stage at native 1x,
+  // so positions need to be multiplied by canvasScale.
   const scaleRect = (r: OverlayRect): OverlayRect => ({
     top: r.top * canvasScale,
     left: r.left * canvasScale,
@@ -308,12 +306,6 @@ export function SelectionOverlay({
   return (
     <div
       className="selection-overlay"
-      style={{
-        transform: `scale(${inverseScale})`,
-        transformOrigin: 'top left',
-        width: `${canvasScale * 100}%`,
-        height: `${canvasScale * 100}%`,
-      }}
       {...(visibleActions.length === 0 ? { 'aria-hidden': true } : {})}
     >
       {/* Hover 框 */}

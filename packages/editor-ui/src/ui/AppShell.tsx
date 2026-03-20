@@ -2267,20 +2267,6 @@ export function AppShell({
                         >
                           {children}
                         </CanvasSurface>
-                        <SelectionOverlay
-                          surface={canvasSurface}
-                          selectedNodeSchemaId={selectedNodeSchemaId}
-                          externalHoverNodeSchemaId={activeCanvasTool === 'pan' ? undefined : hoveredNodeSchemaId}
-                          ancestorItems={breadcrumbItems}
-                          actions={selectionOverlayActions}
-                          onSelectAncestor={onBreadcrumbSelect}
-                          onHoverAncestor={onBreadcrumbHover}
-                          hoverEnabled={activeCanvasTool !== 'pan'}
-                          dragSelectedEnabled={!canvasReadOnly && activeCanvasTool !== 'pan' && Boolean(selectedNodeTreeId)}
-                          onStartDragSelected={handleSelectedDragStart}
-                          onEndDragSelected={clearCanvasDragState}
-                          canvasScale={canvasScale}
-                        />
                         {canvasDropIndicator ? (
                           <div
                             className={`absolute z-[55] ${canvasDropIndicator.variant === 'line' ? 'bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]' : 'border-2 border-dashed border-blue-500 bg-blue-500/8'}`}
@@ -2296,15 +2282,40 @@ export function AppShell({
                           />
                         ) : null}
                       </div>
+                    </div>
 
-                      {/* Viewport Meta Info (Figma Style) — counter-scaled to stay at 100% */}
+                    {/* Selection overlay — rendered OUTSIDE the scaled stage at native 1x.
+                        Positions are computed in canvas-space (rect * canvasScale). */}
+                    <div
+                      className="absolute"
+                      style={{
+                        left: `${canvasStageLeft}px`,
+                        top: `${CANVAS_WS_STAGE_TOP}px`,
+                        width: `${STAGE_WIDTH * canvasScale}px`,
+                        height: `${Math.max(stageContentHeight, STAGE_MIN_HEIGHT) * canvasScale}px`,
+                        pointerEvents: 'none',
+                        zIndex: 20,
+                      }}
+                    >
+                      <SelectionOverlay
+                        surface={canvasSurface}
+                        selectedNodeSchemaId={selectedNodeSchemaId}
+                        externalHoverNodeSchemaId={activeCanvasTool === 'pan' ? undefined : hoveredNodeSchemaId}
+                        ancestorItems={breadcrumbItems}
+                        actions={selectionOverlayActions}
+                        onSelectAncestor={onBreadcrumbSelect}
+                        onHoverAncestor={onBreadcrumbHover}
+                        hoverEnabled={activeCanvasTool !== 'pan'}
+                        dragSelectedEnabled={!canvasReadOnly && activeCanvasTool !== 'pan' && Boolean(selectedNodeTreeId)}
+                        onStartDragSelected={handleSelectedDragStart}
+                        onEndDragSelected={clearCanvasDragState}
+                        canvasScale={canvasScale}
+                      />
+
+                      {/* Viewport Meta Info — rendered at native 1x, no counter-scaling needed */}
                       <div
-                        className="absolute left-0 text-[10px] text-text-secondary font-mono flex gap-3"
-                        style={{
-                          top: -24 / canvasScale,
-                          transform: `scale(${1 / canvasScale})`,
-                          transformOrigin: 'bottom left',
-                        }}
+                        className="absolute text-[10px] text-text-secondary font-mono flex gap-3"
+                        style={{ left: 0, top: -24, pointerEvents: 'none' }}
                       >
                         <span>{STAGE_WIDTH} x {STAGE_MIN_HEIGHT}</span>
                         <span>{Math.round(canvasViewportState.scale * 100)}%</span>
