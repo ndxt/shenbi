@@ -38,7 +38,20 @@ import {
   treeManagementSkeletonSchema,
   userManagementSchema,
 } from './schemas';
-import { PREVIEW_PROJECT_ID, PREVIEW_WORKSPACE_ID } from './constants';
+import {
+  PREVIEW_PROJECT_ID,
+  PREVIEW_WORKSPACE_ID,
+  clearLastGitLabProject,
+  createLocalProjectConfig,
+  loadLastGitLabProject,
+  loadActiveProject,
+  saveActiveProject,
+  saveLastGitLabProject,
+  clearActiveProject,
+} from './constants';
+import type { ActiveProjectConfig } from './constants';
+import { upsertProjectInList, loadProjectList } from './constants';
+import { ProjectManagerDialog } from './ProjectManagerDialog';
 import { ScenarioRuntimeView } from './runtime/ScenarioRuntimeView';
 
 import {
@@ -59,6 +72,8 @@ import {
 import { createAIChatPlugin } from '@shenbi/editor-plugin-ai-chat';
 import { createFilesPlugin, useFileWorkspace, FileExplorer } from '@shenbi/editor-plugin-files';
 import { createSetterPlugin } from '@shenbi/editor-plugin-setter';
+import { createGitLabSyncPlugin } from '@shenbi/editor-plugin-gitlab-sync';
+import type { GitLabProject } from '@shenbi/editor-plugin-gitlab-sync';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
 
 type ScenarioKey =
@@ -324,6 +339,11 @@ export function App() {
   const currentLocale = useCurrentLocale();
   const [appMode, setAppMode] = useShellModeUrl();
   const [renderMode, setRenderMode] = useState<RenderMode>(DEFAULT_RENDER_MODE);
+  const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig>(() => loadActiveProject() ?? createLocalProjectConfig());
+  const [lastGitLabProjectConfig, setLastGitLabProjectConfig] = useState<ActiveProjectConfig | null>(() => loadLastGitLabProject());
+  const activeProjectId = activeProjectConfig.vfsProjectId;
+  const [gitlabUser, setGitlabUser] = useState<{ username: string; avatarUrl: string } | null>(null);
+  const [gitlabBranches, setGitlabBranches] = useState<string[]>([]);
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const persistenceAdapter = useMemo(() => new LocalWorkspacePersistenceAdapter(), []);
   const workspacePersistence = useMemo(
@@ -359,21 +379,128 @@ export function App() {
   const [fileExplorerFocusedId, setFileExplorerFocusedId] = useState<string | undefined>();
   const [shellSaveSources, setShellSaveSources] = useState<Record<string, 'manual' | 'auto'>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingMigrationRef = useRef<{ sourceProjectId: string; targetProjectId: string } | null>(null);
+  const [showProjectManager, setShowProjectManager] = useState(false);
 
-  // Initialize VFS
+  // Initialize VFS (and migrate files from old project if needed)
   useEffect(() => {
     if (typeof indexedDB === 'undefined') {
       setShellSessionHydrated(true);
       return;
     }
-    void vfs.initialize(PREVIEW_PROJECT_ID)
-      .then(() => {
+    void vfs.initialize(activeProjectId)
+      .then(async () => {
+        // Check for pending file migration (e.g. switching from 'default' to 'gitlab-123')
+        const migration = pendingMigrationRef.current;
+        if (migration && migration.targetProjectId === activeProjectId) {
+          pendingMigrationRef.current = null;
+          try {
+            const targetHasFiles = await vfs.hasFiles(migration.targetProjectId);
+            if (!targetHasFiles) {
+              const sourceHasFiles = await vfs.hasFiles(migration.sourceProjectId);
+              if (sourceHasFiles) {
+                await vfs.copyProject(migration.sourceProjectId, migration.targetProjectId);
+              }
+            }
+          } catch {
+            // Migration failed — not critical, continue
+          }
+        }
         setVfsInitialized(true);
       })
       .catch(() => {
         setShellSessionHydrated(true);
       });
-  }, [vfs]);
+  }, [vfs, activeProjectId]);
+
+  // Fetch GitLab user info for header display
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}api/gitlab/oauth/status`, { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { authenticated?: boolean; user?: { username: string; avatarUrl: string } } | null) => {
+        if (data?.authenticated && data.user) {
+          setGitlabUser({ username: data.user.username, avatarUrl: data.user.avatarUrl });
+        }
+      })
+      .catch(() => { /* not logged in */ });
+  }, []);
+
+  // Fetch branches when project is active
+  useEffect(() => {
+    if (!activeProjectConfig?.gitlabProjectId) return;
+    fetch(`${import.meta.env.BASE_URL}api/gitlab/projects/${activeProjectConfig.gitlabProjectId}/branches`, { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : [])
+      .then((data: Array<{ name: string }>) => {
+        setGitlabBranches(data.map((b) => b.name));
+      })
+      .catch(() => setGitlabBranches([]));
+  }, [activeProjectConfig?.gitlabProjectId]);
+
+  // Handle branch change from header
+  const handleBranchChange = useCallback((branch: string) => {
+    const updated = { ...activeProjectConfig, branch };
+    saveActiveProject(updated);
+    setActiveProjectConfig(updated);
+  }, [activeProjectConfig]);
+
+  // Handle logout — only clear GitLab session, keep project & files
+  const handleLogout = useCallback(() => {
+    fetch(`${import.meta.env.BASE_URL}api/gitlab/oauth/logout`, { method: 'POST', credentials: 'include' })
+      .then(() => {
+        setGitlabUser(null);
+        setGitlabBranches([]);
+      })
+      .catch(() => { /* ignore */ });
+  }, []);
+
+  const handleSelectProject = useCallback((config: ActiveProjectConfig) => {
+    saveActiveProject(config);
+    upsertProjectInList(config);
+    setActiveProjectConfig(config);
+    if (config.gitlabProjectId) {
+      saveLastGitLabProject(config);
+      setLastGitLabProjectConfig(config);
+    }
+    // Reset editor state for new project
+    setVfsInitialized(false);
+    setFsTree([]);
+  }, []);
+
+  const handleSelectGitLabProject = useCallback((project: GitLabProject) => {
+    const oldProjectId = activeProjectId;
+    const newProjectId = `gitlab-${project.id}`;
+    // Schedule migration if switching from a different project
+    if (oldProjectId !== newProjectId) {
+      pendingMigrationRef.current = { sourceProjectId: oldProjectId, targetProjectId: newProjectId };
+    }
+    handleSelectProject({
+      gitlabProjectId: project.id,
+      vfsProjectId: newProjectId,
+      projectName: project.name,
+      branch: project.default_branch || 'main',
+      lastOpenedAt: Date.now(),
+      gitlabUrl: project.web_url,
+    });
+  }, [handleSelectProject, activeProjectId]);
+
+  const handleDeleteProject = useCallback((projectId: string) => {
+    // Delete the VFS database for the project
+    try { indexedDB.deleteDatabase(`shenbi-vfs-${projectId}`); } catch { /* ignore */ }
+  }, []);
+
+  // Unbind GitLab remote from current project (keep VFS, just remove GitLab binding)
+  const handleUnbindProject = useCallback(() => {
+    const updated = {
+      ...activeProjectConfig,
+      gitlabProjectId: undefined,
+      gitlabUrl: undefined,
+      branch: undefined,
+    };
+    saveActiveProject(updated);
+    setActiveProjectConfig(updated);
+    upsertProjectInList(updated);
+    setGitlabBranches([]);
+  }, [activeProjectConfig]);
 
   const {
     activeScenarioSnapshot,
@@ -403,7 +530,7 @@ export function App() {
         initialSchema: createEmptyShellSchema(),
         vfs,
         tabManager,
-        projectId: PREVIEW_PROJECT_ID,
+        projectId: activeProjectId,
       });
     },
   });
@@ -420,7 +547,7 @@ export function App() {
   // Refresh file tree
   const refreshFsTree = useCallback(() => {
     if (!vfsInitialized) return;
-    void vfs.listTree(PREVIEW_PROJECT_ID).then((nodes) => {
+    void vfs.listTree(activeProjectId).then((nodes) => {
       setFsTree(buildFSTree(nodes));
     });
   }, [vfs, vfsInitialized]);
@@ -534,7 +661,7 @@ export function App() {
           return;
         }
 
-        const nodes = await vfs.listTree(PREVIEW_PROJECT_ID);
+        const nodes = await vfs.listTree(activeProjectId);
         if (cancelled) {
           return;
         }
@@ -551,7 +678,7 @@ export function App() {
           let schema = persistedTab.schema;
           if (!persistedTab.isDirty) {
             try {
-              schema = await vfs.readFile(PREVIEW_PROJECT_ID, persistedTab.fileId) as PageSchema;
+              schema = await vfs.readFile(activeProjectId, persistedTab.fileId) as PageSchema;
             } catch {
               continue;
             }
@@ -892,15 +1019,15 @@ export function App() {
     if (!vfsInitialized) return undefined;
     return {
       createFile: async (name: string, fileType: string, content: Record<string, unknown>, parentId?: string) => {
-        const node = await vfs.createFile(PREVIEW_PROJECT_ID, parentId ?? null, name, fileType as any, content);
+        const node = await vfs.createFile(activeProjectId, parentId ?? null, name, fileType as any, content);
         refreshFsTree();
         return node.id;
       },
       readFile: async (fileId: string) => {
-        return await vfs.readFile(PREVIEW_PROJECT_ID, fileId) as Record<string, unknown>;
+        return await vfs.readFile(activeProjectId, fileId) as Record<string, unknown>;
       },
       writeFile: async (fileId: string, content: Record<string, unknown>) => {
-        await vfs.writeFile(PREVIEW_PROJECT_ID, fileId, content);
+        await vfs.writeFile(activeProjectId, fileId, content);
       },
     };
   }, [refreshFsTree, vfs, vfsInitialized]);
@@ -1474,12 +1601,97 @@ export function App() {
           ],
         },
       }));
+
+      // GitLab Sync plugin
+      registeredPlugins.push(createGitLabSyncPlugin({
+        activeProjectId: activeProjectConfig.gitlabProjectId ?? lastGitLabProjectConfig?.gitlabProjectId,
+        activeBranch: activeProjectConfig.branch ?? lastGitLabProjectConfig?.branch,
+        onSelectProject: handleSelectGitLabProject,
+        onUnbindProject: activeProjectConfig.gitlabProjectId ? handleUnbindProject : undefined,
+        projectName: activeProjectConfig.projectName,
+        getLocalFiles: async () => {
+          const nodes = await vfs.listTree(activeProjectId);
+          const files = new Map<string, string>();
+          for (const node of nodes) {
+            if (node.type === 'file') {
+              try {
+                const content = await vfs.readFile(activeProjectId, node.id);
+                if (content && typeof content === 'object') {
+                  files.set(node.path, JSON.stringify(content, null, 2));
+                }
+              } catch { /* skip unreadable files */ }
+            }
+          }
+          return files;
+        },
+        writeLocalFile: async (path: string, content: string) => {
+          try {
+            const parsed = JSON.parse(content);
+            // GitLab path: "待办跟踪/待办看板.page.json" → VFS path: "/待办跟踪/待办看板.page.json"
+            const vfsPath = `/${path.replace(/^\/+/, '')}`;
+
+            const node = await vfs.getNodeByPath(activeProjectId, vfsPath).catch(() => null);
+            if (node) {
+              // Update existing file
+              await vfs.writeFile(activeProjectId, node.id, parsed);
+            } else {
+              // Create new file: strip extension for name (VFS auto-appends it)
+              const knownExts: [string, string][] = [
+                ['.page.json', 'page'], ['.api.json', 'api'], ['.flow.json', 'flow'],
+                ['.db.json', 'db'], ['.dict.json', 'dict'],
+              ];
+              const cleanPath = path.replace(/^\/+/, '');
+              let basePath = cleanPath;
+              let fileType = 'page';
+              for (const [ext, ft] of knownExts) {
+                if (cleanPath.endsWith(ext)) {
+                  basePath = cleanPath.slice(0, -ext.length);
+                  fileType = ft;
+                  break;
+                }
+              }
+
+              // Handle nested paths: "待办跟踪/待办看板" → create dir "待办跟踪", then file "待办看板" inside it
+              const parts = basePath.split('/');
+              const fileName = parts.pop()!;
+              let parentId: string | null = null;
+
+              // Create directories recursively
+              for (let i = 0; i < parts.length; i++) {
+                const dirPath = `/${parts.slice(0, i + 1).join('/')}`;
+                const dirNode = await vfs.getNodeByPath(activeProjectId, dirPath).catch(() => null);
+                if (dirNode) {
+                  parentId = dirNode.id;
+                } else {
+                  const newDir = await vfs.createDirectory(activeProjectId, parentId, parts[i]!);
+                  parentId = newDir.id;
+                }
+              }
+
+              await vfs.createFile(activeProjectId, parentId, fileName, fileType as 'page', parsed);
+            }
+          } catch { /* skip invalid JSON */ }
+        },
+        deleteLocalFile: async (path: string) => {
+          try {
+            const vfsPath = `/${path.replace(/^\/+/, '')}`;
+            const node = await vfs.getNodeByPath(activeProjectId, vfsPath).catch(() => null);
+            if (node) {
+              await vfs.deleteFile(activeProjectId, node.id);
+            }
+          } catch { /* ignore */ }
+        },
+        refreshFileTree: () => refreshFsTreeRef.current(),
+      }));
     } else if (appMode === 'shell' && filesPrimaryPanelOptions) {
       registeredPlugins.push(createFilesPlugin(filesPrimaryPanelOptions));
     }
 
     return registeredPlugins;
   }, [
+    activeProjectConfig?.branch,
+    activeProjectConfig?.gitlabProjectId,
+    activeProjectId,
     appMode,
     executeAppCommand,
     fileExplorerStatusText,
@@ -1488,7 +1700,11 @@ export function App() {
     handleDeleteSelectedNode,
     handleDuplicateSelectedNode,
     moveSelectedNode,
+    handleSelectGitLabProject,
+    lastGitLabProjectConfig?.branch,
+    lastGitLabProjectConfig?.gitlabProjectId,
     previewT,
+    vfs,
     vfsInitialized,
   ]);
 
@@ -1531,7 +1747,17 @@ export function App() {
         activeScenario,
       )
       .catch(() => undefined);
-  }, [activeScenario, scenarioPersistenceHydrated, workspacePersistence]);
+  }, [
+    activeProjectConfig?.branch,
+    activeProjectConfig?.gitlabProjectId,
+    activeProjectId,
+    activeScenario,
+    handleSelectGitLabProject,
+    refreshFsTreeRef,
+    scenarioPersistenceHydrated,
+    vfs,
+    workspacePersistence,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1564,12 +1790,29 @@ export function App() {
       .catch(() => undefined);
   }, [renderMode, renderModeHydrated, workspacePersistence]);
 
+  const handleBackToProjects = useCallback(() => {
+    clearActiveProject();
+    setActiveProjectConfig(createLocalProjectConfig());
+    setVfsInitialized(false);
+    setFsTree([]);
+  }, []);
+
+  // ── Project selection gate ──
   return (
     <AppShell
       workspaceId={PREVIEW_WORKSPACE_ID}
       persistenceAdapter={persistenceAdapter}
       renderMode={renderMode}
       canvasReadOnly={shellGenerationLock}
+      title={activeProjectConfig.projectName}
+      subtitle={activeProjectConfig.branch}
+      userAvatarUrl={gitlabUser?.avatarUrl}
+      userName={gitlabUser?.username}
+      branches={gitlabBranches.length > 0 ? gitlabBranches : undefined}
+      onBranchChange={handleBranchChange}
+      onLogout={gitlabUser ? handleLogout : undefined}
+      gitlabUrl={activeProjectConfig.gitlabUrl}
+      onOpenProjectManager={() => setShowProjectManager(true)}
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes,
@@ -1733,6 +1976,15 @@ export function App() {
           <ScenarioRuntimeView key={`${appMode}:${activeScenario}`} schema={activeSchema} />
         </div>
       </div>
+    
+      <ProjectManagerDialog
+        open={showProjectManager}
+        activeProjectId={activeProjectId}
+        gitlabUser={gitlabUser}
+        onClose={() => setShowProjectManager(false)}
+        onSelectProject={handleSelectProject}
+        onDeleteProject={handleDeleteProject}
+      />
     </AppShell>
   );
 }

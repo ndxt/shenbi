@@ -11,6 +11,10 @@ import {
   Maximize,
   Minimize,
   Languages,
+  GitBranch,
+  LogOut,
+  ExternalLink,
+  FolderOpen,
 } from 'lucide-react';
 import {
   type SupportedLocale,
@@ -35,6 +39,20 @@ interface TitleBarProps {
   isMaximized: boolean;
   onToggleMaximize: () => void;
   onOpenCommandPalette?: () => void;
+  title?: string | undefined;
+  subtitle?: string | undefined;
+  userAvatarUrl?: string | undefined;
+  userName?: string | undefined;
+  /** List of branch names for the branch switcher */
+  branches?: string[] | undefined;
+  /** Called when user selects a different branch */
+  onBranchChange?: ((branch: string) => void) | undefined;
+  /** Called when user clicks logout */
+  onLogout?: (() => void) | undefined;
+  /** URL to open the project on GitLab */
+  gitlabUrl?: string | undefined;
+  /** Called when user clicks project name to open project manager */
+  onOpenProjectManager?: (() => void) | undefined;
 }
 
 export function TitleBar({ 
@@ -54,6 +72,15 @@ export function TitleBar({
   isMaximized,
   onToggleMaximize,
   onOpenCommandPalette,
+  title,
+  subtitle,
+  userAvatarUrl,
+  userName,
+  branches,
+  onBranchChange,
+  onLogout,
+  gitlabUrl,
+  onOpenProjectManager,
 }: TitleBarProps) {
   const { t } = useTranslation('editorUi');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -92,10 +119,34 @@ export function TitleBar({
         <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center">
           <Command size={14} className="text-white" />
         </div>
-        <span className="text-[13px] font-bold tracking-tight text-text-primary">Shenbi IDE</span>
-        <span className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary">
-          Editor UI Package
+        <span
+          className={`text-[13px] font-bold tracking-tight text-text-primary ${onOpenProjectManager ? 'cursor-pointer hover:text-blue-400 transition-colors' : ''}`}
+          onClick={onOpenProjectManager}
+          title={onOpenProjectManager ? '管理项目' : undefined}
+        >
+          <FolderOpen size={13} className="inline mr-1 opacity-60" />
+          {title ?? 'Shenbi IDE'}
         </span>
+        {branches && branches.length > 0 && onBranchChange ? (
+          <select
+            className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary bg-transparent cursor-pointer outline-none"
+            value={subtitle ?? ''}
+            onChange={(e) => onBranchChange(e.target.value)}
+          >
+            {branches.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary flex items-center gap-1">
+            {subtitle ? <><GitBranch size={10} /> {subtitle}</> : 'Editor UI Package'}
+          </span>
+        )}
+        {gitlabUrl && (
+          <a href={gitlabUrl} target="_blank" rel="noreferrer" className="text-text-secondary hover:text-text-primary transition-colors" title="在 GitLab 中打开">
+            <ExternalLink size={12} />
+          </a>
+        )}
       </div>
       
       <div className="flex-1 text-center text-[11px] text-text-secondary font-medium">
@@ -221,6 +272,21 @@ export function TitleBar({
           </div>
         )}
       </div>
+        {userAvatarUrl ? (
+          <div className="flex items-center gap-1.5 pl-2 border-l border-border-ide ml-1">
+            <img src={userAvatarUrl} alt="" className="w-5 h-5 rounded-full" />
+            {userName && <span className="text-[11px] text-text-secondary">{userName}</span>}
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="p-1 rounded transition-colors text-text-secondary hover:text-text-primary hover:bg-bg-panel"
+                title="退出登录"
+              >
+                <LogOut size={13} />
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   );

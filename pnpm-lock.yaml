@@ -78,6 +78,9 @@ importers:
       '@shenbi/editor-plugin-files':
         specifier: workspace:*
         version: link:../../packages/editor-plugins/files
+      '@shenbi/editor-plugin-gitlab-sync':
+        specifier: workspace:*
+        version: link:../../packages/editor-plugins/gitlab-sync
       '@shenbi/editor-ui':
         specifier: workspace:*
         version: link:../../packages/editor-ui
@@ -306,6 +309,43 @@ importers:
       jsdom:
         specifier: ^26.0.0
         version: 26.1.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@22.19.11)(jsdom@26.1.0)(vite@6.4.1(@types/node@22.19.11)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.0)(tsx@4.21.0))
+
+  packages/editor-plugins/gitlab-sync:
+    dependencies:
+      '@shenbi/editor-core':
+        specifier: workspace:*
+        version: link:../../editor-core
+      '@shenbi/editor-plugin-api':
+        specifier: workspace:*
+        version: link:../api
+      '@shenbi/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
+      lucide-react:
+        specifier: ^0.575.0
+        version: 0.575.0(react@19.2.4)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.11
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
