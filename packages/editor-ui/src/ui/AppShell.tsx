@@ -2379,25 +2379,44 @@ export function AppShell({
                         onEndDragSelected={clearCanvasDragState}
                         canvasScale={canvasScale}
                       />
-
-                      {/* Device Preview Bar — replaces old dimension label */}
-                      <DevicePreviewBar
-                        presets={DEVICE_PRESETS}
-                        activeDeviceId={activeDeviceId}
-                        stageWidth={stageWidth}
-                        stageMinHeight={STAGE_MIN_HEIGHT}
-                        scale={canvasViewportState.scale}
-                        showDeviceFrame={showDeviceFrame}
-                        hasFrame={Boolean(activeDevice.frame)}
-                        onSelectDevice={(id) => {
-                          setActiveDeviceId(id);
-                        }}
-                        onChangeWidth={setCustomStageWidth}
-                        onToggleFrame={() => setShowDeviceFrame((v) => !v)}
-                        onSelectScale={updateCanvasScalePreset}
-                        onFit={fitCanvasToViewport}
-                      />
                     </div>
+                      );
+                    })()}
+
+                    {/* Device Preview Bar — independently positioned above the full stage+frame */}
+                    {(() => {
+                      const framePadH = showDeviceFrame && activeDevice.frame
+                        ? (DEVICE_FRAME_PADDING[activeDevice.frame]?.[1] ?? 0) + (DEVICE_FRAME_PADDING[activeDevice.frame]?.[3] ?? 0)
+                        : 0;
+                      const totalVisualW = (stageWidth + framePadH) * canvasScale;
+                      return (
+                        <div
+                          className="absolute flex items-center justify-center"
+                          style={{
+                            left: `${canvasStageLeft}px`,
+                            top: `${CANVAS_WS_STAGE_TOP - 48}px`,
+                            width: `${totalVisualW}px`,
+                            pointerEvents: 'none',
+                            zIndex: 20,
+                          }}
+                        >
+                          <DevicePreviewBar
+                            presets={DEVICE_PRESETS}
+                            activeDeviceId={activeDeviceId}
+                            stageWidth={stageWidth}
+                            stageMinHeight={STAGE_MIN_HEIGHT}
+                            scale={canvasViewportState.scale}
+                            showDeviceFrame={showDeviceFrame}
+                            hasFrame={Boolean(activeDevice.frame)}
+                            onSelectDevice={(id) => {
+                              setActiveDeviceId(id);
+                            }}
+                            onChangeWidth={setCustomStageWidth}
+                            onToggleFrame={() => setShowDeviceFrame((v) => !v)}
+                            onSelectScale={updateCanvasScalePreset}
+                            onFit={fitCanvasToViewport}
+                          />
+                        </div>
                       );
                     })()}
                   </div>
@@ -2748,10 +2767,6 @@ function DevicePreviewBar({
   };
 
   return (
-    <div
-      className="absolute flex items-center justify-center"
-      style={{ left: 0, top: -48, width: '100%', pointerEvents: 'none' }}
-    >
       <div className="device-preview-bar">
         <div className="device-preview-bar__devices">
           {presets.map((preset) => {
@@ -2841,6 +2856,5 @@ function DevicePreviewBar({
           </>
         ) : null}
       </div>
-    </div>
   );
 }
