@@ -212,15 +212,32 @@ export function App() {
   const [fileExplorerFocusedId, setFileExplorerFocusedId] = useState<string | undefined>();
   const [shellSaveSources, setShellSaveSources] = useState<Record<string, 'manual' | 'auto'>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingMigrationRef = useRef<{ sourceProjectId: string; targetProjectId: string } | null>(null);
 
-  // Initialize VFS
+  // Initialize VFS (and migrate files from old project if needed)
   useEffect(() => {
     if (typeof indexedDB === 'undefined') {
       setShellSessionHydrated(true);
       return;
     }
     void vfs.initialize(activeProjectId)
-      .then(() => {
+      .then(async () => {
+        // Check for pending file migration (e.g. switching from 'default' to 'gitlab-123')
+        const migration = pendingMigrationRef.current;
+        if (migration && migration.targetProjectId === activeProjectId) {
+          pendingMigrationRef.current = null;
+          try {
+            const targetHasFiles = await vfs.hasFiles(migration.targetProjectId);
+            if (!targetHasFiles) {
+              const sourceHasFiles = await vfs.hasFiles(migration.sourceProjectId);
+              if (sourceHasFiles) {
+                await vfs.copyProject(migration.sourceProjectId, migration.targetProjectId);
+              }
+            }
+          } catch {
+            // Migration failed — not critical, continue
+          }
+        }
         setVfsInitialized(true);
       })
       .catch(() => {
@@ -258,17 +275,12 @@ export function App() {
     setActiveProjectConfig(updated);
   }, [activeProjectConfig]);
 
-  // Handle logout
+  // Handle logout — only clear GitLab session, keep project & files
   const handleLogout = useCallback(() => {
     fetch(`${import.meta.env.BASE_URL}api/gitlab/oauth/logout`, { method: 'POST', credentials: 'include' })
       .then(() => {
         setGitlabUser(null);
-        clearActiveProject();
-        clearLastGitLabProject();
-        setActiveProjectConfig(createLocalProjectConfig());
-        setLastGitLabProjectConfig(null);
-        setVfsInitialized(false);
-        setFsTree([]);
+        setGitlabBranches([]);
       })
       .catch(() => { /* ignore */ });
   }, []);
@@ -286,15 +298,21 @@ export function App() {
   }, []);
 
   const handleSelectGitLabProject = useCallback((project: GitLabProject) => {
+    const oldProjectId = activeProjectId;
+    const newProjectId = `gitlab-${project.id}`;
+    // Schedule migration if switching from a different project
+    if (oldProjectId !== newProjectId) {
+      pendingMigrationRef.current = { sourceProjectId: oldProjectId, targetProjectId: newProjectId };
+    }
     handleSelectProject({
       gitlabProjectId: project.id,
-      vfsProjectId: `gitlab-${project.id}`,
+      vfsProjectId: newProjectId,
       projectName: project.name,
       branch: project.default_branch || 'main',
       lastOpenedAt: Date.now(),
       gitlabUrl: project.web_url,
     });
-  }, [handleSelectProject]);
+  }, [handleSelectProject, activeProjectId]);
 
   const {
     activeScenarioSnapshot,

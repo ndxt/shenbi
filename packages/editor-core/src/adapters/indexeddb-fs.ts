@@ -566,4 +566,84 @@ export class IndexedDBFileSystemAdapter implements VirtualFileSystemAdapter {
       store.put(desc);
     }
   }
+
+  // ── Project-level utilities ──
+
+  /**
+   * Check whether a project VFS has any files/directories.
+   */
+  async hasFiles(projectId: string): Promise<boolean> {
+    const db = await this.getDB(projectId);
+    return tx<boolean>(db, 'fs_nodes', 'readonly', (transaction) => {
+      const store = transaction.objectStore('fs_nodes');
+      const countReq = store.count();
+      return new Promise<boolean>((resolve, reject) => {
+        countReq.onsuccess = () => resolve(countReq.result > 0);
+        countReq.onerror = () => reject(countReq.error);
+      });
+    });
+  }
+
+  /**
+   * Copy all nodes and file contents from one project VFS to another.
+   * Generates new IDs for all nodes and remaps parent references.
+   * Skips if the target project already has files.
+   */
+  async copyProject(sourceProjectId: string, targetProjectId: string): Promise<void> {
+    // Read all nodes and content from source
+    const sourceDb = await this.getDB(sourceProjectId);
+
+    const allNodes = await tx<FSNodeMetadata[]>(sourceDb, 'fs_nodes', 'readonly', (transaction) => {
+      return getAll<FSNodeMetadata>(transaction.objectStore('fs_nodes'));
+    });
+
+    if (allNodes.length === 0) return;
+
+    const allContent = await tx<{ fileId: string; content: FileContent }[]>(
+      sourceDb, 'fs_content', 'readonly', (transaction) => {
+        return getAll<{ fileId: string; content: FileContent }>(transaction.objectStore('fs_content'));
+      },
+    );
+
+    // Build old-ID → new-ID mapping
+    const idMap = new Map<string, string>();
+    for (const node of allNodes) {
+      idMap.set(node.id, generateId());
+    }
+
+    // Build content lookup
+    const contentMap = new Map<string, FileContent>();
+    for (const c of allContent) {
+      contentMap.set(c.fileId, c.content);
+    }
+
+    // Write to target
+    const targetDb = await this.getDB(targetProjectId);
+
+    await tx<void>(targetDb, ['fs_nodes', 'fs_content'], 'readwrite', (transaction) => {
+      const nodeStore = transaction.objectStore('fs_nodes');
+      const contentStore = transaction.objectStore('fs_content');
+
+      for (const node of allNodes) {
+        const newId = idMap.get(node.id)!;
+        const newParentId = node.parentId ? (idMap.get(node.parentId) ?? null) : null;
+        const newNode: FSNodeMetadata = {
+          ...node,
+          id: newId,
+          parentId: newParentId,
+        };
+        nodeStore.put(newNode);
+
+        // Copy file content if exists
+        const content = contentMap.get(node.id);
+        if (content) {
+          contentStore.put({ fileId: newId, content });
+        }
+      }
+
+      return new Promise<void>((resolve) => {
+        transaction.oncomplete = () => resolve();
+      });
+    });
+  }
 }
