@@ -154,10 +154,6 @@ const THEME_CLASSES = [
 
 const STAGE_WIDTH = 1200;
 const STAGE_MIN_HEIGHT = 800;
-const CANVAS_WORKSPACE_WIDTH = 6000;
-const CANVAS_WORKSPACE_HEIGHT = 4000;
-const CANVAS_STAGE_LEFT = Math.round((CANVAS_WORKSPACE_WIDTH - STAGE_WIDTH) / 2);
-const CANVAS_STAGE_TOP = 320;
 const MIN_CANVAS_SCALE = 0.25;
 const MAX_CANVAS_SCALE = 2;
 const CANVAS_ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
@@ -284,6 +280,8 @@ export function AppShell({
   const [canvasScale, setCanvasScale] = React.useState(1);
   const canvasScaleRef = React.useRef(1);
   canvasScaleRef.current = canvasScale;
+  const [stageContentHeight, setStageContentHeight] = React.useState(STAGE_MIN_HEIGHT);
+  const stageContentHeightRef = React.useRef(STAGE_MIN_HEIGHT);
   const [activeCanvasTool, setActiveCanvasTool] = React.useState<CanvasToolMode>('select');
   const [canvasViewportState, setCanvasViewportState] = React.useState<CanvasViewportState>({
     scale: 1,
@@ -402,6 +400,21 @@ export function AppShell({
     startResize: startConsoleResize,
     setSize: setConsoleSize,
   } = useResize(192, 100, 800);
+  // ---------- Infinite canvas: large static workspace ----------
+  // Use a generously-sized workspace so the user can pan far in every direction.
+  // Height grows dynamically only when content is very tall.
+  const CANVAS_WS_BASE = 20000;  // base workspace dimension
+  const CANVAS_WS_STAGE_TOP = 5000;  // stage Y offset inside workspace (lots of room above)
+
+  const canvasWorkspaceWidth = CANVAS_WS_BASE;
+  const canvasStageLeft = Math.round((CANVAS_WS_BASE - STAGE_WIDTH * canvasScale) / 2);
+
+  const canvasWorkspaceHeight = React.useMemo(() => {
+    const stageVisualBottom = CANVAS_WS_STAGE_TOP
+      + Math.max(stageContentHeight, STAGE_MIN_HEIGHT) * canvasScale;
+    // Ensure at least 5000px of scroll space below the stage bottom
+    return Math.max(CANVAS_WS_BASE, stageVisualBottom + 5000);
+  }, [canvasScale, stageContentHeight]);
   const syncCanvasViewportState = React.useCallback(() => {
     const element = canvasScrollRef.current;
     if (!element) {
@@ -463,14 +476,16 @@ export function AppShell({
       return;
     }
     const scaledWidth = STAGE_WIDTH * nextScale;
-    const scaledHeight = STAGE_MIN_HEIGHT * nextScale;
+    const stageHeight = Math.max(stageContentHeightRef.current, STAGE_MIN_HEIGHT);
+    const scaledHeight = stageHeight * nextScale;
+    const wsStageLeft = Math.round((CANVAS_WS_BASE - scaledWidth) / 2);
     const nextScrollLeft = Math.max(
       0,
-      CANVAS_STAGE_LEFT + scaledWidth / 2 - element.clientWidth / 2,
+      wsStageLeft + scaledWidth / 2 - element.clientWidth / 2,
     );
     const nextScrollTop = Math.max(
       0,
-      CANVAS_STAGE_TOP + scaledHeight / 2 - element.clientHeight / 2,
+      CANVAS_WS_STAGE_TOP + scaledHeight / 2 - element.clientHeight / 2,
     );
     element.scrollLeft = nextScrollLeft;
     element.scrollTop = nextScrollTop;
@@ -511,16 +526,19 @@ export function AppShell({
     const viewportRect = element.getBoundingClientRect();
     const pointerX = anchor.clientX - viewportRect.left;
     const pointerY = anchor.clientY - viewportRect.top;
-    const stageRelativeX = element.scrollLeft + pointerX - CANVAS_STAGE_LEFT;
-    const stageRelativeY = element.scrollTop + pointerY - CANVAS_STAGE_TOP;
+    const stageRelativeX = element.scrollLeft + pointerX - canvasStageLeft;
+    const stageRelativeY = element.scrollTop + pointerY - CANVAS_WS_STAGE_TOP;
     const scaledX = (stageRelativeX / previousScale) * nextScale;
     const scaledY = (stageRelativeY / previousScale) * nextScale;
 
     canvasScaleRef.current = nextScale;
     setCanvasScale(nextScale);
     canvasScaleRafRef.current = requestAnimationFrame(() => {
-      const nextScrollLeft = CANVAS_STAGE_LEFT + scaledX - pointerX;
-      const nextScrollTop = CANVAS_STAGE_TOP + scaledY - pointerY;
+      const nextStageCenterX = Math.round(
+        (CANVAS_WS_BASE - STAGE_WIDTH * nextScale) / 2,
+      );
+      const nextScrollLeft = nextStageCenterX + scaledX - pointerX;
+      const nextScrollTop = CANVAS_WS_STAGE_TOP + scaledY - pointerY;
       element.scrollLeft = Math.max(0, nextScrollLeft);
       element.scrollTop = Math.max(0, nextScrollTop);
       setCanvasViewportState({
@@ -530,7 +548,7 @@ export function AppShell({
       });
       canvasScaleRafRef.current = null;
     });
-  }, [centerCanvasOnStage]);
+  }, [canvasStageLeft, centerCanvasOnStage]);
 
   const zoomCanvasIn = React.useCallback(() => {
     updateCanvasScale(canvasScale + 0.1);
@@ -576,8 +594,8 @@ export function AppShell({
     }
 
     const rect = canvasSurface.getRelativeRect(selectedElement);
-    const nextScrollLeft = CANVAS_STAGE_LEFT + (rect.left + rect.width / 2) * canvasScale - element.clientWidth / 2;
-    const nextScrollTop = CANVAS_STAGE_TOP + (rect.top + rect.height / 2) * canvasScale - element.clientHeight / 2;
+    const nextScrollLeft = canvasStageLeft + (rect.left + rect.width / 2) * canvasScale - element.clientWidth / 2;
+    const nextScrollTop = CANVAS_WS_STAGE_TOP + (rect.top + rect.height / 2) * canvasScale - element.clientHeight / 2;
     element.scrollLeft = Math.max(0, nextScrollLeft);
     element.scrollTop = Math.max(0, nextScrollTop);
     syncCanvasViewportState();
@@ -1275,13 +1293,20 @@ export function AppShell({
       void runCommand(shortcut.commandId);
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    const hostDocument = document;
+    const frameDocument = canvasSurface?.ownerDocument && canvasSurface.ownerDocument !== hostDocument
+      ? canvasSurface.ownerDocument
+      : null;
+    hostDocument.addEventListener('keydown', handleKeyDown);
+    frameDocument?.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      hostDocument.removeEventListener('keydown', handleKeyDown);
+      frameDocument?.removeEventListener('keydown', handleKeyDown);
     };
   }, [
     allShortcuts,
     activeCanvasTool,
+    canvasSurface,
     pluginContext?.selection,
     resolveCommandState,
     runCommand,
@@ -1314,12 +1339,14 @@ export function AppShell({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code === 'Space' && !event.repeat) {
+      if (event.code === 'Space') {
         if (!shouldHandleCanvasSpace(event.target)) {
           return;
         }
         event.preventDefault();
-        spacePressedRef.current = true;
+        if (!event.repeat) {
+          spacePressedRef.current = true;
+        }
       }
     };
     const handleKeyUp = (event: KeyboardEvent) => {
@@ -1391,6 +1418,29 @@ export function AppShell({
       element.removeEventListener('scroll', handleScroll);
     };
   }, [syncCanvasViewportState]);
+
+  // Track actual stage content height for dynamic workspace sizing
+  React.useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) {
+      return;
+    }
+    const sync = () => {
+      const measured = stage.scrollHeight;
+      if (measured !== stageContentHeightRef.current) {
+        stageContentHeightRef.current = measured;
+        setStageContentHeight(measured);
+      }
+    };
+    sync();
+    const observer = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => { sync(); })
+      : null;
+    observer?.observe(stage);
+    return () => {
+      observer?.disconnect();
+    };
+  }, [canvasSurface]);
 
   const handleActivitySelectItem = (item: ActivityBarItemContribution) => {
     activityBarProps?.onSelectItem?.(item);
@@ -1641,7 +1691,7 @@ export function AppShell({
     if (!shouldStartCanvasPan(event.button)) {
       return;
     }
-    if (!startCanvasPan(event.pointerId, event.clientX, event.clientY)) {
+    if (!startCanvasPan(event.pointerId, event.screenX, event.screenY)) {
       return;
     }
     event.preventDefault();
@@ -1649,7 +1699,7 @@ export function AppShell({
   }, [shouldStartCanvasPan, startCanvasPan]);
 
   const handleCanvasPointerMove = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
-    moveCanvasPan(event.pointerId, event.clientX, event.clientY);
+    moveCanvasPan(event.pointerId, event.screenX, event.screenY);
   }, [moveCanvasPan]);
 
   const handleCanvasPointerUp = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
@@ -1664,24 +1714,26 @@ export function AppShell({
     }
     const rootElement = canvasSurface.rootElement;
 
+    // Use screenX/Y for pan coordinates — they are absolute and never
+    // shift when the iframe element moves during outer-container scroll.
     const handlePointerDown = (event: PointerEvent) => {
       if (!shouldStartCanvasPan(event.button)) {
         return;
       }
-      if (!startCanvasPan(event.pointerId, event.clientX, event.clientY)) {
+      if (!startCanvasPan(event.pointerId, event.screenX, event.screenY)) {
         return;
       }
       event.preventDefault();
-      rootElement.setPointerCapture?.(event.pointerId);
+      rootElement.setPointerCapture(event.pointerId);
     };
     const handlePointerMove = (event: PointerEvent) => {
-      moveCanvasPan(event.pointerId, event.clientX, event.clientY);
+      moveCanvasPan(event.pointerId, event.screenX, event.screenY);
     };
     const handlePointerUp = (event: PointerEvent) => {
       if (!endCanvasPan(event.pointerId)) {
         return;
       }
-      rootElement.releasePointerCapture?.(event.pointerId);
+      try { rootElement.releasePointerCapture(event.pointerId); } catch { /* noop */ }
     };
 
     rootElement.addEventListener('pointerdown', handlePointerDown, true);
@@ -1716,8 +1768,18 @@ export function AppShell({
     }
 
     const ownerDocument = canvasSurface.ownerDocument;
+    const frameElement = canvasSurface.hostElement as HTMLIFrameElement;
     const handleWheel = (event: WheelEvent) => {
-      handleCanvasWheelEvent(event);
+      const frameRect = frameElement.getBoundingClientRect();
+      handleCanvasWheelEvent({
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        deltaY: event.deltaY,
+        clientX: frameRect.left + event.clientX,
+        clientY: frameRect.top + event.clientY,
+        preventDefault: () => event.preventDefault(),
+        stopPropagation: () => event.stopPropagation(),
+      });
     };
 
     ownerDocument.addEventListener('wheel', handleWheel, { passive: false, capture: true });
@@ -1780,7 +1842,7 @@ export function AppShell({
         top: 0,
         left: 0,
         width: STAGE_WIDTH,
-        height: STAGE_MIN_HEIGHT,
+        height: Math.max(stageContentHeightRef.current, STAGE_MIN_HEIGHT),
         variant: 'frame',
       };
     }
@@ -2156,18 +2218,18 @@ export function AppShell({
                   <div
                     className="relative"
                     style={{
-                      width: `${CANVAS_WORKSPACE_WIDTH}px`,
-                      height: `${CANVAS_WORKSPACE_HEIGHT}px`,
-                      minWidth: `${CANVAS_WORKSPACE_WIDTH}px`,
-                      minHeight: `${CANVAS_WORKSPACE_HEIGHT}px`,
+                      width: `${canvasWorkspaceWidth}px`,
+                      height: `${canvasWorkspaceHeight}px`,
+                      minWidth: `${canvasWorkspaceWidth}px`,
+                      minHeight: `${canvasWorkspaceHeight}px`,
                     }}
                   >
                     <div
                       ref={stageRef}
                       className="absolute"
                       style={{
-                        left: `${CANVAS_STAGE_LEFT}px`,
-                        top: `${CANVAS_STAGE_TOP}px`,
+                        left: `${canvasStageLeft}px`,
+                        top: `${CANVAS_WS_STAGE_TOP}px`,
                         width: `${STAGE_WIDTH}px`,
                         minHeight: `${STAGE_MIN_HEIGHT}px`,
                         transform: `translate3d(0, 0, 0) scale(${canvasScale})`,

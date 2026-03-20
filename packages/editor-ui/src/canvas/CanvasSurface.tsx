@@ -275,10 +275,17 @@ function IframeCanvasSurface({
 
     sync();
 
+    let styleSyncRaf = 0;
+    const scheduleStyleSync = () => {
+      if (styleSyncRaf) { return; }
+      styleSyncRaf = requestAnimationFrame(() => {
+        styleSyncRaf = 0;
+        sync();
+      });
+    };
+
     const sourceHeadObserver = typeof MutationObserver === 'function'
-      ? new MutationObserver(() => {
-          sync();
-        })
+      ? new MutationObserver(scheduleStyleSync)
       : null;
     sourceHeadObserver?.observe(document.head, {
       childList: true,
@@ -288,9 +295,7 @@ function IframeCanvasSurface({
     });
 
     const sourceRootObserver = typeof MutationObserver === 'function'
-      ? new MutationObserver(() => {
-          sync();
-        })
+      ? new MutationObserver(scheduleStyleSync)
       : null;
     sourceRootObserver?.observe(document.documentElement, {
       attributes: true,
@@ -298,6 +303,7 @@ function IframeCanvasSurface({
     });
 
     return () => {
+      if (styleSyncRaf) { cancelAnimationFrame(styleSyncRaf); }
       sourceHeadObserver?.disconnect();
       sourceRootObserver?.disconnect();
     };
@@ -315,10 +321,17 @@ function IframeCanvasSurface({
     syncHeightRef.current = sync;
     sync();
 
+    let heightSyncRaf = 0;
+    const scheduleHeightSync = () => {
+      if (heightSyncRaf) { return; }
+      heightSyncRaf = requestAnimationFrame(() => {
+        heightSyncRaf = 0;
+        sync();
+      });
+    };
+
     const resizeObserver = typeof ResizeObserver === 'function'
-      ? new ResizeObserver(() => {
-          sync();
-        })
+      ? new ResizeObserver(scheduleHeightSync)
       : null;
     resizeObserver?.observe(portalRoot);
     const pageRoot = iframeElement.contentDocument?.querySelector('[data-shenbi-page-root]');
@@ -327,9 +340,7 @@ function IframeCanvasSurface({
     }
 
     const mutationObserver = typeof MutationObserver === 'function'
-      ? new MutationObserver(() => {
-          sync();
-        })
+      ? new MutationObserver(scheduleHeightSync)
       : null;
     mutationObserver?.observe(portalRoot, {
       childList: true,
@@ -346,6 +357,7 @@ function IframeCanvasSurface({
 
     return () => {
       syncHeightRef.current = null;
+      if (heightSyncRaf) { cancelAnimationFrame(heightSyncRaf); }
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
       window.removeEventListener('resize', handleWindowResize);
@@ -354,11 +366,8 @@ function IframeCanvasSurface({
   }, [iframeElement, portalRoot]);
 
   React.useEffect(() => {
-    if (iframeElement?.contentDocument) {
-      syncIframeStyles(iframeElement.contentDocument, themeClassName);
-    }
     syncHeightRef.current?.();
-  }, [children, iframeElement, themeClassName]);
+  }, [children, iframeElement]);
 
   return (
     <div
