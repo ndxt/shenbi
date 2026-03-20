@@ -230,7 +230,6 @@ body {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(18px);
   pointer-events: auto;
-  overflow: hidden;
 }
 
 .canvas-zoom-hud__controls {
@@ -302,6 +301,7 @@ body {
   margin: 0;
   background: rgba(255, 255, 255, 0.03);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 13px 13px 0 0;
   overflow: hidden;
   cursor: pointer;
 }

@@ -30,6 +30,8 @@ export interface SelectionOverlayProps {
   dragSelectedEnabled?: boolean;
   onStartDragSelected?: (event: React.DragEvent<HTMLDivElement>) => void;
   onEndDragSelected?: () => void;
+  /** 当前画布缩放比例，用于反向缩放使选框始终100%显示 */
+  canvasScale?: number;
 }
 
 interface OverlayRect {
@@ -87,6 +89,7 @@ export function SelectionOverlay({
   dragSelectedEnabled = false,
   onStartDragSelected,
   onEndDragSelected,
+  canvasScale = 1,
 }: SelectionOverlayProps) {
   const [hoverRect, setHoverRect] = React.useState<OverlayRect>(EMPTY_RECT);
   const [hoverComponentType, setHoverComponentType] = React.useState('');
@@ -288,17 +291,40 @@ export function SelectionOverlay({
   const showSelected = !isRectEmpty(selectedRect);
   const visibleActions = actions?.filter((action) => action) ?? [];
 
+  // Counter-scale factor: undo the parent stage's transform: scale(canvasScale)
+  const inverseScale = 1 / canvasScale;
+
+  // Scale rect positions: the overlay counter-scales the parent, so content-space
+  // coordinates need to be multiplied by canvasScale to stay correctly positioned.
+  const scaleRect = (r: OverlayRect): OverlayRect => ({
+    top: r.top * canvasScale,
+    left: r.left * canvasScale,
+    width: r.width * canvasScale,
+    height: r.height * canvasScale,
+  });
+  const scaledHoverRect = scaleRect(effectiveHoverRect);
+  const scaledSelectedRect = scaleRect(selectedRect);
+
   return (
-    <div className="selection-overlay" {...(visibleActions.length === 0 ? { 'aria-hidden': true } : {})}>
+    <div
+      className="selection-overlay"
+      style={{
+        transform: `scale(${inverseScale})`,
+        transformOrigin: 'top left',
+        width: `${canvasScale * 100}%`,
+        height: `${canvasScale * 100}%`,
+      }}
+      {...(visibleActions.length === 0 ? { 'aria-hidden': true } : {})}
+    >
       {/* Hover 框 */}
       {showHover && (
         <div
           className="selection-overlay__hover"
           style={{
-            top: effectiveHoverRect.top,
-            left: effectiveHoverRect.left,
-            width: effectiveHoverRect.width,
-            height: effectiveHoverRect.height,
+            top: scaledHoverRect.top,
+            left: scaledHoverRect.left,
+            width: scaledHoverRect.width,
+            height: scaledHoverRect.height,
           }}
         >
           {effectiveHoverComponentType && (
@@ -314,10 +340,10 @@ export function SelectionOverlay({
         <div
           className="selection-overlay__selected"
           style={{
-            top: selectedRect.top,
-            left: selectedRect.left,
-            width: selectedRect.width,
-            height: selectedRect.height,
+            top: scaledSelectedRect.top,
+            left: scaledSelectedRect.left,
+            width: scaledSelectedRect.width,
+            height: scaledSelectedRect.height,
           }}
         >
           {(selectedComponentType || visibleActions.length > 0) && (

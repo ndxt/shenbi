@@ -2279,6 +2279,7 @@ export function AppShell({
                           dragSelectedEnabled={!canvasReadOnly && activeCanvasTool !== 'pan' && Boolean(selectedNodeTreeId)}
                           onStartDragSelected={handleSelectedDragStart}
                           onEndDragSelected={clearCanvasDragState}
+                          canvasScale={canvasScale}
                         />
                         {canvasDropIndicator ? (
                           <div
@@ -2296,8 +2297,15 @@ export function AppShell({
                         ) : null}
                       </div>
 
-                      {/* Viewport Meta Info (Figma Style) */}
-                      <div className="absolute -top-6 left-0 text-[10px] text-text-secondary font-mono flex gap-3">
+                      {/* Viewport Meta Info (Figma Style) — counter-scaled to stay at 100% */}
+                      <div
+                        className="absolute left-0 text-[10px] text-text-secondary font-mono flex gap-3"
+                        style={{
+                          top: -24 / canvasScale,
+                          transform: `scale(${1 / canvasScale})`,
+                          transformOrigin: 'bottom left',
+                        }}
+                      >
                         <span>{STAGE_WIDTH} x {STAGE_MIN_HEIGHT}</span>
                         <span>{Math.round(canvasViewportState.scale * 100)}%</span>
                       </div>
