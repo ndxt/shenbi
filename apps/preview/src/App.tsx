@@ -58,6 +58,7 @@ import { createAIChatPlugin } from '@shenbi/editor-plugin-ai-chat';
 import { createFilesPlugin, useFileWorkspace, FileExplorer } from '@shenbi/editor-plugin-files';
 import { createSetterPlugin } from '@shenbi/editor-plugin-setter';
 import { createGitLabSyncPlugin } from '@shenbi/editor-plugin-gitlab-sync';
+import type { GitLabProject } from '@shenbi/editor-plugin-gitlab-sync';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
 
 type ScenarioKey =
@@ -260,6 +261,25 @@ export function App() {
       })
       .catch(() => { /* ignore */ });
   }, []);
+
+  const handleSelectProject = useCallback((config: ActiveProjectConfig) => {
+    saveActiveProject(config);
+    setActiveProjectConfig(config);
+    // Reset editor state for new project
+    setVfsInitialized(false);
+    setFsTree([]);
+  }, []);
+
+  const handleSelectGitLabProject = useCallback((project: GitLabProject) => {
+    handleSelectProject({
+      gitlabProjectId: project.id,
+      vfsProjectId: `gitlab-${project.id}`,
+      projectName: project.name,
+      branch: project.default_branch || 'main',
+      lastOpenedAt: Date.now(),
+      gitlabUrl: project.web_url,
+    });
+  }, [handleSelectProject]);
 
   const {
     activeScenarioSnapshot,
@@ -1071,6 +1091,9 @@ export function App() {
 
       // GitLab Sync plugin
       registeredPlugins.push(createGitLabSyncPlugin({
+        activeProjectId: activeProjectConfig?.gitlabProjectId,
+        activeBranch: activeProjectConfig?.branch,
+        onSelectProject: handleSelectGitLabProject,
         getLocalFiles: async () => {
           const nodes = await vfs.listTree(activeProjectId);
           const files = new Map<string, string>();
@@ -1229,16 +1252,17 @@ export function App() {
         activeScenario,
       )
       .catch(() => undefined);
-  }, [activeScenario, scenarioPersistenceHydrated, workspacePersistence]);
-
-  // ── Project selection handler ──
-  const handleSelectProject = useCallback((config: ActiveProjectConfig) => {
-    saveActiveProject(config);
-    setActiveProjectConfig(config);
-    // Reset editor state for new project
-    setVfsInitialized(false);
-    setFsTree([]);
-  }, []);
+  }, [
+    activeProjectConfig?.branch,
+    activeProjectConfig?.gitlabProjectId,
+    activeProjectId,
+    activeScenario,
+    handleSelectGitLabProject,
+    refreshFsTreeRef,
+    scenarioPersistenceHydrated,
+    vfs,
+    workspacePersistence,
+  ]);
 
   const handleBackToProjects = useCallback(() => {
     clearActiveProject();

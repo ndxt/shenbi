@@ -109,7 +109,11 @@ export function createGitLabRoute(config: GitLabOAuthConfig): Hono {
     const groupId = c.req.param('groupId');
     const search = c.req.query('search') || undefined;
     const opts = { instanceUrl: session.instanceUrl, accessToken: session.accessToken };
-    const projects = await gitlab.listGroupProjects(opts, groupId, { search });
+    const projects = await gitlab.listGroupProjects(
+      opts,
+      groupId,
+      search ? { search } : {},
+    );
     return c.json(projects);
   });
 
@@ -152,7 +156,11 @@ export function createGitLabRoute(config: GitLabOAuthConfig): Hono {
     const path = c.req.query('path') || undefined;
     const recursive = c.req.query('recursive') === 'true';
     const opts = { instanceUrl: session.instanceUrl, accessToken: session.accessToken };
-    const tree = await gitlab.getTree(opts, projectId, { path, ref, recursive });
+    const tree = await gitlab.getTree(opts, projectId, {
+      ...(path ? { path } : {}),
+      ...(ref ? { ref } : {}),
+      ...(recursive ? { recursive } : {}),
+    });
     return c.json(tree);
   });
 

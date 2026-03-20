@@ -43,6 +43,9 @@ import type { FileDiffItem } from './diff-utils';
 // ---------------------------------------------------------------------------
 
 export interface GitLabSyncPanelProps {
+  activeProjectId?: number | undefined;
+  activeBranch?: string | undefined;
+  onSelectProject?: ((project: client.GitLabProject) => void) | undefined;
   getLocalFiles: () => Promise<Map<string, string>>;
   writeLocalFile: (path: string, content: string) => Promise<void>;
   deleteLocalFile: (path: string) => Promise<void>;
@@ -211,6 +214,9 @@ const S = {
 // ---------------------------------------------------------------------------
 
 export function GitLabSyncPanel({
+  activeProjectId,
+  activeBranch,
+  onSelectProject,
   getLocalFiles,
   writeLocalFile,
   deleteLocalFile,
@@ -227,36 +233,47 @@ export function GitLabSyncPanel({
   const [commitMessage, setCommitMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
-  const [branches, setBranches] = useState<client.GitLabBranch[]>([]);
   const [changesExpanded, setChangesExpanded] = useState(true);
   const localFilesRef = useRef<Map<string, string>>(new Map());
+  const autoRefreshedRef = useRef<string>('');
 
   // ── Initialize ──
   useEffect(() => {
+    let cancelled = false;
+
     client.getAuthStatus()
       .then((status) => {
+        if (cancelled) return;
         if (status.authenticated && status.user) {
-          const saved = localStorage.getItem('gitlab_sync_config');
-          if (saved) {
-            try {
-              const config = JSON.parse(saved) as { projectId?: number; branch?: string };
-              if (config.projectId) {
-                client.getProject(config.projectId).then((project) => {
-                  setState({ kind: 'synced', user: status.user!, project, branch: config.branch ?? project.default_branch });
-                }).catch(() => {
-                  setState({ kind: 'project-picker', user: status.user!, groupId: status.defaultGroupId ?? 0 });
-                });
-                return;
-              }
-            } catch { /* ignore */ }
+          const user = status.user;
+          if (activeProjectId) {
+            client.getProject(activeProjectId).then((project) => {
+              if (cancelled) return;
+              setDiffs([]);
+              setSelectedPaths(new Set());
+              autoRefreshedRef.current = '';
+              setState({
+                kind: 'synced',
+                user,
+                project,
+                branch: activeBranch ?? (project.default_branch || 'main'),
+              });
+            }).catch(() => {
+              if (cancelled) return;
+              setState({ kind: 'project-picker', user, groupId: status.defaultGroupId ?? 0 });
+            });
+            return;
           }
-          setState({ kind: 'project-picker', user: status.user, groupId: status.defaultGroupId ?? 0 });
+          setState({ kind: 'project-picker', user, groupId: status.defaultGroupId ?? 0 });
         } else {
           setState({ kind: 'not-logged-in' });
         }
       })
       .catch(() => setState({ kind: 'not-logged-in' }));
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBranch, activeProjectId]);
 
   // ── Load projects ──
   useEffect(() => {
@@ -267,14 +284,6 @@ export function GitLabSyncPanel({
       .catch(() => setProjects([]));
   }, [state.kind, state.kind === 'project-picker' ? state.groupId : 0, projectSearch]);
 
-  // ── Load branches ──
-  useEffect(() => {
-    if (state.kind !== 'synced') return;
-    client.listBranches(state.project.id)
-      .then(setBranches)
-      .catch(() => setBranches([]));
-  }, [state.kind, state.kind === 'synced' ? state.project.id : 0]);
-
   // ── Login / Logout ──
   const handleLogin = useCallback(() => {
     window.location.href = client.getLoginUrl(instanceUrl || undefined);
@@ -282,7 +291,6 @@ export function GitLabSyncPanel({
 
   const handleLogout = useCallback(() => {
     client.logout().then(() => {
-      localStorage.removeItem('gitlab_sync_config');
       setState({ kind: 'not-logged-in' });
     });
   }, []);
@@ -291,9 +299,9 @@ export function GitLabSyncPanel({
   const handleSelectProject = useCallback((project: client.GitLabProject) => {
     if (state.kind !== 'project-picker') return;
     const branch = project.default_branch || 'main';
-    localStorage.setItem('gitlab_sync_config', JSON.stringify({ projectId: project.id, branch }));
+    onSelectProject?.(project);
     setState({ kind: 'synced', user: state.user, project, branch });
-  }, [state]);
+  }, [onSelectProject, state]);
 
   const handleCreateProject = useCallback(async () => {
     if (state.kind !== 'project-picker' || !newProjectName.trim()) return;
@@ -334,7 +342,6 @@ export function GitLabSyncPanel({
   }, [state, getLocalFiles]);
 
   // ── Auto-refresh ──
-  const autoRefreshedRef = useRef<string>('');
   useEffect(() => {
     if (state.kind !== 'synced') return;
     const key = `${state.project.id}:${state.branch}`;
@@ -379,14 +386,15 @@ export function GitLabSyncPanel({
       const localShas = await computeLocalShas(localFiles);
       const remoteTree = await client.getTree(state.project.id, state.branch);
       const remoteBlobs = remoteTree.filter((item) => item.type === 'blob');
+      const remotePaths = new Set(remoteBlobs.map((blob) => blob.path));
       const toDownload = remoteBlobs.filter((blob) => {
         const localSha = localShas.get(blob.path);
         return !localSha || localSha !== blob.id;
       });
-      if (toDownload.length === 0) {
+      const toDelete = [...localShas.keys()].filter((path) => !remotePaths.has(path));
+      if (toDownload.length === 0 && toDelete.length === 0) {
         setStatusMsg('✓ 已是最新');
         setDiffs([]);
-        setIsBusy(false);
         return;
       }
       const downloadTasks = toDownload.map((blob) => async () => {
@@ -394,19 +402,31 @@ export function GitLabSyncPanel({
         await writeLocalFile(blob.path, decodeBase64(file.content));
         return blob.path;
       });
-      await runWithConcurrency(downloadTasks, 5, (completed, total) => {
-        setStatusMsg(`拉取 ${completed}/${total}`);
+      const deleteTasks = toDelete.map((path) => async () => {
+        await deleteLocalFile(path);
+        return path;
       });
+      const totalTasks = downloadTasks.length + deleteTasks.length;
+      if (downloadTasks.length > 0) {
+        await runWithConcurrency(downloadTasks, 5, (completed, total) => {
+          setStatusMsg(`拉取 ${completed}/${totalTasks || total}`);
+        });
+      }
+      if (deleteTasks.length > 0) {
+        await runWithConcurrency(deleteTasks, 5, (completed, total) => {
+          setStatusMsg(`拉取 ${downloadTasks.length + completed}/${totalTasks || total}`);
+        });
+      }
       saveShaCache(state.project.id, state.branch, remoteTree);
       refreshFileTree();
-      setStatusMsg(`✓ 已更新 ${toDownload.length} 个文件`);
+      setStatusMsg(`✓ 已同步 ${toDownload.length} 个更新，删除 ${toDelete.length} 个文件`);
       setDiffs([]);
     } catch (err) {
       setStatusMsg(err instanceof Error ? err.message : 'Pull failed');
     } finally {
       setIsBusy(false);
     }
-  }, [state, getLocalFiles, writeLocalFile, refreshFileTree]);
+  }, [state, deleteLocalFile, getLocalFiles, refreshFileTree, writeLocalFile]);
 
   // ── Toggles ──
   const togglePath = useCallback((path: string) => {
@@ -432,15 +452,6 @@ export function GitLabSyncPanel({
         setState({ kind: 'project-picker', user: status.user, groupId: status.defaultGroupId ?? 0 });
       }
     });
-  }, [state]);
-
-  const handleBranchChange = useCallback((branch: string) => {
-    if (state.kind !== 'synced') return;
-    setState({ ...state, branch });
-    setDiffs([]);
-    setSelectedPaths(new Set());
-    autoRefreshedRef.current = '';
-    localStorage.setItem('gitlab_sync_config', JSON.stringify({ projectId: state.project.id, branch }));
   }, [state]);
 
   // ────────────────────────── RENDER ──────────────────────────
