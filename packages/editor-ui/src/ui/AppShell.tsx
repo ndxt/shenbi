@@ -2349,17 +2349,24 @@ export function AppShell({
 
                     {/* Selection overlay — rendered OUTSIDE the scaled stage at native 1x.
                         Positions are computed in canvas-space (rect * canvasScale). */}
-                    <div
-                      className="absolute"
-                      style={{
-                        left: `${canvasStageLeft}px`,
-                        top: `${CANVAS_WS_STAGE_TOP}px`,
-                        width: `${stageWidth * canvasScale}px`,
-                        height: `${Math.max(stageContentHeight, STAGE_MIN_HEIGHT) * canvasScale}px`,
-                        pointerEvents: 'none',
-                        zIndex: 20,
-                      }}
-                    >
+                    {(() => {
+                      const framePad = showDeviceFrame && activeDevice.frame
+                        ? DEVICE_FRAME_PADDING[activeDevice.frame]
+                        : undefined;
+                      const overlayOffsetLeft = framePad ? framePad[3] * canvasScale : 0;
+                      const overlayOffsetTop = framePad ? framePad[0] * canvasScale : 0;
+                      return (
+                        <div
+                          className="absolute"
+                          style={{
+                            left: `${canvasStageLeft + overlayOffsetLeft}px`,
+                            top: `${CANVAS_WS_STAGE_TOP + overlayOffsetTop}px`,
+                            width: `${stageWidth * canvasScale}px`,
+                            height: `${Math.max(stageContentHeight, STAGE_MIN_HEIGHT) * canvasScale}px`,
+                            pointerEvents: 'none',
+                            zIndex: 20,
+                          }}
+                        >
                       <SelectionOverlay
                         surface={canvasSurface}
                         selectedNodeSchemaId={selectedNodeSchemaId}
@@ -2395,6 +2402,8 @@ export function AppShell({
                         onToggleFrame={() => setShowDeviceFrame((v) => !v)}
                       />
                     </div>
+                      );
+                    })()}
                   </div>
                 </main>
               </div>
