@@ -577,21 +577,6 @@ export function GitLabSyncPanel({
 
   return (
     <div style={S.panel}>
-      {/* ── Header: Project · Branch ── */}
-      <div style={S.header}>
-        <div style={S.headerLeft}>
-          <FolderGit2 size={14} style={{ color: color.accent }} />
-          <span style={S.projectLabel}>{state.project.name}</span>
-          <span style={S.branchBadge}><GitBranch size={10} /> {state.branch}</span>
-        </div>
-        <div style={S.headerRight}>
-          <img src={state.user.avatarUrl} alt="" style={S.avatar} />
-          <span style={S.userName}>{state.user.username}</span>
-          <button style={S.iconBtn()} onClick={handleChangeProject} title="切换项目">
-            <MoreHorizontal size={13} />
-          </button>
-        </div>
-      </div>
       {/* ── Action bar: Refresh + Pull ── */}
       <div style={S.actionBar}>
         <button
