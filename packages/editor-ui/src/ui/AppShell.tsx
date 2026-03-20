@@ -9,7 +9,6 @@ import {
   Minus,
   Monitor,
   MousePointer2,
-  MoveHorizontal,
   Plus,
   Smartphone,
   Tablet,
@@ -176,7 +175,6 @@ const DEVICE_PRESETS: DevicePreset[] = [
   { id: 'phone', label: 'Phone', width: 375, icon: Smartphone, frame: 'phone' },
   { id: 'tablet', label: 'Tablet', width: 768, icon: Tablet, frame: 'tablet' },
   { id: 'desktop', label: 'Desktop', width: 1200, icon: Monitor, frame: 'monitor' },
-  { id: 'responsive', label: 'Responsive', width: 1200, icon: MoveHorizontal },
 ];
 
 /** Frame padding: [top, right, bottom, left] */
@@ -314,7 +312,7 @@ export function AppShell({
   const [showDeviceFrame, setShowDeviceFrame] = React.useState(false);
   const [customStageWidth, setCustomStageWidth] = React.useState(STAGE_DEFAULT_WIDTH);
   const activeDevice = DEVICE_PRESETS.find((p) => p.id === activeDeviceId) ?? DEVICE_PRESETS[2]!;
-  const stageWidth = activeDeviceId === 'responsive' ? customStageWidth : activeDevice.width;
+  const stageWidth = activeDeviceId === 'custom' ? customStageWidth : activeDevice.width;
   const stageWidthRef = React.useRef(stageWidth);
   stageWidthRef.current = stageWidth;
   const [canvasViewportState, setCanvasViewportState] = React.useState<CanvasViewportState>({
@@ -2393,10 +2391,6 @@ export function AppShell({
                         hasFrame={Boolean(activeDevice.frame)}
                         onSelectDevice={(id) => {
                           setActiveDeviceId(id);
-                          const preset = DEVICE_PRESETS.find((p) => p.id === id);
-                          if (preset && id !== 'responsive') {
-                            setCustomStageWidth(preset.width);
-                          }
                         }}
                         onChangeWidth={setCustomStageWidth}
                         onToggleFrame={() => setShowDeviceFrame((v) => !v)}
@@ -2736,8 +2730,8 @@ function DevicePreviewBar({
     const parsed = parseInt(widthInput, 10);
     if (!Number.isNaN(parsed) && parsed >= 200 && parsed <= 3840) {
       onChangeWidth(parsed);
-      if (activeDeviceId !== 'responsive') {
-        onSelectDevice('responsive');
+      if (activeDeviceId !== 'custom') {
+        onSelectDevice('custom');
       }
     } else {
       setWidthInput(String(stageWidth));
