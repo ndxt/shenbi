@@ -8,6 +8,14 @@ import {
 import type { CanvasToolMode } from '../canvas/types';
 import { CanvasChromeButton } from './CanvasZoomHud';
 
+export interface CanvasToolRailAction {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}
+
 export interface CanvasToolRailProps {
   activeTool: CanvasToolMode;
   spacePanActive: boolean;
@@ -17,6 +25,7 @@ export interface CanvasToolRailProps {
   onFit: () => void;
   onCenter: () => void;
   onFocusSelection: () => void;
+  actions?: CanvasToolRailAction[];
 }
 
 export function CanvasToolRail({
@@ -28,9 +37,32 @@ export function CanvasToolRail({
   onFit,
   onCenter,
   onFocusSelection,
+  actions,
 }: CanvasToolRailProps) {
   const effectivePan = spacePanActive || activeTool === 'pan';
   const effectiveSelect = !spacePanActive && activeTool === 'select';
+  const secondaryActions = actions ?? [
+    {
+      id: 'fit',
+      title: 'Fit View (Shift+1)',
+      icon: <Focus size={14} />,
+      onClick: onFit,
+    },
+    {
+      id: 'center',
+      title: 'Center Stage (Shift+2)',
+      icon: <LocateFixed size={14} />,
+      onClick: onCenter,
+    },
+    {
+      id: 'focus-selection',
+      title: 'Focus Selected Node (Shift+3)',
+      icon: <span className="canvas-tool-rail__focus-dot" aria-hidden="true" />,
+      disabled: focusSelectionDisabled,
+      onClick: onFocusSelection,
+    },
+  ];
+
   return (
     <div className="canvas-tool-rail" role="toolbar" aria-label="Canvas Tools">
       <CanvasChromeButton
@@ -48,19 +80,16 @@ export function CanvasToolRail({
         <Hand size={14} />
       </CanvasChromeButton>
       <div className="canvas-tool-rail__divider" />
-      <CanvasChromeButton title="Fit View (Shift+1)" onClick={onFit}>
-        <Focus size={14} />
-      </CanvasChromeButton>
-      <CanvasChromeButton title="Center Stage (Shift+2)" onClick={onCenter}>
-        <LocateFixed size={14} />
-      </CanvasChromeButton>
-      <CanvasChromeButton
-        title="Focus Selected Node (Shift+3)"
-        disabled={focusSelectionDisabled}
-        onClick={onFocusSelection}
-      >
-        <span className="canvas-tool-rail__focus-dot" aria-hidden="true" />
-      </CanvasChromeButton>
+      {secondaryActions.map((action) => (
+        <CanvasChromeButton
+          key={action.id}
+          title={action.title}
+          disabled={action.disabled}
+          onClick={action.onClick}
+        >
+          {action.icon}
+        </CanvasChromeButton>
+      ))}
     </div>
   );
 }

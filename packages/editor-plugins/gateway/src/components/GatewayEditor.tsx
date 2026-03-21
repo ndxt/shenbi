@@ -89,6 +89,7 @@ export function GatewayEditor({
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onDirty={onDirty}
+        initialViewport={documentSchema?.viewport}
       />
     </ReactFlowProvider>
   );
