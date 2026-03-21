@@ -1510,7 +1510,7 @@ export function AppShell({
             {/* Editor/Canvas Area Container */}
             <div className="flex-1 min-w-[320px] flex flex-col overflow-hidden relative bg-bg-canvas">
               {activeCanvasRenderer ? (
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden">
                   {activeCanvasRenderer.render({
                     ...(activeEditorTab?.fileId ? { activeFileId: activeEditorTab.fileId } : {}),
                     ...(activeEditorTab?.fileName ? { activeFileName: activeEditorTab.fileName } : {}),
