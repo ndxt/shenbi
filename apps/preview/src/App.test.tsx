@@ -10,7 +10,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { App } from './App';
+import { App, canSchemaNodeAcceptCanvasChildren, resolveCanvasDropPosition } from './App';
 import { MockAIClient, resetAIClient, setAIClient } from '@shenbi/editor-plugin-ai-chat';
 
 const modeSwitchLabel = /^(模式切换|Mode switch)$/;
@@ -534,6 +534,44 @@ describe('preview/App integration', () => {
     });
   });
 
+  it('会记住画布渲染模式切换', async () => {
+    const user = userEvent.setup();
+    const firstView = render(createElement(App));
+
+    await waitFor(() => {
+      expect(screen.getByText('User 1')).toBeInTheDocument();
+    });
+
+    const renderModeSelect = screen.getByLabelText('Canvas render mode') as HTMLSelectElement;
+    expect(renderModeSelect.value).toBe('direct');
+
+    await user.selectOptions(renderModeSelect, 'iframe');
+    await waitFor(() => {
+      expect(renderModeSelect.value).toBe('iframe');
+    });
+
+    firstView.unmount();
+
+    render(createElement(App));
+    await waitFor(() => {
+      expect((screen.getByLabelText('Canvas render mode') as HTMLSelectElement).value).toBe('iframe');
+    });
+  });
+
+  it('编辑器：Delete 会删除当前选中的节点', async () => {
+    const user = userEvent.setup();
+    await renderAppAndWaitFirstPage();
+
+    await selectNodeInOutline(user, 'search-create-btn');
+    const createButton = screen.getByRole('button', { name: '新增用户' });
+
+    fireEvent.keyDown(createButton, { key: 'Delete' });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: '新增用户' })).not.toBeInTheDocument();
+    });
+  });
+
   it('AI 面板：面板开关和模型选择可从本地恢复', async () => {
     const user = userEvent.setup();
     const firstRender = render(createElement(App));
@@ -682,5 +720,42 @@ describe('preview/App integration', () => {
       expect(input.value).toBe('User 3');
       expect(screen.getByText('User 3')).toBeInTheDocument();
     });
+  });
+
+  it('结构化拖拽：只允许容器节点接受 inside 落点', () => {
+    const schema = {
+      id: 'page-1',
+      body: [
+        {
+          id: 'card-1',
+          component: 'Card',
+          children: [],
+        },
+        {
+          id: 'button-1',
+          component: 'Input',
+        },
+      ],
+    };
+
+    expect(canSchemaNodeAcceptCanvasChildren(schema as any, 'card-1')).toBe(true);
+    expect(canSchemaNodeAcceptCanvasChildren(schema as any, 'button-1')).toBe(false);
+  });
+
+  it('结构化拖拽：叶子节点 inside 落点不会再被静默改写为 after', () => {
+    const schema = {
+      id: 'page-1',
+      body: [
+        {
+          id: 'button-1',
+          component: 'Input',
+        },
+      ],
+    };
+
+    expect(resolveCanvasDropPosition(schema as any, {
+      placement: 'inside',
+      targetNodeSchemaId: 'button-1',
+    })).toBeUndefined();
   });
 });

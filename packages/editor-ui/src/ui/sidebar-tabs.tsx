@@ -26,6 +26,8 @@ function createBuiltinSidebarTabs(): SidebarTabContribution[] {
         <ComponentPanel
           {...(context.contracts ? { contracts: context.contracts } : {})}
           {...(context.onInsertComponent ? { onInsert: context.onInsertComponent } : {})}
+          {...(context.onStartDragComponent ? { onStartDrag: context.onStartDragComponent } : {})}
+          {...(context.onEndDragComponent ? { onEndDrag: context.onEndDragComponent } : {})}
         />
       ),
     },

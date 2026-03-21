@@ -10,6 +10,7 @@ import { TabManager, type TabState } from './tab-manager';
 import {
   appendSchemaNode,
   insertSchemaNodeAt,
+  moveSchemaNode,
   patchSchemaNodeColumns,
   patchSchemaNodeEvents,
   patchSchemaNodeLogic,
@@ -323,6 +324,31 @@ function extractIndexFromArgs(args: unknown, commandId: string): number {
   return Number(args.index);
 }
 
+function extractMoveNodeArgs(args: unknown): {
+  sourceTreeId: string;
+  targetParentTreeId?: string;
+  index: number;
+} {
+  if (!isRecord(args) || typeof args.sourceTreeId !== 'string' || !Number.isInteger(args.index)) {
+    throw new Error('node.move expects args: { sourceTreeId: string, targetParentTreeId?: string, index: number }');
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(args, 'targetParentTreeId')
+    && args.targetParentTreeId !== undefined
+    && args.targetParentTreeId !== 'dialogs'
+    && (typeof args.targetParentTreeId !== 'string' || args.targetParentTreeId.trim().length === 0)
+  ) {
+    throw new Error('node.move expects args: { sourceTreeId: string, targetParentTreeId?: string, index: number }');
+  }
+  return {
+    sourceTreeId: args.sourceTreeId.trim(),
+    ...(typeof args.targetParentTreeId === 'string' || args.targetParentTreeId === 'dialogs'
+      ? { targetParentTreeId: args.targetParentTreeId }
+      : {}),
+    index: Number(args.index),
+  };
+}
+
 function registerBuiltinCommands(
   state: EditorState,
   history: History<EditorStateSnapshot>,
@@ -434,6 +460,23 @@ function registerBuiltinCommands(
       const treeId = extractTreeIdFromArgs(args, 'node.remove');
       const previousSchema = currentState.getSchema();
       const nextSchema = removeSchemaNode(previousSchema, treeId);
+      if (nextSchema === previousSchema) {
+        return;
+      }
+      currentState.setSchema(nextSchema);
+      currentState.setDirty(true);
+      eventBus.emit('schema:changed', { schema: nextSchema });
+    },
+  });
+
+  commands.register({
+    id: 'node.move',
+    label: 'Move Node',
+    recordHistory: false,
+    execute(currentState, args) {
+      const { sourceTreeId, targetParentTreeId, index } = extractMoveNodeArgs(args);
+      const previousSchema = currentState.getSchema();
+      const nextSchema = moveSchemaNode(previousSchema, sourceTreeId, targetParentTreeId, index);
       if (nextSchema === previousSchema) {
         return;
       }

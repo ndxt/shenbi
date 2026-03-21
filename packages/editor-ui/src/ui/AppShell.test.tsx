@@ -176,6 +176,20 @@ describe('AppShell', () => {
     expect(onCanvasSelectNode).toHaveBeenCalledWith('node-1');
   });
 
+  it('点击画布空白会触发 onCanvasDeselectNode', () => {
+    const onCanvasDeselectNode = vi.fn();
+    render(
+      <AppShell onCanvasDeselectNode={onCanvasDeselectNode}>
+        <div data-shenbi-node-id="node-1">Canvas Node</div>
+      </AppShell>,
+    );
+
+    const surfaceRoot = screen.getByText('Canvas Node').parentElement;
+    expect(surfaceRoot).not.toBeNull();
+    fireEvent.click(surfaceRoot as Element);
+    expect(onCanvasDeselectNode).toHaveBeenCalledTimes(1);
+  });
+
   it('支持通过 plugins 注入侧栏和检查器 tab', async () => {
     const plugins = [
       defineEditorPlugin({
@@ -1596,5 +1610,201 @@ describe('AppShell', () => {
     } finally {
       Element.prototype.scrollIntoView = original;
     }
+  });
+
+  it('会让当前选中的画布节点支持直接拖拽移动', async () => {
+    const view = render(
+      <AppShell selectedNodeSchemaId="node-1" selectedNodeTreeId="body:0">
+        <div data-shenbi-node-id="node-1" data-shenbi-component-type="Button">
+          Node Content
+        </div>
+      </AppShell>,
+    );
+
+    const selectedNode = screen.getByText('Node Content');
+    await waitFor(() => {
+      expect(selectedNode).toHaveAttribute('draggable', 'true');
+    });
+
+    view.rerender(
+      <AppShell selectedNodeSchemaId={undefined} selectedNodeTreeId={undefined}>
+        <div data-shenbi-node-id="node-1" data-shenbi-component-type="Button">
+          Node Content
+        </div>
+      </AppShell>,
+    );
+
+    await waitFor(() => {
+      expect(selectedNode).not.toHaveAttribute('draggable');
+    });
+  });
+
+  it('会在选中框外层渲染通用 Action 条，并且点击不会误触发取消选中', async () => {
+    const duplicateExecute = vi.fn();
+    render(
+      <AppShell
+        selectedNodeSchemaId="node-1"
+        selectedNodeTreeId="body:0"
+        canDuplicateSelectedNode
+        canMoveSelectedNodeDown
+        canDeleteSelectedNode
+        onCanvasDeselectNode={vi.fn()}
+        pluginContext={{
+          selection: {
+            getSelectedNodeId: () => 'body:0',
+          },
+        }}
+        plugins={[
+          defineEditorPlugin({
+            id: 'plugin.canvas-actions',
+            name: 'Canvas Actions',
+            contributes: {
+              commands: [
+                { id: 'canvas.duplicateSelectedNode', title: 'Duplicate', execute: duplicateExecute },
+                { id: 'canvas.moveSelectedNodeUp', title: 'Move Up', enabledWhen: 'canCanvasMoveSelectionUp', execute: () => undefined },
+                { id: 'canvas.moveSelectedNodeDown', title: 'Move Down', enabledWhen: 'canCanvasMoveSelectionDown', execute: () => undefined },
+                { id: 'canvas.deleteSelectedNode', title: 'Delete', enabledWhen: 'canCanvasDeleteSelection', execute: () => undefined },
+              ],
+            },
+          }),
+        ]}
+      >
+        <div data-shenbi-node-id="node-1" data-shenbi-component-type="Button">
+          Node Content
+        </div>
+      </AppShell>,
+    );
+
+    const selectedNode = screen.getByText('Node Content');
+    Object.defineProperty(selectedNode, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        top: 80,
+        left: 120,
+        right: 240,
+        bottom: 132,
+        width: 120,
+        height: 52,
+        x: 120,
+        y: 80,
+        toJSON: () => undefined,
+      }),
+    });
+
+    fireEvent(window, new Event('resize'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('toolbar', { name: 'Selected Node Actions' })).toBeInTheDocument();
+    });
+
+    expect(screen.getByTitle('Move Up')).toBeDisabled();
+    expect(screen.getByTitle('Move Down')).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTitle('Duplicate'));
+    expect(duplicateExecute).toHaveBeenCalled();
+  });
+
+  it('会渲染画布浮动工具栏和缩放 HUD', () => {
+    render(
+      <AppShell>
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole('toolbar', { name: 'Canvas Tools' })).toBeInTheDocument();
+    expect(screen.getByTitle('Selection Tool (V)')).toBeInTheDocument();
+    expect(screen.getByTitle('Hand Tool (H)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Canvas Zoom Controls')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '100%' })).toBeInTheDocument();
+  });
+
+  it('支持通过快捷键切换画布工具模式', () => {
+    render(
+      <AppShell>
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    const canvas = document.querySelector('[data-shenbi-shortcut-area="canvas"]');
+    expect(canvas).not.toBeNull();
+    canvas?.focus?.();
+
+    const selectButton = screen.getByTitle('Selection Tool (V)');
+    const panButton = screen.getByTitle('Hand Tool (H)');
+    expect(selectButton.className).toContain('canvas-chrome-button--active');
+
+    fireEvent.keyDown(canvas as Element, { key: 'H' });
+    expect(panButton.className).toContain('canvas-chrome-button--active');
+
+    fireEvent.keyDown(canvas as Element, { key: 'V' });
+    expect(selectButton.className).toContain('canvas-chrome-button--active');
+  });
+
+  it('手型模式下点击页面节点不会触发选中', () => {
+    const onCanvasSelectNode = vi.fn();
+    render(
+      <AppShell onCanvasSelectNode={onCanvasSelectNode}>
+        <div data-shenbi-node-id="node-1">Canvas Node</div>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByTitle('Hand Tool (H)'));
+    fireEvent.click(screen.getByText('Canvas Node'));
+
+    expect(onCanvasSelectNode).not.toHaveBeenCalled();
+  });
+
+  it('手型模式下画布会切换为抓手光标语义', async () => {
+    render(
+      <AppShell>
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    const canvas = document.querySelector('[data-shenbi-shortcut-area="canvas"]') as HTMLElement | null;
+    expect(canvas).not.toBeNull();
+    expect(canvas?.className).toContain('cursor-default');
+
+    await act(async () => {
+      fireEvent.click(screen.getByTitle('Hand Tool (H)'));
+    });
+    await waitFor(() => {
+      expect(screen.getByTitle('Hand Tool (H)').className).toContain('canvas-chrome-button--active');
+    });
+    expect(canvas?.className).toContain('cursor-grab');
+  });
+
+  it('按下空格会阻止浏览器默认滚动行为', () => {
+    render(
+      <AppShell>
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    const event = new KeyboardEvent('keydown', {
+      code: 'Space',
+      key: ' ',
+      bubbles: true,
+      cancelable: true,
+    });
+
+    const prevented = !document.dispatchEvent(event);
+    expect(prevented || event.defaultPrevented).toBe(true);
+  });
+
+  it('会在缩放 HUD 中展示固定缩放选项，并在没有选中节点时禁用聚焦按钮', () => {
+    render(
+      <AppShell>
+        <div>Canvas Content</div>
+      </AppShell>,
+    );
+
+    const focusButton = screen.getByTitle('Focus Selected Node (Shift+3)');
+    expect(focusButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '100%' }));
+    expect(screen.getByRole('menu', { name: 'Canvas Zoom Presets' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '25%' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fit' })).toBeInTheDocument();
   });
 });

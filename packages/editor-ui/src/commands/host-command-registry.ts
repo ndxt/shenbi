@@ -1,5 +1,6 @@
 import type { ContextMenuContribution, MenuContribution, PluginShortcutContribution } from '@shenbi/editor-plugin-api';
 import type { PluginContext } from '@shenbi/editor-plugin-api';
+import type { CanvasToolMode } from '../canvas/types';
 
 export interface HostCommandDefinition {
   id: string;
@@ -29,6 +30,16 @@ export interface HostCommandRegistryOptions {
   setShowAssistantPanel: (value: boolean) => void;
   setShowCommandPalette: (value: boolean) => void;
   toggleMaximize: () => void;
+  zoomCanvasIn: () => void;
+  zoomCanvasOut: () => void;
+  resetCanvasZoom: () => void;
+  fitCanvasToViewport: () => void;
+  centerCanvasStage: () => void;
+  focusCanvasSelection: () => void;
+  activeCanvasTool: CanvasToolMode;
+  setActiveCanvasTool: (value: CanvasToolMode) => void;
+  hasCanvasSelection: boolean;
+  canvasScale: number;
   t: (key: string) => string;
 }
 
@@ -188,6 +199,121 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
         options.toggleMaximize();
       },
     },
+    {
+      id: 'canvas.tool.select',
+      title: options.activeCanvasTool === 'select' ? 'Selection Tool' : 'Switch to Selection Tool',
+      category: t('hostCommands.category.layout'),
+      aliases: ['select tool', 'pointer tool'],
+      keywords: ['canvas', 'tool', 'select', 'pointer'],
+      description: 'Activate the selection tool for editing the canvas.',
+      shortcut: 'V',
+      when: '!inputFocused',
+      enabledWhen: '!canvasSelectToolActive',
+      priority: 20,
+      execute: () => {
+        options.setActiveCanvasTool('select');
+      },
+    },
+    {
+      id: 'canvas.tool.pan',
+      title: options.activeCanvasTool === 'pan' ? 'Hand Tool' : 'Switch to Hand Tool',
+      category: t('hostCommands.category.layout'),
+      aliases: ['hand tool', 'pan tool'],
+      keywords: ['canvas', 'tool', 'pan', 'hand'],
+      description: 'Activate the hand tool to move around the infinite canvas.',
+      shortcut: 'H',
+      when: '!inputFocused',
+      enabledWhen: '!canvasPanToolActive',
+      priority: 20,
+      execute: () => {
+        options.setActiveCanvasTool('pan');
+      },
+    },
+    {
+      id: 'canvas.zoomIn',
+      title: `Zoom In (${Math.round(options.canvasScale * 100)}%)`,
+      category: t('hostCommands.category.layout'),
+      aliases: ['zoom in canvas'],
+      keywords: ['canvas', 'zoom', 'scale'],
+      description: 'Zoom in the canvas viewport.',
+      shortcut: 'Mod+=',
+      when: '!inputFocused',
+      priority: 10,
+      execute: () => {
+        options.zoomCanvasIn();
+      },
+    },
+    {
+      id: 'canvas.zoomOut',
+      title: 'Zoom Out',
+      category: t('hostCommands.category.layout'),
+      aliases: ['zoom out canvas'],
+      keywords: ['canvas', 'zoom', 'scale'],
+      description: 'Zoom out the canvas viewport.',
+      shortcut: 'Mod+-',
+      when: '!inputFocused',
+      priority: 10,
+      execute: () => {
+        options.zoomCanvasOut();
+      },
+    },
+    {
+      id: 'canvas.resetZoom',
+      title: 'Reset Zoom',
+      category: t('hostCommands.category.layout'),
+      aliases: ['canvas 100 percent'],
+      keywords: ['canvas', 'zoom', 'reset'],
+      description: 'Reset the canvas zoom to 100%.',
+      shortcut: 'Mod+0',
+      when: '!inputFocused',
+      priority: 10,
+      execute: () => {
+        options.resetCanvasZoom();
+      },
+    },
+    {
+      id: 'canvas.fitView',
+      title: 'Fit Canvas',
+      category: t('hostCommands.category.layout'),
+      aliases: ['fit canvas', 'fit view'],
+      keywords: ['canvas', 'fit', 'viewport'],
+      description: 'Fit the page into the current canvas viewport.',
+      shortcut: 'Shift+1',
+      when: '!inputFocused',
+      priority: 10,
+      execute: () => {
+        options.fitCanvasToViewport();
+      },
+    },
+    {
+      id: 'canvas.centerStage',
+      title: 'Center Stage',
+      category: t('hostCommands.category.layout'),
+      aliases: ['center canvas', 'center stage'],
+      keywords: ['canvas', 'center', 'stage', 'viewport'],
+      description: 'Center the stage in the current canvas viewport without changing zoom.',
+      shortcut: 'Shift+2',
+      when: '!inputFocused',
+      priority: 10,
+      execute: () => {
+        options.centerCanvasStage();
+      },
+    },
+    {
+      id: 'canvas.focusSelection',
+      title: 'Focus Selected Node',
+      category: t('hostCommands.category.layout'),
+      aliases: ['focus selected', 'scroll to selection'],
+      keywords: ['canvas', 'selection', 'focus', 'center'],
+      description: 'Center the currently selected node in the viewport.',
+      shortcut: 'Shift+3',
+      when: '!inputFocused',
+      enabledWhen: 'hasCanvasSelection',
+      priority: 10,
+      execute: () => {
+        options.focusCanvasSelection();
+      },
+    },
   ];
 
   return commands.filter((command): command is HostCommandDefinition => Boolean(command));
@@ -244,6 +370,16 @@ export function hostCommandsToContextMenus(hostCommands: readonly HostCommandDef
           break;
         case 'layout.toggleConsole':
           menus.push({ ...base, area: 'activity-bar' });
+          break;
+        case 'canvas.zoomIn':
+        case 'canvas.zoomOut':
+        case 'canvas.resetZoom':
+        case 'canvas.fitView':
+        case 'canvas.centerStage':
+        case 'canvas.focusSelection':
+        case 'canvas.tool.select':
+        case 'canvas.tool.pan':
+          menus.push({ ...base, area: 'canvas' });
           break;
         default:
           break;

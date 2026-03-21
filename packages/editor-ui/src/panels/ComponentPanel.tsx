@@ -123,6 +123,8 @@ function buildComponentTree(
 export interface ComponentPanelProps {
   contracts?: ComponentContract[];
   onInsert?: (componentType: string) => void;
+  onStartDrag?: (componentType: string) => void;
+  onEndDrag?: () => void;
 }
 
 function getCategoryName(category: string, t: TranslateFn): string {
@@ -145,6 +147,8 @@ function UnifiedPopover({
   top,
   left,
   onInsert,
+  onStartDrag,
+  onEndDrag,
   onHoverItem,
 }: {
   parent: ComponentItem;
@@ -152,6 +156,8 @@ function UnifiedPopover({
   top: number;
   left: number;
   onInsert: (id: string) => void;
+  onStartDrag?: (id: string) => void;
+  onEndDrag?: () => void;
   onHoverItem: (item: ComponentItem | null) => void;
 }) {
   const { t } = useTranslation('editorUi');
@@ -172,6 +178,16 @@ function UnifiedPopover({
               {parent.children.map((child) => (
                 <div
                   key={child.id}
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = 'copyMove';
+                    event.dataTransfer.setData('text/plain', child.id);
+                    event.dataTransfer.setData('application/x-shenbi-component-type', child.id);
+                    onStartDrag?.(child.id);
+                  }}
+                  onDragEnd={() => {
+                    onEndDrag?.();
+                  }}
                   onClick={(event) => {
                     event.stopPropagation();
                     onInsert(child.id);
@@ -265,7 +281,12 @@ function StandaloneDocTooltip({
   );
 }
 
-export function ComponentPanel({ contracts = [], onInsert }: ComponentPanelProps) {
+export function ComponentPanel({
+  contracts = [],
+  onInsert,
+  onStartDrag,
+  onEndDrag,
+}: ComponentPanelProps) {
   const { t } = useTranslation('editorUi');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeParent, setActiveParent] = useState<ComponentItem | null>(null);
@@ -373,6 +394,16 @@ export function ComponentPanel({ contracts = [], onInsert }: ComponentPanelProps
                   onMouseLeave={handleMouseLeave}
                 >
                   <div
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = 'copyMove';
+                      event.dataTransfer.setData('text/plain', item.id);
+                      event.dataTransfer.setData('application/x-shenbi-component-type', item.id);
+                      onStartDrag?.(item.id);
+                    }}
+                    onDragEnd={() => {
+                      onEndDrag?.();
+                    }}
                     onClick={() => onInsert?.(item.id)}
                     className={`flex flex-col items-center justify-center h-[72px] w-full p-2 rounded-md cursor-pointer transition-colors active:scale-95 group/card ${
                       activeParent?.id === item.id
@@ -428,6 +459,8 @@ export function ComponentPanel({ contracts = [], onInsert }: ComponentPanelProps
             top={tooltipPos.top}
             left={tooltipPos.left}
             onInsert={(id) => onInsert?.(id)}
+            {...(onStartDrag ? { onStartDrag } : {})}
+            {...(onEndDrag ? { onEndDrag } : {})}
             onHoverItem={setHoveredItem}
           />
         </div>

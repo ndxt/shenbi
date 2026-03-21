@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as antd from 'antd';
 import { Line, Column, Bar, Area, Pie, Gauge } from '@ant-design/charts';
 import { type PageSchema } from '@shenbi/schema';
@@ -26,6 +26,16 @@ export interface ScenarioRuntimeViewProps {
 }
 
 export function ScenarioRuntimeView({ schema }: ScenarioRuntimeViewProps) {
+  const [pageRoot, setPageRoot] = useState<HTMLElement | null>(null);
+  const supportsScopedMessage = typeof antd.message.useMessage === 'function';
+  const supportsScopedNotification = typeof antd.notification.useNotification === 'function';
+  const [messageApi, messageContextHolder] = supportsScopedMessage
+    ? antd.message.useMessage()
+    : [antd.message, null];
+  const [notificationApi, notificationContextHolder] = supportsScopedNotification
+    ? antd.notification.useNotification()
+    : [antd.notification, null];
+
   useEffect(() => {
     const isTest = process.env.NODE_ENV === 'test';
     const controller = installMockFetch({
@@ -37,9 +47,14 @@ export function ScenarioRuntimeView({ schema }: ScenarioRuntimeViewProps) {
     };
   }, []);
 
+  const getPopupContainer = useCallback(() => {
+    return pageRoot ?? document.body;
+  }, [pageRoot]);
+
   const runtime = usePageRuntime(schema, {
-    message: antd.message,
-    notification: antd.notification,
+    message: messageApi,
+    notification: notificationApi,
+    getPopupContainer,
   });
 
   const compiledBody = useMemo(
@@ -48,11 +63,18 @@ export function ScenarioRuntimeView({ schema }: ScenarioRuntimeViewProps) {
   );
 
   return (
-    <ShenbiPage
-      schema={schema}
-      resolver={resolver}
-      runtime={runtime}
-      compiledBody={compiledBody}
-    />
+    <antd.ConfigProvider getPopupContainer={getPopupContainer}>
+      <antd.App>
+        {messageContextHolder}
+        {notificationContextHolder}
+        <ShenbiPage
+          schema={schema}
+          resolver={resolver}
+          runtime={runtime}
+          compiledBody={compiledBody}
+          onRootReady={setPageRoot}
+        />
+      </antd.App>
+    </antd.ConfigProvider>
   );
 }

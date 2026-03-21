@@ -3,12 +3,60 @@ import type { PageSchema } from '@shenbi/schema';
 import {
   History,
   MemoryFileStorageAdapter,
+  insertSchemaNodeAt,
+  moveSchemaNode,
+  removeSchemaNode,
   type EditorStateSnapshot,
   type FileStorageAdapter,
 } from '@shenbi/editor-core';
+import type { SchemaNode } from '@shenbi/schema';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getTreeParentPath(treeId: string): string | undefined {
+  const tokens = treeId.split('.').filter(Boolean);
+  const lastToken = tokens[tokens.length - 1];
+  const index = Number(lastToken);
+  if (!Number.isInteger(index)) {
+    return undefined;
+  }
+  return tokens.slice(0, -1).join('.');
+}
+
+function getTargetContainerPath(targetParentTreeId: string | undefined): string {
+  if (!targetParentTreeId) {
+    return 'body';
+  }
+  if (targetParentTreeId === 'dialogs') {
+    return 'dialogs';
+  }
+  return `${targetParentTreeId}.children`;
+}
+
+function resolveTreeIdForContainer(containerPath: string, index: number): string {
+  return `${containerPath}.${index}`;
+}
+
+function resolveMovedTreeId(
+  sourceTreeId: string,
+  targetParentTreeId: string | undefined,
+  targetIndex: number,
+): string | undefined {
+  const sourceContainerPath = getTreeParentPath(sourceTreeId);
+  if (!sourceContainerPath) {
+    return undefined;
+  }
+  const sourceIndex = Number(sourceTreeId.split('.').filter(Boolean).at(-1));
+  if (!Number.isInteger(sourceIndex)) {
+    return undefined;
+  }
+  const targetContainerPath = getTargetContainerPath(targetParentTreeId);
+  const resolvedIndex = sourceContainerPath === targetContainerPath && sourceIndex < targetIndex
+    ? targetIndex - 1
+    : targetIndex;
+  return resolveTreeIdForContainer(targetContainerPath, Math.max(0, resolvedIndex));
 }
 
 export interface UseScenarioSessionOptions<ScenarioKey extends string> {
@@ -114,6 +162,69 @@ export function useScenarioSession<ScenarioKey extends string>(
           throw new Error('schema.replace expects args: { schema }');
         }
         updateScenarioSchema(() => payload.schema as PageSchema);
+        return undefined;
+      }
+      case 'node.insertAt': {
+        if (!isRecord(payload) || typeof payload.index !== 'number' || !('node' in payload)) {
+          throw new Error('node.insertAt expects args: { node, index, parentTreeId? }');
+        }
+        const index = payload.index;
+        updateScenarioSchema((previousSchema) => insertSchemaNodeAt(
+          previousSchema,
+          payload.node as SchemaNode,
+          index,
+          typeof payload.parentTreeId === 'string' ? payload.parentTreeId : undefined,
+        ));
+        return undefined;
+      }
+      case 'node.remove': {
+        if (!isRecord(payload) || typeof payload.treeId !== 'string' || payload.treeId.trim().length === 0) {
+          throw new Error('node.remove expects args: { treeId: string }');
+        }
+        const treeId = payload.treeId.trim();
+        updateScenarioSchema((previousSchema) => removeSchemaNode(previousSchema, treeId));
+        updateScenarioSnapshot(scenario, (previousSnapshot) => {
+          if (!previousSnapshot.selectedNodeId) {
+            return previousSnapshot;
+          }
+          if (
+            previousSnapshot.selectedNodeId === treeId
+            || previousSnapshot.selectedNodeId.startsWith(`${treeId}.`)
+          ) {
+            const { selectedNodeId: _selectedNodeId, ...restSnapshot } = previousSnapshot;
+            return restSnapshot;
+          }
+          return previousSnapshot;
+        });
+        return undefined;
+      }
+      case 'node.move': {
+        if (!isRecord(payload) || typeof payload.sourceTreeId !== 'string' || typeof payload.index !== 'number') {
+          throw new Error('node.move expects args: { sourceTreeId, index, targetParentTreeId? }');
+        }
+        const sourceTreeId = payload.sourceTreeId;
+        const index = payload.index;
+        const targetParentTreeId = typeof payload.targetParentTreeId === 'string'
+          ? payload.targetParentTreeId
+          : undefined;
+        const nextSelectedNodeId = resolveMovedTreeId(sourceTreeId, targetParentTreeId, index);
+        updateScenarioSchema((previousSchema) => moveSchemaNode(
+          previousSchema,
+          sourceTreeId,
+          targetParentTreeId,
+          index,
+        ));
+        if (nextSelectedNodeId) {
+          updateScenarioSnapshot(scenario, (previousSnapshot) => {
+            if (previousSnapshot.selectedNodeId !== sourceTreeId) {
+              return previousSnapshot;
+            }
+            return {
+              ...previousSnapshot,
+              selectedNodeId: nextSelectedNodeId,
+            };
+          });
+        }
         return undefined;
       }
       case 'editor.undo': {

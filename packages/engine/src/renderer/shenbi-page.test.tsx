@@ -85,6 +85,7 @@ describe('ShenbiPage', () => {
   it('dialog 未打开时不渲染', () => {
     const dialog: CompiledNode = {
       id: 'dlg1',
+      Component: 'div',
       componentType: 'Modal',
       staticProps: {},
       dynamicProps: {},
@@ -103,6 +104,7 @@ describe('ShenbiPage', () => {
   it('dialog 打开时渲染弹窗内容', () => {
     const dialog: CompiledNode = {
       id: 'dlg1',
+      Component: 'div',
       componentType: 'Modal',
       staticProps: {},
       dynamicProps: {},
@@ -121,6 +123,7 @@ describe('ShenbiPage', () => {
   it('Drawer 显隐由 __drawer_{id} 控制', () => {
     const drawer: CompiledNode = {
       id: 'drawer1',
+      Component: 'div',
       componentType: 'Drawer',
       staticProps: {},
       dynamicProps: {},
@@ -162,6 +165,7 @@ describe('ShenbiPage', () => {
   it('dialog 可拿到 payload 上下文', () => {
     const dialog: CompiledNode = {
       id: 'dlg_payload',
+      Component: 'div',
       componentType: 'Modal',
       staticProps: {},
       dynamicProps: {},

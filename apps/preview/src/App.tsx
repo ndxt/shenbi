@@ -3,8 +3,10 @@ import * as antd from 'antd';
 import { Undo2, Redo2, Trash2, FileUp } from 'lucide-react';
 import {
   builtinContracts,
+  createSchemaNodeFromContract,
   getBuiltinContract,
   type PageSchema,
+  type SchemaNode,
 } from '@shenbi/schema';
 import { defineEditorPlugin } from '@shenbi/editor-plugin-api';
 import {
@@ -25,6 +27,7 @@ import {
   patchSchemaNodeLogic,
   patchSchemaNodeProps,
   patchSchemaNodeStyle,
+  removeSchemaNode,
 } from '@shenbi/editor-core';
 import {
   descriptionsSkeletonSchema,
@@ -53,6 +56,7 @@ import { ScenarioRuntimeView } from './runtime/ScenarioRuntimeView';
 
 import {
   AppShell,
+  type CanvasDropTarget,
   createWorkspacePersistenceService,
   LocalWorkspacePersistenceAdapter,
   useEditorHostBridge,
@@ -85,6 +89,10 @@ type AppMode = ShellMode;
 const PREVIEW_PERSISTENCE_NAMESPACE = 'preview-debug';
 const ACTIVE_SCENARIO_PERSISTENCE_KEY = 'active-scenario';
 const SHELL_SESSION_PERSISTENCE_KEY = 'shell-session';
+const RENDER_MODE_PERSISTENCE_KEY = 'canvas-render-mode';
+
+type RenderMode = 'direct' | 'iframe';
+const DEFAULT_RENDER_MODE: RenderMode = process.env.NODE_ENV === 'test' ? 'direct' : 'iframe';
 
 function cloneSchema(schema: PageSchema): PageSchema {
   if (typeof structuredClone === 'function') {
@@ -134,10 +142,165 @@ function createEmptyShellSchema(): PageSchema {
   };
 }
 
+function getTreeArrayPosition(treeId: string | undefined): {
+  targetParentTreeId?: string;
+  index: number;
+} | undefined {
+  if (!treeId) {
+    return undefined;
+  }
+  if (treeId === 'body') {
+    return {
+      index: 0,
+    };
+  }
+
+  const tokens = treeId.split('.').filter(Boolean);
+  const lastToken = tokens[tokens.length - 1];
+  const index = Number(lastToken);
+  if (!Number.isInteger(index)) {
+    return undefined;
+  }
+
+  const parentTokens = tokens.slice(0, -1);
+  if (parentTokens.length === 1 && parentTokens[0] === 'body') {
+    return { index };
+  }
+  if (parentTokens.length === 1 && parentTokens[0] === 'dialogs') {
+    return { targetParentTreeId: 'dialogs', index };
+  }
+  if (parentTokens[parentTokens.length - 1] === 'children') {
+    const targetParentTreeId = parentTokens.slice(0, -1).join('.');
+    return {
+      ...(targetParentTreeId ? { targetParentTreeId } : {}),
+      index,
+    };
+  }
+
+  return undefined;
+}
+
 function hasSchemaContent(schema: PageSchema): boolean {
   const bodyCount = Array.isArray(schema.body) ? schema.body.length : (schema.body ? 1 : 0);
   const dialogCount = Array.isArray(schema.dialogs) ? schema.dialogs.length : (schema.dialogs ? 1 : 0);
   return bodyCount + dialogCount > 0;
+}
+
+function canDropInsideComponent(componentType: string | undefined): boolean {
+  if (!componentType) {
+    return false;
+  }
+  const contract = getBuiltinContract(componentType);
+  return Boolean(contract?.children && ['node', 'nodes', 'mixed'].includes(contract.children.type));
+}
+
+export function canSchemaNodeAcceptCanvasChildren(
+  schema: PageSchema,
+  schemaNodeId: string | undefined,
+): boolean {
+  if (!schemaNodeId) {
+    return false;
+  }
+  const targetTreeId = getTreeIdBySchemaNodeId(schema, schemaNodeId);
+  if (!targetTreeId) {
+    return false;
+  }
+  const targetNode = getSchemaNodeByTreeId(schema, targetTreeId);
+  if (!targetNode) {
+    return false;
+  }
+  return canDropInsideComponent(targetNode.component);
+}
+
+function createClonedNodeId(componentType: string): string {
+  const normalized = componentType
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'node';
+  const randomSuffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID().slice(0, 8)
+    : Math.random().toString(36).slice(2, 10);
+  return `${normalized}-${randomSuffix}`;
+}
+
+function cloneSchemaNodeWithFreshIds(node: SchemaNode): SchemaNode {
+  const cloned = typeof structuredClone === 'function'
+    ? structuredClone(node)
+    : JSON.parse(JSON.stringify(node)) as SchemaNode;
+
+  const walk = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      return value.map((item) => walk(item));
+    }
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+    const record = value as Record<string, unknown>;
+    const nextRecord = Object.fromEntries(
+      Object.entries(record).map(([key, nested]) => [key, walk(nested)]),
+    );
+    if (typeof nextRecord.component === 'string') {
+      nextRecord.id = createClonedNodeId(nextRecord.component);
+    }
+    return nextRecord;
+  };
+
+  return walk(cloned) as SchemaNode;
+}
+
+function getContainerNodeCount(schema: PageSchema, parentTreeId?: string): number {
+  if (!parentTreeId) {
+    return Array.isArray(schema.body) ? schema.body.length : (schema.body ? 1 : 0);
+  }
+  if (parentTreeId === 'dialogs') {
+    return Array.isArray(schema.dialogs) ? schema.dialogs.length : (schema.dialogs ? 1 : 0);
+  }
+  const parentNode = getSchemaNodeByTreeId(schema, parentTreeId);
+  return Array.isArray(parentNode?.children) ? parentNode.children.length : 0;
+}
+
+export function resolveCanvasDropPosition(
+  schema: PageSchema,
+  target: CanvasDropTarget,
+): {
+  parentTreeId?: string;
+  index: number;
+} | undefined {
+  if (target.placement === 'root' || !target.targetNodeSchemaId) {
+    const bodyLength = Array.isArray(schema.body) ? schema.body.length : (schema.body ? 1 : 0);
+    return { index: bodyLength };
+  }
+
+  const targetTreeId = getTreeIdBySchemaNodeId(schema, target.targetNodeSchemaId);
+  if (!targetTreeId) {
+    return undefined;
+  }
+
+  const targetNode = getSchemaNodeByTreeId(schema, targetTreeId);
+  if (!targetNode) {
+    return undefined;
+  }
+
+  if (target.placement === 'inside') {
+    if (!canDropInsideComponent(targetNode.component)) {
+      return undefined;
+    }
+    const childCount = Array.isArray(targetNode.children) ? targetNode.children.length : 0;
+    return {
+      parentTreeId: targetTreeId,
+      index: childCount,
+    };
+  }
+
+  const targetPosition = getTreeArrayPosition(targetTreeId);
+  if (!targetPosition) {
+    return undefined;
+  }
+
+  return {
+    ...(targetPosition.targetParentTreeId ? { parentTreeId: targetPosition.targetParentTreeId } : {}),
+    index: target.placement === 'before' ? targetPosition.index : targetPosition.index + 1,
+  };
 }
 
 interface PersistedShellSession {
@@ -175,6 +338,7 @@ export function App() {
   const { t: filesT } = useTranslation('pluginFiles');
   const currentLocale = useCurrentLocale();
   const [appMode, setAppMode] = useShellModeUrl();
+  const [renderMode, setRenderMode] = useState<RenderMode>(DEFAULT_RENDER_MODE);
   const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig>(() => loadActiveProject() ?? createLocalProjectConfig());
   const [lastGitLabProjectConfig, setLastGitLabProjectConfig] = useState<ActiveProjectConfig | null>(() => loadLastGitLabProject());
   const activeProjectId = activeProjectConfig.vfsProjectId;
@@ -187,6 +351,7 @@ export function App() {
     [persistenceAdapter],
   );
   const [scenarioPersistenceHydrated, setScenarioPersistenceHydrated] = useState(false);
+  const [renderModeHydrated, setRenderModeHydrated] = useState(false);
   const [shellSessionHydrated, setShellSessionHydrated] = useState(false);
   const initialScenarioSnapshots = useMemo(() => createInitialScenarioSnapshots(), []);
   const initialScenarioSchemas = useMemo(() => createInitialScenarioState(), []);
@@ -647,6 +812,30 @@ export function App() {
     () => (selectedNode ? getBuiltinContract(selectedNode.component) : undefined),
     [selectedNode],
   );
+  const selectedNodePosition = useMemo(
+    () => getTreeArrayPosition(selectedNodeId),
+    [selectedNodeId],
+  );
+  const selectedNodeSiblingCount = useMemo(
+    () => (
+      selectedNodePosition
+        ? getContainerNodeCount(activeSchema, selectedNodePosition.targetParentTreeId)
+        : 0
+    ),
+    [activeSchema, selectedNodePosition],
+  );
+  const canDeleteSelectedNode = Boolean(selectedNodeId) && !shellGenerationLock;
+  const canDuplicateSelectedNode = Boolean(selectedNodeId && selectedNode) && !shellGenerationLock;
+  const canMoveSelectedNodeUp = Boolean(
+    selectedNodePosition
+    && selectedNodePosition.index > 0
+    && !shellGenerationLock,
+  );
+  const canMoveSelectedNodeDown = Boolean(
+    selectedNodePosition
+    && selectedNodePosition.index < selectedNodeSiblingCount - 1
+    && !shellGenerationLock,
+  );
   const breadcrumbItems = useMemo(
     () => getAncestorChain(treeNodes, selectedNodeId),
     [treeNodes, selectedNodeId],
@@ -1041,6 +1230,175 @@ export function App() {
   const handleFocusedIdChangeRef = useRef(handleFocusedIdChange);
   handleFocusedIdChangeRef.current = handleFocusedIdChange;
 
+  const handleCanvasSelectNode = (schemaNodeId: string) => {
+    if (shellGenerationLock) {
+      return;
+    }
+    selectSchemaNode(schemaNodeId);
+  };
+
+  const handleCanvasDeselectNode = () => {
+    if (shellGenerationLock) {
+      return;
+    }
+    selectTreeNode(getDefaultSelectedNodeId(treeNodes) ?? '');
+  };
+
+  const handleBreadcrumbSelect = (treeNodeId: string) => {
+    selectTreeNode(treeNodeId);
+  };
+
+  const [breadcrumbHoveredSchemaId, setBreadcrumbHoveredSchemaId] = useState<string | null>(null);
+
+  const handleBreadcrumbHover = useCallback((treeNodeId: string | null) => {
+    if (!treeNodeId) {
+      setBreadcrumbHoveredSchemaId(null);
+      return;
+    }
+    const node = getSchemaNodeByTreeId(activeSchema, treeNodeId);
+    setBreadcrumbHoveredSchemaId(node?.id ?? null);
+  }, [activeSchema]);
+
+  const executeSchemaCommand = useCallback((commandId: string, payload: Record<string, unknown>) => {
+    if (notifyGenerationLock()) {
+      return;
+    }
+    if (appMode === 'shell') {
+      void fileEditor.commands.execute(commandId, payload).catch((error) => {
+        antd.message.error(error instanceof Error ? error.message : String(error));
+      });
+      return;
+    }
+    executeScenarioCommand(commandId, payload);
+  }, [appMode, executeScenarioCommand, fileEditor.commands, notifyGenerationLock]);
+
+  const insertComponentAtTarget = useCallback((componentType: string, target: CanvasDropTarget) => {
+    const contract = getBuiltinContract(componentType);
+    if (!contract || notifyGenerationLock()) {
+      return;
+    }
+
+    const position = resolveCanvasDropPosition(activeSchema, target);
+    if (!position) {
+      return;
+    }
+
+    const node = createSchemaNodeFromContract(contract);
+    executeSchemaCommand('node.insertAt', {
+      node,
+      ...(position.parentTreeId ? { parentTreeId: position.parentTreeId } : {}),
+      index: position.index,
+    });
+
+    if (node.id) {
+      requestAnimationFrame(() => {
+        selectSchemaNode(node.id!);
+      });
+    }
+  }, [activeSchema, executeSchemaCommand, notifyGenerationLock, selectSchemaNode]);
+
+  const handleInsertComponent = useCallback((componentType: string) => {
+    const canAppendInside = selectedContract?.children
+      && ['node', 'nodes', 'mixed'].includes(selectedContract.children.type);
+    insertComponentAtTarget(componentType, selectedNodeId && canAppendInside && selectedNode?.id
+      ? {
+          placement: 'inside',
+          targetNodeSchemaId: selectedNode.id,
+        }
+      : {
+          placement: selectedNode?.id ? 'after' : 'root',
+          ...(selectedNode?.id ? { targetNodeSchemaId: selectedNode.id } : {}),
+        });
+  }, [
+    insertComponentAtTarget,
+    notifyGenerationLock,
+    selectedContract,
+    selectedNode,
+    selectedNodeId,
+  ]);
+
+  const handleDeleteSelectedNode = useCallback(() => {
+    if (!selectedNodeId || notifyGenerationLock()) {
+      return;
+    }
+    const nextSchema = removeSchemaNode(activeSchema, selectedNodeId);
+    executeSchemaCommand('node.remove', { treeId: selectedNodeId });
+    requestAnimationFrame(() => {
+      const nextTree = buildEditorTree(nextSchema);
+      selectTreeNode(getDefaultSelectedNodeId(nextTree) ?? '');
+    });
+  }, [activeSchema, executeSchemaCommand, notifyGenerationLock, selectTreeNode, selectedNodeId]);
+
+  const handleDuplicateSelectedNode = useCallback(() => {
+    if (!selectedNodeId || !selectedNode || notifyGenerationLock()) {
+      return;
+    }
+    const position = getTreeArrayPosition(selectedNodeId);
+    if (!position) {
+      return;
+    }
+    const duplicatedNode = cloneSchemaNodeWithFreshIds(selectedNode);
+    executeSchemaCommand('node.insertAt', {
+      node: duplicatedNode,
+      ...(position.targetParentTreeId ? { parentTreeId: position.targetParentTreeId } : {}),
+      index: position.index + 1,
+    });
+    if (duplicatedNode.id) {
+      requestAnimationFrame(() => {
+        selectSchemaNode(duplicatedNode.id!);
+      });
+    }
+  }, [executeSchemaCommand, notifyGenerationLock, selectSchemaNode, selectedNode, selectedNodeId]);
+
+  const moveSelectedNode = useCallback((direction: -1 | 1) => {
+    if (!selectedNodeId || notifyGenerationLock()) {
+      return;
+    }
+    const position = getTreeArrayPosition(selectedNodeId);
+    if (!position) {
+      return;
+    }
+    const nextIndex = position.index + direction;
+    if (nextIndex < 0) {
+      return;
+    }
+    executeSchemaCommand('node.move', {
+      sourceTreeId: selectedNodeId,
+      ...(position.targetParentTreeId ? { targetParentTreeId: position.targetParentTreeId } : {}),
+      index: nextIndex,
+    });
+  }, [executeSchemaCommand, notifyGenerationLock, selectedNodeId]);
+
+  const handleCanvasInsertComponent = useCallback((componentType: string, target: CanvasDropTarget) => {
+    insertComponentAtTarget(componentType, target);
+  }, [insertComponentAtTarget]);
+
+  const handleCanvasMoveSelectedNode = useCallback((target: CanvasDropTarget) => {
+    if (!selectedNodeId || notifyGenerationLock()) {
+      return;
+    }
+    if (target.targetNodeSchemaId) {
+      const targetTreeId = getTreeIdBySchemaNodeId(activeSchema, target.targetNodeSchemaId);
+      if (
+        targetTreeId
+        && (targetTreeId === selectedNodeId || targetTreeId.startsWith(`${selectedNodeId}.children.`))
+      ) {
+        return;
+      }
+    }
+
+    const position = resolveCanvasDropPosition(activeSchema, target);
+    if (!position) {
+      return;
+    }
+
+    executeSchemaCommand('node.move', {
+      sourceTreeId: selectedNodeId,
+      ...(position.parentTreeId ? { targetParentTreeId: position.parentTreeId } : {}),
+      index: position.index,
+    });
+  }, [activeSchema, executeSchemaCommand, notifyGenerationLock, selectedNodeId]);
+
   const plugins = useMemo(() => {
     const registeredPlugins = [
       defineEditorPlugin({
@@ -1056,6 +1414,106 @@ export function App() {
               execute: () => {
                 void executeAppCommand('workspace.resetDocument');
               },
+            },
+          ],
+        },
+      }),
+      defineEditorPlugin({
+        id: 'preview.canvas-editing',
+        name: 'Preview Canvas Editing',
+        contributes: {
+          commands: [
+            {
+              id: 'canvas.deleteSelectedNode',
+              title: 'Delete Selected Node',
+              category: 'Canvas',
+              enabledWhen: 'hasSelection && !canvasReadOnly && canCanvasDeleteSelection',
+              execute: () => {
+                handleDeleteSelectedNode();
+              },
+            },
+            {
+              id: 'canvas.duplicateSelectedNode',
+              title: 'Duplicate Selected Node',
+              category: 'Canvas',
+              enabledWhen: 'hasSelection && !canvasReadOnly && canCanvasDuplicateSelection',
+              execute: () => {
+                handleDuplicateSelectedNode();
+              },
+            },
+            {
+              id: 'canvas.moveSelectedNodeUp',
+              title: 'Move Selected Node Up',
+              category: 'Canvas',
+              enabledWhen: 'hasSelection && !canvasReadOnly && canCanvasMoveSelectionUp',
+              execute: () => {
+                moveSelectedNode(-1);
+              },
+            },
+            {
+              id: 'canvas.moveSelectedNodeDown',
+              title: 'Move Selected Node Down',
+              category: 'Canvas',
+              enabledWhen: 'hasSelection && !canvasReadOnly && canCanvasMoveSelectionDown',
+              execute: () => {
+                moveSelectedNode(1);
+              },
+            },
+          ],
+          shortcuts: [
+            {
+              id: 'canvas.deleteSelectedNode.delete',
+              commandId: 'canvas.deleteSelectedNode',
+              keybinding: 'Delete',
+              when: 'editorFocused && !inputFocused',
+            },
+            {
+              id: 'canvas.deleteSelectedNode.backspace',
+              commandId: 'canvas.deleteSelectedNode',
+              keybinding: 'Backspace',
+              when: 'editorFocused && !inputFocused',
+            },
+            {
+              id: 'canvas.moveSelectedNodeUp.shortcut',
+              commandId: 'canvas.moveSelectedNodeUp',
+              keybinding: 'Alt+ArrowUp',
+              when: 'editorFocused && !inputFocused',
+            },
+            {
+              id: 'canvas.moveSelectedNodeDown.shortcut',
+              commandId: 'canvas.moveSelectedNodeDown',
+              keybinding: 'Alt+ArrowDown',
+              when: 'editorFocused && !inputFocused',
+            },
+          ],
+          contextMenus: [
+            {
+              id: 'canvas.moveSelectedNodeUp.context',
+              label: 'Move Up',
+              commandId: 'canvas.moveSelectedNodeUp',
+              area: 'canvas',
+              group: 'edit',
+            },
+            {
+              id: 'canvas.duplicateSelectedNode.context',
+              label: 'Duplicate',
+              commandId: 'canvas.duplicateSelectedNode',
+              area: 'canvas',
+              group: 'edit',
+            },
+            {
+              id: 'canvas.moveSelectedNodeDown.context',
+              label: 'Move Down',
+              commandId: 'canvas.moveSelectedNodeDown',
+              area: 'canvas',
+              group: 'edit',
+            },
+            {
+              id: 'canvas.deleteSelectedNode.context',
+              label: 'Delete',
+              commandId: 'canvas.deleteSelectedNode',
+              area: 'canvas',
+              group: 'edit',
             },
           ],
         },
@@ -1085,7 +1543,6 @@ export function App() {
       }),
     ];
 
-    // VFS-based file explorer in shell mode (render function uses refs for live data)
     if (appMode === 'shell' && vfsInitialized) {
       registeredPlugins.push(createFilesPlugin({
         ...(filesPrimaryPanelOptions ?? {
@@ -1227,20 +1684,22 @@ export function App() {
         refreshFileTree: () => refreshFsTreeRef.current(),
       }));
     } else if (appMode === 'shell' && filesPrimaryPanelOptions) {
-      // Fallback to legacy file panel if VFS not ready
       registeredPlugins.push(createFilesPlugin(filesPrimaryPanelOptions));
     }
+
     return registeredPlugins;
   }, [
     activeProjectConfig?.branch,
     activeProjectConfig?.gitlabProjectId,
     activeProjectId,
     appMode,
-    currentLocale,
     executeAppCommand,
     fileExplorerStatusText,
     filesPrimaryPanelOptions,
     filesT,
+    handleDeleteSelectedNode,
+    handleDuplicateSelectedNode,
+    moveSelectedNode,
     handleSelectGitLabProject,
     lastGitLabProjectConfig?.branch,
     lastGitLabProjectConfig?.gitlabProjectId,
@@ -1248,35 +1707,6 @@ export function App() {
     vfs,
     vfsInitialized,
   ]);
-
-  const handleCanvasSelectNode = (schemaNodeId: string) => {
-    if (shellGenerationLock) {
-      return;
-    }
-    selectSchemaNode(schemaNodeId);
-  };
-
-  const handleCanvasDeselectNode = () => {
-    if (shellGenerationLock) {
-      return;
-    }
-    selectTreeNode(getDefaultSelectedNodeId(treeNodes) ?? '');
-  };
-
-  const handleBreadcrumbSelect = (treeNodeId: string) => {
-    selectTreeNode(treeNodeId);
-  };
-
-  const [breadcrumbHoveredSchemaId, setBreadcrumbHoveredSchemaId] = useState<string | null>(null);
-
-  const handleBreadcrumbHover = useCallback((treeNodeId: string | null) => {
-    if (!treeNodeId) {
-      setBreadcrumbHoveredSchemaId(null);
-      return;
-    }
-    const node = getSchemaNodeByTreeId(activeSchema, treeNodeId);
-    setBreadcrumbHoveredSchemaId(node?.id ?? null);
-  }, [activeSchema]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1329,6 +1759,37 @@ export function App() {
     workspacePersistence,
   ]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void workspacePersistence
+      .getJSON<RenderMode>(PREVIEW_PERSISTENCE_NAMESPACE, RENDER_MODE_PERSISTENCE_KEY)
+      .then((storedMode) => {
+        if (cancelled || !storedMode || !['direct', 'iframe'].includes(storedMode)) {
+          return;
+        }
+        setRenderMode(storedMode);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) {
+          setRenderModeHydrated(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspacePersistence]);
+
+  useEffect(() => {
+    if (!renderModeHydrated) {
+      return;
+    }
+    void workspacePersistence
+      .setJSON(PREVIEW_PERSISTENCE_NAMESPACE, RENDER_MODE_PERSISTENCE_KEY, renderMode)
+      .catch(() => undefined);
+  }, [renderMode, renderModeHydrated, workspacePersistence]);
+
   const handleBackToProjects = useCallback(() => {
     clearActiveProject();
     setActiveProjectConfig(createLocalProjectConfig());
@@ -1341,6 +1802,8 @@ export function App() {
     <AppShell
       workspaceId={PREVIEW_WORKSPACE_ID}
       persistenceAdapter={persistenceAdapter}
+      renderMode={renderMode}
+      canvasReadOnly={shellGenerationLock}
       title={activeProjectConfig.projectName}
       subtitle={activeProjectConfig.branch}
       userAvatarUrl={gitlabUser?.avatarUrl}
@@ -1355,6 +1818,7 @@ export function App() {
         treeNodes,
         onSelectNode: selectTreeNode,
         ...(selectedNodeId ? { selectedNodeId } : {}),
+        onInsertComponent: handleInsertComponent,
       }}
       inspectorProps={{
         ...(selectedNode ? { selectedNode } : {}),
@@ -1364,6 +1828,14 @@ export function App() {
       pluginContext={enhancedPluginContext}
       onCanvasSelectNode={handleCanvasSelectNode}
       onCanvasDeselectNode={handleCanvasDeselectNode}
+      {...(selectedNodeId ? { selectedNodeTreeId: selectedNodeId } : {})}
+      canCanvasDropInsideNode={(nodeSchemaId) => canSchemaNodeAcceptCanvasChildren(activeSchema, nodeSchemaId)}
+      onCanvasInsertComponent={handleCanvasInsertComponent}
+      onCanvasMoveSelectedNode={handleCanvasMoveSelectedNode}
+      canDeleteSelectedNode={canDeleteSelectedNode}
+      canDuplicateSelectedNode={canDuplicateSelectedNode}
+      canMoveSelectedNodeUp={canMoveSelectedNodeUp}
+      canMoveSelectedNodeDown={canMoveSelectedNodeDown}
       {...(selectedNode?.id ? { selectedNodeSchemaId: selectedNode.id } : {})}
       {...(breadcrumbHoveredSchemaId ? { hoveredNodeSchemaId: breadcrumbHoveredSchemaId } : {})}
       schemaName={shellSchemaName}
@@ -1395,6 +1867,19 @@ export function App() {
                 {option.label}
               </option>
             ))}
+          </select>
+          <span className="text-text-secondary" style={{ fontSize: '11px' }}>
+            Render
+          </span>
+          <select
+            className="h-7 w-[110px] rounded border border-border-ide bg-bg-panel px-2 text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
+            style={{ fontSize: '12px' }}
+            aria-label="Canvas render mode"
+            value={renderMode}
+            onChange={(event) => setRenderMode(event.target.value as RenderMode)}
+          >
+            <option value="iframe">iframe</option>
+            <option value="direct">direct</option>
           </select>
           {appMode === 'scenarios' ? (
             <>
