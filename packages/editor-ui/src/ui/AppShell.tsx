@@ -76,10 +76,6 @@ import type {
 import {
   STAGE_DEFAULT_WIDTH,
   STAGE_MIN_HEIGHT,
-  MIN_CANVAS_SCALE,
-  MAX_CANVAS_SCALE,
-  CANVAS_ZOOM_PRESETS,
-  CANVAS_WHEEL_ZOOM_SENSITIVITY,
   DEVICE_FRAME_PADDING,
   type DevicePreset,
 } from '../canvas/constants';
@@ -87,6 +83,9 @@ import { createBuiltinSidebarTabs } from './sidebar-tabs';
 import { CanvasToolRail } from './CanvasToolRail';
 import { CanvasZoomHud } from './CanvasZoomHud';
 import { DevicePreviewBar } from './DevicePreviewBar';
+import { useCanvasZoom } from '../hooks/useCanvasZoom';
+import { useCanvasPan } from '../hooks/useCanvasPan';
+import { useCanvasDragDrop } from '../hooks/useCanvasDragDrop';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -190,20 +189,12 @@ function resolveActivityItemPanelId(
   return panels.some((panel) => panel.id === targetPanelId) ? targetPanelId : undefined;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
 
 function isElementTarget(target: EventTarget | null): target is HTMLElement {
   return Boolean(target)
     && typeof (target as Node).nodeType === 'number'
     && (target as Node).nodeType === 1
     && typeof (target as HTMLElement).closest === 'function';
-}
-
-function resolveWheelZoomScale(currentScale: number, deltaY: number): number {
-  const zoomFactor = Math.exp(-deltaY * CANVAS_WHEEL_ZOOM_SENSITIVITY);
-  return clamp(currentScale * zoomFactor, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
 }
 
 interface StoredLayoutState {
@@ -225,15 +216,6 @@ interface StoredLayoutState {
 interface StoredWorkbenchPreferences {
   theme?: ThemeMode;
   locale?: SupportedLocale;
-}
-
-interface CanvasDragSession {
-  source: 'component' | 'selected-node';
-  componentType?: string;
-}
-
-interface ZoomMenuState {
-  open: boolean;
 }
 
 export function AppShell({
@@ -287,11 +269,6 @@ export function AppShell({
   const canvasScrollRef = React.useRef<HTMLElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
   const [canvasSurface, setCanvasSurface] = React.useState<CanvasSurfaceHandle | null>(null);
-  const [canvasScale, setCanvasScale] = React.useState(1);
-  const canvasScaleRef = React.useRef(1);
-  canvasScaleRef.current = canvasScale;
-  const [stageContentHeight, setStageContentHeight] = React.useState(STAGE_MIN_HEIGHT);
-  const stageContentHeightRef = React.useRef(STAGE_MIN_HEIGHT);
   const [activeCanvasTool, setActiveCanvasTool] = React.useState<CanvasToolMode>('select');
   const [activeDeviceId, setActiveDeviceId] = React.useState('desktop');
   const [showDeviceFrame, setShowDeviceFrame] = React.useState(false);
@@ -300,30 +277,56 @@ export function AppShell({
   const stageWidth = activeDeviceId === 'custom' ? customStageWidth : activeDevice.width;
   const stageWidthRef = React.useRef(stageWidth);
   stageWidthRef.current = stageWidth;
-  const [canvasViewportState, setCanvasViewportState] = React.useState<CanvasViewportState>({
-    scale: 1,
-    scrollLeft: 0,
-    scrollTop: 0,
-    viewportWidth: 0,
-    viewportHeight: 0,
+
+  const zoom = useCanvasZoom({
+    canvasScrollRef,
+    stageRef,
+    canvasSurface,
+    stageWidth,
+    selectedNodeSchemaId,
   });
-  const [isCanvasPanning, setIsCanvasPanning] = React.useState(false);
-  const [canvasDragSession, setCanvasDragSession] = React.useState<CanvasDragSession | null>(null);
-  const [canvasDropIndicator, setCanvasDropIndicator] = React.useState<CanvasDropIndicator | null>(null);
-  const [zoomMenuState, setZoomMenuState] = React.useState<ZoomMenuState>({ open: false });
-  const canvasChromeRef = React.useRef<HTMLDivElement | null>(null);
-  const zoomMenuRef = React.useRef<HTMLDivElement | null>(null);
-  const canvasScaleRafRef = React.useRef<number | null>(null);
-  const spacePressedRef = React.useRef(false);
-  const [isSpacePressed, setIsSpacePressed] = React.useState(false);
-  const panSessionRef = React.useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    startScrollLeft: number;
-    startScrollTop: number;
-  } | null>(null);
-  const panInteractionCleanupRef = React.useRef<(() => void) | null>(null);
+
+  const pan = useCanvasPan({
+    canvasScrollRef,
+    canvasSurface,
+    activeCanvasTool,
+    syncCanvasViewportState: zoom.syncCanvasViewportState,
+    closeZoomMenu: () => zoom.setZoomMenuState({ open: false }),
+  });
+
+  const dragDrop = useCanvasDragDrop({
+    stageRef,
+    canvasSurface,
+    canvasScale: zoom.canvasScale,
+    stageWidth,
+    stageContentHeightRef: zoom.stageContentHeightRef,
+    activeCanvasTool,
+    canvasReadOnly,
+    selectedNodeSchemaId,
+    selectedNodeTreeId,
+    canCanvasDropInsideNode,
+    onCanvasInsertComponent: onCanvasInsertComponent,
+    onCanvasMoveSelectedNode: onCanvasMoveSelectedNode,
+  });
+
+  // Destructure commonly used values from hooks
+  const {
+    canvasScale, canvasScaleRef, canvasViewportState, stageContentHeight,
+    stageContentHeightRef, canvasWorkspaceWidth, canvasWorkspaceHeight,
+    canvasStageLeft, canvasStageTop: CANVAS_WS_STAGE_TOP, zoomMenuState, setZoomMenuState,
+    zoomMenuRef, canvasChromeRef, updateCanvasScale, zoomCanvasIn, zoomCanvasOut,
+    resetCanvasZoom, fitCanvasToViewport, centerCanvasStage, focusCanvasSelection,
+    updateCanvasScalePreset, syncCanvasViewportState, handleCanvasWheelEvent,
+  } = zoom;
+  const {
+    isCanvasPanning, isSpacePressed, spacePressedRef,
+    handleCanvasPointerDown, handleCanvasPointerMove, handleCanvasPointerUp,
+  } = pan;
+  const {
+    canvasDragSession, canvasDropIndicator, clearCanvasDragState, handleCanvasDragOver,
+    handleCanvasDragLeave, handleCanvasDrop, handleSidebarStartDragComponent,
+    handleSidebarEndDragComponent, handleSelectedDragStart,
+  } = dragDrop;
   const resolvedPersistenceAdapter = React.useMemo(
     () => persistenceAdapter ?? new LocalWorkspacePersistenceAdapter(),
     [persistenceAdapter],
@@ -423,213 +426,6 @@ export function AppShell({
   // ---------- Infinite canvas: large static workspace ----------
   // Use a generously-sized workspace so the user can pan far in every direction.
   // Height grows dynamically only when content is very tall.
-  const CANVAS_WS_BASE = 20000;  // base workspace dimension
-  const CANVAS_WS_STAGE_TOP = 5000;  // stage Y offset inside workspace (lots of room above)
-
-  const canvasWorkspaceWidth = CANVAS_WS_BASE;
-  const canvasStageLeft = Math.round((CANVAS_WS_BASE - stageWidth * canvasScale) / 2);
-
-  const canvasWorkspaceHeight = React.useMemo(() => {
-    const stageVisualBottom = CANVAS_WS_STAGE_TOP
-      + Math.max(stageContentHeight, STAGE_MIN_HEIGHT) * canvasScale;
-    // Ensure at least 5000px of scroll space below the stage bottom
-    return Math.max(CANVAS_WS_BASE, stageVisualBottom + 5000);
-  }, [canvasScale, stageContentHeight]);
-  const syncCanvasViewportState = React.useCallback(() => {
-    const element = canvasScrollRef.current;
-    if (!element) {
-      return;
-    }
-    setCanvasViewportState({
-      scale: canvasScale,
-      scrollLeft: element.scrollLeft,
-      scrollTop: element.scrollTop,
-      viewportWidth: element.clientWidth,
-      viewportHeight: element.clientHeight,
-    });
-  }, [canvasScale]);
-  React.useEffect(() => () => {
-    if (canvasScaleRafRef.current !== null) {
-      cancelAnimationFrame(canvasScaleRafRef.current);
-    }
-  }, []);
-  const clearCanvasPanInteractionGuards = React.useCallback(() => {
-    panInteractionCleanupRef.current?.();
-    panInteractionCleanupRef.current = null;
-  }, []);
-  const applyCanvasPanInteractionGuards = React.useCallback(() => {
-    clearCanvasPanInteractionGuards();
-
-    const canvasElement = canvasScrollRef.current;
-    const ownerDocument = canvasSurface?.ownerDocument ?? null;
-    const pageRoot = ownerDocument?.querySelector('[data-shenbi-page-root]') as HTMLElement | null;
-    const previousPageRootPointerEvents = pageRoot?.style.pointerEvents ?? '';
-    const preventNativeInteraction = (event: Event) => {
-      event.preventDefault();
-    };
-
-    canvasElement?.classList.add('canvas-surface--panning');
-    ownerDocument?.documentElement.classList.add('shenbi-canvas-panning');
-    ownerDocument?.body.classList.add('shenbi-canvas-panning');
-    if (pageRoot) {
-      pageRoot.style.pointerEvents = 'none';
-    }
-    ownerDocument?.addEventListener('dragstart', preventNativeInteraction, true);
-    ownerDocument?.addEventListener('selectstart', preventNativeInteraction, true);
-
-    panInteractionCleanupRef.current = () => {
-      canvasElement?.classList.remove('canvas-surface--panning');
-      ownerDocument?.documentElement.classList.remove('shenbi-canvas-panning');
-      ownerDocument?.body.classList.remove('shenbi-canvas-panning');
-      if (pageRoot) {
-        pageRoot.style.pointerEvents = previousPageRootPointerEvents;
-      }
-      ownerDocument?.removeEventListener('dragstart', preventNativeInteraction, true);
-      ownerDocument?.removeEventListener('selectstart', preventNativeInteraction, true);
-    };
-  }, [canvasSurface, clearCanvasPanInteractionGuards]);
-  React.useEffect(() => () => {
-    clearCanvasPanInteractionGuards();
-  }, [clearCanvasPanInteractionGuards]);
-
-  const centerCanvasOnStage = React.useCallback((nextScale: number) => {
-    const element = canvasScrollRef.current;
-    if (!element) {
-      return;
-    }
-    const scaledWidth = stageWidth * nextScale;
-    const stageHeight = Math.max(stageContentHeightRef.current, STAGE_MIN_HEIGHT);
-    const scaledHeight = stageHeight * nextScale;
-    const wsStageLeft = Math.round((CANVAS_WS_BASE - scaledWidth) / 2);
-    const nextScrollLeft = Math.max(
-      0,
-      wsStageLeft + scaledWidth / 2 - element.clientWidth / 2,
-    );
-    const nextScrollTop = Math.max(
-      0,
-      CANVAS_WS_STAGE_TOP + scaledHeight / 2 - element.clientHeight / 2,
-    );
-    element.scrollLeft = nextScrollLeft;
-    element.scrollTop = nextScrollTop;
-    setCanvasViewportState({
-      scale: nextScale,
-      scrollLeft: nextScrollLeft,
-      scrollTop: nextScrollTop,
-      viewportWidth: element.clientWidth,
-      viewportHeight: element.clientHeight,
-    });
-  }, []);
-
-  const updateCanvasScale = React.useCallback((
-    nextScaleInput: number,
-    anchor?: { clientX: number; clientY: number },
-  ) => {
-    const element = canvasScrollRef.current;
-    const previousScale = canvasScaleRef.current;
-    const nextScale = clamp(nextScaleInput, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
-    if (!element || nextScale === previousScale) {
-      canvasScaleRef.current = nextScale;
-      setCanvasScale(nextScale);
-      return;
-    }
-    if (canvasScaleRafRef.current !== null) {
-      cancelAnimationFrame(canvasScaleRafRef.current);
-      canvasScaleRafRef.current = null;
-    }
-
-    if (!anchor) {
-      canvasScaleRef.current = nextScale;
-      setCanvasScale(nextScale);
-      canvasScaleRafRef.current = requestAnimationFrame(() => {
-        centerCanvasOnStage(nextScale);
-        canvasScaleRafRef.current = null;
-      });
-      return;
-    }
-
-    const viewportRect = element.getBoundingClientRect();
-    const pointerX = anchor.clientX - viewportRect.left;
-    const pointerY = anchor.clientY - viewportRect.top;
-    const stageRelativeX = element.scrollLeft + pointerX - canvasStageLeft;
-    const stageRelativeY = element.scrollTop + pointerY - CANVAS_WS_STAGE_TOP;
-    const scaledX = (stageRelativeX / previousScale) * nextScale;
-    const scaledY = (stageRelativeY / previousScale) * nextScale;
-
-    canvasScaleRef.current = nextScale;
-    setCanvasScale(nextScale);
-    canvasScaleRafRef.current = requestAnimationFrame(() => {
-      const nextStageCenterX = Math.round(
-        (CANVAS_WS_BASE - stageWidth * nextScale) / 2,
-      );
-      const nextScrollLeft = nextStageCenterX + scaledX - pointerX;
-      const nextScrollTop = CANVAS_WS_STAGE_TOP + scaledY - pointerY;
-      element.scrollLeft = Math.max(0, nextScrollLeft);
-      element.scrollTop = Math.max(0, nextScrollTop);
-      setCanvasViewportState({
-        scale: nextScale,
-        scrollLeft: element.scrollLeft,
-        scrollTop: element.scrollTop,
-        viewportWidth: element.clientWidth,
-        viewportHeight: element.clientHeight,
-      });
-      canvasScaleRafRef.current = null;
-    });
-  }, [canvasStageLeft, centerCanvasOnStage]);
-
-  const zoomCanvasIn = React.useCallback(() => {
-    updateCanvasScale(canvasScale + 0.1);
-  }, [canvasScale, updateCanvasScale]);
-
-  const zoomCanvasOut = React.useCallback(() => {
-    updateCanvasScale(canvasScale - 0.1);
-  }, [canvasScale, updateCanvasScale]);
-
-  const resetCanvasZoom = React.useCallback(() => {
-    updateCanvasScale(1);
-  }, [updateCanvasScale]);
-
-  const fitCanvasToViewport = React.useCallback(() => {
-    const element = canvasScrollRef.current;
-    if (!element) {
-      return;
-    }
-    const availableWidth = Math.max(element.clientWidth - 160, 320);
-    const availableHeight = Math.max(element.clientHeight - 160, 240);
-    const nextScale = clamp(
-      Math.min(availableWidth / stageWidth, availableHeight / STAGE_MIN_HEIGHT),
-      MIN_CANVAS_SCALE,
-      MAX_CANVAS_SCALE,
-    );
-    setCanvasScale(nextScale);
-    requestAnimationFrame(() => {
-      centerCanvasOnStage(nextScale);
-    });
-  }, [centerCanvasOnStage]);
-  const centerCanvasStage = React.useCallback(() => {
-    centerCanvasOnStage(canvasScale);
-  }, [canvasScale, centerCanvasOnStage]);
-  const focusCanvasSelection = React.useCallback(() => {
-    const element = canvasScrollRef.current;
-    if (!element || !canvasSurface || !selectedNodeSchemaId) {
-      return;
-    }
-
-    const selectedElement = canvasSurface.findNodeElement(selectedNodeSchemaId);
-    if (!selectedElement) {
-      return;
-    }
-
-    const rect = canvasSurface.getRelativeRect(selectedElement);
-    const nextScrollLeft = canvasStageLeft + (rect.left + rect.width / 2) * canvasScale - element.clientWidth / 2;
-    const nextScrollTop = CANVAS_WS_STAGE_TOP + (rect.top + rect.height / 2) * canvasScale - element.clientHeight / 2;
-    element.scrollLeft = Math.max(0, nextScrollLeft);
-    element.scrollTop = Math.max(0, nextScrollTop);
-    syncCanvasViewportState();
-  }, [canvasScale, canvasSurface, selectedNodeSchemaId, syncCanvasViewportState]);
-  const updateCanvasScalePreset = React.useCallback((nextScale: number) => {
-    updateCanvasScale(nextScale);
-    setZoomMenuState({ open: false });
-  }, [updateCanvasScale]);
   const pluginContributes = React.useMemo(
     () => collectPluginContributes(plugins),
     [plugins],
@@ -1373,120 +1169,7 @@ export function AppShell({
     };
   }, [contextMenuState.open]);
 
-  React.useEffect(() => {
-    const shouldHandleCanvasSpace = (target: EventTarget | null) => {
-      const element = isElementTarget(target) ? target : document.activeElement;
-      const isTyping = isElementTarget(element)
-        && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.isContentEditable);
-      return !isTyping;
-    };
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code === 'Space') {
-        if (!shouldHandleCanvasSpace(event.target)) {
-          return;
-        }
-        event.preventDefault();
-        if (!event.repeat) {
-          spacePressedRef.current = true;
-          setIsSpacePressed(true);
-        }
-      }
-    };
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.code === 'Space') {
-        if (shouldHandleCanvasSpace(event.target)) {
-          event.preventDefault();
-        }
-        spacePressedRef.current = false;
-        setIsSpacePressed(false);
-      }
-    };
-    const handleBlur = () => {
-      spacePressedRef.current = false;
-      setIsSpacePressed(false);
-      setIsCanvasPanning(false);
-      panSessionRef.current = null;
-      clearCanvasPanInteractionGuards();
-    };
-    const hostDocument = document;
-    const hostWindow = window;
-    const frameDocument = canvasSurface?.ownerDocument && canvasSurface.ownerDocument !== hostDocument
-      ? canvasSurface.ownerDocument
-      : null;
-    const frameWindow = canvasSurface?.ownerWindow && canvasSurface.ownerWindow !== hostWindow
-      ? canvasSurface.ownerWindow
-      : null;
-
-    hostDocument.addEventListener('keydown', handleKeyDown, true);
-    hostDocument.addEventListener('keyup', handleKeyUp, true);
-    hostWindow.addEventListener('keydown', handleKeyDown, true);
-    hostWindow.addEventListener('keyup', handleKeyUp, true);
-    frameDocument?.addEventListener('keydown', handleKeyDown, true);
-    frameDocument?.addEventListener('keyup', handleKeyUp, true);
-    frameWindow?.addEventListener('keydown', handleKeyDown, true);
-    frameWindow?.addEventListener('keyup', handleKeyUp, true);
-    hostWindow.addEventListener('blur', handleBlur, true);
-    frameWindow?.addEventListener('blur', handleBlur, true);
-    return () => {
-      hostDocument.removeEventListener('keydown', handleKeyDown, true);
-      hostDocument.removeEventListener('keyup', handleKeyUp, true);
-      hostWindow.removeEventListener('keydown', handleKeyDown, true);
-      hostWindow.removeEventListener('keyup', handleKeyUp, true);
-      frameDocument?.removeEventListener('keydown', handleKeyDown, true);
-      frameDocument?.removeEventListener('keyup', handleKeyUp, true);
-      frameWindow?.removeEventListener('keydown', handleKeyDown, true);
-      frameWindow?.removeEventListener('keyup', handleKeyUp, true);
-      hostWindow.removeEventListener('blur', handleBlur, true);
-      frameWindow?.removeEventListener('blur', handleBlur, true);
-    };
-  }, [canvasSurface, clearCanvasPanInteractionGuards]);
-
-  React.useEffect(() => {
-    const element = canvasScrollRef.current;
-    if (!element) {
-      return;
-    }
-    centerCanvasOnStage(canvasScale);
-  }, [centerCanvasOnStage]);
-
-  React.useEffect(() => {
-    const element = canvasScrollRef.current;
-    if (!element) {
-      return;
-    }
-    const handleScroll = () => {
-      syncCanvasViewportState();
-    };
-    element.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => {
-      element.removeEventListener('scroll', handleScroll);
-    };
-  }, [syncCanvasViewportState]);
-
-  // Track actual stage content height for dynamic workspace sizing
-  React.useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) {
-      return;
-    }
-    const sync = () => {
-      const measured = stage.scrollHeight;
-      if (measured !== stageContentHeightRef.current) {
-        stageContentHeightRef.current = measured;
-        setStageContentHeight(measured);
-      }
-    };
-    sync();
-    const observer = typeof ResizeObserver === 'function'
-      ? new ResizeObserver(() => { sync(); })
-      : null;
-    observer?.observe(stage);
-    return () => {
-      observer?.disconnect();
-    };
-  }, [canvasSurface]);
 
   const handleActivitySelectItem = (item: ActivityBarItemContribution) => {
     activityBarProps?.onSelectItem?.(item);
@@ -1527,7 +1210,6 @@ export function AppShell({
       activeCanvasTool === 'pan'
       || spacePressedRef.current
       || isCanvasPanning
-      || panSessionRef.current
       || canvasDragSession
     ) {
       return;
@@ -1645,396 +1327,7 @@ export function AppShell({
   }, []);
 
 
-  React.useEffect(() => {
-    if (!zoomMenuState.open) {
-      return;
-    }
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (
-        zoomMenuRef.current?.contains(target)
-        || canvasChromeRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setZoomMenuState({ open: false });
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setZoomMenuState({ open: false });
-      }
-    };
-    document.addEventListener('pointerdown', handlePointerDown, true);
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown, true);
-      document.removeEventListener('keydown', handleKeyDown, true);
-    };
-  }, [zoomMenuState.open]);
-  const shouldStartCanvasPan = React.useCallback((button: number) => (
-    button === 1
-    || (button === 0 && (spacePressedRef.current || activeCanvasTool === 'pan'))
-  ), [activeCanvasTool]);
-  const startCanvasPan = React.useCallback((
-    pointerId: number,
-    clientX: number,
-    clientY: number,
-  ) => {
-    const element = canvasScrollRef.current;
-    if (!element) {
-      return false;
-    }
-    setIsCanvasPanning(true);
-    setZoomMenuState({ open: false });
-    applyCanvasPanInteractionGuards();
-    panSessionRef.current = {
-      pointerId,
-      startX: clientX,
-      startY: clientY,
-      startScrollLeft: element.scrollLeft,
-      startScrollTop: element.scrollTop,
-    };
-    return true;
-  }, [applyCanvasPanInteractionGuards]);
-  const moveCanvasPan = React.useCallback((pointerId: number, clientX: number, clientY: number) => {
-    const session = panSessionRef.current;
-    const element = canvasScrollRef.current;
-    if (!session || !element || session.pointerId !== pointerId) {
-      return;
-    }
-    element.scrollLeft = session.startScrollLeft - (clientX - session.startX);
-    element.scrollTop = session.startScrollTop - (clientY - session.startY);
-    syncCanvasViewportState();
-  }, [syncCanvasViewportState]);
-  const endCanvasPan = React.useCallback((pointerId: number) => {
-    if (panSessionRef.current?.pointerId !== pointerId) {
-      return false;
-    }
-    setIsCanvasPanning(false);
-    panSessionRef.current = null;
-    clearCanvasPanInteractionGuards();
-    return true;
-  }, [clearCanvasPanInteractionGuards]);
-  const handleCanvasWheelEvent = React.useCallback((event: {
-    ctrlKey: boolean;
-    metaKey: boolean;
-    deltaY: number;
-    clientX: number;
-    clientY: number;
-    preventDefault: () => void;
-    stopPropagation?: () => void;
-  }) => {
-    if (!(event.ctrlKey || event.metaKey)) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation?.();
-    updateCanvasScale(resolveWheelZoomScale(canvasScale, event.deltaY), {
-      clientX: event.clientX,
-      clientY: event.clientY,
-    });
-  }, [canvasScale, updateCanvasScale]);
 
-  const handleCanvasPointerDown = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
-    if (!shouldStartCanvasPan(event.button)) {
-      return;
-    }
-    if (!startCanvasPan(event.pointerId, event.screenX, event.screenY)) {
-      return;
-    }
-    event.preventDefault();
-    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
-  }, [shouldStartCanvasPan, startCanvasPan]);
-
-  const handleCanvasPointerMove = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
-    moveCanvasPan(event.pointerId, event.screenX, event.screenY);
-  }, [moveCanvasPan]);
-
-  const handleCanvasPointerUp = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
-    if (!endCanvasPan(event.pointerId)) {
-      return;
-    }
-    (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
-  }, [endCanvasPan]);
-  React.useEffect(() => {
-    if (canvasSurface?.mode !== 'iframe' || !canvasSurface.rootElement) {
-      return;
-    }
-    const rootElement = canvasSurface.rootElement;
-
-    // Use screenX/Y for pan coordinates — they are absolute and never
-    // shift when the iframe element moves during outer-container scroll.
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!shouldStartCanvasPan(event.button)) {
-        return;
-      }
-      if (!startCanvasPan(event.pointerId, event.screenX, event.screenY)) {
-        return;
-      }
-      event.preventDefault();
-      rootElement.setPointerCapture(event.pointerId);
-    };
-    const handlePointerMove = (event: PointerEvent) => {
-      moveCanvasPan(event.pointerId, event.screenX, event.screenY);
-    };
-    const handlePointerUp = (event: PointerEvent) => {
-      if (!endCanvasPan(event.pointerId)) {
-        return;
-      }
-      try { rootElement.releasePointerCapture(event.pointerId); } catch { /* noop */ }
-    };
-
-    rootElement.addEventListener('pointerdown', handlePointerDown, true);
-    rootElement.addEventListener('pointermove', handlePointerMove, true);
-    rootElement.addEventListener('pointerup', handlePointerUp, true);
-    rootElement.addEventListener('pointercancel', handlePointerUp, true);
-    return () => {
-      rootElement.removeEventListener('pointerdown', handlePointerDown, true);
-      rootElement.removeEventListener('pointermove', handlePointerMove, true);
-      rootElement.removeEventListener('pointerup', handlePointerUp, true);
-      rootElement.removeEventListener('pointercancel', handlePointerUp, true);
-    };
-  }, [canvasSurface, endCanvasPan, moveCanvasPan, shouldStartCanvasPan, startCanvasPan]);
-  React.useEffect(() => {
-    const element = canvasScrollRef.current;
-    if (!element) {
-      return;
-    }
-
-    const handleWheel = (event: WheelEvent) => {
-      handleCanvasWheelEvent(event);
-    };
-
-    element.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-    return () => {
-      element.removeEventListener('wheel', handleWheel, true);
-    };
-  }, [handleCanvasWheelEvent]);
-  React.useEffect(() => {
-    if (canvasSurface?.mode !== 'iframe' || !canvasSurface.ownerDocument) {
-      return;
-    }
-
-    const ownerDocument = canvasSurface.ownerDocument;
-    const frameElement = canvasSurface.hostElement as HTMLIFrameElement;
-    const handleWheel = (event: WheelEvent) => {
-      const frameRect = frameElement.getBoundingClientRect();
-      handleCanvasWheelEvent({
-        ctrlKey: event.ctrlKey,
-        metaKey: event.metaKey,
-        deltaY: event.deltaY,
-        clientX: frameRect.left + event.clientX,
-        clientY: frameRect.top + event.clientY,
-        preventDefault: () => event.preventDefault(),
-        stopPropagation: () => event.stopPropagation(),
-      });
-    };
-
-    ownerDocument.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-    return () => {
-      ownerDocument.removeEventListener('wheel', handleWheel, true);
-    };
-  }, [canvasSurface, handleCanvasWheelEvent]);
-
-  const clearCanvasDragState = React.useCallback(() => {
-    setCanvasDragSession(null);
-    setCanvasDropIndicator(null);
-  }, []);
-  React.useEffect(() => {
-    if (activeCanvasTool === 'pan') {
-      clearCanvasDragState();
-    }
-  }, [activeCanvasTool, clearCanvasDragState]);
-
-  const resolveCanvasDropIndicator = React.useCallback((
-    clientX: number,
-    clientY: number,
-  ): CanvasDropIndicator | null => {
-    const stageElement = stageRef.current;
-    const surface = canvasSurface;
-    if (!stageElement || !surface) {
-      return null;
-    }
-
-    const stageRect = stageElement.getBoundingClientRect();
-    if (
-      clientX < stageRect.left
-      || clientX > stageRect.right
-      || clientY < stageRect.top
-      || clientY > stageRect.bottom
-    ) {
-      return null;
-    }
-
-    const localX = (clientX - stageRect.left) / canvasScale;
-    const localY = (clientY - stageRect.top) / canvasScale;
-    const nodeElements = [...(surface.rootElement?.querySelectorAll('[data-shenbi-node-id]') ?? [])];
-
-    const candidates = nodeElements
-      .map((element) => {
-        const rect = surface.getRelativeRect(element);
-        const contains = (
-          localX >= rect.left
-          && localX <= rect.left + rect.width
-          && localY >= rect.top
-          && localY <= rect.top + rect.height
-        );
-        return { element, rect, area: rect.width * rect.height, contains };
-      })
-      .filter((item) => item.contains && item.rect.width > 0 && item.rect.height > 0)
-      .sort((left, right) => left.area - right.area);
-
-    if (candidates.length === 0) {
-      return {
-        target: { placement: 'root' },
-        top: 0,
-        left: 0,
-        width: stageWidth,
-        height: Math.max(stageContentHeightRef.current, STAGE_MIN_HEIGHT),
-        variant: 'frame',
-      };
-    }
-
-    const hit = candidates[0];
-    if (!hit) {
-      return null;
-    }
-    const nodeId = hit.element.getAttribute('data-shenbi-node-id') ?? undefined;
-    if (!nodeId) {
-      return null;
-    }
-
-    return resolveNodeDropIndicator(
-      nodeId,
-      hit.rect,
-      localY,
-      canCanvasDropInsideNode?.(nodeId) ?? true,
-    );
-  }, [canCanvasDropInsideNode, canvasScale, canvasSurface]);
-
-  const updateCanvasDropIndicator = React.useCallback((clientX: number, clientY: number) => {
-    setCanvasDropIndicator(resolveCanvasDropIndicator(clientX, clientY));
-  }, [resolveCanvasDropIndicator]);
-
-  const handleSidebarStartDragComponent = React.useCallback((componentType: string) => {
-    if (canvasReadOnly || activeCanvasTool === 'pan') {
-      return;
-    }
-    setCanvasDragSession({
-      source: 'component',
-      componentType,
-    });
-  }, [activeCanvasTool, canvasReadOnly]);
-
-  const handleSidebarEndDragComponent = React.useCallback(() => {
-    clearCanvasDragState();
-  }, [clearCanvasDragState]);
-
-  const startSelectedNodeDrag = React.useCallback((dataTransfer: DataTransfer | null): boolean => {
-    if (canvasReadOnly || activeCanvasTool === 'pan' || !selectedNodeTreeId || !dataTransfer) {
-      return false;
-    }
-    dataTransfer.effectAllowed = 'move';
-    dataTransfer.setData('text/plain', selectedNodeTreeId);
-    dataTransfer.setData('application/x-shenbi-selected-node', selectedNodeTreeId);
-    setCanvasDragSession({
-      source: 'selected-node',
-    });
-    return true;
-  }, [activeCanvasTool, canvasReadOnly, selectedNodeTreeId]);
-
-  const handleSelectedDragStart = React.useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    if (!startSelectedNodeDrag(event.dataTransfer)) {
-      event.preventDefault();
-    }
-  }, [startSelectedNodeDrag]);
-
-  React.useEffect(() => {
-    if (!canvasSurface || !selectedNodeSchemaId) {
-      return;
-    }
-
-    const selectedElement = canvasSurface.findNodeElement(selectedNodeSchemaId);
-    if (!(selectedElement instanceof HTMLElement)) {
-      return;
-    }
-
-    const previousDraggableAttr = selectedElement.getAttribute('draggable');
-    const handleDragStart = (event: DragEvent) => {
-      if (!startSelectedNodeDrag(event.dataTransfer)) {
-        event.preventDefault();
-      }
-    };
-    const handleDragEnd = () => {
-      clearCanvasDragState();
-    };
-
-    selectedElement.setAttribute('draggable', (!canvasReadOnly && activeCanvasTool !== 'pan' && selectedNodeTreeId) ? 'true' : 'false');
-    selectedElement.addEventListener('dragstart', handleDragStart);
-    selectedElement.addEventListener('dragend', handleDragEnd);
-
-    return () => {
-      selectedElement.removeEventListener('dragstart', handleDragStart);
-      selectedElement.removeEventListener('dragend', handleDragEnd);
-      if (previousDraggableAttr === null) {
-        selectedElement.removeAttribute('draggable');
-      } else {
-        selectedElement.setAttribute('draggable', previousDraggableAttr);
-      }
-    };
-  }, [
-    activeCanvasTool,
-    canvasReadOnly,
-    canvasSurface,
-    clearCanvasDragState,
-    selectedNodeSchemaId,
-    selectedNodeTreeId,
-    startSelectedNodeDrag,
-  ]);
-
-  const handleCanvasDragOver = React.useCallback((event: React.DragEvent<HTMLElement>) => {
-    if (!canvasDragSession || canvasReadOnly || activeCanvasTool === 'pan') {
-      return;
-    }
-    event.preventDefault();
-    event.dataTransfer.dropEffect = canvasDragSession.source === 'component' ? 'copy' : 'move';
-    updateCanvasDropIndicator(event.clientX, event.clientY);
-  }, [activeCanvasTool, canvasDragSession, canvasReadOnly, updateCanvasDropIndicator]);
-
-  const handleCanvasDragLeave = React.useCallback((event: React.DragEvent<HTMLElement>) => {
-    const nextTarget = event.relatedTarget;
-    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
-      return;
-    }
-    setCanvasDropIndicator(null);
-  }, []);
-
-  const handleCanvasDrop = React.useCallback((event: React.DragEvent<HTMLElement>) => {
-    if (!canvasDragSession || canvasReadOnly || activeCanvasTool === 'pan') {
-      clearCanvasDragState();
-      return;
-    }
-    event.preventDefault();
-    const indicator = resolveCanvasDropIndicator(event.clientX, event.clientY);
-    if (!indicator) {
-      clearCanvasDragState();
-      return;
-    }
-    if (canvasDragSession.source === 'component' && canvasDragSession.componentType) {
-      onCanvasInsertComponent?.(canvasDragSession.componentType, indicator.target);
-    } else if (canvasDragSession.source === 'selected-node') {
-      onCanvasMoveSelectedNode?.(indicator.target);
-    }
-    clearCanvasDragState();
-  }, [
-    activeCanvasTool,
-    canvasDragSession,
-    canvasReadOnly,
-    clearCanvasDragState,
-    onCanvasInsertComponent,
-    onCanvasMoveSelectedNode,
-    resolveCanvasDropIndicator,
-  ]);
 
   const canvasCursorClassName = isCanvasPanning
     ? 'cursor-grabbing'
@@ -2503,4 +1796,3 @@ export function AppShell({
     </div>
   );
 }
-
