@@ -48,13 +48,20 @@ vi.mock('../canvas/iframe-pool', () => {
 });
 
 import { AppShell as RawAppShell } from './AppShell';
+import { createPageCanvasPlugin } from '@shenbi/editor-plugin-page-canvas';
+
+const pageCanvasPlugin = createPageCanvasPlugin();
 
 type AppShellProps = Omit<React.ComponentProps<typeof RawAppShell>, 'workspaceId'> & {
   workspaceId?: string;
 };
 
 function AppShell(props: AppShellProps) {
-  return <RawAppShell {...props} workspaceId={props.workspaceId ?? 'test-workspace'} />;
+  const mergedPlugins = React.useMemo(() => {
+    const base = props.plugins ?? [];
+    return [pageCanvasPlugin, ...base];
+  }, [props.plugins]);
+  return <RawAppShell {...props} plugins={mergedPlugins} workspaceId={props.workspaceId ?? 'test-workspace'} />;
 }
 
 describe('AppShell iframe canvas mode', () => {

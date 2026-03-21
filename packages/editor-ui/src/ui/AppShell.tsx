@@ -77,6 +77,7 @@ import {
   STAGE_DEFAULT_WIDTH,
   STAGE_MIN_HEIGHT,
   DEVICE_FRAME_PADDING,
+  DEVICE_PRESETS,
   type DevicePreset,
 } from '../canvas/constants';
 import { createBuiltinSidebarTabs } from './sidebar-tabs';
@@ -162,11 +163,7 @@ const THEME_CLASSES = [
   'theme-webstorm-dark',
 ] as const;
 
-const DEVICE_PRESETS: DevicePreset[] = [
-  { id: 'phone', label: 'Phone', width: 375, icon: Smartphone, frame: 'phone' },
-  { id: 'tablet', label: 'Tablet', width: 768, icon: Tablet, frame: 'tablet' },
-  { id: 'desktop', label: 'Desktop', width: 1200, icon: Monitor, frame: 'monitor' },
-];
+
 
 function isPromiseLike(value: unknown): value is Promise<unknown> {
   return Boolean(value) && typeof (value as Promise<unknown>).then === 'function';
@@ -296,7 +293,7 @@ export function AppShell({
 
   const dragDrop = useCanvasDragDrop({
     stageRef,
-    canvasSurface,
+    canvasSurface: null, // PageCanvasRenderer owns the surface drag-drop behavior
     canvasScale: zoom.canvasScale,
     stageWidth,
     stageContentHeightRef: zoom.stageContentHeightRef,
@@ -493,11 +490,9 @@ export function AppShell({
     [activeTabId, tabs],
   );
   const activeCanvasRenderer = React.useMemo(() => {
-    if (!activeEditorTab?.fileType || activeEditorTab.fileType === 'page') {
-      return undefined;
-    }
+    const fileType = activeEditorTab?.fileType ?? 'page'; // Default to page canvas when no tab is active
     return pluginContributes.canvasRenderers.find(
-      (renderer) => renderer.fileTypes.includes(activeEditorTab.fileType),
+      (renderer) => renderer.fileTypes.includes(fileType),
     );
   }, [activeEditorTab, pluginContributes.canvasRenderers]);
   const fileContextTabs = React.useMemo(() => {
@@ -1390,7 +1385,7 @@ export function AppShell({
     ];
   }, [hostCommandMap, pluginCommandMap, resolveCommandState, runCommand]);
 
-  const shouldRenderFileContextPanel = (activeEditorTab?.fileType === 'page' || Boolean(activeCanvasRenderer)) && showFileContextPanel;
+  const shouldRenderFileContextPanel = Boolean(activeEditorTab) && (activeEditorTab?.fileType === 'page' || Boolean(activeCanvasRenderer)) && showFileContextPanel;
 
   return (
     <div ref={rootRef} className="h-screen w-screen flex flex-col bg-bg-canvas text-text-primary overflow-hidden font-inter">
@@ -1521,214 +1516,37 @@ export function AppShell({
                     ...(activeEditorTab?.fileName ? { activeFileName: activeEditorTab.fileName } : {}),
                     ...(activeEditorTab?.fileType ? { activeFileType: activeEditorTab.fileType } : {}),
                     pluginContext: resolvedPluginContext,
+                    children,
+                    renderMode,
+                    theme,
+                    canvasReadOnly,
+                    selectedNodeSchemaId,
+                    selectedNodeTreeId,
+                    hoveredNodeSchemaId,
+                    breadcrumbItems,
+                    onBreadcrumbSelect,
+                    onBreadcrumbHover,
+                    canCanvasDropInsideNode,
+                    onInsertComponent: onCanvasInsertComponent as ((componentType: string, target: unknown) => void) | undefined,
+                    onMoveSelectedNode: onCanvasMoveSelectedNode as ((target: unknown) => void) | undefined,
+                    canDeleteSelectedNode,
+                    canDuplicateSelectedNode,
+                    canMoveSelectedNodeUp,
+                    canMoveSelectedNodeDown,
+                    selectionOverlayActions,
+                    onSurfacePointerSelection: handleSurfacePointerSelection,
+                    onCanvasSurfaceReady: (surface: unknown) => setCanvasSurface(surface as CanvasSurfaceHandle | null),
+                    onCanvasContextMenu: (event: React.MouseEvent) => openContextMenu('canvas', event as React.MouseEvent<HTMLElement>),
+                    ...(onCanvasSelectNode ? { onSelectNode: onCanvasSelectNode } : {}),
+                    ...(onCanvasDeselectNode ? { onDeselectNode: onCanvasDeselectNode } : {}),
+                    activeCanvasTool,
+                    setActiveCanvasTool: setActiveCanvasTool as (mode: string) => void,
                   })}
                 </div>
               ) : (
-              <div className="relative flex flex-1 min-h-0 flex-col">
-                <div ref={canvasChromeRef} className="canvas-toolbar-layer">
-                  <CanvasToolRail
-                    activeTool={activeCanvasTool}
-                    spacePanActive={isSpacePressed}
-                    focusSelectionDisabled={!canFocusCanvasSelection}
-                    onSelectTool={() => { void runCommand('canvas.tool.select'); }}
-                    onPanTool={() => { void runCommand('canvas.tool.pan'); }}
-                    onFit={() => { void runCommand('canvas.fitView'); }}
-                    onCenter={() => { void runCommand('canvas.centerStage'); }}
-                    onFocusSelection={() => { void runCommand('canvas.focusSelection'); }}
-                  />
-                  <CanvasZoomHud
-                    scale={canvasScale}
-                    viewportState={canvasViewportState}
-                    stageWidth={stageWidth}
-                    stageHeight={Math.max(stageContentHeight, STAGE_MIN_HEIGHT)}
-                    stageLeft={canvasStageLeft}
-                    stageTop={CANVAS_WS_STAGE_TOP}
-                    workspaceWidth={canvasWorkspaceWidth}
-                    workspaceHeight={canvasWorkspaceHeight}
-                    menuOpen={zoomMenuState.open}
-                    menuRef={zoomMenuRef}
-                    onZoomOut={() => { void runCommand('canvas.zoomOut'); }}
-                    onZoomIn={() => { void runCommand('canvas.zoomIn'); }}
-                    onToggleMenu={() => setZoomMenuState((current) => ({ open: !current.open }))}
-                    onSelectScale={(nextScale) => {
-                      updateCanvasScalePreset(nextScale);
-                    }}
-                    onFit={() => {
-                      void runCommand('canvas.fitView');
-                      setZoomMenuState({ open: false });
-                    }}
-                  />
+                <div className="flex-1 flex items-center justify-center text-text-secondary">
+                  <span>No editor available for this file type</span>
                 </div>
-                <main
-                  data-shenbi-shortcut-area="canvas"
-                  ref={(node) => {
-                    canvasScrollRef.current = node;
-                  }}
-                  className={`flex-1 overflow-auto scrollbar-hide relative canvas-grid ${canvasCursorClassName}`}
-                  onContextMenu={(event) => openContextMenu('canvas', event)}
-                  onPointerDown={handleCanvasPointerDown}
-                  onPointerMove={handleCanvasPointerMove}
-                  onPointerUp={handleCanvasPointerUp}
-                  onPointerCancel={handleCanvasPointerUp}
-                  onDragOver={handleCanvasDragOver}
-                  onDrop={handleCanvasDrop}
-                  onDragLeave={handleCanvasDragLeave}
-                >
-                  <div
-                    className="relative"
-                    style={{
-                      width: `${canvasWorkspaceWidth}px`,
-                      height: `${canvasWorkspaceHeight}px`,
-                      minWidth: `${canvasWorkspaceWidth}px`,
-                      minHeight: `${canvasWorkspaceHeight}px`,
-                    }}
-                  >
-                    <div
-                      ref={stageRef}
-                      className="absolute"
-                      style={{
-                        left: `${canvasStageLeft}px`,
-                        top: `${CANVAS_WS_STAGE_TOP}px`,
-                        width: `${stageWidth + (showDeviceFrame && activeDevice.frame ? (DEVICE_FRAME_PADDING[activeDevice.frame]?.[1] ?? 0) + (DEVICE_FRAME_PADDING[activeDevice.frame]?.[3] ?? 0) : 0)}px`,
-                        minHeight: `${STAGE_MIN_HEIGHT + (showDeviceFrame && activeDevice.frame ? (DEVICE_FRAME_PADDING[activeDevice.frame]?.[0] ?? 0) + (DEVICE_FRAME_PADDING[activeDevice.frame]?.[2] ?? 0) : 0)}px`,
-                        transform: `translate3d(0, 0, 0) scale(${canvasScale})`,
-                        transformOrigin: 'top left',
-                        willChange: 'transform',
-                        backfaceVisibility: 'hidden',
-                      }}
-                    >
-                      {showDeviceFrame && activeDevice.frame ? (
-                        <div className={`device-frame device-frame--${activeDevice.frame}`}>
-                          <div className="relative z-10 stage-viewport rounded-sm overflow-hidden border border-border-ide" style={{ width: `${stageWidth}px`, minHeight: `${STAGE_MIN_HEIGHT}px` }}>
-                            <CanvasSurface
-                              mode={renderMode}
-                              themeClassName={`theme-${theme}`}
-                              pointerEventsDisabled={Boolean(canvasDragSession)}
-                              onReady={setCanvasSurface}
-                            >
-                              {children}
-                            </CanvasSurface>
-                            {canvasDropIndicator ? (
-                              <div
-                                className={`absolute z-[55] ${canvasDropIndicator.variant === 'line' ? 'bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]' : 'border-2 border-dashed border-blue-500 bg-blue-500/8'}`}
-                                style={{
-                                  top: canvasDropIndicator.top,
-                                  left: canvasDropIndicator.left,
-                                  width: canvasDropIndicator.width,
-                                  height: canvasDropIndicator.variant === 'line'
-                                    ? 2
-                                    : Math.max(canvasDropIndicator.height, 24),
-                                  pointerEvents: 'none',
-                                }}
-                              />
-                            ) : null}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="relative z-10 stage-viewport rounded-sm overflow-hidden border border-border-ide" style={{ width: `${stageWidth}px`, minHeight: `${STAGE_MIN_HEIGHT}px` }}>
-                          <CanvasSurface
-                            mode={renderMode}
-                            themeClassName={`theme-${theme}`}
-                            pointerEventsDisabled={Boolean(canvasDragSession)}
-                            onReady={setCanvasSurface}
-                          >
-                            {children}
-                          </CanvasSurface>
-                          {canvasDropIndicator ? (
-                            <div
-                              className={`absolute z-[55] ${canvasDropIndicator.variant === 'line' ? 'bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]' : 'border-2 border-dashed border-blue-500 bg-blue-500/8'}`}
-                              style={{
-                                top: canvasDropIndicator.top,
-                                left: canvasDropIndicator.left,
-                                width: canvasDropIndicator.width,
-                                height: canvasDropIndicator.variant === 'line'
-                                  ? 2
-                                  : Math.max(canvasDropIndicator.height, 24),
-                                pointerEvents: 'none',
-                              }}
-                            />
-                          ) : null}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Selection overlay — rendered OUTSIDE the scaled stage at native 1x.
-                        Positions are computed in canvas-space (rect * canvasScale). */}
-                    {(() => {
-                      const framePad = showDeviceFrame && activeDevice.frame
-                        ? DEVICE_FRAME_PADDING[activeDevice.frame]
-                        : undefined;
-                      const overlayOffsetLeft = framePad ? framePad[3] * canvasScale : 0;
-                      const overlayOffsetTop = framePad ? framePad[0] * canvasScale : 0;
-                      return (
-                        <div
-                          className="absolute"
-                          style={{
-                            left: `${canvasStageLeft + overlayOffsetLeft}px`,
-                            top: `${CANVAS_WS_STAGE_TOP + overlayOffsetTop}px`,
-                            width: `${stageWidth * canvasScale}px`,
-                            height: `${Math.max(stageContentHeight, STAGE_MIN_HEIGHT) * canvasScale}px`,
-                            pointerEvents: 'none',
-                            zIndex: 20,
-                          }}
-                        >
-                      <SelectionOverlay
-                        surface={canvasSurface}
-                        selectedNodeSchemaId={selectedNodeSchemaId}
-                        externalHoverNodeSchemaId={activeCanvasTool === 'pan' ? undefined : hoveredNodeSchemaId}
-                        ancestorItems={breadcrumbItems}
-                        actions={selectionOverlayActions}
-                        onSelectAncestor={onBreadcrumbSelect}
-                        onHoverAncestor={onBreadcrumbHover}
-                        hoverEnabled={activeCanvasTool !== 'pan'}
-                        dragSelectedEnabled={!canvasReadOnly && activeCanvasTool !== 'pan' && Boolean(selectedNodeTreeId)}
-                        onStartDragSelected={handleSelectedDragStart}
-                        onEndDragSelected={clearCanvasDragState}
-                        canvasScale={canvasScale}
-                      />
-                    </div>
-                      );
-                    })()}
-
-                    {/* Device Preview Bar — independently positioned above the full stage+frame */}
-                    {(() => {
-                      const framePadH = showDeviceFrame && activeDevice.frame
-                        ? (DEVICE_FRAME_PADDING[activeDevice.frame]?.[1] ?? 0) + (DEVICE_FRAME_PADDING[activeDevice.frame]?.[3] ?? 0)
-                        : 0;
-                      const totalVisualW = (stageWidth + framePadH) * canvasScale;
-                      return (
-                        <div
-                          className="absolute flex items-center justify-center"
-                          style={{
-                            left: `${canvasStageLeft}px`,
-                            top: `${CANVAS_WS_STAGE_TOP - 48}px`,
-                            width: `${totalVisualW}px`,
-                            pointerEvents: 'none',
-                            zIndex: 20,
-                          }}
-                        >
-                          <DevicePreviewBar
-                            presets={DEVICE_PRESETS}
-                            activeDeviceId={activeDeviceId}
-                            stageWidth={stageWidth}
-                            stageMinHeight={STAGE_MIN_HEIGHT}
-                            scale={canvasViewportState.scale}
-                            showDeviceFrame={showDeviceFrame}
-                            hasFrame={Boolean(activeDevice.frame)}
-                            onSelectDevice={(id) => {
-                              setActiveDeviceId(id);
-                            }}
-                            onChangeWidth={setCustomStageWidth}
-                            onToggleFrame={() => setShowDeviceFrame((v) => !v)}
-                            onSelectScale={updateCanvasScalePreset}
-                            onFit={fitCanvasToViewport}
-                          />
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </main>
-              </div>
               )}
                 <CommandPalette
                   commands={commandPaletteCommands}

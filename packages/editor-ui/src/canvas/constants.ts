@@ -1,4 +1,5 @@
 import type React from 'react';
+import { Monitor, Smartphone, Tablet } from 'lucide-react';
 
 export const STAGE_DEFAULT_WIDTH = 1200;
 export const STAGE_MIN_HEIGHT = 800;
@@ -21,3 +22,9 @@ export const DEVICE_FRAME_PADDING: Record<string, [number, number, number, numbe
   tablet: [28, 20, 28, 20],
   monitor: [20, 20, 56, 20],
 };
+
+export const DEVICE_PRESETS: DevicePreset[] = [
+  { id: 'phone', label: 'Phone', width: 375, icon: Smartphone, frame: 'phone' },
+  { id: 'tablet', label: 'Tablet', width: 768, icon: Tablet, frame: 'tablet' },
+  { id: 'desktop', label: 'Desktop', width: 1200, icon: Monitor, frame: 'monitor' },
+];

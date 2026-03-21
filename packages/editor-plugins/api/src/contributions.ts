@@ -115,6 +115,68 @@ export interface CanvasRendererRenderContext {
   activeFileName?: string;
   activeFileType?: string;
   pluginContext?: PluginContext;
+  /** The actual page content to render inside the canvas surface */
+  children?: React.ReactNode;
+  /** Render mode: 'direct' DOM or 'iframe' isolation */
+  renderMode?: 'direct' | 'iframe';
+  /** Current theme name (e.g. 'light', 'dark') */
+  theme?: string;
+  /** Whether the canvas is read-only */
+  canvasReadOnly?: boolean;
+  /** Callback when a node is selected on the canvas */
+  onSelectNode?: (nodeId: string) => void;
+  /** Callback when the canvas selection is cleared */
+  onDeselectNode?: () => void;
+  /** Currently selected node schema ID */
+  selectedNodeSchemaId?: string;
+  /** Currently selected node tree ID */
+  selectedNodeTreeId?: string;
+  /** Currently hovered node schema ID */
+  hoveredNodeSchemaId?: string | null;
+  /** Breadcrumb ancestor items for the selection overlay */
+  breadcrumbItems?: Array<{ id: string; label: string }>;
+  /** Callback when a breadcrumb ancestor is selected */
+  onBreadcrumbSelect?: (nodeId: string) => void;
+  /** Callback when a breadcrumb ancestor is hovered */
+  onBreadcrumbHover?: (nodeId: string | null) => void;
+  /** Check if a drop target can accept children */
+  canCanvasDropInsideNode?: (nodeSchemaId: string) => boolean;
+  /** Callback when a component is inserted via drag-drop */
+  onInsertComponent?: (componentType: string, target: unknown) => void;
+  /** Callback when the selected node is moved via drag-drop */
+  onMoveSelectedNode?: (target: unknown) => void;
+  /** Whether the selected node can be deleted */
+  canDeleteSelectedNode?: boolean;
+  /** Whether the selected node can be duplicated */
+  canDuplicateSelectedNode?: boolean;
+  /** Whether the selected node can be moved up */
+  canMoveSelectedNodeUp?: boolean;
+  /** Whether the selected node can be moved down */
+  canMoveSelectedNodeDown?: boolean;
+  /** Selection overlay action buttons */
+  selectionOverlayActions?: Array<{
+    id: string;
+    title: string;
+    icon?: React.ReactNode;
+    disabled?: boolean;
+    onRun?: () => void;
+  }>;
+  /** Handler for pointer-based node selection on the canvas surface */
+  onSurfacePointerSelection?: (target: EventTarget | null) => void;
+  /** CSS class for the canvas cursor (e.g. 'cursor-grabbing', 'canvas-cursor-grab') */
+  canvasCursorClassName?: string;
+  /** Callback when the CanvasSurface is ready */
+  onCanvasSurfaceReady?: (surface: unknown) => void;
+  /** Callback when the canvas context menu is opened */
+  onCanvasContextMenu?: (event: React.MouseEvent) => void;
+  /** Callback for sidebar drag component start */
+  onSidebarStartDragComponent?: (componentType: string) => void;
+  /** Callback for sidebar drag component end */
+  onSidebarEndDragComponent?: () => void;
+  /** Current active canvas tool mode (e.g. 'select', 'pan') */
+  activeCanvasTool?: string;
+  /** Callback to change the active canvas tool mode */
+  setActiveCanvasTool?: (mode: string) => void;
 }
 
 export interface CanvasRendererContribution extends OrderedContribution {

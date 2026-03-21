@@ -75,6 +75,7 @@ import { createSetterPlugin } from '@shenbi/editor-plugin-setter';
 import { createGitLabSyncPlugin } from '@shenbi/editor-plugin-gitlab-sync';
 import type { GitLabProject } from '@shenbi/editor-plugin-gitlab-sync';
 import { createGatewayPlugin } from '@shenbi/editor-plugin-gateway';
+import { createPageCanvasPlugin } from '@shenbi/editor-plugin-page-canvas';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
 
 type ScenarioKey =
@@ -1543,6 +1544,7 @@ export function App() {
         getAvailableComponents: () => builtinContracts,
       }),
       createGatewayPlugin(),
+      createPageCanvasPlugin(),
     ];
 
     if (appMode === 'shell' && vfsInitialized) {

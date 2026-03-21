@@ -6,7 +6,6 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
-  Controls,
   MiniMap,
   useReactFlow,
   type OnNodesChange,
@@ -20,6 +19,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { CanvasZoomHud } from '@shenbi/editor-ui';
 
 import { nodeTypes as baseNodeTypes } from '../nodes/node-registry';
 import { TypedEdge } from '../edges/TypedEdge';
@@ -61,6 +61,7 @@ export function GatewayCanvas({
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
   const [zoom, setZoom] = useState(1);
   const [showZoomMenu, setShowZoomMenu] = useState(false);
+  const zoomMenuRef = useRef<HTMLDivElement>(null);
   const [selectorPanel, setSelectorPanel] = useState<{
     visible: boolean;
     position: { x: number; y: number };
@@ -246,31 +247,23 @@ export function GatewayCanvas({
     return types;
   }, [handleAddNode]);
 
-  // Zoom control functions
+  // Zoom control functions — delegate to ReactFlow instance
   const handleZoomIn = useCallback(() => {
-    if (reactFlowInstance.current) {
-      reactFlowInstance.current.zoomIn();
-    }
+    reactFlowInstance.current?.zoomIn();
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    if (reactFlowInstance.current) {
-      reactFlowInstance.current.zoomOut();
-    }
+    reactFlowInstance.current?.zoomOut();
   }, []);
 
   const handleZoomTo = useCallback((zoomLevel: number) => {
-    if (reactFlowInstance.current) {
-      reactFlowInstance.current.zoomTo(zoomLevel);
-      setShowZoomMenu(false);
-    }
+    reactFlowInstance.current?.zoomTo(zoomLevel);
+    setShowZoomMenu(false);
   }, []);
 
   const handleZoomToFit = useCallback(() => {
-    if (reactFlowInstance.current) {
-      reactFlowInstance.current.fitView({ padding: 0.2 });
-      setShowZoomMenu(false);
-    }
+    reactFlowInstance.current?.fitView({ padding: 0.2 });
+    setShowZoomMenu(false);
   }, []);
 
   // Close zoom menu when clicking outside
@@ -279,7 +272,7 @@ export function GatewayCanvas({
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (!target.closest('.gateway-canvas__zoom-display-wrapper')) {
+      if (!target.closest('.canvas-zoom-hud')) {
         setShowZoomMenu(false);
       }
     };
@@ -319,7 +312,6 @@ export function GatewayCanvas({
         proOptions={{ hideAttribution: true }}
       >
         <Background color="#333333" />
-        <Controls />
         <MiniMap
           nodeColor={minimapNodeColor}
           nodeStrokeWidth={2}
@@ -332,66 +324,18 @@ export function GatewayCanvas({
         />
       </ReactFlow>
 
-      {/* Zoom controls */}
-      <div className="gateway-canvas__zoom-controls">
-        <button
-          className="gateway-canvas__zoom-button"
-          onClick={handleZoomOut}
-          title="缩小"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
-            <line x1="4" y1="7" x2="10" y2="7" stroke="currentColor" strokeWidth="1.5" />
-            <line x1="11" y1="11" x2="15" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-        
-        <div className="gateway-canvas__zoom-display-wrapper">
-          <button
-            className="gateway-canvas__zoom-display"
-            onClick={() => setShowZoomMenu(!showZoomMenu)}
-          >
-            {Math.round(zoom * 100)}%
-          </button>
-          
-          {showZoomMenu && (
-            <div className="gateway-canvas__zoom-menu">
-              <button onClick={() => handleZoomTo(2)} className="gateway-canvas__zoom-menu-item">
-                200%
-              </button>
-              <button onClick={() => handleZoomTo(1)} className="gateway-canvas__zoom-menu-item">
-                100% <span className="gateway-canvas__zoom-menu-shortcut">Shift 1</span>
-              </button>
-              <button onClick={() => handleZoomTo(0.75)} className="gateway-canvas__zoom-menu-item">
-                75%
-              </button>
-              <button onClick={() => handleZoomTo(0.5)} className="gateway-canvas__zoom-menu-item">
-                50% <span className="gateway-canvas__zoom-menu-shortcut">Shift 5</span>
-              </button>
-              <button onClick={() => handleZoomTo(0.25)} className="gateway-canvas__zoom-menu-item">
-                25%
-              </button>
-              <div className="gateway-canvas__zoom-menu-divider" />
-              <button onClick={handleZoomToFit} className="gateway-canvas__zoom-menu-item">
-                Zoom to Fit <span className="gateway-canvas__zoom-menu-shortcut">Ctrl 1</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        <button
-          className="gateway-canvas__zoom-button"
-          onClick={handleZoomIn}
-          title="放大"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
-            <line x1="7" y1="4" x2="7" y2="10" stroke="currentColor" strokeWidth="1.5" />
-            <line x1="4" y1="7" x2="10" y2="7" stroke="currentColor" strokeWidth="1.5" />
-            <line x1="11" y1="11" x2="15" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
+      {/* Zoom controls — shared CanvasZoomHud from editor-ui */}
+      <CanvasZoomHud
+        scale={zoom}
+        menuOpen={showZoomMenu}
+        menuRef={zoomMenuRef}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onToggleMenu={() => setShowZoomMenu((prev) => !prev)}
+        onSelectScale={handleZoomTo}
+        onFit={handleZoomToFit}
+        showMinimap={false}
+      />
 
       {selectorPanel?.visible && (
         <NodeSelectorPanel

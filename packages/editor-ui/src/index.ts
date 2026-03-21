@@ -9,6 +9,10 @@ export * from './ui/EditorTabs';
 export * from './ui/WorkbenchToolbar';
 export * from './ui/AIPanel';
 export * from './ui/CommandPalette';
+export * from './ui/SelectionOverlay';
+export * from './ui/CanvasToolRail';
+export * from './ui/CanvasZoomHud';
+export * from './ui/DevicePreviewBar';
 
 export * from './panels';
 export * from './persistence';
@@ -21,7 +25,13 @@ export * from './hooks/useEditorSession';
 export * from './hooks/useScenarioSession';
 export * from './hooks/useEditorHostBridge';
 export * from './hooks/useTabManager';
+export * from './hooks/useCanvasZoom';
+export * from './hooks/useCanvasPan';
+export * from './hooks/useCanvasDragDrop';
 export * from './canvas/types';
+export * from './canvas/constants';
+export { CanvasSurface } from './canvas/CanvasSurface';
+export { resolveNodeDropIndicator, type CanvasDropIndicator } from './canvas/drop-indicator';
 
 export * from './ai/editor-ai-bridge';
 export * from './ai/useEditorAIBridge';

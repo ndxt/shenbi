@@ -4,6 +4,9 @@ import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { defineEditorPlugin, type ActivityBarItemIconProps } from '@shenbi/editor-plugin-api';
 import type { WorkspacePersistenceAdapter } from '../persistence/workspace-persistence';
+import { createPageCanvasPlugin } from '@shenbi/editor-plugin-page-canvas';
+
+const pageCanvasPlugin = createPageCanvasPlugin();
 
 function MockIcon(_props: ActivityBarItemIconProps) {
   return <span aria-hidden>Icon</span>;
@@ -14,7 +17,11 @@ type AppShellProps = Omit<React.ComponentProps<typeof RawAppShell>, 'workspaceId
 };
 
 function AppShell(props: AppShellProps) {
-  return <RawAppShell {...props} workspaceId={props.workspaceId ?? 'test-workspace'} />;
+  const mergedPlugins = React.useMemo(() => {
+    const base = props.plugins ?? [];
+    return [pageCanvasPlugin, ...base];
+  }, [props.plugins]);
+  return <RawAppShell {...props} plugins={mergedPlugins} workspaceId={props.workspaceId ?? 'test-workspace'} />;
 }
 
 function createPageTab() {
@@ -126,7 +133,9 @@ describe('AppShell', () => {
     await waitFor(() => {
       expect(adapter.getJSON).toHaveBeenCalledWith('test-workspace', 'layout', 'workbench');
     });
-    expect(document.querySelector('[data-shenbi-shortcut-area="sidebar"]')).toBeNull();
+    await waitFor(() => {
+      expect(document.querySelector('[data-shenbi-shortcut-area="sidebar"]')).toBeNull();
+    });
 
     fireEvent.click(screen.getByTitle('Toggle Sidebar'));
 
