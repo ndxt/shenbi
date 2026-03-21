@@ -26,11 +26,11 @@ export interface UseCanvasZoomOptions {
   /** Current stage width in design pixels */
   stageWidth: number;
   /** ID of the currently selected node (for focus‐selection) */
-  selectedNodeSchemaId?: string;
+  selectedNodeSchemaId?: string | undefined;
   /** Base workspace dimension (typically 20000) */
-  workspaceBaseSize?: number;
+  workspaceBaseSize?: number | undefined;
   /** Stage Y offset inside the workspace */
-  workspaceStageTop?: number;
+  workspaceStageTop?: number | undefined;
 }
 
 export interface UseCanvasZoomReturn {

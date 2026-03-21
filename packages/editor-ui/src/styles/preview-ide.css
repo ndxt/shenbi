@@ -31,6 +31,17 @@
   --bg-status-bar: #2563eb;
   --border-ide: #27272a;
   --grid-line: #18181b;
+  --canvas-chrome-border: rgba(255, 255, 255, 0.06);
+  --canvas-chrome-bg: rgba(17, 18, 21, 0.92);
+  --canvas-chrome-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  --canvas-minimap-bg: rgba(255, 255, 255, 0.03);
+  --canvas-minimap-stage-bg: rgba(255, 255, 255, 0.12);
+  --canvas-minimap-stage-border: rgba(255, 255, 255, 0.18);
+  --canvas-minimap-node-bg: rgba(255, 255, 255, 0.2);
+  --canvas-minimap-node-border: rgba(255, 255, 255, 0.22);
+  --canvas-minimap-mask-bg: rgba(17, 18, 21, 0.88);
+  --canvas-minimap-viewport-border: rgba(96, 165, 250, 0.7);
+  --canvas-minimap-viewport-bg: rgba(59, 130, 246, 0.08);
   
   --text-primary: #f4f4f5;
   --text-secondary: #a1a1aa;
@@ -45,6 +56,17 @@
   --bg-status-bar: #3b82f6;
   --border-ide: #e2e8f0;
   --grid-line: #cbd5e1;
+  --canvas-chrome-border: rgba(15, 23, 42, 0.08);
+  --canvas-chrome-bg: rgba(255, 255, 255, 0.92);
+  --canvas-chrome-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  --canvas-minimap-bg: rgba(15, 23, 42, 0.03);
+  --canvas-minimap-stage-bg: rgba(15, 23, 42, 0.1);
+  --canvas-minimap-stage-border: rgba(15, 23, 42, 0.14);
+  --canvas-minimap-node-bg: rgba(15, 23, 42, 0.16);
+  --canvas-minimap-node-border: rgba(15, 23, 42, 0.2);
+  --canvas-minimap-mask-bg: rgba(15, 23, 42, 0.18);
+  --canvas-minimap-viewport-border: rgba(37, 99, 235, 0.55);
+  --canvas-minimap-viewport-bg: rgba(59, 130, 246, 0.12);
   
   --text-primary: #0f172a;
   --text-secondary: #64748b;
@@ -60,6 +82,17 @@
   --bg-status-bar: #427ceb;
   --border-ide: #2b2d31;
   --grid-line: #22252a;
+  --canvas-chrome-border: rgba(255, 255, 255, 0.06);
+  --canvas-chrome-bg: rgba(17, 18, 21, 0.9);
+  --canvas-chrome-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  --canvas-minimap-bg: rgba(255, 255, 255, 0.03);
+  --canvas-minimap-stage-bg: rgba(255, 255, 255, 0.12);
+  --canvas-minimap-stage-border: rgba(255, 255, 255, 0.18);
+  --canvas-minimap-node-bg: rgba(255, 255, 255, 0.2);
+  --canvas-minimap-node-border: rgba(255, 255, 255, 0.22);
+  --canvas-minimap-mask-bg: rgba(17, 18, 21, 0.88);
+  --canvas-minimap-viewport-border: rgba(96, 165, 250, 0.7);
+  --canvas-minimap-viewport-bg: rgba(59, 130, 246, 0.08);
   
   --text-primary: #e4e4e7;
   --text-secondary: #8b8f98;
@@ -76,6 +109,17 @@
   --bg-status-bar: #2b2d30;
   --border-ide: #393b40;
   --grid-line: #2b2d30;
+  --canvas-chrome-border: rgba(255, 255, 255, 0.06);
+  --canvas-chrome-bg: rgba(30, 31, 34, 0.92);
+  --canvas-chrome-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  --canvas-minimap-bg: rgba(255, 255, 255, 0.03);
+  --canvas-minimap-stage-bg: rgba(255, 255, 255, 0.12);
+  --canvas-minimap-stage-border: rgba(255, 255, 255, 0.18);
+  --canvas-minimap-node-bg: rgba(255, 255, 255, 0.2);
+  --canvas-minimap-node-border: rgba(255, 255, 255, 0.22);
+  --canvas-minimap-mask-bg: rgba(17, 18, 21, 0.88);
+  --canvas-minimap-viewport-border: rgba(96, 165, 250, 0.7);
+  --canvas-minimap-viewport-bg: rgba(59, 130, 246, 0.08);
   
   --text-primary: #dfe1e5;
   --text-secondary: #868a91;
@@ -150,10 +194,10 @@ body {
   flex-direction: column;
   gap: 2px;
   padding: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--canvas-chrome-border);
   border-radius: 14px;
-  background: rgba(17, 18, 21, 0.88);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  background: var(--canvas-chrome-bg);
+  box-shadow: var(--canvas-chrome-shadow);
   backdrop-filter: blur(18px);
   pointer-events: auto;
 }
@@ -224,10 +268,10 @@ body {
   align-items: stretch;
   gap: 0;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--canvas-chrome-border);
   border-radius: 14px;
-  background: rgba(17, 18, 21, 0.92);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  background: var(--canvas-chrome-bg);
+  box-shadow: var(--canvas-chrome-shadow);
   backdrop-filter: blur(18px);
   pointer-events: auto;
 }
@@ -266,10 +310,10 @@ body {
   flex-direction: column;
   min-width: 80px;
   padding: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--canvas-chrome-border);
   border-radius: 12px;
-  background: rgba(17, 18, 21, 0.96);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  background: var(--canvas-chrome-bg);
+  box-shadow: var(--canvas-chrome-shadow);
 }
 
 .canvas-zoom-hud__menu-item {
@@ -299,27 +343,38 @@ body {
   width: 120px;
   height: 72px;
   margin: 0;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--canvas-minimap-bg);
+  border-bottom: 1px solid var(--canvas-chrome-border);
   border-radius: 13px 13px 0 0;
   overflow: hidden;
   cursor: pointer;
 }
 
-.canvas-zoom-hud__minimap-stage {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 1px;
-  transition: left 0.1s ease, top 0.1s ease, width 0.1s ease, height 0.1s ease;
+.canvas-minimap {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
-.canvas-zoom-hud__minimap-viewport {
-  position: absolute;
-  border: 1.5px solid rgba(96, 165, 250, 0.7);
-  background: rgba(59, 130, 246, 0.08);
-  border-radius: 1px;
-  transition: left 0.1s ease, top 0.1s ease, width 0.1s ease, height 0.1s ease;
+.canvas-minimap__item--stage,
+.canvas-minimap__item--region {
+  fill: var(--canvas-minimap-stage-bg);
+  stroke: var(--canvas-minimap-stage-border);
+}
+
+.canvas-minimap__item--node {
+  fill: var(--canvas-minimap-node-bg, var(--canvas-minimap-stage-bg));
+  stroke: var(--canvas-minimap-node-border, var(--canvas-minimap-stage-border));
+}
+
+.canvas-minimap__mask {
+  fill: var(--canvas-minimap-mask-bg);
+}
+
+.canvas-minimap__viewport {
+  fill: var(--canvas-minimap-viewport-bg);
+  stroke: var(--canvas-minimap-viewport-border);
+  stroke-width: 1.5;
 }
 
 /* Device Preview Bar */
@@ -329,8 +384,8 @@ body {
   gap: 8px;
   padding: 4px 10px;
   border-radius: 10px;
-  background: rgba(17, 18, 21, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--canvas-chrome-bg);
+  border: 1px solid var(--canvas-chrome-border);
   backdrop-filter: blur(12px);
   pointer-events: auto;
   color: rgba(255, 255, 255, 0.7);

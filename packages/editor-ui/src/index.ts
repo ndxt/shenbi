@@ -11,6 +11,7 @@ export * from './ui/AIPanel';
 export * from './ui/CommandPalette';
 export * from './ui/SelectionOverlay';
 export * from './ui/CanvasToolRail';
+export * from './ui/CanvasMinimap';
 export * from './ui/CanvasZoomHud';
 export * from './ui/DevicePreviewBar';
 

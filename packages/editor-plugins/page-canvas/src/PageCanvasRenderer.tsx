@@ -25,6 +25,7 @@ import {
   DEVICE_PRESETS,
 } from '@shenbi/editor-ui';
 import type { CanvasSurfaceHandle, CanvasToolMode, CanvasDropTarget } from '@shenbi/editor-ui';
+import { buildPageMinimapModel } from './minimap-model';
 
 export interface PageCanvasRendererProps extends CanvasRendererRenderContext {}
 
@@ -178,6 +179,21 @@ export function PageCanvasRenderer(props: PageCanvasRendererProps) {
     : undefined;
   const framePadH = framePad ? (framePad[1] + framePad[3]) : 0;
   const framePadV = framePad ? (framePad[0] + framePad[2]) : 0;
+  const minimapModel = React.useMemo(() => buildPageMinimapModel({
+    viewportState: canvasViewportState,
+    canvasScale,
+    stageWidth,
+    stageHeight: Math.max(stageContentHeight, STAGE_MIN_HEIGHT),
+    stageLeft: canvasStageLeft,
+    stageTop: CANVAS_WS_STAGE_TOP,
+  }), [
+    canvasScale,
+    canvasStageLeft,
+    canvasViewportState,
+    stageWidth,
+    stageContentHeight,
+    CANVAS_WS_STAGE_TOP,
+  ]);
 
   return (
     <div className="relative flex flex-1 min-h-0 flex-col">
@@ -194,13 +210,7 @@ export function PageCanvasRenderer(props: PageCanvasRendererProps) {
         />
         <CanvasZoomHud
           scale={canvasScale}
-          viewportState={canvasViewportState}
-          stageWidth={stageWidth}
-          stageHeight={Math.max(stageContentHeight, STAGE_MIN_HEIGHT)}
-          stageLeft={canvasStageLeft}
-          stageTop={CANVAS_WS_STAGE_TOP}
-          workspaceWidth={canvasWorkspaceWidth}
-          workspaceHeight={canvasWorkspaceHeight}
+          minimapModel={minimapModel}
           menuOpen={zoomMenuState.open}
           menuRef={zoomMenuRef}
           onZoomOut={() => zoom.zoomCanvasOut()}

@@ -6,8 +6,6 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
-  MiniMap,
-  useReactFlow,
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
@@ -19,7 +17,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { CanvasZoomHud } from '@shenbi/editor-ui';
+import { CanvasZoomHud, readPaletteDragPayload } from '@shenbi/editor-ui';
 
 import { nodeTypes as baseNodeTypes } from '../nodes/node-registry';
 import { TypedEdge } from '../edges/TypedEdge';
@@ -32,6 +30,7 @@ import type {
 } from '../types';
 import { NODE_CONTRACTS } from '../types';
 import { NodeSelectorPanel } from './NodeSelectorPanel';
+import { buildGatewayMinimapModel } from './gateway-minimap';
 import '../styles/gateway.css';
 
 const edgeTypes = {
@@ -60,6 +59,8 @@ export function GatewayCanvas({
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [viewportState, setViewportState] = useState({ x: 0, y: 0, zoom: 1 });
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const zoomMenuRef = useRef<HTMLDivElement>(null);
   const [selectorPanel, setSelectorPanel] = useState<{
@@ -113,14 +114,22 @@ export function GatewayCanvas({
   );
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
+    const payload = readPaletteDragPayload(event.dataTransfer);
+    if (!payload || payload.kind !== 'gateway-node') {
+      return;
+    }
     event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
+    event.dataTransfer.dropEffect = 'copy';
   }, []);
 
   const handleDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-      const kind = event.dataTransfer.getData('application/gateway-node-kind') as GatewayNodeKind;
+      const payload = readPaletteDragPayload(event.dataTransfer);
+      if (!payload || payload.kind !== 'gateway-node') {
+        return;
+      }
+      const kind = payload.type as GatewayNodeKind;
       if (!kind || !NODE_CONTRACTS[kind]) {
         return;
       }
@@ -157,15 +166,16 @@ export function GatewayCanvas({
     [nodes, onNodesChangeProp, onDirty],
   );
 
-  const minimapNodeColor = useCallback((node: GatewayNode) => {
-    const data = node.data as GatewayNodeData;
-    return NODE_CONTRACTS[data.kind]?.color ?? '#64748b';
-  }, []);
-
   const defaultEdgeOptions = useMemo(() => ({
     type: 'typed',
     animated: false,
   }), []);
+  const minimapModel = useMemo(() => buildGatewayMinimapModel({
+    nodes,
+    viewport: viewportState,
+    viewportWidth: viewportSize.width,
+    viewportHeight: viewportSize.height,
+  }), [nodes, viewportSize.height, viewportSize.width, viewportState]);
 
   // Handle add node button click
   const handleAddNode = useCallback((sourceNodeId: string, sourceHandle: string) => {
@@ -283,6 +293,30 @@ export function GatewayCanvas({
     };
   }, [showZoomMenu]);
 
+  React.useEffect(() => {
+    const element = reactFlowWrapper.current;
+    if (!element) {
+      return;
+    }
+
+    const syncViewportSize = () => {
+      setViewportSize({
+        width: element.clientWidth,
+        height: element.clientHeight,
+      });
+    };
+
+    syncViewportSize();
+    const observer = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => syncViewportSize())
+      : null;
+    observer?.observe(element);
+
+    return () => {
+      observer?.disconnect();
+    };
+  }, []);
+
   return (
     <div ref={reactFlowWrapper} className="gateway-canvas">
       <ReactFlow
@@ -300,9 +334,11 @@ export function GatewayCanvas({
         onInit={(instance) => {
           reactFlowInstance.current = instance;
           setZoom(instance.getZoom());
+          setViewportState(instance.toObject().viewport);
         }}
         onMove={(_, viewport) => {
           setZoom(viewport.zoom);
+          setViewportState(viewport);
         }}
         fitView
         snapToGrid
@@ -311,31 +347,27 @@ export function GatewayCanvas({
         multiSelectionKeyCode="Shift"
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#333333" />
-        <MiniMap
-          nodeColor={minimapNodeColor}
-          nodeStrokeWidth={2}
-          pannable
-          zoomable
-          style={{
-            width: 120,
-            height: 90,
-          }}
+        <Background
+          id="gateway-grid"
+          color="var(--grid-line)"
+          bgColor="var(--bg-canvas)"
+          gap={20}
+          size={1}
+          variant={BackgroundVariant.Dots}
+        />
+        <CanvasZoomHud
+          className="nopan"
+          scale={zoom}
+          minimapModel={minimapModel}
+          menuOpen={showZoomMenu}
+          menuRef={zoomMenuRef}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onToggleMenu={() => setShowZoomMenu((prev) => !prev)}
+          onSelectScale={handleZoomTo}
+          onFit={handleZoomToFit}
         />
       </ReactFlow>
-
-      {/* Zoom controls — shared CanvasZoomHud from editor-ui */}
-      <CanvasZoomHud
-        scale={zoom}
-        menuOpen={showZoomMenu}
-        menuRef={zoomMenuRef}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onToggleMenu={() => setShowZoomMenu((prev) => !prev)}
-        onSelectScale={handleZoomTo}
-        onFit={handleZoomToFit}
-        showMinimap={false}
-      />
 
       {selectorPanel?.visible && (
         <NodeSelectorPanel

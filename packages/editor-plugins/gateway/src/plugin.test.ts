@@ -12,7 +12,7 @@ describe('createGatewayPlugin', () => {
     const plugin = createGatewayPlugin();
     const panels = plugin.contributes?.fileContextPanels;
     expect(panels).toHaveLength(1);
-    expect(panels?.[0].id).toBe('gateway-components');
+    expect(panels?.[0].id).toBe('components');
     expect(panels?.[0].fileTypes).toEqual(['api']);
   });
 

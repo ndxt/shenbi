@@ -2,6 +2,7 @@ import React from 'react';
 import type { CanvasSurfaceHandle, CanvasToolMode, CanvasDropTarget } from '../canvas/types';
 import { resolveNodeDropIndicator, type CanvasDropIndicator } from '../canvas/drop-indicator';
 import { STAGE_MIN_HEIGHT } from '../canvas/constants';
+import { readPaletteDragPayload } from '../panels/PalettePanel';
 
 interface CanvasDragSession {
   source: 'component' | 'selected-node';
@@ -24,15 +25,15 @@ export interface UseCanvasDragDropOptions {
   /** Whether canvas is read-only */
   canvasReadOnly: boolean;
   /** ID of the currently selected node's schema ID */
-  selectedNodeSchemaId?: string;
+  selectedNodeSchemaId?: string | undefined;
   /** ID of the currently selected node in the tree */
-  selectedNodeTreeId?: string;
+  selectedNodeTreeId?: string | undefined;
   /** Check if a drop target can accept inside drops */
-  canCanvasDropInsideNode?: (nodeSchemaId: string) => boolean;
+  canCanvasDropInsideNode?: ((nodeSchemaId: string) => boolean) | undefined;
   /** Callback when a component is inserted via drag-drop */
-  onCanvasInsertComponent?: (componentType: string, target: CanvasDropTarget) => void;
+  onCanvasInsertComponent?: ((componentType: string, target: CanvasDropTarget) => void) | undefined;
   /** Callback when the selected node is moved via drag-drop */
-  onCanvasMoveSelectedNode?: (target: CanvasDropTarget) => void;
+  onCanvasMoveSelectedNode?: ((target: CanvasDropTarget) => void) | undefined;
 }
 
 export interface UseCanvasDragDropReturn {
@@ -63,6 +64,14 @@ export function useCanvasDragDrop({
 }: UseCanvasDragDropOptions): UseCanvasDragDropReturn {
   const [canvasDragSession, setCanvasDragSession] = React.useState<CanvasDragSession | null>(null);
   const [canvasDropIndicator, setCanvasDropIndicator] = React.useState<CanvasDropIndicator | null>(null);
+
+  const resolvePaletteComponentType = React.useCallback((dataTransfer: DataTransfer | null): string | null => {
+    const payload = readPaletteDragPayload(dataTransfer);
+    if (!payload || payload.kind !== 'component') {
+      return null;
+    }
+    return payload.type;
+  }, []);
 
   const clearCanvasDragState = React.useCallback(() => {
     setCanvasDragSession(null);
@@ -224,13 +233,29 @@ export function useCanvasDragDrop({
   ]);
 
   const handleCanvasDragOver = React.useCallback((event: React.DragEvent<HTMLElement>) => {
-    if (!canvasDragSession || canvasReadOnly || activeCanvasTool === 'pan') {
+    if (canvasReadOnly || activeCanvasTool === 'pan') {
+      return;
+    }
+    const draggedComponentType = resolvePaletteComponentType(event.dataTransfer);
+    const resolvedSession = canvasDragSession ?? (
+      draggedComponentType
+        ? { source: 'component' as const, componentType: draggedComponentType }
+        : null
+    );
+    if (!resolvedSession) {
       return;
     }
     event.preventDefault();
-    event.dataTransfer.dropEffect = canvasDragSession.source === 'component' ? 'copy' : 'move';
+    if (
+      resolvedSession.source === 'component'
+      && resolvedSession.componentType
+      && canvasDragSession?.componentType !== resolvedSession.componentType
+    ) {
+      setCanvasDragSession(resolvedSession);
+    }
+    event.dataTransfer.dropEffect = resolvedSession.source === 'component' ? 'copy' : 'move';
     updateCanvasDropIndicator(event.clientX, event.clientY);
-  }, [activeCanvasTool, canvasDragSession, canvasReadOnly, updateCanvasDropIndicator]);
+  }, [activeCanvasTool, canvasDragSession, canvasReadOnly, resolvePaletteComponentType, updateCanvasDropIndicator]);
 
   const handleCanvasDragLeave = React.useCallback((event: React.DragEvent<HTMLElement>) => {
     const nextTarget = event.relatedTarget;
@@ -241,7 +266,17 @@ export function useCanvasDragDrop({
   }, []);
 
   const handleCanvasDrop = React.useCallback((event: React.DragEvent<HTMLElement>) => {
-    if (!canvasDragSession || canvasReadOnly || activeCanvasTool === 'pan') {
+    if (canvasReadOnly || activeCanvasTool === 'pan') {
+      clearCanvasDragState();
+      return;
+    }
+    const draggedComponentType = resolvePaletteComponentType(event.dataTransfer);
+    const resolvedSession = canvasDragSession ?? (
+      draggedComponentType
+        ? { source: 'component' as const, componentType: draggedComponentType }
+        : null
+    );
+    if (!resolvedSession) {
       clearCanvasDragState();
       return;
     }
@@ -251,9 +286,9 @@ export function useCanvasDragDrop({
       clearCanvasDragState();
       return;
     }
-    if (canvasDragSession.source === 'component' && canvasDragSession.componentType) {
-      onCanvasInsertComponent?.(canvasDragSession.componentType, indicator.target);
-    } else if (canvasDragSession.source === 'selected-node') {
+    if (resolvedSession.source === 'component' && resolvedSession.componentType) {
+      onCanvasInsertComponent?.(resolvedSession.componentType, indicator.target);
+    } else if (resolvedSession.source === 'selected-node') {
       onCanvasMoveSelectedNode?.(indicator.target);
     }
     clearCanvasDragState();
@@ -264,6 +299,7 @@ export function useCanvasDragDrop({
     clearCanvasDragState,
     onCanvasInsertComponent,
     onCanvasMoveSelectedNode,
+    resolvePaletteComponentType,
     resolveCanvasDropIndicator,
   ]);
 

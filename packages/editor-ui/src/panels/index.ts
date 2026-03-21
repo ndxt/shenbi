@@ -1,4 +1,5 @@
 export * from './ComponentPanel';
+export * from './PalettePanel';
 export * from './SchemaTree';
 export * from './SetterPanel';
 export * from './ActionPanel';
