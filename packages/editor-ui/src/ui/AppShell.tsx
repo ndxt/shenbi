@@ -3,17 +3,10 @@ import {
   ArrowDown,
   ArrowUp,
   Copy,
-  Focus,
-  Hand,
-  LocateFixed,
-  Minus,
   Monitor,
-  MousePointer2,
-  Plus,
   Smartphone,
   Tablet,
   Trash2,
-  Frame,
 } from 'lucide-react';
 import {
   collectPluginContributes,
@@ -80,7 +73,20 @@ import type {
   CanvasToolMode,
   CanvasViewportState,
 } from '../canvas/types';
+import {
+  STAGE_DEFAULT_WIDTH,
+  STAGE_MIN_HEIGHT,
+  MIN_CANVAS_SCALE,
+  MAX_CANVAS_SCALE,
+  CANVAS_ZOOM_PRESETS,
+  CANVAS_WHEEL_ZOOM_SENSITIVITY,
+  DEVICE_FRAME_PADDING,
+  type DevicePreset,
+} from '../canvas/constants';
 import { createBuiltinSidebarTabs } from './sidebar-tabs';
+import { CanvasToolRail } from './CanvasToolRail';
+import { CanvasZoomHud } from './CanvasZoomHud';
+import { DevicePreviewBar } from './DevicePreviewBar';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -157,33 +163,11 @@ const THEME_CLASSES = [
   'theme-webstorm-dark',
 ] as const;
 
-const STAGE_DEFAULT_WIDTH = 1200;
-const STAGE_MIN_HEIGHT = 800;
-const MIN_CANVAS_SCALE = 0.25;
-const MAX_CANVAS_SCALE = 2;
-const CANVAS_ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
-const CANVAS_WHEEL_ZOOM_SENSITIVITY = 0.0015;
-
-interface DevicePreset {
-  id: string;
-  label: string;
-  width: number;
-  icon: React.FC<{ size?: number }>;
-  frame?: 'phone' | 'tablet' | 'monitor';
-}
-
 const DEVICE_PRESETS: DevicePreset[] = [
   { id: 'phone', label: 'Phone', width: 375, icon: Smartphone, frame: 'phone' },
   { id: 'tablet', label: 'Tablet', width: 768, icon: Tablet, frame: 'tablet' },
   { id: 'desktop', label: 'Desktop', width: 1200, icon: Monitor, frame: 'monitor' },
 ];
-
-/** Frame padding: [top, right, bottom, left] */
-const DEVICE_FRAME_PADDING: Record<string, [number, number, number, number]> = {
-  phone: [48, 12, 40, 12],
-  tablet: [28, 20, 28, 20],
-  monitor: [20, 20, 56, 20],
-};
 
 function isPromiseLike(value: unknown): value is Promise<unknown> {
   return Boolean(value) && typeof (value as Promise<unknown>).then === 'function';
@@ -2520,372 +2504,3 @@ export function AppShell({
   );
 }
 
-function CanvasToolRail({
-  activeTool,
-  spacePanActive,
-  focusSelectionDisabled,
-  onSelectTool,
-  onPanTool,
-  onFit,
-  onCenter,
-  onFocusSelection,
-}: {
-  activeTool: CanvasToolMode;
-  spacePanActive: boolean;
-  focusSelectionDisabled: boolean;
-  onSelectTool: () => void;
-  onPanTool: () => void;
-  onFit: () => void;
-  onCenter: () => void;
-  onFocusSelection: () => void;
-}) {
-  const effectivePan = spacePanActive || activeTool === 'pan';
-  const effectiveSelect = !spacePanActive && activeTool === 'select';
-  return (
-    <div className="canvas-tool-rail" role="toolbar" aria-label="Canvas Tools">
-      <CanvasChromeButton
-        title="Selection Tool (V)"
-        active={effectiveSelect}
-        onClick={onSelectTool}
-      >
-        <MousePointer2 size={14} />
-      </CanvasChromeButton>
-      <CanvasChromeButton
-        title="Hand Tool (H)"
-        active={effectivePan}
-        onClick={onPanTool}
-      >
-        <Hand size={14} />
-      </CanvasChromeButton>
-      <div className="canvas-tool-rail__divider" />
-      <CanvasChromeButton title="Fit View (Shift+1)" onClick={onFit}>
-        <Focus size={14} />
-      </CanvasChromeButton>
-      <CanvasChromeButton title="Center Stage (Shift+2)" onClick={onCenter}>
-        <LocateFixed size={14} />
-      </CanvasChromeButton>
-      <CanvasChromeButton
-        title="Focus Selected Node (Shift+3)"
-        disabled={focusSelectionDisabled}
-        onClick={onFocusSelection}
-      >
-        <span className="canvas-tool-rail__focus-dot" aria-hidden="true" />
-      </CanvasChromeButton>
-    </div>
-  );
-}
-
-function CanvasZoomHud({
-  scale,
-  viewportState,
-  stageWidth,
-  stageHeight,
-  stageLeft,
-  stageTop,
-  workspaceWidth,
-  workspaceHeight,
-  menuOpen,
-  menuRef,
-  onZoomOut,
-  onZoomIn,
-  onToggleMenu,
-  onSelectScale,
-  onFit,
-}: {
-  scale: number;
-  viewportState: CanvasViewportState;
-  stageWidth: number;
-  stageHeight: number;
-  stageLeft: number;
-  stageTop: number;
-  workspaceWidth: number;
-  workspaceHeight: number;
-  menuOpen: boolean;
-  menuRef: React.RefObject<HTMLDivElement | null>;
-  onZoomOut: () => void;
-  onZoomIn: () => void;
-  onToggleMenu: () => void;
-  onSelectScale: (nextScale: number) => void;
-  onFit: () => void;
-}) {
-  // Minimap calculations — focus on a region around stage + viewport,
-  // not the entire 20000px workspace, so the stage is actually visible.
-  const MINIMAP_W = 120;
-  const MINIMAP_H = 72;
-
-  const stageVisualW = stageWidth * scale;
-  const stageVisualH = stageHeight * scale;
-  const stageCenterX = stageLeft + stageVisualW / 2;
-  const stageCenterY = stageTop + stageVisualH / 2;
-
-  // Viewport rect in workspace coordinates
-  const vpX = viewportState.scrollLeft;
-  const vpY = viewportState.scrollTop;
-  const vpW = viewportState.viewportWidth ?? 1200;
-  const vpH = viewportState.viewportHeight ?? 800;
-
-  // Compute bounding box that contains both stage and viewport, with padding
-  const regionLeft = Math.min(stageLeft, vpX);
-  const regionTop = Math.min(stageTop, vpY);
-  const regionRight = Math.max(stageLeft + stageVisualW, vpX + vpW);
-  const regionBottom = Math.max(stageTop + stageVisualH, vpY + vpH);
-  const regionW = regionRight - regionLeft;
-  const regionH = regionBottom - regionTop;
-  // Add 30% padding so content doesn't sit at minimap edges
-  const pad = Math.max(regionW, regionH) * 0.3;
-  const focusX = regionLeft - pad;
-  const focusY = regionTop - pad;
-  const focusW = regionW + pad * 2;
-  const focusH = regionH + pad * 2;
-
-  // Fit focus region into minimap
-  const focusAspect = focusW / focusH;
-  const mmAspect = MINIMAP_W / MINIMAP_H;
-  const mmScale = focusAspect >= mmAspect
-    ? MINIMAP_W / focusW
-    : MINIMAP_H / focusH;
-  const mmOffsetX = (MINIMAP_W - focusW * mmScale) / 2 - focusX * mmScale;
-  const mmOffsetY = (MINIMAP_H - focusH * mmScale) / 2 - focusY * mmScale;
-
-  const mmStage = {
-    left: stageLeft * mmScale + mmOffsetX,
-    top: stageTop * mmScale + mmOffsetY,
-    width: Math.max(stageVisualW * mmScale, 2),
-    height: Math.max(stageVisualH * mmScale, 2),
-  };
-
-  const mmViewport = {
-    left: vpX * mmScale + mmOffsetX,
-    top: vpY * mmScale + mmOffsetY,
-    width: Math.max(vpW * mmScale, 4),
-    height: Math.max(vpH * mmScale, 4),
-  };
-
-  return (
-    <div className="canvas-zoom-hud" aria-label="Canvas Zoom Controls">
-      {menuOpen ? (
-        <div ref={menuRef} className="canvas-zoom-hud__menu" role="menu" aria-label="Canvas Zoom Presets">
-          {CANVAS_ZOOM_PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              className="canvas-zoom-hud__menu-item"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={() => onSelectScale(preset)}
-            >
-              {Math.round(preset * 100)}%
-            </button>
-          ))}
-          <button
-            type="button"
-            className="canvas-zoom-hud__menu-item"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={onFit}
-          >
-            Fit
-          </button>
-        </div>
-      ) : null}
-      <div className="canvas-zoom-hud__minimap">
-        <div
-          className="canvas-zoom-hud__minimap-stage"
-          style={{ left: mmStage.left, top: mmStage.top, width: mmStage.width, height: mmStage.height }}
-        />
-        <div
-          className="canvas-zoom-hud__minimap-viewport"
-          style={{ left: mmViewport.left, top: mmViewport.top, width: mmViewport.width, height: mmViewport.height }}
-        />
-      </div>
-      <div className="canvas-zoom-hud__controls">
-        <CanvasChromeButton title="Zoom Out" onClick={onZoomOut}>
-          <Minus size={14} />
-        </CanvasChromeButton>
-        <button
-          type="button"
-          className="canvas-zoom-hud__scale"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={onToggleMenu}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-        >
-          {Math.round(scale * 100)}%
-        </button>
-        <CanvasChromeButton title="Zoom In" onClick={onZoomIn}>
-          <Plus size={14} />
-        </CanvasChromeButton>
-      </div>
-    </div>
-  );
-}
-
-function CanvasChromeButton({
-  title,
-  active = false,
-  disabled = false,
-  onClick,
-  children,
-}: {
-  title: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      disabled={disabled}
-      className={`canvas-chrome-button${active ? ' canvas-chrome-button--active' : ''}`}
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
-}
-
-/** Device preview bar: device preset switcher + dimensions + frame toggle */
-function DevicePreviewBar({
-  presets,
-  activeDeviceId,
-  stageWidth,
-  stageMinHeight,
-  scale,
-  showDeviceFrame,
-  hasFrame,
-  onSelectDevice,
-  onChangeWidth,
-  onToggleFrame,
-  onSelectScale,
-  onFit,
-}: {
-  presets: DevicePreset[];
-  activeDeviceId: string;
-  stageWidth: number;
-  stageMinHeight: number;
-  scale: number;
-  showDeviceFrame: boolean;
-  hasFrame: boolean;
-  onSelectDevice: (id: string) => void;
-  onChangeWidth: (w: number) => void;
-  onToggleFrame: () => void;
-  onSelectScale: (s: number) => void;
-  onFit: () => void;
-}) {
-  const [editingWidth, setEditingWidth] = React.useState(false);
-  const [widthInput, setWidthInput] = React.useState(String(stageWidth));
-  const [zoomMenuOpen, setZoomMenuOpen] = React.useState(false);
-  const zoomMenuRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    if (!editingWidth) {
-      setWidthInput(String(stageWidth));
-    }
-  }, [stageWidth, editingWidth]);
-
-  const commitWidth = () => {
-    const parsed = parseInt(widthInput, 10);
-    if (!Number.isNaN(parsed) && parsed >= 200 && parsed <= 3840) {
-      onChangeWidth(parsed);
-      if (activeDeviceId !== 'custom') {
-        onSelectDevice('custom');
-      }
-    } else {
-      setWidthInput(String(stageWidth));
-    }
-    setEditingWidth(false);
-  };
-
-  return (
-      <div className="device-preview-bar">
-        <div className="device-preview-bar__devices">
-          {presets.map((preset) => {
-            const Icon = preset.icon;
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                className={`device-preview-bar__device-btn${activeDeviceId === preset.id ? ' device-preview-bar__device-btn--active' : ''}`}
-                title={`${preset.label} (${preset.width}px)`}
-                onClick={() => onSelectDevice(preset.id)}
-              >
-                <Icon size={13} />
-              </button>
-            );
-          })}
-        </div>
-        <div className="device-preview-bar__sep" />
-        <div className="device-preview-bar__dims">
-          {editingWidth ? (
-            <input
-              className="device-preview-bar__dim-input"
-              value={widthInput}
-              autoFocus
-              onChange={(e) => setWidthInput(e.target.value)}
-              onBlur={commitWidth}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitWidth();
-                if (e.key === 'Escape') {
-                  setWidthInput(String(stageWidth));
-                  setEditingWidth(false);
-                }
-              }}
-            />
-          ) : (
-            <span
-              style={{ cursor: 'text' }}
-              onClick={() => setEditingWidth(true)}
-            >
-              {stageWidth}
-            </span>
-          )}
-          <span>×</span>
-          <span>{stageMinHeight}</span>
-          <span
-            style={{ marginLeft: 4, opacity: 0.6, cursor: 'pointer', position: 'relative' }}
-            onClick={() => setZoomMenuOpen((v) => !v)}
-          >
-            {Math.round(scale * 100)}%
-            {zoomMenuOpen ? (
-              <div ref={zoomMenuRef} className="canvas-zoom-hud__menu" role="menu" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 'calc(100% + 8px)', bottom: 'auto', right: 'auto' }}>
-                {CANVAS_ZOOM_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className="canvas-zoom-hud__menu-item"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); onSelectScale(preset); setZoomMenuOpen(false); }}
-                  >
-                    {Math.round(preset * 100)}%
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="canvas-zoom-hud__menu-item"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); onFit(); setZoomMenuOpen(false); }}
-                >
-                  Fit
-                </button>
-              </div>
-            ) : null}
-          </span>
-        </div>
-        {hasFrame ? (
-          <>
-            <div className="device-preview-bar__sep" />
-            <button
-              type="button"
-              className={`device-preview-bar__frame-toggle${showDeviceFrame ? ' device-preview-bar__frame-toggle--active' : ''}`}
-              onClick={onToggleFrame}
-              title="Toggle Device Frame"
-            >
-              <Frame size={11} />
-              <span>Frame</span>
-            </button>
-          </>
-        ) : null}
-      </div>
-  );
-}
