@@ -1,5 +1,6 @@
 import {
   type AuxiliaryPanelContribution,
+  type CanvasRendererContribution,
   type ContextMenuContribution,
   type FileContextPanelContribution,
   type MenuContribution,
@@ -43,6 +44,7 @@ export interface PluginContributes {
   sidebarTabs?: SidebarTabContribution[];
   inspectorTabs?: InspectorTabContribution[];
   auxiliaryPanels?: AuxiliaryPanelContribution[];
+  canvasRenderers?: CanvasRendererContribution[];
   menus?: MenuContribution[];
   contextMenus?: ContextMenuContribution[];
   commands?: PluginCommandContribution[];
@@ -64,6 +66,7 @@ export interface ResolvedPluginContributes {
   sidebarTabs: SidebarTabContribution[];
   inspectorTabs: InspectorTabContribution[];
   auxiliaryPanels: AuxiliaryPanelContribution[];
+  canvasRenderers: CanvasRendererContribution[];
   menus: MenuContribution[];
   contextMenus: ContextMenuContribution[];
   commands: PluginCommandContribution[];
@@ -83,6 +86,7 @@ export function collectPluginContributes(
   const sidebarTabs: SidebarTabContribution[] = [];
   const inspectorTabs: InspectorTabContribution[] = [];
   const auxiliaryPanels: AuxiliaryPanelContribution[] = [];
+  const canvasRenderers: CanvasRendererContribution[] = [];
   const menus: MenuContribution[] = [];
   const contextMenus: ContextMenuContribution[] = [];
   const commands: PluginCommandContribution[] = [];
@@ -99,6 +103,7 @@ export function collectPluginContributes(
     sidebarTabs.push(...(contributes.sidebarTabs ?? []));
     inspectorTabs.push(...(contributes.inspectorTabs ?? []));
     auxiliaryPanels.push(...(contributes.auxiliaryPanels ?? []));
+    canvasRenderers.push(...(contributes.canvasRenderers ?? []));
     menus.push(...(contributes.menus ?? []));
     contextMenus.push(...(contributes.contextMenus ?? []));
     commands.push(...(contributes.commands ?? []));
@@ -112,6 +117,7 @@ export function collectPluginContributes(
     sidebarTabs: mergeContributions([], sidebarTabs),
     inspectorTabs: mergeContributions([], inspectorTabs),
     auxiliaryPanels: mergeContributions([], auxiliaryPanels),
+    canvasRenderers: mergeContributions([], canvasRenderers),
     menus: mergeContributions([], menus),
     contextMenus: mergeContributions([], contextMenus),
     commands: mergeContributions([], commands),

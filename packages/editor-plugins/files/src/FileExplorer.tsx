@@ -17,6 +17,7 @@ import {
   Workflow,
   BookOpen,
   FilePlus,
+  Plug,
 } from 'lucide-react';
 import type { FSTreeNode, FileType } from '@shenbi/editor-core';
 import { useTranslation } from '@shenbi/i18n';
@@ -149,7 +150,7 @@ interface FileTypeOption {
 
 const FILE_TYPE_OPTIONS: FileTypeOption[] = [
   { fileType: 'page',  labelZh: '页面',  labelEn: 'Page',   icon: FileCode,  iconColor: 'text-blue-400' },
-  { fileType: 'api',   labelZh: 'API',   labelEn: 'API',    icon: FileJson,  iconColor: 'text-green-400' },
+  { fileType: 'api',   labelZh: 'API',   labelEn: 'API',    icon: Plug,      iconColor: 'text-green-400' },
   { fileType: 'flow',  labelZh: '流程',  labelEn: 'Flow',   icon: Workflow,  iconColor: 'text-purple-400' },
   { fileType: 'db',    labelZh: '数据表', labelEn: 'DB',     icon: Database,  iconColor: 'text-yellow-400' },
   { fileType: 'dict',  labelZh: '字典',  labelEn: 'Dict',   icon: BookOpen,  iconColor: 'text-orange-400' },
@@ -158,7 +159,7 @@ const FILE_TYPE_OPTIONS: FileTypeOption[] = [
 function getFileIcon(fileType?: FileType): React.ElementType {
   switch (fileType) {
     case 'page': return FileCode;
-    case 'api': return FileJson;
+    case 'api': return Plug;
     case 'flow': return Workflow;
     case 'db': return Database;
     case 'dict': return BookOpen;
@@ -206,6 +207,7 @@ function MenuItemBtn({ children, onClick, danger }: { children: React.ReactNode;
         color: hover ? '#fff' : (danger ? '#f87171' : '#cccccc'),
         background: hover ? '#04395e' : 'transparent',
         transition: 'background 0.1s, color 0.1s',
+        whiteSpace: 'nowrap',
       }}
     >
       {children}
@@ -250,7 +252,7 @@ function FileTypeDropdown({
     >
       {FILE_TYPE_OPTIONS.map((opt) => (
         <MenuItemBtn key={opt.fileType} onClick={() => { onSelect(opt.fileType); onClose(); }}>
-          <opt.icon size={14} style={{ color: getFileTypeColor(opt.fileType) }} />
+          <opt.icon size={14} style={{ color: getFileTypeColor(opt.fileType), flexShrink: 0, minWidth: 24 }} />
           <span>{opt.labelZh}</span>
         </MenuItemBtn>
       ))}
@@ -676,7 +678,7 @@ function ContextMenuPanel({
   const submenuTimer = useRef<number | undefined>(undefined);
 
   const openSubmenu = () => { clearTimeout(submenuTimer.current); setSubmenuOpen(true); };
-  const closeSubmenu = () => { submenuTimer.current = window.setTimeout(() => setSubmenuOpen(false), 150); };
+  const closeSubmenu = () => { submenuTimer.current = window.setTimeout(() => setSubmenuOpen(false), 300); };
   const keepSubmenu = () => { clearTimeout(submenuTimer.current); };
 
   const panelStyle: React.CSSProperties = {
@@ -687,7 +689,7 @@ function ContextMenuPanel({
   };
 
   const subStyle: React.CSSProperties = {
-    position: 'absolute', left: 'calc(100% - 2px)', top: 0, minWidth: 200, borderRadius: 5,
+    position: 'absolute', left: 'calc(100% - 4px)', top: 0, minWidth: 200, borderRadius: 5,
     border: '1px solid #454545', background: '#252526',
     padding: '4px 0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
   };
@@ -844,6 +846,7 @@ export function FileExplorer({
 
   const handleRootContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     setContextMenu({ open: true, x: event.clientX, y: event.clientY, node: null, targetParentId: null });
   }, []);
 
@@ -1081,11 +1084,18 @@ export function FileExplorer({
         className="flex items-center px-3 gap-0.5"
         style={{ paddingTop: 10, paddingBottom: 4 }}
       >
-        <span className="flex-1 select-none" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', opacity: 0.7 }}>
+        <span className="flex-1 select-none" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', opacity: 0.7, minWidth: 24 }}>
           {t('title')}
         </span>
         <span className="flex items-center gap-0.5">
-          <ToolbarBtn icon={FilePlus} title={t('toolbar.newFile')} onClick={() => startCreating(null, 'file', 'page')} />
+          <ToolbarBtn
+            icon={FilePlus}
+            title={t('toolbar.newFile')}
+            onClick={(e: unknown) => {
+              const rect = ((e as React.MouseEvent<HTMLButtonElement>).currentTarget).getBoundingClientRect();
+              setTypeDropdown({ top: rect.bottom + 4, left: rect.left, parentId: null });
+            }}
+          />
           <ToolbarBtn icon={FolderPlus} title={t('toolbar.newFolder')} onClick={() => startCreating(null, 'directory')} />
           <ToolbarBtn icon={Save} title={t('toolbar.saveCurrentFile')} onClick={onSaveActiveFile} disabled={!canSaveActiveFile || !onSaveActiveFile} />
           <ToolbarBtn icon={RefreshCw} title={t('toolbar.refresh')} onClick={onRefresh} />

@@ -1,0 +1,556 @@
+/* ========================================================================= */
+/* Gateway Editor — Node & Canvas Styles (Dify Style)                       */
+/* ========================================================================= */
+
+/* ---- Node Base ---- */
+.gateway-node {
+  background: #2a2a2e;
+  border: 1px solid #3d3d42;
+  border-radius: 8px;
+  width: 200px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+  position: relative;
+  cursor: pointer;
+}
+
+.gateway-node:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  border-color: #4d4d52;
+}
+
+.gateway-node--selected {
+  border-color: var(--node-color, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3),
+              0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Node Content (Horizontal Layout) ---- */
+.gateway-node__content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.gateway-node__icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.gateway-node__icon {
+  color: white;
+}
+
+.gateway-node__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gateway-node__label {
+  font-weight: 600;
+  font-size: 12px;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.3px;
+}
+
+.gateway-node__description {
+  font-size: 10px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Handle (connection point) ---- */
+.gateway-node__handle {
+  width: 16px !important;
+  height: 16px !important;
+  border: 2px solid #2a2a2e !important;
+  border-radius: 50% !important;
+  transition: all 0.2s ease;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
+.gateway-node__handle--input {
+  left: -8px !important;
+}
+
+.gateway-node__handle--output {
+  right: -8px !important;
+}
+
+.gateway-node__handle:hover {
+  box-shadow: 0 0 8px currentColor;
+}
+
+/* Single handle gets centered, multiple handles use React Flow's auto-layout */
+.gateway-node__handle[style*="top: 50%"]:hover {
+  transform: translateY(-50%) scale(1.3) !important;
+}
+
+/* ---- Handle Plus Icon ---- */
+.gateway-node__handle-wrapper {
+  position: relative;
+}
+
+.gateway-node__handle-plus {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+/* ---- Add Node Button (Deprecated) ---- */
+.gateway-node__add-button {
+  position: absolute;
+  right: -32px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #2a2a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.gateway-node__add-button:hover {
+  background: #2563eb;
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+}
+
+.gateway-node__add-icon {
+  color: white;
+}
+
+/* ---- Body ---- */
+.gateway-node__body {
+  padding: 0 14px 12px;
+  border-top: 1px solid #3d3d42;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+/* ---- Node panel ---- */
+.gateway-node-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1a1a1a;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.gateway-node-panel__search {
+  margin: 12px;
+  padding: 8px 12px;
+  border: 1px solid #3d3d42;
+  border-radius: 6px;
+  background: #2a2a2e;
+  color: #ffffff;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.gateway-node-panel__search::placeholder {
+  color: #6b7280;
+}
+
+.gateway-node-panel__search:focus {
+  border-color: #3b82f6;
+}
+
+.gateway-node-panel__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+}
+
+.gateway-node-panel__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: grab;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.gateway-node-panel__item:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.gateway-node-panel__item:active {
+  cursor: grabbing;
+}
+
+.gateway-node-panel__item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.gateway-node-panel__item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gateway-node-panel__item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.gateway-node-panel__item-desc {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Canvas container ---- */
+.gateway-canvas {
+  width: 100%;
+  height: 100%;
+  background: #1a1a1a;
+}
+
+.gateway-canvas .react-flow__background {
+  background: #1a1a1a;
+}
+
+.gateway-canvas .react-flow__minimap {
+  background: #2a2a2e;
+  border: 1px solid #3d3d42;
+  border-radius: 8px;
+}
+
+.gateway-canvas .react-flow__controls {
+  border: 1px solid #3d3d42;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.gateway-canvas .react-flow__controls-button {
+  background: #2a2a2e;
+  border-bottom: 1px solid #3d3d42;
+  color: #ffffff;
+}
+
+.gateway-canvas .react-flow__controls-button:hover {
+  background: #3d3d42;
+}
+
+/* Connection line while dragging */
+.gateway-canvas .react-flow__connection-line {
+  stroke: #3b82f6;
+  stroke-width: 2;
+}
+
+
+/* ---- Node Selector Panel ---- */
+.node-selector-panel {
+  width: 320px;
+  background: #2a2a2e;
+  border: 1px solid #3d3d42;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.node-selector-panel__header {
+  display: flex;
+  gap: 4px;
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid #3d3d42;
+  align-items: center;
+}
+
+.node-selector-panel__tab {
+  flex: 1;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #9ca3af;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.node-selector-panel__tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.node-selector-panel__tab--active {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.node-selector-panel__close {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #9ca3af;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.node-selector-panel__close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.node-selector-panel__search {
+  margin: 12px;
+  padding: 8px 12px;
+  border: 1px solid #3d3d42;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: #ffffff;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: calc(100% - 24px);
+}
+
+.node-selector-panel__search::placeholder {
+  color: #6b7280;
+}
+
+.node-selector-panel__search:focus {
+  border-color: #3b82f6;
+}
+
+.node-selector-panel__list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.node-selector-panel__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.node-selector-panel__item:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.node-selector-panel__item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.node-selector-panel__item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.node-selector-panel__item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.node-selector-panel__item-desc {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-selector-panel__empty {
+  padding: 24px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+
+/* ---- Zoom Controls ---- */
+.gateway-canvas__zoom-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(42, 42, 46, 0.95);
+  border: 1px solid #3d3d42;
+  border-radius: 10px;
+  padding: 6px 8px;
+  z-index: 5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.gateway-canvas__zoom-button {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gateway-canvas__zoom-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.gateway-canvas__zoom-display-wrapper {
+  position: relative;
+}
+
+.gateway-canvas__zoom-display {
+  min-width: 50px;
+  height: 28px;
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gateway-canvas__zoom-display:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.gateway-canvas__zoom-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 200px;
+  background: #2a2a2e;
+  border: 1px solid #3d3d42;
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.gateway-canvas__zoom-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gateway-canvas__zoom-menu-item:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.gateway-canvas__zoom-menu-shortcut {
+  color: #6b7280;
+  font-size: 12px;
+  margin-left: 16px;
+}
+
+.gateway-canvas__zoom-menu-divider {
+  height: 1px;
+  background: #3d3d42;
+  margin: 4px 0;
+}
+
+/* Adjust MiniMap position - closer to zoom controls */
+.gateway-canvas .react-flow__minimap {
+  bottom: 60px;
+  right: 16px;
+}

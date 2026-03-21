@@ -80,6 +80,7 @@ import type {
   CanvasToolMode,
   CanvasViewportState,
 } from '../canvas/types';
+import { createBuiltinSidebarTabs } from './sidebar-tabs';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -690,6 +691,7 @@ export function AppShell({
   );
   const legacySidebarTabs = React.useMemo(
     () => [
+      ...createBuiltinSidebarTabs(),
       ...pluginContributes.sidebarTabs,
       ...(sidebarProps?.tabs ?? []),
     ],
@@ -710,16 +712,29 @@ export function AppShell({
     () => tabs?.find((tab) => tab.fileId === activeTabId) ?? tabs?.[0],
     [activeTabId, tabs],
   );
+  const activeCanvasRenderer = React.useMemo(() => {
+    if (!activeEditorTab?.fileType || activeEditorTab.fileType === 'page') {
+      return undefined;
+    }
+    return pluginContributes.canvasRenderers.find(
+      (renderer) => renderer.fileTypes.includes(activeEditorTab.fileType),
+    );
+  }, [activeEditorTab, pluginContributes.canvasRenderers]);
   const fileContextTabs = React.useMemo(() => {
-    if (activeEditorTab?.fileType !== 'page') {
+    const fileType = activeEditorTab?.fileType;
+    // Show file context panels for page files and for files that have a canvas renderer
+    if (!fileType) {
+      return [];
+    }
+    if (fileType !== 'page' && !activeCanvasRenderer) {
       return [];
     }
     const contextualTabs = pluginContributes.fileContextPanels
       .filter((panel) => {
         if (!panel.fileTypes || panel.fileTypes.length === 0) {
-          return true;
+          return fileType === 'page';
         }
-        return panel.fileTypes.includes(activeEditorTab.fileType);
+        return panel.fileTypes.includes(fileType);
       })
       .map((panel) => ({
         id: panel.id,
@@ -732,8 +747,11 @@ export function AppShell({
           activeFileType: activeEditorTab.fileType,
         }),
       }));
-    return [...contextualTabs, ...fileContextLegacyTabs];
-  }, [activeEditorTab, fileContextLegacyTabs, pluginContributes.fileContextPanels]);
+    if (fileType === 'page') {
+      return [...contextualTabs, ...fileContextLegacyTabs];
+    }
+    return contextualTabs;
+  }, [activeEditorTab, activeCanvasRenderer, fileContextLegacyTabs, pluginContributes.fileContextPanels]);
   const activePrimaryPanel = React.useMemo(
     () => (
       activePrimaryPanelId
@@ -773,10 +791,10 @@ export function AppShell({
     }
   }, [activeActivityItemId, activeActivityPanelId, activePrimaryPanelId, defaultPrimaryPanelId, primaryPanels]);
   React.useEffect(() => {
-    if (activeEditorTab?.fileType === 'page') {
+    if (activeEditorTab?.fileType === 'page' || activeCanvasRenderer) {
       setShowFileContextPanel(true);
     }
-  }, [activeEditorTab?.fileType]);
+  }, [activeEditorTab?.fileType, activeCanvasRenderer]);
   const auxiliaryPanels = React.useMemo(() => {
     const panels = [...pluginContributes.auxiliaryPanels];
     if (aiPanelProps) {
@@ -1508,7 +1526,7 @@ export function AppShell({
       return;
     }
     setActiveFileContextTabId(tabId);
-    if (activeEditorTab?.fileType === 'page') {
+    if (activeEditorTab?.fileType === 'page' || activeCanvasRenderer) {
       setShowFileContextPanel(true);
     }
     if (!showSidebar && item.target?.type === 'panel') {
@@ -1641,6 +1659,8 @@ export function AppShell({
   const handleChangeLocale = React.useCallback((nextLocale: SupportedLocale) => {
     void changeLanguage(nextLocale);
   }, []);
+
+
   React.useEffect(() => {
     if (!zoomMenuState.open) {
       return;
@@ -2093,7 +2113,7 @@ export function AppShell({
     ];
   }, [hostCommandMap, pluginCommandMap, resolveCommandState, runCommand]);
 
-  const shouldRenderFileContextPanel = activeEditorTab?.fileType === 'page' && showFileContextPanel;
+  const shouldRenderFileContextPanel = (activeEditorTab?.fileType === 'page' || Boolean(activeCanvasRenderer)) && showFileContextPanel;
 
   return (
     <div ref={rootRef} className="h-screen w-screen flex flex-col bg-bg-canvas text-text-primary overflow-hidden font-inter">
@@ -2217,6 +2237,16 @@ export function AppShell({
             ) : null}
             {/* Editor/Canvas Area Container */}
             <div className="flex-1 min-w-[320px] flex flex-col overflow-hidden relative bg-bg-canvas">
+              {activeCanvasRenderer ? (
+                <div className="flex-1 overflow-hidden">
+                  {activeCanvasRenderer.render({
+                    ...(activeEditorTab?.fileId ? { activeFileId: activeEditorTab.fileId } : {}),
+                    ...(activeEditorTab?.fileName ? { activeFileName: activeEditorTab.fileName } : {}),
+                    ...(activeEditorTab?.fileType ? { activeFileType: activeEditorTab.fileType } : {}),
+                    pluginContext: resolvedPluginContext,
+                  })}
+                </div>
+              ) : (
               <div className="relative flex flex-1 min-h-0 flex-col">
                 <div ref={canvasChromeRef} className="canvas-toolbar-layer">
                   <CanvasToolRail
@@ -2422,6 +2452,7 @@ export function AppShell({
                   </div>
                 </main>
               </div>
+              )}
                 <CommandPalette
                   commands={commandPaletteCommands}
                   recentCommandIds={recentCommandIdsRef.current}

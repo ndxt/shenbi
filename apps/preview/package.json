@@ -22,6 +22,7 @@
     "@shenbi/editor-plugin-files": "workspace:*",
     "@shenbi/editor-plugin-gitlab-sync": "workspace:*",
     "@shenbi/editor-ui": "workspace:*",
+    "@shenbi/editor-plugin-gateway": "workspace:*",
     "@shenbi/engine": "workspace:*",
     "@shenbi/i18n": "workspace:*",
     "@shenbi/schema": "workspace:*",

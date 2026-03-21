@@ -16,7 +16,7 @@ import { SchemaTree } from '../panels/SchemaTree';
 export type { SidebarTabContribution, SidebarTabRenderContext } from '@shenbi/editor-plugin-api';
 export type { CreateFilesSidebarTabOptions } from '@shenbi/editor-plugin-files';
 
-function createBuiltinSidebarTabs(): SidebarTabContribution[] {
+export function createBuiltinSidebarTabs(): SidebarTabContribution[] {
   return [
     {
       id: 'components',
@@ -45,7 +45,7 @@ function createBuiltinSidebarTabs(): SidebarTabContribution[] {
       ),
     },
     {
-      id: 'data',
+      id: 'sidebar-data',
       label: i18n.t('workbench.data', { ns: 'editorUi' }),
       order: 30,
       render: () => <PagePanel />,
@@ -56,6 +56,6 @@ function createBuiltinSidebarTabs(): SidebarTabContribution[] {
 export function resolveSidebarTabs(
   extensions?: SidebarTabContribution[],
 ): SidebarTabContribution[] {
-  return mergeContributions(createBuiltinSidebarTabs(), extensions);
+  return mergeContributions([], extensions);
 }
 export { createFilesSidebarTab };

@@ -74,6 +74,7 @@ import { createFilesPlugin, useFileWorkspace, FileExplorer } from '@shenbi/edito
 import { createSetterPlugin } from '@shenbi/editor-plugin-setter';
 import { createGitLabSyncPlugin } from '@shenbi/editor-plugin-gitlab-sync';
 import type { GitLabProject } from '@shenbi/editor-plugin-gitlab-sync';
+import { createGatewayPlugin } from '@shenbi/editor-plugin-gateway';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
 
 type ScenarioKey =
@@ -1541,6 +1542,7 @@ export function App() {
         defaultWidth: 300,
         getAvailableComponents: () => builtinContracts,
       }),
+      createGatewayPlugin(),
     ];
 
     if (appMode === 'shell' && vfsInitialized) {
