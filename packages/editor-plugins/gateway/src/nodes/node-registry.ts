@@ -19,4 +19,8 @@ export const nodeTypes: NodeTypes = {
   'sql-query': SqlQueryNode,
   branch: BranchNode,
   loop: LoopNode,
+  'loop-start': LoopNode,
+  'loop-end': LoopNode,
+  'loop-break': LoopNode,
+  'loop-continue': LoopNode,
 };

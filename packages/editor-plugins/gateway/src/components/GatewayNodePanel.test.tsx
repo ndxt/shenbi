@@ -35,6 +35,17 @@ function createDataTransferMock(): DataTransfer {
 }
 
 describe('GatewayNodePanel', () => {
+  it('renders gateway nodes with page-style semantic group headers', () => {
+    render(<GatewayNodePanel />);
+
+    expect(screen.getByText('入口 / 出口')).toBeInTheDocument();
+    expect(screen.getByText('数据处理')).toBeInTheDocument();
+    expect(screen.getByText('流程控制')).toBeInTheDocument();
+    expect(screen.queryByText('开始')).not.toBeInTheDocument();
+    expect(screen.getByText('返回结果')).toBeInTheDocument();
+    expect(screen.getByText('循环')).toBeInTheDocument();
+  });
+
   it('filters items by search keyword', () => {
     render(<GatewayNodePanel />);
 

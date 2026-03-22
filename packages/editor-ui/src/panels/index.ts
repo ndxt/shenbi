@@ -1,5 +1,7 @@
 export * from './ComponentPanel';
 export * from './PalettePanel';
+export * from './palette-model';
+export * from './page-palette-assets';
 export * from './SchemaTree';
 export * from './SetterPanel';
 export * from './ActionPanel';

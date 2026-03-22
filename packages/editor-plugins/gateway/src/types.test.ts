@@ -3,9 +3,19 @@ import { NODE_CONTRACTS, DRAGGABLE_NODE_KINDS, getNodeContract } from './types';
 import type { GatewayNodeKind } from './types';
 
 describe('NODE_CONTRACTS', () => {
-  it('defines all 7 node kinds', () => {
+  it('defines all gateway node kinds including loop subnodes', () => {
     const kinds: GatewayNodeKind[] = [
-      'start', 'end', 'data-definition', 'metadata', 'sql-query', 'branch', 'loop',
+      'start',
+      'end',
+      'data-definition',
+      'metadata',
+      'sql-query',
+      'branch',
+      'loop',
+      'loop-start',
+      'loop-end',
+      'loop-break',
+      'loop-continue',
     ];
     for (const kind of kinds) {
       expect(NODE_CONTRACTS[kind]).toBeDefined();
@@ -49,20 +59,40 @@ describe('NODE_CONTRACTS', () => {
     expect(loop.inputs[0].dataType).toBe('array');
     expect(loop.outputs).toHaveLength(2);
   });
+
+  it('loop subnodes define bridgeable control-flow ports', () => {
+    const loopStart = NODE_CONTRACTS['loop-start'];
+    const loopEnd = NODE_CONTRACTS['loop-end'];
+    const loopBreak = NODE_CONTRACTS['loop-break'];
+    const loopContinue = NODE_CONTRACTS['loop-continue'];
+
+    expect(loopStart.inputs[0].dataType).toBe('array');
+    expect(loopStart.outputs).toHaveLength(2);
+    expect(loopEnd.inputs).toHaveLength(1);
+    expect(loopEnd.outputs).toHaveLength(1);
+    expect(loopBreak.inputs).toHaveLength(1);
+    expect(loopBreak.outputs).toHaveLength(1);
+    expect(loopContinue.inputs).toHaveLength(1);
+    expect(loopContinue.outputs).toHaveLength(1);
+  });
 });
 
 describe('DRAGGABLE_NODE_KINDS', () => {
-  it('excludes start and end', () => {
+  it('excludes only start from draggable node kinds', () => {
     expect(DRAGGABLE_NODE_KINDS).not.toContain('start');
-    expect(DRAGGABLE_NODE_KINDS).not.toContain('end');
   });
 
-  it('includes all other node kinds', () => {
+  it('includes visible insertable gateway node kinds', () => {
+    expect(DRAGGABLE_NODE_KINDS).toContain('end');
     expect(DRAGGABLE_NODE_KINDS).toContain('data-definition');
     expect(DRAGGABLE_NODE_KINDS).toContain('metadata');
     expect(DRAGGABLE_NODE_KINDS).toContain('sql-query');
     expect(DRAGGABLE_NODE_KINDS).toContain('branch');
     expect(DRAGGABLE_NODE_KINDS).toContain('loop');
+    expect(DRAGGABLE_NODE_KINDS).toContain('loop-start');
+    expect(DRAGGABLE_NODE_KINDS).toContain('loop-end');
+    expect(DRAGGABLE_NODE_KINDS).toContain('loop-break');
+    expect(DRAGGABLE_NODE_KINDS).toContain('loop-continue');
   });
 });
 

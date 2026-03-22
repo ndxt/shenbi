@@ -23,7 +23,11 @@ export type GatewayNodeKind =
   | 'metadata'
   | 'sql-query'
   | 'branch'
-  | 'loop';
+  | 'loop'
+  | 'loop-start'
+  | 'loop-end'
+  | 'loop-break'
+  | 'loop-continue';
 
 /** Contract describing a node's capabilities and ports */
 export interface GatewayNodeContract {
@@ -170,15 +174,73 @@ export const NODE_CONTRACTS: Record<GatewayNodeKind, GatewayNodeContract> = {
       { id: 'done', label: '完成', dataType: 'array' },
     ],
   },
+  'loop-start': {
+    kind: 'loop-start',
+    label: '开始循环',
+    description: '开始遍历数组或集合，并把当前项送入循环体',
+    icon: 'Play',
+    color: '#14b8a6',
+    inputs: [
+      { id: 'items', label: '数据集', dataType: 'array' },
+    ],
+    outputs: [
+      { id: 'item', label: '当前项', dataType: 'any' },
+      { id: 'done', label: '完成', dataType: 'array' },
+    ],
+  },
+  'loop-end': {
+    kind: 'loop-end',
+    label: '结束循环',
+    description: '结束当前循环体并输出汇总结果',
+    icon: 'Square',
+    color: '#0f766e',
+    inputs: [
+      { id: 'input', label: '输入', dataType: 'any' },
+    ],
+    outputs: [
+      { id: 'output', label: '输出', dataType: 'any' },
+    ],
+  },
+  'loop-break': {
+    kind: 'loop-break',
+    label: '跳出循环',
+    description: '提前结束循环并跳到循环外继续执行',
+    icon: 'LogOut',
+    color: '#0f766e',
+    inputs: [
+      { id: 'input', label: '输入', dataType: 'any' },
+    ],
+    outputs: [
+      { id: 'output', label: '输出', dataType: 'any' },
+    ],
+  },
+  'loop-continue': {
+    kind: 'loop-continue',
+    label: '继续循环',
+    description: '跳过当前剩余步骤，直接进入下一次循环',
+    icon: 'SkipForward',
+    color: '#0f766e',
+    inputs: [
+      { id: 'input', label: '输入', dataType: 'any' },
+    ],
+    outputs: [
+      { id: 'output', label: '输出', dataType: 'any' },
+    ],
+  },
 };
 
-/** Node kinds that users can drag from the palette (excludes start/end) */
+/** Node kinds that users can drag from the palette (start remains implicit) */
 export const DRAGGABLE_NODE_KINDS: GatewayNodeKind[] = [
+  'end',
   'data-definition',
   'metadata',
   'sql-query',
   'branch',
   'loop',
+  'loop-start',
+  'loop-end',
+  'loop-break',
+  'loop-continue',
 ];
 
 /** Get the contract for a node kind */

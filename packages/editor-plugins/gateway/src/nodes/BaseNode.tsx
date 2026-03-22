@@ -2,11 +2,22 @@
 // BaseNode — shared node shell component for all gateway nodes
 // ---------------------------------------------------------------------------
 
-import React, { useState } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import React, { useEffect, useState } from 'react';
+import { Handle, Position, type NodeProps, useUpdateNodeInternals } from '@xyflow/react';
 import type { GatewayNodeData, GatewayNodeKind } from '../types';
 import { NODE_CONTRACTS, PORT_TYPE_COLORS } from '../types';
-import { Play, Square, Variable, FileJson, Database, GitBranch, Repeat, Plus } from 'lucide-react';
+import {
+  Play,
+  Square,
+  Variable,
+  FileJson,
+  Database,
+  GitBranch,
+  Repeat,
+  Plus,
+  LogOut,
+  SkipForward,
+} from 'lucide-react';
 
 const iconMap = {
   Play,
@@ -17,6 +28,8 @@ const iconMap = {
   GitBranch,
   Repeat,
   Plus,
+  LogOut,
+  SkipForward,
 } as const;
 
 type IconName = keyof typeof iconMap;
@@ -27,16 +40,32 @@ export interface BaseNodeProps extends NodeProps {
   onAddNode?: (sourceNodeId: string, sourceHandle: string) => void;
 }
 
+function getHandleStyle(
+  index: number,
+  count: number,
+  color: string,
+): React.CSSProperties {
+  if (count === 1) {
+    return {
+      backgroundColor: color,
+      top: '50%',
+    };
+  }
+
+  return {
+    backgroundColor: color,
+    top: `${((index + 1) / (count + 1)) * 100}%`,
+  };
+}
+
 export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodeProps) {
-  const [isHovered, setIsHovered] = useState(false);
   const [mouseDownTime, setMouseDownTime] = useState<number>(0);
   const contract = NODE_CONTRACTS[data.kind as GatewayNodeKind];
+  const updateNodeInternals = useUpdateNodeInternals();
   
   if (!contract) {
     return <div className="gateway-node gateway-node--unknown">Unknown node</div>;
   }
-
-  const hasOutputs = contract.outputs.length > 0;
 
   const handleMouseDown = () => {
     setMouseDownTime(Date.now());
@@ -50,15 +79,19 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
     }
   };
 
+  useEffect(() => {
+    if (id) {
+      updateNodeInternals(id);
+    }
+  }, [contract.inputs.length, contract.outputs.length, id, updateNodeInternals]);
+
   return (
     <div
       className={`gateway-node ${selected ? 'gateway-node--selected' : ''}`}
       style={{ '--node-color': contract.color } as React.CSSProperties}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Input Handles */}
-      {contract.inputs.map((port) => {
+      {contract.inputs.map((port, index) => {
         const isSingleInput = contract.inputs.length === 1;
         return (
           <Handle
@@ -66,11 +99,8 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
             type="target"
             position={Position.Left}
             id={port.id}
-            className="gateway-node__handle gateway-node__handle--input"
-            style={{ 
-              backgroundColor: PORT_TYPE_COLORS[port.dataType],
-              ...(isSingleInput ? { top: '50%', transform: 'translateY(-50%)' } : {}),
-            }}
+            className={`gateway-node__handle gateway-node__handle--input ${isSingleInput ? 'gateway-node__handle--single' : ''}`}
+            style={getHandleStyle(index, contract.inputs.length, PORT_TYPE_COLORS[port.dataType])}
           />
         );
       })}
@@ -94,30 +124,26 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
       {/* Custom body content */}
       {children ? <div className="gateway-node__body">{children}</div> : null}
 
-      {/* Output Handles with Add Button */}
+      {/* Output Handles double as quick-add affordances on click. */}
       {contract.outputs.map((port, index) => {
         const isSingleOutput = contract.outputs.length === 1;
         return (
-          <div key={port.id} className="gateway-node__handle-wrapper">
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={port.id}
-              className="gateway-node__handle gateway-node__handle--output"
-              style={{ 
-                backgroundColor: PORT_TYPE_COLORS[port.dataType],
-                ...(isSingleOutput ? { top: '50%', transform: 'translateY(-50%)' } : {}),
-              }}
-              onMouseDown={handleMouseDown}
-              onMouseUp={() => handleMouseUp(port.id)}
-            >
-              {isHovered && index === 0 && (
-                <div className="gateway-node__handle-plus">
-                  <Plus size={12} strokeWidth={3} />
-                </div>
-              )}
-            </Handle>
-          </div>
+          <Handle
+            key={port.id}
+            type="source"
+            position={Position.Right}
+            id={port.id}
+            className={`gateway-node__handle gateway-node__handle--output ${isSingleOutput ? 'gateway-node__handle--single' : ''}`}
+            style={getHandleStyle(index, contract.outputs.length, PORT_TYPE_COLORS[port.dataType])}
+            onMouseDown={handleMouseDown}
+            onMouseUp={() => handleMouseUp(port.id)}
+          >
+            {onAddNode ? (
+              <span className="gateway-node__handle-plus" aria-hidden="true">
+                <Plus size={10} strokeWidth={3} />
+              </span>
+            ) : null}
+          </Handle>
         );
       })}
     </div>

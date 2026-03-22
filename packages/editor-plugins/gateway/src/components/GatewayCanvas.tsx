@@ -19,7 +19,7 @@ import { CanvasToolRail, CanvasZoomHud, readPaletteDragPayload, type CanvasToolM
 import { Focus } from 'lucide-react';
 
 import { nodeTypes as baseNodeTypes } from '../nodes/node-registry';
-import { TypedEdge } from '../edges/TypedEdge';
+import { TypedEdge, type TypedEdgeAddNodePayload } from '../edges/TypedEdge';
 import { isValidConnection } from '../validation';
 import type {
   GatewayNode,
@@ -29,13 +29,44 @@ import type {
 } from '../types';
 import { NODE_CONTRACTS } from '../types';
 import { NodeSelectorPanel } from './NodeSelectorPanel';
+import { resolveBridgeOutputHandle } from './gateway-edge-insert';
 import { buildGatewayMinimapModel } from './gateway-minimap';
+import { buildGatewayPaletteAssets } from './gateway-palette-assets';
 import { resolveGatewayInitialViewport, type GatewayViewport } from './gateway-viewport';
 import '../styles/gateway.css';
 
-const edgeTypes = {
-  typed: TypedEdge,
+type SelectorPanelState = {
+  visible: boolean;
+  position: { x: number; y: number };
+  sourceNodeId: string;
+  sourceHandle: string;
+  edgeId?: string;
+  targetNodeId?: string;
+  targetHandle?: string;
 };
+
+const INSERT_NODE_GAP_X = 280;
+
+function collectDownstreamNodeIds(startNodeId: string, edges: GatewayEdge[]): Set<string> {
+  const visited = new Set<string>();
+  const queue = [startNodeId];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+
+    for (const edge of edges) {
+      if (edge.source === current && edge.target && !visited.has(edge.target)) {
+        queue.push(edge.target);
+      }
+    }
+  }
+
+  return visited;
+}
 
 function createNodeId(): string {
   return `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -60,6 +91,8 @@ export function GatewayCanvas({
 }: GatewayCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
   const hasInitializedViewportRef = useRef(false);
   const [activeTool, setActiveTool] = useState<CanvasToolMode>('select');
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -69,12 +102,15 @@ export function GatewayCanvas({
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const zoomMenuRef = useRef<HTMLDivElement>(null);
-  const [selectorPanel, setSelectorPanel] = useState<{
-    visible: boolean;
-    position: { x: number; y: number };
-    sourceNodeId: string;
-    sourceHandle: string;
-  } | null>(null);
+  const [selectorPanel, setSelectorPanel] = useState<SelectorPanelState | null>(null);
+
+  React.useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
+  React.useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
 
   const handleNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -178,6 +214,7 @@ export function GatewayCanvas({
   }), []);
   const selectedNodes = useMemo(() => nodes.filter((node) => Boolean(node.selected)), [nodes]);
   const effectivePan = isSpacePressed || activeTool === 'pan';
+  const gatewayAssetGroups = useMemo(() => buildGatewayPaletteAssets(), []);
   const minimapModel = useMemo(() => buildGatewayMinimapModel({
     nodes,
     viewport: viewportState,
@@ -213,7 +250,7 @@ export function GatewayCanvas({
 
   // Handle add node button click
   const handleAddNode = useCallback((sourceNodeId: string, sourceHandle: string) => {
-    const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+    const sourceNode = nodesRef.current.find((n) => n.id === sourceNodeId);
     if (!sourceNode || !reactFlowInstance.current) {
       return;
     }
@@ -234,7 +271,30 @@ export function GatewayCanvas({
       sourceNodeId,
       sourceHandle,
     });
-  }, [nodes]);
+  }, []);
+
+  const handleAddNodeFromEdge = useCallback((payload: TypedEdgeAddNodePayload) => {
+    const sourceNode = nodesRef.current.find((node) => node.id === payload.sourceNodeId);
+    const resolvedSourceHandle = payload.sourceHandle
+      ?? (sourceNode ? NODE_CONTRACTS[sourceNode.data.kind].outputs[0]?.id : undefined);
+
+    if (!resolvedSourceHandle) {
+      return;
+    }
+
+    setSelectorPanel({
+      visible: true,
+      position: {
+        x: payload.position.x + 24,
+        y: payload.position.y - 180,
+      },
+      sourceNodeId: payload.sourceNodeId,
+      sourceHandle: resolvedSourceHandle,
+      edgeId: payload.edgeId,
+      targetNodeId: payload.targetNodeId,
+      targetHandle: payload.targetHandle ?? undefined,
+    });
+  }, []);
 
   // Handle node selection from panel
   const handleSelectNodeFromPanel = useCallback((kind: GatewayNodeKind) => {
@@ -243,17 +303,54 @@ export function GatewayCanvas({
     }
 
     const contract = NODE_CONTRACTS[kind];
-    const sourceNode = nodes.find((n) => n.id === selectorPanel.sourceNodeId);
-    
+    if (selectorPanel.edgeId && (contract.inputs.length === 0 || contract.outputs.length === 0)) {
+      return;
+    }
+    const sourceNode = nodesRef.current.find((n) => n.id === selectorPanel.sourceNodeId);
+    const targetNode = selectorPanel.targetNodeId
+      ? nodesRef.current.find((node) => node.id === selectorPanel.targetNodeId)
+      : null;
+
     if (!sourceNode) {
       return;
     }
 
-    // Create new node to the right of source node
-    const newNodePosition = {
-      x: sourceNode.position.x + 280,
+    const downstreamIds = selectorPanel.edgeId && targetNode
+      ? collectDownstreamNodeIds(selectorPanel.targetNodeId!, edgesRef.current)
+      : new Set<string>();
+
+    const shiftedNodes = new Map<string, GatewayNode>();
+    let newNodePosition = {
+      x: sourceNode.position.x + INSERT_NODE_GAP_X,
       y: sourceNode.position.y,
     };
+
+    if (selectorPanel.edgeId && targetNode) {
+      const nextTargetX = Math.max(
+        targetNode.position.x,
+        sourceNode.position.x + INSERT_NODE_GAP_X * 2,
+      );
+      const downstreamShiftX = nextTargetX - targetNode.position.x;
+
+      newNodePosition = {
+        x: nextTargetX - INSERT_NODE_GAP_X,
+        y: targetNode.position.y,
+      };
+
+      if (downstreamShiftX > 0) {
+        for (const node of nodesRef.current) {
+          if (downstreamIds.has(node.id)) {
+            shiftedNodes.set(node.id, {
+              ...node,
+              position: {
+                ...node.position,
+                x: node.position.x + downstreamShiftX,
+              },
+            });
+          }
+        }
+      }
+    }
 
     const newNode: GatewayNode = {
       id: createNodeId(),
@@ -266,8 +363,7 @@ export function GatewayCanvas({
       },
     };
 
-    // Create edge connecting source to new node
-    const newEdge: GatewayEdge = {
+    const edgeToNewNode: GatewayEdge = {
       id: `edge_${Date.now()}`,
       type: 'typed',
       source: selectorPanel.sourceNodeId,
@@ -276,11 +372,30 @@ export function GatewayCanvas({
       targetHandle: contract.inputs[0]?.id || 'input',
     };
 
-    onNodesChangeProp([...nodes, newNode]);
-    onEdgesChangeProp([...edges, newEdge]);
+    let nextEdges = [...edgesRef.current, edgeToNewNode];
+    if (selectorPanel.edgeId && selectorPanel.targetNodeId) {
+      const bridgeOutputHandle = resolveBridgeOutputHandle(
+        contract,
+        targetNode,
+        selectorPanel.targetHandle,
+      );
+      nextEdges = nextEdges.filter((edge) => edge.id !== selectorPanel.edgeId);
+      nextEdges.push({
+        id: `edge_${Date.now()}_insert`,
+        type: 'typed',
+        source: newNode.id,
+        sourceHandle: bridgeOutputHandle || contract.outputs[0]?.id || 'output',
+        target: selectorPanel.targetNodeId,
+        targetHandle: selectorPanel.targetHandle || 'input',
+      });
+    }
+
+    const nextNodes = nodesRef.current.map((node) => shiftedNodes.get(node.id) ?? node);
+    onNodesChangeProp([...nextNodes, newNode]);
+    onEdgesChangeProp(nextEdges);
     onDirty?.();
     setSelectorPanel(null);
-  }, [selectorPanel, nodes, edges, onNodesChangeProp, onEdgesChangeProp, onDirty]);
+  }, [selectorPanel, onNodesChangeProp, onEdgesChangeProp, onDirty]);
 
   // Create node types with add node handler
   const nodeTypes = useMemo(() => {
@@ -290,6 +405,10 @@ export function GatewayCanvas({
     }
     return types;
   }, [handleAddNode]);
+
+  const edgeTypes = useMemo(() => ({
+    typed: (props: any) => <TypedEdge {...props} onAddNode={handleAddNodeFromEdge} />,
+  }), [handleAddNodeFromEdge]);
 
   // Zoom control functions — delegate to ReactFlow instance
   const handleZoomIn = useCallback(() => {
@@ -505,6 +624,8 @@ export function GatewayCanvas({
       {selectorPanel?.visible && (
         <NodeSelectorPanel
           position={selectorPanel.position}
+          assetGroups={gatewayAssetGroups}
+          insertKind={selectorPanel.edgeId ? 'edge-insert' : 'quick-insert'}
           onSelectNode={handleSelectNodeFromPanel}
           onClose={() => setSelectorPanel(null)}
         />

@@ -2,6 +2,7 @@ export { createGatewayPlugin } from './plugin';
 export { GatewayEditor } from './components/GatewayEditor';
 export { GatewayCanvas } from './components/GatewayCanvas';
 export { GatewayNodePanel } from './components/GatewayNodePanel';
+export { buildGatewayPaletteAssets } from './components/gateway-palette-assets';
 export type {
   GatewayNodeKind,
   GatewayNodeContract,

@@ -7,42 +7,38 @@ import {
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useTranslation } from '@shenbi/i18n';
+import {
+  buildPaletteGroupsFromAssetGroups,
+  type PaletteAssetGroup,
+  type PaletteAssetInsertKind,
+  type PaletteDragPayload,
+  type PaletteGroup,
+  type PaletteItem,
+} from './palette-model';
+export type {
+  PaletteAsset,
+  PaletteAssetGroup,
+  PaletteAssetInsertKind,
+  PaletteAssetVisibility,
+  PaletteDragPayload,
+  PaletteGroup,
+  PaletteItem,
+} from './palette-model';
 
 const PALETTE_DRAG_MIME = 'application/x-shenbi-palette-item';
 
 type LucideIconName = keyof typeof LucideIcons;
 
-export interface PaletteDragPayload {
-  kind: 'component' | 'gateway-node';
-  type: string;
-  label: string;
-  description?: string | undefined;
-  icon?: string | undefined;
-  meta?: Record<string, unknown> | undefined;
-}
-
-export interface PaletteItem {
-  id: string;
-  type: string;
-  name: string;
-  description?: string | undefined;
-  icon?: string | undefined;
-  children?: PaletteItem[] | undefined;
-  dragPayload: PaletteDragPayload;
-}
-
-export interface PaletteGroup {
-  id: string;
-  name: string;
-  items: PaletteItem[];
-}
-
 export interface PalettePanelProps {
-  groups: PaletteGroup[];
+  groups?: PaletteGroup[] | undefined;
+  assetGroups?: PaletteAssetGroup[] | undefined;
   layout?: 'grid' | 'list' | undefined;
+  insertKind?: PaletteAssetInsertKind | undefined;
   searchPlaceholder?: string | undefined;
   emptyText?: string | undefined;
   showGroupHeaders?: boolean | undefined;
+  variant?: 'sidebar' | 'overlay' | undefined;
+  dragEnabled?: boolean | undefined;
   onInsert?: ((payload: PaletteDragPayload, item: PaletteItem) => void) | undefined;
   onStartDrag?: ((payload: PaletteDragPayload, item: PaletteItem) => void) | undefined;
   onEndDrag?: (() => void) | undefined;
@@ -94,8 +90,12 @@ function renderPaletteIcon(iconName?: string, size = 18): React.ReactNode {
 }
 
 function getItemColor(item: PaletteItem): string | undefined {
-  const color = item.dragPayload.meta?.color;
+  const color = item.color ?? item.dragPayload.meta?.color;
   return typeof color === 'string' ? color : undefined;
+}
+
+function canInsertItem(item: PaletteItem): boolean {
+  return item.insertable !== false;
 }
 
 function PalettePopover({
@@ -106,6 +106,7 @@ function PalettePopover({
   onInsert,
   onStartDrag,
   onEndDrag,
+  dragEnabled,
   onHoverItem,
 }: {
   parent: PaletteItem;
@@ -115,6 +116,7 @@ function PalettePopover({
   onInsert?: ((payload: PaletteDragPayload, item: PaletteItem) => void) | undefined;
   onStartDrag?: ((payload: PaletteDragPayload, item: PaletteItem) => void) | undefined;
   onEndDrag?: (() => void) | undefined;
+  dragEnabled: boolean;
   onHoverItem: (item: PaletteItem | null) => void;
 }) {
   const { t } = useTranslation('editorUi');
@@ -122,7 +124,7 @@ function PalettePopover({
 
   return (
     <div
-      className="fixed z-50 flex flex-col w-[292px] group/popover pl-[8px] -ml-[8px]"
+      className="fixed z-[120] flex flex-col w-[292px] group/popover pl-[8px] -ml-[8px]"
       style={{ left: `${left}px`, top: `${top}px` }}
     >
       <div className="bg-bg-sidebar/95 backdrop-blur-xl border border-border-ide rounded-lg shadow-2xl dark:shadow-[0_16px_60px_rgba(0,0,0,0.6)] ring-1 ring-white/5 overflow-hidden flex flex-col w-full animate-in fade-in zoom-in slide-in-from-left-2 duration-200">
@@ -135,8 +137,12 @@ function PalettePopover({
               {parent.children.map((child) => (
                 <div
                   key={child.id}
-                  draggable
+                  draggable={dragEnabled && child.draggable !== false}
                   onDragStart={(event) => {
+                    if (!dragEnabled || child.draggable === false) {
+                      event.preventDefault();
+                      return;
+                    }
                     beginPaletteDrag(event, child.dragPayload);
                     onStartDrag?.(child.dragPayload, child);
                   }}
@@ -145,7 +151,9 @@ function PalettePopover({
                   }}
                   onClick={(event) => {
                     event.stopPropagation();
-                    onInsert?.(child.dragPayload, child);
+                    if (canInsertItem(child)) {
+                      onInsert?.(child.dragPayload, child);
+                    }
                   }}
                   onMouseEnter={(event) => {
                     event.stopPropagation();
@@ -214,7 +222,7 @@ function PaletteDocTooltip({
 
   return (
     <div
-      className="fixed z-50 flex flex-col w-[288px] pl-[8px] -ml-[8px]"
+      className="fixed z-[120] flex flex-col w-[288px] pl-[8px] -ml-[8px]"
       style={{ left: `${left}px`, top: `${top}px` }}
     >
       <div className="bg-bg-sidebar/95 backdrop-blur-xl border border-border-ide rounded-lg shadow-2xl dark:shadow-[0_16px_60px_rgba(0,0,0,0.6)] ring-1 ring-white/5 p-4 w-full text-[12px] animate-in fade-in zoom-in duration-200">
@@ -243,6 +251,7 @@ function GridPaletteItem({
   onInsert,
   onStartDrag,
   onEndDrag,
+  dragEnabled,
   onMouseEnter,
   onMouseLeave,
 }: {
@@ -251,6 +260,7 @@ function GridPaletteItem({
   onInsert?: ((payload: PaletteDragPayload, item: PaletteItem) => void) | undefined;
   onStartDrag?: ((payload: PaletteDragPayload, item: PaletteItem) => void) | undefined;
   onEndDrag?: (() => void) | undefined;
+  dragEnabled: boolean;
   onMouseEnter: (event: React.MouseEvent, item: PaletteItem) => void;
   onMouseLeave: () => void;
 }) {
@@ -261,20 +271,28 @@ function GridPaletteItem({
       onMouseLeave={onMouseLeave}
     >
       <div
-        draggable
+        draggable={dragEnabled && item.draggable !== false}
         onDragStart={(event) => {
+          if (!dragEnabled || item.draggable === false) {
+            event.preventDefault();
+            return;
+          }
           beginPaletteDrag(event, item.dragPayload);
           onStartDrag?.(item.dragPayload, item);
         }}
         onDragEnd={() => {
           onEndDrag?.();
         }}
-        onClick={() => onInsert?.(item.dragPayload, item)}
-        className={`flex flex-col items-center justify-center h-[72px] w-full p-2 rounded-md cursor-pointer transition-colors active:scale-95 group/card ${
+        onClick={() => {
+          if (canInsertItem(item)) {
+            onInsert?.(item.dragPayload, item);
+          }
+        }}
+        className={`flex flex-col items-center justify-center h-[72px] w-full p-2 rounded-md transition-colors group/card ${
           active
             ? 'bg-blue-500/10 text-blue-500'
             : 'bg-transparent border border-transparent hover:bg-text-primary/5'
-        }`}
+        } ${canInsertItem(item) ? 'cursor-pointer active:scale-95' : 'cursor-default'}`}
       >
         <div
           className={`transition-colors mb-2 ${
@@ -314,26 +332,38 @@ function ListPaletteItem({
   onInsert,
   onStartDrag,
   onEndDrag,
+  dragEnabled,
 }: {
   item: PaletteItem;
   onInsert?: ((payload: PaletteDragPayload, item: PaletteItem) => void) | undefined;
   onStartDrag?: ((payload: PaletteDragPayload, item: PaletteItem) => void) | undefined;
   onEndDrag?: (() => void) | undefined;
+  dragEnabled: boolean;
 }) {
   const iconBg = getItemColor(item) ?? 'rgba(59, 130, 246, 0.14)';
 
   return (
     <div
-      draggable
+      draggable={dragEnabled && item.draggable !== false}
       onDragStart={(event) => {
+        if (!dragEnabled || item.draggable === false) {
+          event.preventDefault();
+          return;
+        }
         beginPaletteDrag(event, item.dragPayload);
         onStartDrag?.(item.dragPayload, item);
       }}
       onDragEnd={() => {
         onEndDrag?.();
       }}
-      onClick={() => onInsert?.(item.dragPayload, item)}
-      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-border-ide/50 hover:bg-text-primary/5 active:scale-[0.99]"
+      onClick={() => {
+        if (canInsertItem(item)) {
+          onInsert?.(item.dragPayload, item);
+        }
+      }}
+      className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors border border-transparent hover:border-border-ide/50 hover:bg-text-primary/5 ${
+        canInsertItem(item) ? 'cursor-pointer active:scale-[0.99]' : 'cursor-default'
+      }`}
     >
       <div
         className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
@@ -353,10 +383,14 @@ function ListPaletteItem({
 
 export function PalettePanel({
   groups,
+  assetGroups,
   layout = 'grid',
+  insertKind = 'sidebar',
   searchPlaceholder,
   emptyText,
   showGroupHeaders = true,
+  variant = 'sidebar',
+  dragEnabled = true,
   onInsert,
   onStartDrag,
   onEndDrag,
@@ -368,8 +402,11 @@ export function PalettePanel({
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<number | null>(null);
+  const resolvedGroups = assetGroups
+    ? buildPaletteGroupsFromAssetGroups(assetGroups, insertKind)
+    : (groups ?? []);
 
-  const filteredGroups = groups
+  const filteredGroups = resolvedGroups
     .map((group) => {
       const matchedItems = group.items.filter((item) => {
         const lowerSearch = searchTerm.toLowerCase();
@@ -433,7 +470,14 @@ export function PalettePanel({
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-bg-sidebar text-text-primary select-none" ref={containerRef}>
+    <div
+      className={`flex flex-col h-full bg-bg-sidebar text-text-primary select-none ${
+        variant === 'overlay'
+          ? 'border border-border-ide rounded-xl shadow-2xl overflow-hidden'
+          : ''
+      }`}
+      ref={containerRef}
+    >
       <div className="p-2 border-b border-border-ide/50">
         <div className="relative">
           <Search size={14} className="absolute left-2.5 top-[7px] text-text-secondary opacity-70" />
@@ -467,6 +511,7 @@ export function PalettePanel({
                     onInsert={onInsert}
                     onStartDrag={onStartDrag}
                     onEndDrag={onEndDrag}
+                    dragEnabled={dragEnabled}
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                   />
@@ -477,6 +522,7 @@ export function PalettePanel({
                     onInsert={onInsert}
                     onStartDrag={onStartDrag}
                     onEndDrag={onEndDrag}
+                    dragEnabled={dragEnabled}
                   />
                 )
               ))}
@@ -502,6 +548,7 @@ export function PalettePanel({
             onInsert={onInsert}
             onStartDrag={onStartDrag}
             onEndDrag={onEndDrag}
+            dragEnabled={dragEnabled}
             onHoverItem={setHoveredItem}
           />
         </div>
