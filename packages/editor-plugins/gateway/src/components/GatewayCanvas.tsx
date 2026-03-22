@@ -446,13 +446,6 @@ export function GatewayCanvas({
         onDirty?.();
         break;
       }
-      case 'copy': {
-        const node = nodesRef.current.find((n) => n.id === nodeId);
-        if (node) {
-          void navigator.clipboard.writeText(JSON.stringify(node.data));
-        }
-        break;
-      }
       case 'change':
         // TODO: Open node type selector to swap this node
         break;

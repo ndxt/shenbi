@@ -21,7 +21,6 @@ import {
   Copy,
   Trash2,
   RefreshCw,
-  ClipboardCopy,
 } from 'lucide-react';
 
 const iconMap = {
@@ -39,7 +38,7 @@ const iconMap = {
 
 type IconName = keyof typeof iconMap;
 
-export type NodeMenuAction = 'duplicate' | 'copy' | 'delete' | 'change';
+export type NodeMenuAction = 'duplicate' | 'delete' | 'change';
 
 export interface BaseNodeProps extends NodeProps {
   data: GatewayNodeData;
@@ -108,20 +107,10 @@ function NodeContextMenu({ nodeId, kind, description, onAction, onClose }: NodeC
       <button
         type="button"
         className="gateway-node__context-menu-item"
-        onClick={() => { onAction(nodeId, 'copy'); onClose(); }}
+        onClick={() => { onAction(nodeId, 'duplicate'); onClose(); }}
       >
         <Copy size={14} />
         <span>复制</span>
-        <kbd className="gateway-node__context-menu-shortcut">Ctrl C</kbd>
-      </button>
-
-      <button
-        type="button"
-        className="gateway-node__context-menu-item"
-        onClick={() => { onAction(nodeId, 'duplicate'); onClose(); }}
-      >
-        <ClipboardCopy size={14} />
-        <span>复制为新节点</span>
         <kbd className="gateway-node__context-menu-shortcut">Ctrl D</kbd>
       </button>
 
