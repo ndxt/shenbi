@@ -26,6 +26,8 @@
 - `commands`
 - `notifications`
 
+`workspace / persistence / filesystem` 仍然存在于 `PluginContext`，但它们属于宿主桥接能力，不是默认鼓励所有插件直接扩张依赖的通用服务面。
+
 旧 alias 仍保留兼容，但只允许在 `context.ts` 中兜底，不允许新插件继续直接使用：
 
 - `getSchema`
@@ -34,6 +36,39 @@
 - `patchNode*`
 - `executeCommand`
 - `notify`
+
+## Accessor 风格
+
+从包根导出的 `PluginContext` helper 现在只保留聚合 accessor，不再继续暴露零散字段级 helper。
+
+当前允许从 `@shenbi/editor-plugin-api` 根入口直接使用的 accessor：
+
+- `getPluginDocumentAccess(context)`
+- `getPluginSelectionAccess(context)`
+- `getPluginCommandAccess(context)`
+- `getPluginFeedbackAccess(context)`
+- `getPluginWorkspaceAccess(context)`
+- `getPluginStorageAccess(context)`
+
+使用原则：
+
+1. 插件 bridge / adapter 层优先消费这些 grouped accessor，而不是自己重复兼容旧 alias。
+2. 新 helper 若只是 `getPluginXxxField()` 这种字段级包装，不进入包根导出面。
+3. 如果某类访问还不值得形成一组能力，就优先直接使用 `PluginContext` 的稳定服务面，而不是继续堆新的 helper 名称。
+
+## 导出面原则
+
+`@shenbi/editor-plugin-api` 根入口只应暴露三类东西：
+
+- 稳定协议类型：`PluginContext`、manifest、contribution contexts
+- 少量真正跨插件复用的宿主 accessor
+- 插件定义入口
+
+以下内容默认不应再从包根直接导出：
+
+- 仅用于类型拆分的中间 context 子类型
+- 单字段/单方法级 helper
+- 只服务单个插件包实现细节的兼容函数
 
 ## 生命周期冻结
 
@@ -71,6 +106,7 @@
    - 相关插件包 README
    - `docs/README.md`
 3. 新服务面没有经过平台准入评审前，不进入 `PluginContext`。
+4. 新 helper 若不能归入现有 accessor 分组，默认不加入包根导出面。
 
 ## 参考
 

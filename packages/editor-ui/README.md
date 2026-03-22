@@ -48,6 +48,8 @@
 
 但插件协议本身不在这里定义，唯一来源是 `@shenbi/editor-plugin-api`。
 
+`editor-ui` 内部如果需要从 `PluginContext` 读取宿主能力，也应优先对齐 `editor-plugin-api` 的 grouped accessor 风格，不要在宿主层重新发明一组零散 helper。
+
 ## 当前冻结规则
 
 1. `PluginContext` 的稳定服务面只有：
@@ -55,8 +57,9 @@
    - `selection`
    - `commands`
    - `notifications`
-2. 新业务能力优先复用命令总线和这四类服务面。
-3. 新的插件扩展点或宿主能力，只有在足够通用时才进入这里。
+2. `workspace / persistence / filesystem` 仅作为宿主桥接能力使用，避免把它们扩张成新的通用插件依赖面。
+3. 新业务能力优先复用命令总线和上述服务面，或复用 `editor-plugin-api` 已有 accessor。
+4. 新的插件扩展点或宿主能力，只有在足够通用时才进入这里。
 
 ## 何时放进这个包
 

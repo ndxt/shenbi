@@ -19,13 +19,21 @@ AI 插件读写编辑器状态时，优先走 `PluginContext` 的新服务面：
 - 读取选择：`selection.getSelectedNode()` / `getSelectedNodeId()`
 - 执行宿主命令：`commands.execute(...)`
 
-当前不应在插件实现层直接判断旧 alias 是否存在。旧兼容只能通过 `editor-plugin-api` helper 兜底。
+如果是 bridge / adapter 层，需要从 `PluginContext` 做兼容解析，统一走 `editor-plugin-api` 的 grouped accessor：
+
+- `getPluginDocumentAccess(...)`
+- `getPluginSelectionAccess(...)`
+- `getPluginCommandAccess(...)`
+- `getPluginStorageAccess(...)`
+
+当前不应在插件实现层直接判断旧 alias 是否存在，也不要再新增 `getPluginSchema()` 这类字段级 helper 依赖。
 
 ## 变更规则
 
 1. AI 侧的 schema 替换优先调用 `document.replaceSchema(...)`。
 2. 若需要宿主命令，统一走 `commands.execute(...)`，不要假设宿主一定实现某个专属面板 props。
-3. Bridge 是插件内适配层，不是新的宿主协议来源。
+3. 若 bridge 需要兼容宿主差异，优先复用 grouped accessor，不要在本包再包一层零散 `PluginContext` helper。
+4. Bridge 是插件内适配层，不是新的宿主协议来源。
 
 ## 不负责什么
 

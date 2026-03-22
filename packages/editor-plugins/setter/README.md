@@ -24,6 +24,13 @@ Setter 插件对 schema 的写操作应统一通过 `PluginContext.document.patc
 - `selection.getSelectedNode()`
 - `selection.getSelectedNodeId()`
 
+如果是 inspector tab 适配层，需要兼容 `PluginContext` 的宿主兑现差异，统一走 `editor-plugin-api` 的 grouped accessor，尤其是：
+
+- `getPluginDocumentAccess(...)`
+- `getPluginSelectionAccess(...)`
+
+不要在 setter 包里重新引入或新增 `getPluginSchema()`、`getPluginSelectedNodeId()` 这类字段级 helper 依赖。
+
 ## 变更规则
 
 1. Setter 增强优先新增 inspector tab，不要在宿主层加专属 props。
@@ -31,7 +38,7 @@ Setter 插件对 schema 的写操作应统一通过 `PluginContext.document.patc
    - `patchNodeProps`
    - `patchNodeEvents`
    - `getSelectedNode`
-3. 如果需要新的宿主能力，先证明不能仅靠现有 `document / selection / commands / notifications` 完成。
+3. 如果需要新的宿主能力，先证明不能仅靠现有 `document / selection / commands / notifications` 或现有 grouped accessor 完成。
 
 ## 不负责什么
 
