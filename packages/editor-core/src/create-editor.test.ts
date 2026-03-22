@@ -877,4 +877,74 @@ describe('createEditor', () => {
     expect(editor.state.getCurrentFileId()).toBe('id-dirty-page');
     expect(editor.state.getIsDirty()).toBe(false);
   });
+
+  it('tab.activate does not corrupt target tab with stale editor state (regression)', async () => {
+    const schemaA = createSchema('page-a');
+    const schemaB = createSchema('page-b');
+    const vfs = createMemoryVFS(schemaA);
+    await vfs.createFile('project-1', null, 'page-b', 'page', schemaB);
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    editor.state.setSelectedNodeId('selection-a');
+    await editor.commands.execute('tab.open', { fileId: 'file-page-b' });
+    editor.state.setSelectedNodeId('selection-b');
+
+    // Switch back to tab A
+    await editor.commands.execute('tab.activate', { fileId: 'demo' });
+
+    // Tab B must still have its own schema and selection, not A's
+    const tabB = tabManager.getTab('file-page-b');
+    expect(tabB).toBeDefined();
+    expect(tabB!.schema.name).toBe('page-b');
+    expect(tabB!.selectedNodeId).toBe('selection-b');
+
+    // Editor must show tab A
+    expect(editor.state.getCurrentFileId()).toBe('demo');
+    expect(editor.state.getSchema().name).toBe('page-a');
+    expect(editor.state.getSelectedNodeId()).toBe('selection-a');
+  });
+
+  it('tab.activate never emits intermediate snapshots with wrong-tab data (regression)', async () => {
+    const schemaA = createSchema('page-alpha');
+    const schemaB = createSchema('page-beta');
+    const vfs = createMemoryVFS(schemaA);
+    await vfs.createFile('project-1', null, 'page-beta', 'page', schemaB);
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    await editor.commands.execute('tab.open', { fileId: 'file-page-beta' });
+
+    // Collect all intermediate TabManager snapshots during activation
+    const snapshots: { activeTabId: string | undefined; tabBSchemaName: string | undefined }[] = [];
+    const unsub = tabManager.subscribe((snapshot) => {
+      const tabBData = snapshot.tabs.find((tab) => tab.fileId === 'file-page-beta');
+      snapshots.push({
+        activeTabId: snapshot.activeTabId,
+        tabBSchemaName: tabBData?.schema?.name,
+      });
+    });
+
+    await editor.commands.execute('tab.activate', { fileId: 'demo' });
+    unsub();
+
+    // In EVERY intermediate snapshot, tab B must keep its own schema name
+    for (const snapshot of snapshots) {
+      if (snapshot.tabBSchemaName !== undefined) {
+        expect(snapshot.tabBSchemaName).toBe('page-beta');
+      }
+    }
+  });
 });

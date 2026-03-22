@@ -158,36 +158,49 @@ export function PageCanvasRenderer(props: PageCanvasRendererProps) {
     onCanvasSurfaceReady?.(canvasSurface);
   }, [canvasSurface, onCanvasSurfaceReady]);
 
+  // Use refs so the runtime object identity stays stable across renders.
+  // This prevents a render loop: runtime changes → useEffect fires →
+  // setCanvasRuntime in AppShell → re-render → new runtime → loop.
+  const zoomRef = React.useRef(zoom);
+  zoomRef.current = zoom;
+  const canvasScaleRef = React.useRef(canvasScale);
+  canvasScaleRef.current = canvasScale;
+  const dragDropRef = React.useRef(dragDrop);
+  dragDropRef.current = dragDrop;
+  const isSpacePressedRef = React.useRef(isSpacePressed);
+  isSpacePressedRef.current = isSpacePressed;
+  const isCanvasPanningRef = React.useRef(isCanvasPanning);
+  isCanvasPanningRef.current = isCanvasPanning;
+  const canvasDragSessionRef = React.useRef(canvasDragSession);
+  canvasDragSessionRef.current = canvasDragSession;
+
   const runtime = React.useMemo<CanvasRendererHostRuntime>(() => ({
-    zoomIn: () => zoom.zoomCanvasIn(),
-    zoomOut: () => zoom.zoomCanvasOut(),
-    resetZoom: () => zoom.resetCanvasZoom(),
-    fitCanvas: () => fitCanvasToViewport(),
-    centerCanvas: () => zoom.centerCanvasStage(),
-    focusSelection: () => zoom.focusCanvasSelection(),
-    getScale: () => canvasScale,
-    startSidebarDragComponent: dragDrop.handleSidebarStartDragComponent,
-    endSidebarDragComponent: dragDrop.handleSidebarEndDragComponent,
-    isSpacePanActive: () => isSpacePressed,
-    isCanvasPanning: () => isCanvasPanning,
-    hasCanvasDragSession: () => Boolean(canvasDragSession),
-  }), [
-    canvasDragSession,
-    canvasScale,
-    dragDrop.handleSidebarEndDragComponent,
-    dragDrop.handleSidebarStartDragComponent,
-    fitCanvasToViewport,
-    isCanvasPanning,
-    isSpacePressed,
-    zoom,
-  ]);
+    zoomIn: () => zoomRef.current.zoomCanvasIn(),
+    zoomOut: () => zoomRef.current.zoomCanvasOut(),
+    resetZoom: () => zoomRef.current.resetCanvasZoom(),
+    fitCanvas: () => zoomRef.current.fitCanvasToViewport(),
+    centerCanvas: () => zoomRef.current.centerCanvasStage(),
+    focusSelection: () => zoomRef.current.focusCanvasSelection(),
+    getScale: () => canvasScaleRef.current,
+    startSidebarDragComponent: (componentType: string) => {
+      dragDropRef.current.handleSidebarStartDragComponent?.(componentType);
+    },
+    endSidebarDragComponent: () => dragDropRef.current.handleSidebarEndDragComponent(),
+    isSpacePanActive: () => isSpacePressedRef.current,
+    isCanvasPanning: () => isCanvasPanningRef.current,
+    hasCanvasDragSession: () => Boolean(canvasDragSessionRef.current),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
+
+  const onCanvasRuntimeReadyRef = React.useRef(onCanvasRuntimeReady);
+  onCanvasRuntimeReadyRef.current = onCanvasRuntimeReady;
 
   React.useEffect(() => {
-    onCanvasRuntimeReady?.(runtime);
+    onCanvasRuntimeReadyRef.current?.(runtime);
     return () => {
-      onCanvasRuntimeReady?.(null);
+      onCanvasRuntimeReadyRef.current?.(null);
     };
-  }, [onCanvasRuntimeReady, runtime]);
+  }, [runtime]);
 
   const canvasCursorClassName = externalCursorClassName ?? (
     isCanvasPanning

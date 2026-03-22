@@ -184,6 +184,7 @@ function createFilesPrimaryPlugin(
       onRefresh: () => undefined,
     }),
     hostAdapter: context.adapters.files,
+    hostAdapterRef: context.adapters.files.ref,
   });
 }
 
@@ -192,6 +193,7 @@ function createFilesCommandsPlugin(
 ) {
   return createFilesHostCommandsPlugin({
     hostAdapter: context.adapters.files,
+    hostAdapterRef: context.adapters.files.ref,
     title: context.translations.previewT('plugins.files.closeActiveTab'),
     category: context.translations.filesT('title'),
     pluginName: `${context.translations.filesT('pluginName')} Commands`,

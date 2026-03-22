@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   TabManagerSnapshot,
   VirtualFileSystemAdapter,
@@ -160,16 +160,25 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
     workspacePersistence,
   ]);
 
+  const shellSessionHydratedRef = useRef(false);
+
   useEffect(() => {
     let cancelled = false;
 
-    if (appMode !== 'shell' || shellSessionHydrated) {
+    if (appMode !== 'shell' || shellSessionHydrated || shellSessionHydratedRef.current) {
       return () => {
         cancelled = true;
       };
     }
 
+    // Mark as hydrated immediately (synchronous) to prevent re-entry.
+    // React state updates (setShellSessionHydrated) are batched and may not
+    // take effect before this effect re-runs due to dep changes, so the ref
+    // serves as a synchronous guard.
+    shellSessionHydratedRef.current = true;
+
     if (!vfsInitialized && !vfsInitializationFailed) {
+      shellSessionHydratedRef.current = false; // allow retry
       return () => {
         cancelled = true;
       };

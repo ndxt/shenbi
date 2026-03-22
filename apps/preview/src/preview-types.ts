@@ -118,7 +118,7 @@ export interface PreviewPluginFactoryContext {
     hasFilesPrimaryPanel: boolean;
   };
   adapters: {
-    files: FilesHostAdapter;
+    files: FilesHostAdapter & { ref?: { current: FilesHostAdapter } | undefined };
     gitlabSync: PreviewGitLabSyncAdapter;
   };
 }

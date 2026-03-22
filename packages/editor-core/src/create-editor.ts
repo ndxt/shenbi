@@ -963,8 +963,10 @@ function registerTabCommands(
           });
         }
 
-        tabManager.activateTab(fileId);
+        // Restore editor state BEFORE switching the active tab to avoid
+        // intermediate renders where tab bar shows B but canvas shows A.
         await restoreEditorForTab(existingTab);
+        tabManager.activateTab(fileId);
         eventBus.emit('tab:activated', { fileId });
         return;
       }
@@ -1062,8 +1064,13 @@ function registerTabCommands(
         });
       }
 
-      tabManager.activateTab(fileId);
+      // Restore editor state BEFORE switching the active tab.
+      // This ensures that when tabManager.activateTab() triggers React to
+      // re-render with the new activeTabId, shellSnapshot already holds
+      // the target tab's schema — preventing the UI from briefly showing
+      // stale data (tab bar says B, canvas shows A).
       await restoreEditorForTab(tab);
+      tabManager.activateTab(fileId);
       eventBus.emit('tab:activated', { fileId });
     },
   });
@@ -1269,6 +1276,14 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
     ? state.subscribe((snapshot) => {
       const activeTabId = tabManager.getActiveTabId();
       if (!activeTabId) {
+        return;
+      }
+      // During a tab switch, tabManager.activeTabId is already set to the
+      // new tab but EditorState still holds the *previous* tab's data.
+      // Syncing in this window would corrupt the new tab with stale data.
+      // Skip the update when the active tab doesn't match the editor's
+      // current file — restoreEditorForTab will set the correct state soon.
+      if (snapshot.currentFileId && activeTabId !== snapshot.currentFileId) {
         return;
       }
       const activeTab = tabManager.getTab(activeTabId);

@@ -43,10 +43,14 @@ export interface CreateFilesHostPluginOptions extends Omit<
   'renderPrimaryPanel'
 > {
   hostAdapter: FilesHostAdapter;
+  /** When provided, render reads the latest adapter from this ref instead of the static hostAdapter. */
+  hostAdapterRef?: { current: FilesHostAdapter } | undefined;
 }
 
 export interface CreateFilesHostCommandsPluginOptions {
   hostAdapter: FilesHostAdapter;
+  /** When provided, execute reads the latest adapter from this ref. */
+  hostAdapterRef?: { current: FilesHostAdapter } | undefined;
   title: string;
   category: string;
   commandId?: string | undefined;
@@ -94,18 +98,21 @@ export function createWorkspaceFilesHostAdapter(
 
 export function createFilesHostPlugin({
   hostAdapter,
+  hostAdapterRef,
   ...options
 }: CreateFilesHostPluginOptions): EditorPluginManifest {
   return createFilesPlugin({
     ...options,
-    renderPrimaryPanel: () => (
-      <FileExplorer {...hostAdapter.explorerProps} />
-    ),
+    renderPrimaryPanel: () => {
+      const adapter = hostAdapterRef ? hostAdapterRef.current : hostAdapter;
+      return <FileExplorer {...adapter.explorerProps} />;
+    },
   });
 }
 
 export function createFilesHostCommandsPlugin({
   hostAdapter,
+  hostAdapterRef,
   title,
   category,
   commandId = 'files.closeActiveTab',
@@ -125,7 +132,8 @@ export function createFilesHostCommandsPlugin({
           title,
           category,
           execute: () => {
-            hostAdapter.closeActiveFile();
+            const adapter = hostAdapterRef ? hostAdapterRef.current : hostAdapter;
+            adapter.closeActiveFile();
           },
         },
       ],
