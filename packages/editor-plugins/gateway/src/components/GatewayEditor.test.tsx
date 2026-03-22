@@ -1,13 +1,22 @@
 import React from 'react';
 import '@testing-library/jest-dom/vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GatewayHostAdapter } from '../gateway-host-adapter';
 import { GatewayEditor } from './GatewayEditor';
 
+const gatewayCanvasSpy = vi.fn();
+
 vi.mock('./GatewayCanvas', () => ({
-  GatewayCanvas: () => <div data-testid="gateway-canvas" />,
+  GatewayCanvas: (props: unknown) => {
+    gatewayCanvasSpy(props);
+    return <div data-testid="gateway-canvas" />;
+  },
 }));
+
+afterEach(() => {
+  cleanup();
+});
 
 function createHostAdapter(overrides?: Partial<GatewayHostAdapter>): GatewayHostAdapter {
   return {
@@ -27,14 +36,68 @@ function createHostAdapter(overrides?: Partial<GatewayHostAdapter>): GatewayHost
 }
 
 describe('GatewayEditor', () => {
+  it('persists gateway documents back through the host filesystem adapter as json', async () => {
+    gatewayCanvasSpy.mockClear();
+    const saveDocument = vi.fn(async () => undefined);
+    const hostAdapter = createHostAdapter({ saveDocument });
+
+    render(<GatewayEditor hostAdapter={hostAdapter} />);
+
+    await waitFor(() => {
+      expect(gatewayCanvasSpy).toHaveBeenCalled();
+    });
+
+    const latestProps = gatewayCanvasSpy.mock.calls.at(-1)?.[0] as {
+      onDocumentChange?: (document: Record<string, unknown>) => void;
+    };
+    expect(latestProps.onDocumentChange).toBeTypeOf('function');
+
+    latestProps.onDocumentChange?.({
+      id: 'api-1',
+      name: 'Billing API',
+      type: 'api-gateway',
+      nodes: [
+        {
+          id: 'start-1',
+          kind: 'start',
+          label: '开始',
+          position: { x: 120, y: 200 },
+          config: {},
+        },
+      ],
+      edges: [],
+      viewport: { x: 10, y: 20, zoom: 1.1 },
+    });
+
+    await waitFor(() => {
+      expect(saveDocument).toHaveBeenCalledWith({
+        id: 'api-1',
+        name: 'Billing API',
+        type: 'api-gateway',
+        nodes: [
+          {
+            id: 'start-1',
+            kind: 'start',
+            label: '开始',
+            position: { x: 120, y: 200 },
+            config: {},
+          },
+        ],
+        edges: [],
+        viewport: { x: 10, y: 20, zoom: 1.1 },
+      });
+    });
+  });
+
   it('does not reload the document when hostAdapter identity changes for the same file', async () => {
+    gatewayCanvasSpy.mockClear();
     const firstAdapter = createHostAdapter();
     const { rerender } = render(<GatewayEditor hostAdapter={firstAdapter} />);
 
     await waitFor(() => {
       expect(firstAdapter.loadDocument).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByTestId('gateway-canvas')).toBeInTheDocument();
+    expect(screen.getAllByTestId('gateway-canvas').length).toBeGreaterThan(0);
 
     const secondAdapter = createHostAdapter({
       loadDocument: vi.fn(async () => ({
@@ -55,6 +118,7 @@ describe('GatewayEditor', () => {
   });
 
   it('reloads the document when the hostAdapter points at a different file', async () => {
+    gatewayCanvasSpy.mockClear();
     const firstAdapter = createHostAdapter();
     const { rerender } = render(<GatewayEditor hostAdapter={firstAdapter} />);
 
