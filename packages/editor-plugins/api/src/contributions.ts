@@ -110,6 +110,69 @@ export interface AuxiliaryPanelContribution extends OrderedContribution {
   render: (context: PluginContext) => React.ReactNode;
 }
 
+export interface CanvasRendererHostRuntime {
+  zoomIn?: (() => void) | undefined;
+  zoomOut?: (() => void) | undefined;
+  resetZoom?: (() => void) | undefined;
+  fitCanvas?: (() => void) | undefined;
+  centerCanvas?: (() => void) | undefined;
+  focusSelection?: (() => void) | undefined;
+  getScale?: (() => number) | undefined;
+  startSidebarDragComponent?: ((componentType: string) => void) | undefined;
+  endSidebarDragComponent?: (() => void) | undefined;
+  isSpacePanActive?: (() => boolean) | undefined;
+  isCanvasPanning?: (() => boolean) | undefined;
+  hasCanvasDragSession?: (() => boolean) | undefined;
+}
+
+export interface CanvasRendererSelectionContext {
+  onSelectNode?: ((nodeId: string) => void) | undefined;
+  onDeselectNode?: (() => void) | undefined;
+  selectedNodeSchemaId?: string | undefined;
+  selectedNodeTreeId?: string | undefined;
+  hoveredNodeSchemaId?: string | null | undefined;
+  breadcrumbItems?: Array<{ id: string; label: string }> | undefined;
+  onBreadcrumbSelect?: ((nodeId: string) => void) | undefined;
+  onBreadcrumbHover?: ((nodeId: string | null) => void) | undefined;
+}
+
+export interface CanvasRendererEditingContext {
+  canDropInsideNode?: ((nodeSchemaId: string) => boolean) | undefined;
+  onInsertComponent?: ((componentType: string, target: unknown) => void) | undefined;
+  onMoveSelectedNode?: ((target: unknown) => void) | undefined;
+  canDeleteSelectedNode?: boolean | undefined;
+  canDuplicateSelectedNode?: boolean | undefined;
+  canMoveSelectedNodeUp?: boolean | undefined;
+  canMoveSelectedNodeDown?: boolean | undefined;
+}
+
+export interface CanvasRendererOverlayContext {
+  selectionActions?: Array<{
+    id: string;
+    title: string;
+    icon?: React.ReactNode;
+    disabled?: boolean;
+    onRun?: () => void;
+  }> | undefined;
+  onSurfacePointerSelection?: ((target: EventTarget | null) => void) | undefined;
+  cursorClassName?: string | undefined;
+  onSurfaceReady?: ((surface: unknown) => void) | undefined;
+  onContextMenu?: ((event: React.MouseEvent) => void) | undefined;
+}
+
+export interface CanvasRendererInteractionContext {
+  activeTool?: string | undefined;
+  setActiveTool?: ((mode: string) => void) | undefined;
+  onRuntimeReady?: ((runtime: CanvasRendererHostRuntime | null) => void) | undefined;
+}
+
+export interface CanvasRendererHostContext {
+  selection: CanvasRendererSelectionContext;
+  editing: CanvasRendererEditingContext;
+  overlay: CanvasRendererOverlayContext;
+  interaction: CanvasRendererInteractionContext;
+}
+
 export interface CanvasRendererRenderContext {
   activeFileId?: string;
   activeFileName?: string;
@@ -123,60 +186,7 @@ export interface CanvasRendererRenderContext {
   theme?: string;
   /** Whether the canvas is read-only */
   canvasReadOnly?: boolean;
-  /** Callback when a node is selected on the canvas */
-  onSelectNode?: (nodeId: string) => void;
-  /** Callback when the canvas selection is cleared */
-  onDeselectNode?: () => void;
-  /** Currently selected node schema ID */
-  selectedNodeSchemaId?: string | undefined;
-  /** Currently selected node tree ID */
-  selectedNodeTreeId?: string | undefined;
-  /** Currently hovered node schema ID */
-  hoveredNodeSchemaId?: string | null | undefined;
-  /** Breadcrumb ancestor items for the selection overlay */
-  breadcrumbItems?: Array<{ id: string; label: string }> | undefined;
-  /** Callback when a breadcrumb ancestor is selected */
-  onBreadcrumbSelect?: ((nodeId: string) => void) | undefined;
-  /** Callback when a breadcrumb ancestor is hovered */
-  onBreadcrumbHover?: ((nodeId: string | null) => void) | undefined;
-  /** Check if a drop target can accept children */
-  canCanvasDropInsideNode?: ((nodeSchemaId: string) => boolean) | undefined;
-  /** Callback when a component is inserted via drag-drop */
-  onInsertComponent?: ((componentType: string, target: unknown) => void) | undefined;
-  /** Callback when the selected node is moved via drag-drop */
-  onMoveSelectedNode?: ((target: unknown) => void) | undefined;
-  /** Whether the selected node can be deleted */
-  canDeleteSelectedNode?: boolean | undefined;
-  /** Whether the selected node can be duplicated */
-  canDuplicateSelectedNode?: boolean | undefined;
-  /** Whether the selected node can be moved up */
-  canMoveSelectedNodeUp?: boolean | undefined;
-  /** Whether the selected node can be moved down */
-  canMoveSelectedNodeDown?: boolean | undefined;
-  /** Selection overlay action buttons */
-  selectionOverlayActions?: Array<{
-    id: string;
-    title: string;
-    icon?: React.ReactNode;
-    disabled?: boolean;
-    onRun?: () => void;
-  }> | undefined;
-  /** Handler for pointer-based node selection on the canvas surface */
-  onSurfacePointerSelection?: ((target: EventTarget | null) => void) | undefined;
-  /** CSS class for the canvas cursor (e.g. 'cursor-grabbing', 'canvas-cursor-grab') */
-  canvasCursorClassName?: string | undefined;
-  /** Callback when the CanvasSurface is ready */
-  onCanvasSurfaceReady?: ((surface: unknown) => void) | undefined;
-  /** Callback when the canvas context menu is opened */
-  onCanvasContextMenu?: ((event: React.MouseEvent) => void) | undefined;
-  /** Callback for sidebar drag component start */
-  onSidebarStartDragComponent?: ((componentType: string) => void) | undefined;
-  /** Callback for sidebar drag component end */
-  onSidebarEndDragComponent?: (() => void) | undefined;
-  /** Current active canvas tool mode (e.g. 'select', 'pan') */
-  activeCanvasTool?: string | undefined;
-  /** Callback to change the active canvas tool mode */
-  setActiveCanvasTool?: ((mode: string) => void) | undefined;
+  canvasHost: CanvasRendererHostContext;
 }
 
 export interface CanvasRendererContribution extends OrderedContribution {

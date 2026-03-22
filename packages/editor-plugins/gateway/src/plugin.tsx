@@ -9,6 +9,7 @@ import {
 } from '@shenbi/editor-plugin-api';
 import { GatewayNodePanel } from './components/GatewayNodePanel';
 import { GatewayEditor } from './components/GatewayEditor';
+import { createGatewayHostAdapter } from './gateway-host-adapter';
 
 export function createGatewayPlugin(): EditorPluginManifest {
   return defineEditorPlugin({
@@ -30,7 +31,18 @@ export function createGatewayPlugin(): EditorPluginManifest {
           id: 'gateway-canvas',
           fileTypes: ['api'],
           order: 10,
-          render: () => <GatewayEditor />,
+          render: (context) => {
+            const hostAdapter = createGatewayHostAdapter(context);
+            const interaction = context.canvasHost.interaction;
+            return (
+              <GatewayEditor
+                {...(hostAdapter ? { hostAdapter } : {})}
+                {...(interaction.activeTool ? { activeCanvasTool: interaction.activeTool as import('@shenbi/editor-ui').CanvasToolMode } : {})}
+                {...(interaction.setActiveTool ? { setActiveCanvasTool: interaction.setActiveTool as (mode: import('@shenbi/editor-ui').CanvasToolMode) => void } : {})}
+                {...(interaction.onRuntimeReady ? { onCanvasRuntimeReady: interaction.onRuntimeReady } : {})}
+              />
+            );
+          },
         },
       ],
     },

@@ -10,3 +10,4 @@ export * from './adapters/virtual-fs';
 export * from './adapters/indexeddb-fs';
 export * from './adapters/fs-tree-utils';
 export * from './tab-manager';
+export * from './schema-tree-utils';

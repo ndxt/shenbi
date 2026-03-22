@@ -19,36 +19,11 @@ import {
   createLocalProjectConfig,
   upsertProjectInList,
   removeProjectFromList,
-  projectIdFromGitLab,
 } from './constants';
-
-// ---------------------------------------------------------------------------
-// Inline API helpers (avoid cross-package import)
-// ---------------------------------------------------------------------------
-
-interface GitLabProject {
-  id: number;
-  name: string;
-  path_with_namespace: string;
-  web_url: string;
-  default_branch: string;
-}
-
-async function fetchAuthStatus(): Promise<{
-  authenticated: boolean;
-  defaultGroupId?: number;
-}> {
-  const res = await fetch(`${import.meta.env.BASE_URL}api/gitlab/oauth/status`, { credentials: 'include' });
-  if (!res.ok) return { authenticated: false };
-  return res.json();
-}
-
-async function fetchGroupProjects(groupId: number, search?: string): Promise<GitLabProject[]> {
-  const params = search ? `?search=${encodeURIComponent(search)}` : '';
-  const res = await fetch(`${import.meta.env.BASE_URL}api/gitlab/groups/${groupId}/projects${params}`, { credentials: 'include' });
-  if (!res.ok) return [];
-  return res.json();
-}
+import type {
+  PreviewGitLabProject,
+  PreviewGitLabService,
+} from './preview-types';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -150,6 +125,7 @@ export interface ProjectManagerDialogProps {
   open: boolean;
   activeProjectId: string;
   gitlabUser: { username: string } | null;
+  gitlabService: PreviewGitLabService;
   onClose: () => void;
   onSelectProject: (config: ActiveProjectConfig) => void;
   onDeleteProject: (projectId: string) => void;
@@ -157,13 +133,14 @@ export interface ProjectManagerDialogProps {
 
 export function ProjectManagerDialog({
   open, activeProjectId, gitlabUser,
+  gitlabService,
   onClose, onSelectProject, onDeleteProject,
 }: ProjectManagerDialogProps) {
   const [tab, setTab] = useState<Tab>('projects');
   const [projects, setProjects] = useState<ActiveProjectConfig[]>([]);
   const [newName, setNewName] = useState('');
   const [cloneSearch, setCloneSearch] = useState('');
-  const [gitlabProjects, setGitlabProjects] = useState<GitLabProject[]>([]);
+  const [gitlabProjects, setGitlabProjects] = useState<PreviewGitLabProject[]>([]);
   const [cloning, setCloning] = useState<number | null>(null);
   const [authStatus, setAuthStatus] = useState<{ authenticated: boolean; defaultGroupId?: number } | null>(null);
 
@@ -176,16 +153,23 @@ export function ProjectManagerDialog({
   // Load GitLab auth for clone tab
   useEffect(() => {
     if (!open || tab !== 'clone') return;
-    fetchAuthStatus().then(setAuthStatus).catch(() => setAuthStatus(null));
-  }, [open, tab]);
+    gitlabService.getAuthStatus()
+      .then((status) => {
+        setAuthStatus({
+          authenticated: status.authenticated,
+          ...(status.defaultGroupId ? { defaultGroupId: status.defaultGroupId } : {}),
+        });
+      })
+      .catch(() => setAuthStatus(null));
+  }, [gitlabService, open, tab]);
 
   // Load GitLab projects
   useEffect(() => {
     if (!open || tab !== 'clone' || !authStatus?.authenticated || !authStatus.defaultGroupId) return;
-    fetchGroupProjects(authStatus.defaultGroupId, cloneSearch || undefined)
+    gitlabService.listGroupProjects(authStatus.defaultGroupId, cloneSearch || undefined)
       .then(setGitlabProjects)
       .catch(() => setGitlabProjects([]));
-  }, [open, tab, authStatus?.authenticated, authStatus?.defaultGroupId, cloneSearch]);
+  }, [authStatus?.authenticated, authStatus?.defaultGroupId, cloneSearch, gitlabService, open, tab]);
 
   const handleCreate = useCallback(() => {
     if (!newName.trim()) return;
@@ -196,26 +180,17 @@ export function ProjectManagerDialog({
     onClose();
   }, [newName, onSelectProject, onClose]);
 
-  const handleClone = useCallback(async (project: GitLabProject) => {
+  const handleClone = useCallback(async (project: PreviewGitLabProject) => {
     setCloning(project.id);
     try {
-      const config: ActiveProjectConfig = {
-        id: projectIdFromGitLab(project.id),
-        gitlabProjectId: project.id,
-        vfsProjectId: projectIdFromGitLab(project.id),
-        projectName: project.name,
-        branch: project.default_branch || 'main',
-        createdAt: Date.now(),
-        lastOpenedAt: Date.now(),
-        gitlabUrl: project.web_url,
-      };
+      const config = gitlabService.selectProjectMetadata(project);
       upsertProjectInList(config);
       onSelectProject(config);
       onClose();
     } finally {
       setCloning(null);
     }
-  }, [onSelectProject, onClose]);
+  }, [gitlabService, onClose, onSelectProject]);
 
   const handleSelect = useCallback((project: ActiveProjectConfig) => {
     upsertProjectInList({ ...project, lastOpenedAt: Date.now() });

@@ -21,7 +21,7 @@ describe('resolveBridgeOutputHandle', () => {
   });
 
   it('falls back to the first output when no target handle is available', () => {
-    const loopContract = NODE_CONTRACTS.loop;
+    const loopContract = NODE_CONTRACTS['loop-start'];
 
     expect(resolveBridgeOutputHandle(loopContract, null)).toBe('item');
   });

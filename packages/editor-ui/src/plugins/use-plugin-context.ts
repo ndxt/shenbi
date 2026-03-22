@@ -3,6 +3,7 @@ import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import type {
   PluginContext,
   PluginDocumentPatchService,
+  PluginFileSystemService,
   PluginNotifications,
 } from '@shenbi/editor-plugin-api';
 
@@ -14,6 +15,7 @@ export interface UsePluginContextOptions {
   patchSelectedNode: PluginDocumentPatchService;
   executeCommand: (commandId: string, payload?: unknown) => unknown | Promise<unknown>;
   notifications?: PluginNotifications;
+  filesystem?: PluginFileSystemService;
 }
 
 export function usePluginContext(options: UsePluginContextOptions): PluginContext {
@@ -66,5 +68,6 @@ export function usePluginContext(options: UsePluginContextOptions): PluginContex
       execute: options.executeCommand,
     },
     ...(options.notifications ? { notifications: options.notifications } : {}),
-  }), [options.executeCommand, options.notifications, options.patchSelectedNode, options.replaceSchema]);
+    ...(options.filesystem ? { filesystem: options.filesystem } : {}),
+  }), [options.executeCommand, options.filesystem, options.notifications, options.patchSelectedNode, options.replaceSchema]);
 }

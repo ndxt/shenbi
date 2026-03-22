@@ -143,16 +143,20 @@ export function SelectionOverlay({
     }
 
     // ResizeObserver 监听选中元素尺寸变化
-    const observer = new ResizeObserver(() => {
-      updateSelectedRect();
-    });
-    observer.observe(element);
-    resizeObserverRef.current = observer;
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        updateSelectedRect();
+      });
+      observer.observe(element);
+      resizeObserverRef.current = observer;
 
-    return () => {
-      observer.disconnect();
-      resizeObserverRef.current = null;
-    };
+      return () => {
+        observer.disconnect();
+        resizeObserverRef.current = null;
+      };
+    }
+
+    return undefined;
   }, [selectedNodeSchemaId, surface, updateSelectedRect]);
 
   // 监听画布滚动和窗口 resize，更新选中框位置

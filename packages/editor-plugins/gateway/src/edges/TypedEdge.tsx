@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from '@xyflow/react';
+import type { GatewayEdge } from '../types';
 
 export interface TypedEdgeAddNodePayload {
   edgeId: string;
@@ -14,18 +15,18 @@ export interface TypedEdgeAddNodePayload {
   position: { x: number; y: number };
 }
 
-export interface TypedEdgeProps extends EdgeProps {
+export interface TypedEdgeProps extends EdgeProps<GatewayEdge> {
   onAddNode?: (payload: TypedEdgeAddNodePayload) => void;
 }
 
 export function TypedEdge({
   id,
   source,
-  sourceHandle,
+  sourceHandleId,
   sourceX,
   sourceY,
   target,
-  targetHandle,
+  targetHandleId,
   targetX,
   targetY,
   sourcePosition,
@@ -50,7 +51,7 @@ export function TypedEdge({
       <BaseEdge
         id={id}
         path={edgePath}
-        markerEnd={markerEnd}
+        {...(markerEnd ? { markerEnd } : {})}
         style={{
           ...style,
           strokeWidth: selected ? 2 : 1.5,
@@ -78,9 +79,9 @@ export function TypedEdge({
               onAddNode({
                 edgeId: id,
                 sourceNodeId: source,
-                sourceHandle,
+                sourceHandle: sourceHandleId ?? null,
                 targetNodeId: target,
-                targetHandle,
+                targetHandle: targetHandleId ?? null,
                 position: {
                   x: event.clientX,
                   y: event.clientY,

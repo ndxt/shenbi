@@ -3,12 +3,11 @@ import {
   ArrowDown,
   ArrowUp,
   Copy,
-  Monitor,
-  Smartphone,
-  Tablet,
   Trash2,
 } from 'lucide-react';
 import {
+  type CanvasRendererHostRuntime,
+  type CanvasRendererHostContext,
   collectPluginContributes,
   type ContextMenuArea,
   type EditorPluginActivateResult,
@@ -65,28 +64,12 @@ import type { SidebarProps } from './Sidebar';
 import type { InspectorProps } from './Inspector';
 import type { ToolbarMenuItem } from './ToolbarMenus';
 import { resolveActivityBarItems } from './activitybar-items';
-import { CanvasSurface } from '../canvas/CanvasSurface';
-import { resolveNodeDropIndicator, type CanvasDropIndicator } from '../canvas/drop-indicator';
 import type {
   CanvasDropTarget,
   CanvasSurfaceHandle,
   CanvasToolMode,
-  CanvasViewportState,
 } from '../canvas/types';
-import {
-  STAGE_DEFAULT_WIDTH,
-  STAGE_MIN_HEIGHT,
-  DEVICE_FRAME_PADDING,
-  DEVICE_PRESETS,
-  type DevicePreset,
-} from '../canvas/constants';
 import { createBuiltinSidebarTabs } from './sidebar-tabs';
-import { CanvasToolRail } from './CanvasToolRail';
-import { CanvasZoomHud } from './CanvasZoomHud';
-import { DevicePreviewBar } from './DevicePreviewBar';
-import { useCanvasZoom } from '../hooks/useCanvasZoom';
-import { useCanvasPan } from '../hooks/useCanvasPan';
-import { useCanvasDragDrop } from '../hooks/useCanvasDragDrop';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -263,67 +246,39 @@ export function AppShell({
   onOpenProjectManager,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
-  const canvasScrollRef = React.useRef<HTMLElement | null>(null);
-  const stageRef = React.useRef<HTMLDivElement | null>(null);
   const [canvasSurface, setCanvasSurface] = React.useState<CanvasSurfaceHandle | null>(null);
+  const [canvasRuntime, setCanvasRuntime] = React.useState<CanvasRendererHostRuntime | null>(null);
+  const canvasRuntimeRef = React.useRef<CanvasRendererHostRuntime | null>(null);
+  canvasRuntimeRef.current = canvasRuntime;
   const [activeCanvasTool, setActiveCanvasTool] = React.useState<CanvasToolMode>('select');
-  const [activeDeviceId, setActiveDeviceId] = React.useState('desktop');
-  const [showDeviceFrame, setShowDeviceFrame] = React.useState(false);
-  const [customStageWidth, setCustomStageWidth] = React.useState(STAGE_DEFAULT_WIDTH);
-  const activeDevice = DEVICE_PRESETS.find((p) => p.id === activeDeviceId) ?? DEVICE_PRESETS[2]!;
-  const stageWidth = activeDeviceId === 'custom' ? customStageWidth : activeDevice.width;
-  const stageWidthRef = React.useRef(stageWidth);
-  stageWidthRef.current = stageWidth;
-
-  const zoom = useCanvasZoom({
-    canvasScrollRef,
-    stageRef,
-    canvasSurface,
-    stageWidth,
-    selectedNodeSchemaId,
-  });
-
-  const pan = useCanvasPan({
-    canvasScrollRef,
-    canvasSurface,
-    activeCanvasTool,
-    syncCanvasViewportState: zoom.syncCanvasViewportState,
-    closeZoomMenu: () => zoom.setZoomMenuState({ open: false }),
-  });
-
-  const dragDrop = useCanvasDragDrop({
-    stageRef,
-    canvasSurface: null, // PageCanvasRenderer owns the surface drag-drop behavior
-    canvasScale: zoom.canvasScale,
-    stageWidth,
-    stageContentHeightRef: zoom.stageContentHeightRef,
-    activeCanvasTool,
-    canvasReadOnly,
-    selectedNodeSchemaId,
-    selectedNodeTreeId,
-    canCanvasDropInsideNode,
-    onCanvasInsertComponent: onCanvasInsertComponent,
-    onCanvasMoveSelectedNode: onCanvasMoveSelectedNode,
-  });
-
-  // Destructure commonly used values from hooks
-  const {
-    canvasScale, canvasScaleRef, canvasViewportState, stageContentHeight,
-    stageContentHeightRef, canvasWorkspaceWidth, canvasWorkspaceHeight,
-    canvasStageLeft, canvasStageTop: CANVAS_WS_STAGE_TOP, zoomMenuState, setZoomMenuState,
-    zoomMenuRef, canvasChromeRef, updateCanvasScale, zoomCanvasIn, zoomCanvasOut,
-    resetCanvasZoom, fitCanvasToViewport, centerCanvasStage, focusCanvasSelection,
-    updateCanvasScalePreset, syncCanvasViewportState, handleCanvasWheelEvent,
-  } = zoom;
-  const {
-    isCanvasPanning, isSpacePressed, spacePressedRef,
-    handleCanvasPointerDown, handleCanvasPointerMove, handleCanvasPointerUp,
-  } = pan;
-  const {
-    canvasDragSession, canvasDropIndicator, clearCanvasDragState, handleCanvasDragOver,
-    handleCanvasDragLeave, handleCanvasDrop, handleSidebarStartDragComponent,
-    handleSidebarEndDragComponent, handleSelectedDragStart,
-  } = dragDrop;
+  const zoomCanvasIn = React.useCallback(() => {
+    canvasRuntimeRef.current?.zoomIn?.();
+  }, []);
+  const zoomCanvasOut = React.useCallback(() => {
+    canvasRuntimeRef.current?.zoomOut?.();
+  }, []);
+  const resetCanvasZoom = React.useCallback(() => {
+    canvasRuntimeRef.current?.resetZoom?.();
+  }, []);
+  const fitCanvasToViewport = React.useCallback(() => {
+    canvasRuntimeRef.current?.fitCanvas?.();
+  }, []);
+  const centerCanvasStage = React.useCallback(() => {
+    canvasRuntimeRef.current?.centerCanvas?.();
+  }, []);
+  const focusCanvasSelection = React.useCallback(() => {
+    canvasRuntimeRef.current?.focusSelection?.();
+  }, []);
+  const handleSidebarStartDragComponent = React.useCallback((componentType: string) => {
+    canvasRuntimeRef.current?.startSidebarDragComponent?.(componentType);
+  }, []);
+  const handleSidebarEndDragComponent = React.useCallback(() => {
+    canvasRuntimeRef.current?.endSidebarDragComponent?.();
+  }, []);
+  const canvasScale = canvasRuntime?.getScale?.() ?? 1;
+  const isCanvasPanning = canvasRuntime?.isCanvasPanning?.() ?? false;
+  const isSpacePressed = canvasRuntime?.isSpacePanActive?.() ?? false;
+  const canvasDragSession = canvasRuntime?.hasCanvasDragSession?.() ?? false;
   const resolvedPersistenceAdapter = React.useMemo(
     () => persistenceAdapter ?? new LocalWorkspacePersistenceAdapter(),
     [persistenceAdapter],
@@ -1203,7 +1158,7 @@ export function AppShell({
     }
     if (
       activeCanvasTool === 'pan'
-      || spacePressedRef.current
+      || isSpacePressed
       || isCanvasPanning
       || canvasDragSession
     ) {
@@ -1232,6 +1187,7 @@ export function AppShell({
     canvasDragSession,
     contextMenuState.open,
     isCanvasPanning,
+    isSpacePressed,
     onCanvasDeselectNode,
     onCanvasSelectNode,
     showInspector,
@@ -1384,6 +1340,59 @@ export function AppShell({
       ...extraActions,
     ];
   }, [hostCommandMap, pluginCommandMap, resolveCommandState, runCommand]);
+  const canvasHost = React.useMemo<CanvasRendererHostContext>(() => ({
+    selection: {
+      ...(onCanvasSelectNode ? { onSelectNode: onCanvasSelectNode } : {}),
+      ...(onCanvasDeselectNode ? { onDeselectNode: onCanvasDeselectNode } : {}),
+      ...(selectedNodeSchemaId ? { selectedNodeSchemaId } : {}),
+      ...(selectedNodeTreeId ? { selectedNodeTreeId } : {}),
+      ...(hoveredNodeSchemaId !== undefined ? { hoveredNodeSchemaId } : {}),
+      ...(breadcrumbItems ? { breadcrumbItems } : {}),
+      ...(onBreadcrumbSelect ? { onBreadcrumbSelect } : {}),
+      ...(onBreadcrumbHover ? { onBreadcrumbHover } : {}),
+    },
+    editing: {
+      ...(canCanvasDropInsideNode ? { canDropInsideNode: canCanvasDropInsideNode } : {}),
+      ...(onCanvasInsertComponent ? { onInsertComponent: onCanvasInsertComponent as ((componentType: string, target: unknown) => void) } : {}),
+      ...(onCanvasMoveSelectedNode ? { onMoveSelectedNode: onCanvasMoveSelectedNode as ((target: unknown) => void) } : {}),
+      ...(canDeleteSelectedNode !== undefined ? { canDeleteSelectedNode } : {}),
+      ...(canDuplicateSelectedNode !== undefined ? { canDuplicateSelectedNode } : {}),
+      ...(canMoveSelectedNodeUp !== undefined ? { canMoveSelectedNodeUp } : {}),
+      ...(canMoveSelectedNodeDown !== undefined ? { canMoveSelectedNodeDown } : {}),
+    },
+    overlay: {
+      selectionActions: selectionOverlayActions,
+      onSurfacePointerSelection: handleSurfacePointerSelection,
+      onSurfaceReady: (surface: unknown) => setCanvasSurface(surface as CanvasSurfaceHandle | null),
+      onContextMenu: (event: React.MouseEvent) => openContextMenu('canvas', event as React.MouseEvent<HTMLElement>),
+      cursorClassName: canvasCursorClassName,
+    },
+    interaction: {
+      activeTool: activeCanvasTool,
+      setActiveTool: setActiveCanvasTool as (mode: string) => void,
+      onRuntimeReady: (runtime: CanvasRendererHostRuntime | null) => setCanvasRuntime(runtime),
+    },
+  }), [
+    activeCanvasTool,
+    breadcrumbItems,
+    canCanvasDropInsideNode,
+    canDeleteSelectedNode,
+    canDuplicateSelectedNode,
+    canMoveSelectedNodeDown,
+    canMoveSelectedNodeUp,
+    canvasCursorClassName,
+    handleSurfacePointerSelection,
+    hoveredNodeSchemaId,
+    onBreadcrumbHover,
+    onBreadcrumbSelect,
+    onCanvasDeselectNode,
+    onCanvasInsertComponent,
+    onCanvasMoveSelectedNode,
+    onCanvasSelectNode,
+    selectedNodeSchemaId,
+    selectedNodeTreeId,
+    selectionOverlayActions,
+  ]);
 
   const shouldRenderFileContextPanel = Boolean(activeEditorTab) && (activeEditorTab?.fileType === 'page' || Boolean(activeCanvasRenderer)) && showFileContextPanel;
 
@@ -1520,27 +1529,7 @@ export function AppShell({
                     renderMode,
                     theme,
                     canvasReadOnly,
-                    selectedNodeSchemaId,
-                    selectedNodeTreeId,
-                    hoveredNodeSchemaId,
-                    breadcrumbItems,
-                    onBreadcrumbSelect,
-                    onBreadcrumbHover,
-                    canCanvasDropInsideNode,
-                    onInsertComponent: onCanvasInsertComponent as ((componentType: string, target: unknown) => void) | undefined,
-                    onMoveSelectedNode: onCanvasMoveSelectedNode as ((target: unknown) => void) | undefined,
-                    canDeleteSelectedNode,
-                    canDuplicateSelectedNode,
-                    canMoveSelectedNodeUp,
-                    canMoveSelectedNodeDown,
-                    selectionOverlayActions,
-                    onSurfacePointerSelection: handleSurfacePointerSelection,
-                    onCanvasSurfaceReady: (surface: unknown) => setCanvasSurface(surface as CanvasSurfaceHandle | null),
-                    onCanvasContextMenu: (event: React.MouseEvent) => openContextMenu('canvas', event as React.MouseEvent<HTMLElement>),
-                    ...(onCanvasSelectNode ? { onSelectNode: onCanvasSelectNode } : {}),
-                    ...(onCanvasDeselectNode ? { onDeselectNode: onCanvasDeselectNode } : {}),
-                    activeCanvasTool,
-                    setActiveCanvasTool: setActiveCanvasTool as (mode: string) => void,
+                    canvasHost,
                   })}
                 </div>
               ) : (

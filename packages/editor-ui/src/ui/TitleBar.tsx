@@ -55,8 +55,8 @@ interface TitleBarProps {
   onOpenProjectManager?: (() => void) | undefined;
 }
 
-export function TitleBar({ 
-  theme, 
+export function TitleBar({
+  theme,
   onToggleTheme,
   locale,
   onChangeLocale,
@@ -148,35 +148,34 @@ export function TitleBar({
           </a>
         )}
       </div>
-      
+
       <div className="flex-1 text-center text-[11px] text-text-secondary font-medium">
-        Main Preview Console
       </div>
 
       <div className="flex items-center gap-2 relative">
         <div className="flex items-center gap-1 bg-bg-panel border border-border-ide rounded p-0.5 mr-2">
-          <button 
+          <button
             onClick={onToggleSidebar}
             className={`p-1 rounded transition-colors ${showSidebar ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}`}
             title="Toggle Sidebar"
           >
             <PanelLeft size={14} />
           </button>
-          <button 
+          <button
             onClick={onToggleConsole}
             className={`p-1 rounded transition-colors ${showConsole ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}`}
             title="Toggle Console"
           >
             <PanelBottom size={14} />
           </button>
-          <button 
+          <button
             onClick={onToggleInspector}
             className={`p-1 rounded transition-colors ${showInspector ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}`}
             title="Toggle Inspector"
           >
             <PanelRight size={14} />
           </button>
-          <button 
+          <button
             onClick={onToggleAssistantPanel}
             disabled={!hasAssistantPanel}
             className={`p-1 rounded transition-colors ${showAssistantPanel ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'} ${!hasAssistantPanel ? 'cursor-not-allowed opacity-40' : ''}`}
@@ -194,7 +193,7 @@ export function TitleBar({
           </button>
         </div>
 
-        <button 
+        <button
           onClick={onToggleMaximize}
           className={`p-1.5 rounded transition-colors ${isMaximized ? 'bg-bg-panel text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-panel'}`}
           title={isMaximized ? "Restore Layout" : "Maximize Center Area"}
@@ -205,11 +204,10 @@ export function TitleBar({
         <div className="relative" ref={languageDropdownRef}>
           <button
             onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
-            className={`flex items-center gap-1.5 p-1.5 rounded transition-colors ${
-              isLanguageDropdownOpen
+            className={`flex items-center gap-1.5 p-1.5 rounded transition-colors ${isLanguageDropdownOpen
                 ? 'bg-bg-panel text-blue-500'
                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-panel'
-            }`}
+              }`}
             title={t('titleBar.changeLanguage')}
             aria-label={t('statusBar.language')}
           >
@@ -241,7 +239,7 @@ export function TitleBar({
         </div>
 
         <div className="relative" ref={dropdownRef}>
-          <button 
+          <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="flex items-center gap-1.5 p-1.5 rounded hover:bg-bg-panel transition-colors text-text-secondary hover:text-text-primary"
             title={t('titleBar.changeTheme')}
@@ -250,28 +248,28 @@ export function TitleBar({
           </button>
 
           {isDropdownOpen && (
-          <div className="absolute top-full right-0 mt-1 w-48 bg-bg-panel border border-border-ide rounded shadow-lg py-1 z-50">
-            <div className="px-3 py-1.5 text-[10px] font-bold text-text-secondary uppercase tracking-wider border-b border-border-ide mb-1">
-              {t('titleBar.selectTheme')}
+            <div className="absolute top-full right-0 mt-1 w-48 bg-bg-panel border border-border-ide rounded shadow-lg py-1 z-50">
+              <div className="px-3 py-1.5 text-[10px] font-bold text-text-secondary uppercase tracking-wider border-b border-border-ide mb-1">
+                {t('titleBar.selectTheme')}
+              </div>
+              {themes.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    onToggleTheme(t.id);
+                    setIsDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-text-primary hover:bg-bg-activity-bar transition-colors text-left"
+                >
+                  <div className="w-4 flex justify-center">
+                    {theme === t.id && <Check size={14} className="text-blue-500" />}
+                  </div>
+                  {t.name}
+                </button>
+              ))}
             </div>
-            {themes.map(t => (
-              <button
-                key={t.id}
-                onClick={() => {
-                  onToggleTheme(t.id);
-                  setIsDropdownOpen(false);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-text-primary hover:bg-bg-activity-bar transition-colors text-left"
-              >
-                <div className="w-4 flex justify-center">
-                  {theme === t.id && <Check size={14} className="text-blue-500" />}
-                </div>
-                {t.name}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
         {userAvatarUrl ? (
           <div className="flex items-center gap-1.5 pl-2 border-l border-border-ide ml-1">
             <img src={userAvatarUrl} alt="" className="w-5 h-5 rounded-full" />

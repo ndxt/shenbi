@@ -9,12 +9,14 @@ import {
   type OnEdgesChange,
   type OnConnect,
   type Connection,
+  type IsValidConnection,
   addEdge,
   applyNodeChanges,
   applyEdgeChanges,
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import type { CanvasRendererHostRuntime } from '@shenbi/editor-plugin-api';
 import { CanvasToolRail, CanvasZoomHud, readPaletteDragPayload, type CanvasToolMode } from '@shenbi/editor-ui';
 import { Focus } from 'lucide-react';
 
@@ -34,6 +36,7 @@ import { resolveBridgeOutputHandle } from './gateway-edge-insert';
 import { buildGatewayMinimapModel } from './gateway-minimap';
 import { buildGatewayPaletteAssets } from './gateway-palette-assets';
 import { resolveGatewayInitialViewport, type GatewayViewport } from './gateway-viewport';
+import { gatewayGraphToDocument } from '../gateway-document';
 import '../styles/gateway.css';
 
 type SelectorPanelState = {
@@ -75,36 +78,51 @@ function createNodeId(): string {
 }
 
 export interface GatewayCanvasProps {
+  documentId?: string;
+  documentName?: string;
+  activeCanvasTool?: CanvasToolMode | undefined;
+  onActiveCanvasToolChange?: ((tool: CanvasToolMode) => void) | undefined;
+  onCanvasRuntimeReady?: ((runtime: CanvasRendererHostRuntime | null) => void) | undefined;
   nodes: GatewayNode[];
   edges: GatewayEdge[];
   onNodesChange: (nodes: GatewayNode[]) => void;
   onEdgesChange: (edges: GatewayEdge[]) => void;
+  onDocumentChange?: (document: import('../types').GatewayDocumentSchema) => void;
   onDirty?: () => void;
   initialViewport?: GatewayViewport;
 }
 
 export function GatewayCanvas({
+  documentId,
+  documentName,
+  activeCanvasTool: externalActiveCanvasTool,
+  onActiveCanvasToolChange,
+  onCanvasRuntimeReady,
   nodes,
   edges,
   onNodesChange: onNodesChangeProp,
   onEdgesChange: onEdgesChangeProp,
+  onDocumentChange,
   onDirty,
   initialViewport,
 }: GatewayCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  const reactFlowInstance = useRef<ReactFlowInstance<GatewayNode, GatewayEdge> | null>(null);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
   const hasInitializedViewportRef = useRef(false);
-  const [activeTool, setActiveTool] = useState<CanvasToolMode>('select');
+  const [localActiveTool, setLocalActiveTool] = useState<CanvasToolMode>('select');
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isViewportPanning, setIsViewportPanning] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [viewportState, setViewportState] = useState({ x: 0, y: 0, zoom: 1 });
+  const viewportStateRef = useRef(viewportState);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const zoomMenuRef = useRef<HTMLDivElement>(null);
   const [selectorPanel, setSelectorPanel] = useState<SelectorPanelState | null>(null);
+  const activeTool = externalActiveCanvasTool ?? localActiveTool;
+  const setActiveTool = onActiveCanvasToolChange ?? setLocalActiveTool;
 
   React.useEffect(() => {
     nodesRef.current = nodes;
@@ -114,26 +132,49 @@ export function GatewayCanvas({
     edgesRef.current = edges;
   }, [edges]);
 
+  React.useEffect(() => {
+    viewportStateRef.current = viewportState;
+  }, [viewportState]);
+
+  const emitDocumentChange = useCallback((
+    nextNodes: GatewayNode[],
+    nextEdges: GatewayEdge[],
+    nextViewport = viewportStateRef.current,
+  ) => {
+    if (!onDocumentChange || !documentId) {
+      return;
+    }
+    onDocumentChange(gatewayGraphToDocument({
+      id: documentId,
+      name: documentName ?? 'API Workflow',
+      nodes: nextNodes,
+      edges: nextEdges,
+      viewport: nextViewport,
+    }));
+  }, [documentId, documentName, onDocumentChange]);
+
   const handleNodesChange: OnNodesChange = useCallback(
     (changes) => {
       const next = applyNodeChanges(changes, nodes) as GatewayNode[];
       onNodesChangeProp(next);
+      emitDocumentChange(next, edgesRef.current);
       if (changes.some((c) => c.type !== 'select')) {
         onDirty?.();
       }
     },
-    [nodes, onNodesChangeProp, onDirty],
+    [emitDocumentChange, nodes, onNodesChangeProp, onDirty],
   );
 
   const handleEdgesChange: OnEdgesChange = useCallback(
     (changes) => {
       const next = applyEdgeChanges(changes, edges) as GatewayEdge[];
       onEdgesChangeProp(next);
+      emitDocumentChange(nodesRef.current, next);
       if (changes.some((c) => c.type !== 'select')) {
         onDirty?.();
       }
     },
-    [edges, onEdgesChangeProp, onDirty],
+    [edges, emitDocumentChange, onEdgesChangeProp, onDirty],
   );
 
   const handleConnect: OnConnect = useCallback(
@@ -147,13 +188,19 @@ export function GatewayCanvas({
       };
       const next = addEdge(newEdge, edges) as GatewayEdge[];
       onEdgesChangeProp(next);
+      emitDocumentChange(nodesRef.current, next);
       onDirty?.();
     },
-    [edges, onEdgesChangeProp, onDirty],
+    [edges, emitDocumentChange, onEdgesChangeProp, onDirty],
   );
 
-  const handleIsValidConnection = useCallback(
-    (connection: Connection) => isValidConnection(connection, nodes, edges),
+  const handleIsValidConnection = useCallback<IsValidConnection<GatewayEdge>>(
+    (connection) => isValidConnection({
+      source: connection.source,
+      target: connection.target,
+      sourceHandle: connection.sourceHandle ?? null,
+      targetHandle: connection.targetHandle ?? null,
+    }, nodes, edges),
     [nodes, edges],
   );
 
@@ -206,9 +253,10 @@ export function GatewayCanvas({
       };
 
       onNodesChangeProp([...nodes, newNode]);
+      emitDocumentChange([...nodes, newNode], edgesRef.current);
       onDirty?.();
     },
-    [nodes, onNodesChangeProp, onDirty],
+    [emitDocumentChange, nodes, onNodesChangeProp, onDirty],
   );
 
   const defaultEdgeOptions = useMemo(() => ({
@@ -250,6 +298,44 @@ export function GatewayCanvas({
       },
     },
   ], [selectedNodes]);
+  const runtime = useMemo<CanvasRendererHostRuntime>(() => ({
+    zoomIn: () => {
+      reactFlowInstance.current?.zoomIn();
+    },
+    zoomOut: () => {
+      reactFlowInstance.current?.zoomOut();
+    },
+    resetZoom: () => {
+      reactFlowInstance.current?.zoomTo(1);
+    },
+    fitCanvas: () => {
+      reactFlowInstance.current?.fitView({ padding: 0.2 });
+    },
+    centerCanvas: () => {
+      reactFlowInstance.current?.fitView({ padding: 0.2, duration: 0 });
+    },
+    focusSelection: () => {
+      if (selectedNodes.length === 0) {
+        return;
+      }
+      void reactFlowInstance.current?.fitView({
+        nodes: selectedNodes.map((node) => ({ id: node.id })),
+        padding: 0.3,
+        duration: 200,
+      });
+    },
+    getScale: () => zoom,
+    isSpacePanActive: () => isSpacePressed,
+    isCanvasPanning: () => isViewportPanning,
+    hasCanvasDragSession: () => false,
+  }), [isSpacePressed, isViewportPanning, selectedNodes, zoom]);
+
+  React.useEffect(() => {
+    onCanvasRuntimeReady?.(runtime);
+    return () => {
+      onCanvasRuntimeReady?.(null);
+    };
+  }, [onCanvasRuntimeReady, runtime]);
 
   // Handle add node button click
   const handleAddNode = useCallback((sourceNodeId: string, sourceHandle: string) => {
@@ -301,8 +387,8 @@ export function GatewayCanvas({
       sourceNodeId: payload.sourceNodeId,
       sourceHandle: resolvedSourceHandle,
       edgeId: payload.edgeId,
-      targetNodeId: payload.targetNodeId,
-      targetHandle: resolvedTargetHandle,
+      ...(payload.targetNodeId ? { targetNodeId: payload.targetNodeId } : {}),
+      ...(resolvedTargetHandle ? { targetHandle: resolvedTargetHandle } : {}),
     });
   }, []);
 
@@ -362,6 +448,7 @@ export function GatewayCanvas({
 
       onNodesChangeProp(nextNodes);
       onEdgesChangeProp(nextEdges);
+      emitDocumentChange(nextNodes, nextEdges);
       onDirty?.();
       setSelectorPanel(null);
       return;
@@ -442,7 +529,7 @@ export function GatewayCanvas({
     if (selectorPanel.edgeId && selectorPanel.targetNodeId) {
       const bridgeOutputHandle = resolveBridgeOutputHandle(
         contract,
-        targetNode,
+        targetNode ?? null,
         selectorPanel.targetHandle,
       );
       nextEdges = nextEdges.filter((edge) => edge.id !== selectorPanel.edgeId);
@@ -470,9 +557,10 @@ export function GatewayCanvas({
     const nextNodes = nodesRef.current.map((node) => shiftedNodes.get(node.id) ?? node);
     onNodesChangeProp([...nextNodes, newNode]);
     onEdgesChangeProp(nextEdges);
+    emitDocumentChange([...nextNodes, newNode], nextEdges);
     onDirty?.();
     setSelectorPanel(null);
-  }, [selectorPanel, onNodesChangeProp, onEdgesChangeProp, onDirty]);
+  }, [emitDocumentChange, selectorPanel, onNodesChangeProp, onEdgesChangeProp, onDirty]);
 
   const handleNodeMenuAction = useCallback((nodeId: string, action: NodeMenuAction) => {
     switch (action) {
@@ -483,6 +571,7 @@ export function GatewayCanvas({
         );
         onNodesChangeProp(nextNodes);
         onEdgesChangeProp(nextEdges);
+        emitDocumentChange(nextNodes, nextEdges);
         onDirty?.();
         break;
       }
@@ -499,6 +588,7 @@ export function GatewayCanvas({
           data: { ...sourceNode.data },
         };
         onNodesChangeProp([...nodesRef.current, newNode]);
+        emitDocumentChange([...nodesRef.current, newNode], edgesRef.current);
         onDirty?.();
         break;
       }
@@ -656,7 +746,7 @@ export function GatewayCanvas({
     const nextViewport = resolveGatewayInitialViewport({
       nodes,
       viewportSize,
-      persistedViewport: initialViewport,
+      ...(initialViewport ? { persistedViewport: initialViewport } : {}),
     });
 
     hasInitializedViewportRef.current = true;
@@ -718,6 +808,7 @@ export function GatewayCanvas({
         onMove={(_, viewport) => {
           setZoom(viewport.zoom);
           setViewportState(viewport);
+          emitDocumentChange(nodesRef.current, edgesRef.current, viewport);
         }}
         onMoveEnd={() => {
           setIsViewportPanning(false);

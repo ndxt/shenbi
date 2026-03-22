@@ -631,7 +631,7 @@ function ToolbarBtn({
 }: {
   icon: React.ElementType;
   title: string;
-  onClick?: (() => void) | undefined;
+  onClick?: React.MouseEventHandler<HTMLButtonElement> | undefined;
   disabled?: boolean | undefined;
 }) {
   const [hover, setHover] = useState(false);

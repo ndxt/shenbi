@@ -3,6 +3,16 @@ export { GatewayEditor } from './components/GatewayEditor';
 export { GatewayCanvas } from './components/GatewayCanvas';
 export { GatewayNodePanel } from './components/GatewayNodePanel';
 export { buildGatewayPaletteAssets } from './components/gateway-palette-assets';
+export {
+  createDefaultGatewayDocument,
+  gatewayDocumentToGraph,
+  gatewayGraphToDocument,
+  isGatewayDocumentSchema,
+} from './gateway-document';
+export {
+  createGatewayHostAdapter,
+  type GatewayHostAdapter,
+} from './gateway-host-adapter';
 export type {
   GatewayNodeKind,
   GatewayNodeContract,

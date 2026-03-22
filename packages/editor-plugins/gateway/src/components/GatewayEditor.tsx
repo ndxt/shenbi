@@ -1,34 +1,17 @@
-// ---------------------------------------------------------------------------
-// GatewayEditor — top-level component orchestrating canvas + state
-// ---------------------------------------------------------------------------
-
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
+import type { CanvasRendererHostRuntime } from '@shenbi/editor-plugin-api';
+import type { CanvasToolMode } from '@shenbi/editor-ui';
 import { GatewayCanvas } from './GatewayCanvas';
 import type {
-  GatewayNode,
-  GatewayEdge,
   GatewayDocumentSchema,
-  GatewayNodeData,
 } from '../types';
-
-/** Default nodes for a new API gateway */
-function createDefaultNodes(): GatewayNode[] {
-  return [
-    {
-      id: 'start-1',
-      type: 'start',
-      position: { x: 100, y: 200 },
-      data: { kind: 'start', label: '开始', config: {} } as GatewayNodeData,
-    },
-    {
-      id: 'end-1',
-      type: 'end',
-      position: { x: 600, y: 200 },
-      data: { kind: 'end', label: '返回结果', config: {} } as GatewayNodeData,
-    },
-  ];
-}
+import {
+  createDefaultGatewayDocument,
+  gatewayDocumentToGraph,
+  isGatewayDocumentSchema,
+} from '../gateway-document';
+import type { GatewayHostAdapter } from '../gateway-host-adapter';
 
 export interface GatewayEditorProps {
   /** Document schema from .api.json (if existing file) */
@@ -37,68 +20,131 @@ export interface GatewayEditorProps {
   onDirty?: () => void;
   /** Called with updated document schema for persistence */
   onSave?: (schema: GatewayDocumentSchema) => void;
+  hostAdapter?: GatewayHostAdapter;
+  activeCanvasTool?: CanvasToolMode | undefined;
+  setActiveCanvasTool?: ((mode: CanvasToolMode) => void) | undefined;
+  onCanvasRuntimeReady?: ((runtime: CanvasRendererHostRuntime | null) => void) | undefined;
 }
 
 export function GatewayEditor({
   documentSchema,
   onDirty,
+  onSave,
+  hostAdapter,
+  activeCanvasTool,
+  setActiveCanvasTool,
+  onCanvasRuntimeReady,
 }: GatewayEditorProps) {
-  const [nodes, setNodes] = useState<GatewayNode[]>(() => {
-    if (documentSchema?.nodes?.length) {
-      return documentSchema.nodes.map((n) => ({
-        id: n.id,
-        type: n.kind,
-        position: n.position,
-        data: {
-          kind: n.kind,
-          label: n.label,
-          config: n.config,
-        } as GatewayNodeData,
-      }));
-    }
-    return createDefaultNodes();
-  });
+  const fallbackDocument = useMemo(() => (
+    createDefaultGatewayDocument(
+      hostAdapter?.fileId ?? documentSchema?.id ?? 'gateway',
+      hostAdapter?.fileName ?? documentSchema?.name ?? 'API Workflow',
+    )
+  ), [documentSchema?.id, documentSchema?.name, hostAdapter?.fileId, hostAdapter?.fileName]);
+  const initialGraph = useMemo(
+    () => gatewayDocumentToGraph(documentSchema ?? fallbackDocument),
+    [documentSchema, fallbackDocument],
+  );
+  const [nodes, setNodes] = useState(initialGraph.nodes);
+  const [edges, setEdges] = useState(initialGraph.edges);
+  const [viewport, setViewport] = useState(initialGraph.viewport);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [edges, setEdges] = useState<GatewayEdge[]>(() => {
-    if (documentSchema?.edges?.length) {
-      return documentSchema.edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        sourceHandle: e.sourceHandle,
-        target: e.target,
-        targetHandle: e.targetHandle,
-        type: 'typed',
-      }));
-    }
-    return [
-      {
-        id: 'edge_default',
-        type: 'typed',
-        source: 'start-1',
-        sourceHandle: 'request',
-        target: 'end-1',
-        targetHandle: 'result',
-      },
-    ];
-  });
+  useEffect(() => {
+    setNodes(initialGraph.nodes);
+    setEdges(initialGraph.edges);
+    setViewport(initialGraph.viewport);
+  }, [initialGraph]);
 
-  const handleNodesChange = useCallback((nextNodes: GatewayNode[]) => {
-    setNodes(nextNodes);
+  useEffect(() => {
+    if (!hostAdapter) {
+      return undefined;
+    }
+
+    let disposed = false;
+    void hostAdapter.loadDocument()
+      .then((loaded) => {
+        if (disposed) {
+          return;
+        }
+        if (!loaded || !isGatewayDocumentSchema(loaded)) {
+          const fallbackGraph = gatewayDocumentToGraph(fallbackDocument);
+          setNodes(fallbackGraph.nodes);
+          setEdges(fallbackGraph.edges);
+          setViewport(fallbackGraph.viewport);
+          return;
+        }
+        const nextGraph = gatewayDocumentToGraph(loaded);
+        setNodes(nextGraph.nodes);
+        setEdges(nextGraph.edges);
+        setViewport(nextGraph.viewport);
+      })
+      .catch((error) => {
+        if (disposed) {
+          return;
+        }
+        hostAdapter.notifyError(
+          error instanceof Error
+            ? error.message
+            : 'Failed to load gateway document',
+        );
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [fallbackDocument, hostAdapter]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
   }, []);
 
-  const handleEdgesChange = useCallback((nextEdges: GatewayEdge[]) => {
-    setEdges(nextEdges);
-  }, []);
+  const persistDocument = useCallback((nextDocument: GatewayDocumentSchema) => {
+    onSave?.(nextDocument);
+    if (!hostAdapter) {
+      return;
+    }
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = setTimeout(() => {
+      void hostAdapter.saveDocument(nextDocument).catch((error) => {
+        hostAdapter.notifyError(
+          error instanceof Error
+            ? error.message
+            : 'Failed to save gateway document',
+        );
+      });
+    }, 150);
+  }, [hostAdapter, onSave]);
 
   return (
     <ReactFlowProvider>
       <GatewayCanvas
+        {...(hostAdapter ? {
+          documentId: hostAdapter.fileId,
+          documentName: hostAdapter.fileName,
+        } : {
+          documentId: documentSchema?.id ?? fallbackDocument.id,
+          documentName: documentSchema?.name ?? fallbackDocument.name,
+        })}
+        {...(activeCanvasTool ? { activeCanvasTool } : {})}
+        {...(setActiveCanvasTool ? { onActiveCanvasToolChange: setActiveCanvasTool } : {})}
+        {...(onCanvasRuntimeReady ? { onCanvasRuntimeReady } : {})}
         nodes={nodes}
         edges={edges}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={handleEdgesChange}
-        onDirty={onDirty}
-        initialViewport={documentSchema?.viewport}
+        onNodesChange={setNodes}
+        onEdgesChange={setEdges}
+        onDocumentChange={(nextDocument) => {
+          setViewport(nextDocument.viewport);
+          persistDocument(nextDocument);
+        }}
+        {...(onDirty ? { onDirty } : {})}
+        {...(viewport ? { initialViewport: viewport } : {})}
       />
     </ReactFlowProvider>
   );

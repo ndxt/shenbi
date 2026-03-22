@@ -84,7 +84,7 @@ export function CanvasToolRail({
         <CanvasChromeButton
           key={action.id}
           title={action.title}
-          disabled={action.disabled}
+          {...(action.disabled !== undefined ? { disabled: action.disabled } : {})}
           onClick={action.onClick}
         >
           {action.icon}
