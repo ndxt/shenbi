@@ -2,19 +2,22 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import type {
   PluginContext,
-  PluginDocumentPatchService,
   PluginFileSystemService,
-  PluginNotifications,
 } from '@shenbi/editor-plugin-api';
+
+type PluginPatchSelectedNodeService = NonNullable<
+  NonNullable<PluginContext['document']>['patchSelectedNode']
+>;
+type PluginNotificationService = PluginContext['notifications'];
 
 export interface UsePluginContextOptions {
   schema: PageSchema;
   selectedNode: SchemaNode | undefined;
   selectedNodeId: string | undefined;
   replaceSchema: (schema: PageSchema) => void;
-  patchSelectedNode: PluginDocumentPatchService;
+  patchSelectedNode: PluginPatchSelectedNodeService;
   executeCommand: (commandId: string, payload?: unknown) => unknown | Promise<unknown>;
-  notifications?: PluginNotifications;
+  notifications?: PluginNotificationService;
   filesystem?: PluginFileSystemService;
 }
 

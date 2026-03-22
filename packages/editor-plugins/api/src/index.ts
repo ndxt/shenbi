@@ -1,11 +1,5 @@
 export type {
-  PluginCommandService,
-  PluginWorkspaceService,
   PluginPersistenceService,
-  PluginNotifications,
-  PluginSelectionService,
-  PluginDocumentPatchService,
-  PluginDocumentService,
   PluginFileSystemService,
   PluginContext,
 } from './context';
