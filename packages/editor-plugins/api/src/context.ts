@@ -56,85 +56,43 @@ export interface PluginContext {
   persistence?: PluginPersistenceService;
   notifications?: PluginNotifications;
   filesystem?: PluginFileSystemService;
-
-  // Backward-compatible aliases during migration.
-  /** @deprecated Use document.getSchema instead. */
-  getSchema?: () => PageSchema;
-  /** @deprecated Use document.replaceSchema instead. */
-  replaceSchema?: (schema: PageSchema) => void;
-  /** @deprecated Use selection.getSelectedNode instead. */
-  getSelectedNode?: () => SchemaNode | undefined;
-  /** @deprecated Use document.patchSelectedNode.props instead. */
-  patchNodeProps?: (patch: Record<string, unknown>) => void;
-  /** @deprecated Use document.patchSelectedNode.columns instead. */
-  patchNodeColumns?: (columns: unknown[]) => void;
-  /** @deprecated Use document.patchSelectedNode.style instead. */
-  patchNodeStyle?: (patch: Record<string, unknown>) => void;
-  /** @deprecated Use document.patchSelectedNode.events instead. */
-  patchNodeEvents?: (patch: Record<string, unknown>) => void;
-  /** @deprecated Use document.patchSelectedNode.logic instead. */
-  patchNodeLogic?: (patch: Record<string, unknown>) => void;
-  /** @deprecated Use commands.execute instead. */
-  executeCommand?: (commandId: string, payload?: unknown) => unknown | Promise<unknown>;
-  /** @deprecated Use notifications instead. */
-  notify?: PluginNotifications;
 }
 
 export function getPluginDocumentAccess(context: PluginContext) {
-  const patchSelectedNode = context.document?.patchSelectedNode
-    ?? (
-      context.patchNodeProps
-      || context.patchNodeColumns
-      || context.patchNodeStyle
-      || context.patchNodeEvents
-      || context.patchNodeLogic
-        ? {
-            ...(context.patchNodeProps ? { props: context.patchNodeProps } : {}),
-            ...(context.patchNodeColumns ? { columns: context.patchNodeColumns } : {}),
-            ...(context.patchNodeStyle ? { style: context.patchNodeStyle } : {}),
-            ...(context.patchNodeEvents ? { events: context.patchNodeEvents } : {}),
-            ...(context.patchNodeLogic ? { logic: context.patchNodeLogic } : {}),
-          }
-        : undefined
-    );
-
   return {
-    getSchema: () => context.document?.getSchema?.() ?? context.getSchema?.(),
+    getSchema: () => context.document?.getSchema?.(),
     replaceSchema: (schema: PageSchema) => {
       if (context.document?.replaceSchema) {
         context.document.replaceSchema(schema);
         return true;
       }
-      if (context.replaceSchema) {
-        context.replaceSchema(schema);
-        return true;
-      }
       return false;
     },
-    patchSelectedNode,
+    patchSelectedNode: context.document?.patchSelectedNode,
+    subscribe: (listener: (schema: PageSchema) => void) => context.document?.subscribe?.(listener),
   };
 }
 
 export function getPluginSelectionAccess(context: PluginContext) {
-  const getSelectedNode = () => context.selection?.getSelectedNode?.() ?? context.getSelectedNode?.();
   return {
-    getSelectedNode,
-    getSelectedNodeId: () => context.selection?.getSelectedNodeId?.() ?? getSelectedNode()?.id,
+    getSelectedNode: () => context.selection?.getSelectedNode?.(),
+    getSelectedNodeId: () => context.selection?.getSelectedNodeId?.() ?? context.selection?.getSelectedNode?.()?.id,
+    subscribe: (listener: (selectedNodeId: string | undefined) => void) => context.selection?.subscribe?.(listener),
   };
 }
 
 export function getPluginCommandAccess(context: PluginContext) {
   return {
-    canExecute: () => Boolean(context.commands?.execute ?? context.executeCommand),
+    canExecute: () => Boolean(context.commands?.execute),
     execute: (commandId: string, payload?: unknown) => (
-      context.commands?.execute(commandId, payload) ?? context.executeCommand?.(commandId, payload)
+      context.commands?.execute(commandId, payload)
     ),
   };
 }
 
 export function getPluginFeedbackAccess(context: PluginContext) {
   return {
-    notifications: context.notifications ?? context.notify,
+    notifications: context.notifications,
   };
 }
 

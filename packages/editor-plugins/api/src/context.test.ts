@@ -27,12 +27,16 @@ describe('plugin context helpers', () => {
     expect(getPluginSelectionAccess(context).getSelectedNodeId()).toBe('node-1');
   });
 
-  it('falls back to deprecated patch aliases when document service is absent', () => {
+  it('exposes document patching from the document service', () => {
     const props = vi.fn();
     const style = vi.fn();
     const context: PluginContext = {
-      patchNodeProps: props,
-      patchNodeStyle: style,
+      document: {
+        patchSelectedNode: {
+          props,
+          style,
+        },
+      },
     };
 
     const patchService = getPluginDocumentAccess(context).patchSelectedNode;
@@ -51,10 +55,6 @@ describe('plugin context helpers', () => {
       notifications: {
         success,
       },
-      executeCommand: vi.fn(),
-      notify: {
-        success: vi.fn(),
-      },
     };
 
     getPluginCommandAccess(context).execute('cmd.run', { ok: true });
@@ -66,15 +66,16 @@ describe('plugin context helpers', () => {
 
   it('reports command availability through grouped command access', () => {
     expect(getPluginCommandAccess({ commands: { execute: vi.fn() } }).canExecute()).toBe(true);
-    expect(getPluginCommandAccess({ executeCommand: vi.fn() }).canExecute()).toBe(true);
     expect(getPluginCommandAccess({}).canExecute()).toBe(false);
   });
 
-  it('replacePluginSchema falls back to deprecated replaceSchema alias', () => {
+  it('replaceSchema delegates through the document service', () => {
     const replaceSchema = vi.fn();
     const handled = getPluginDocumentAccess(
       {
-        replaceSchema,
+        document: {
+          replaceSchema,
+        },
       },
     ).replaceSchema({ id: 'page-2', body: [] });
 
@@ -111,5 +112,28 @@ describe('plugin context helpers', () => {
     expect(getPluginWorkspaceAccess(context).getWorkspaceId()).toBe('workspace-1');
     expect(getPluginStorageAccess(context).persistence).toBe(persistence);
     expect(getPluginStorageAccess(context).filesystem).toBe(filesystem);
+  });
+
+  it('exposes document and selection subscriptions through grouped helpers', () => {
+    const documentSubscribe = vi.fn(() => () => undefined);
+    const selectionSubscribe = vi.fn(() => () => undefined);
+    const context: PluginContext = {
+      document: {
+        subscribe: documentSubscribe,
+      },
+      selection: {
+        subscribe: selectionSubscribe,
+      },
+    };
+    const documentListener = vi.fn();
+    const selectionListener = vi.fn();
+
+    const unsubscribeDocument = getPluginDocumentAccess(context).subscribe(documentListener);
+    const unsubscribeSelection = getPluginSelectionAccess(context).subscribe(selectionListener);
+
+    expect(documentSubscribe).toHaveBeenCalledWith(documentListener);
+    expect(selectionSubscribe).toHaveBeenCalledWith(selectionListener);
+    expect(typeof unsubscribeDocument).toBe('function');
+    expect(typeof unsubscribeSelection).toBe('function');
   });
 });

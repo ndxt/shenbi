@@ -142,14 +142,14 @@ export function createEditorAIBridgeFromPluginContext(
     const unsubs: Array<() => void> = [];
     const notify = () => listener(getSnapshot());
 
-    const unsubDocument = options.context.document?.subscribe?.(() => {
+    const unsubDocument = documentAccess.subscribe?.(() => {
       notify();
     });
     if (unsubDocument) {
       unsubs.push(unsubDocument);
     }
 
-    const unsubSelection = options.context.selection?.subscribe?.(() => {
+    const unsubSelection = selectionAccess.subscribe?.(() => {
       notify();
     });
     if (unsubSelection) {
