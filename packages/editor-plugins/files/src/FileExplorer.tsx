@@ -852,13 +852,14 @@ export function FileExplorer({
 
   const closeContextMenu = useCallback(() => setContextMenu((prev) => ({ ...prev, open: false })), []);
 
-  // Close context menu and type dropdown on outside click
+  // Close context menu on outside click. File type dropdown manages its own outside-click
+  // handling so the opening toolbar click is not immediately treated as a close signal.
   useEffect(() => {
-    if (!contextMenu.open && !typeDropdown) return;
-    const handleClick = () => { closeContextMenu(); setTypeDropdown(null); };
+    if (!contextMenu.open) return;
+    const handleClick = () => { closeContextMenu(); };
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
-  }, [closeContextMenu, contextMenu.open, typeDropdown]);
+  }, [closeContextMenu, contextMenu.open]);
 
   const startCreating = useCallback((parentId: string | null, type: 'file' | 'directory', fileType?: FileType | undefined) => {
     setCreating({ parentId, type, ...(fileType !== undefined ? { fileType } : {}) });
