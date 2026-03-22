@@ -84,23 +84,18 @@ export interface SidebarTabRenderContext {
   environment: SidebarTabEnvironmentContext;
 }
 
-export interface SidebarTabContribution extends OrderedContribution {
+interface LabeledRenderContribution<TContext> extends OrderedContribution {
   label: string;
-  render: (context: SidebarTabRenderContext) => React.ReactNode;
+  render: (context: TContext) => React.ReactNode;
 }
 
-export interface PrimaryPanelContribution extends OrderedContribution {
-  label: string;
-  render: (context: SidebarTabRenderContext) => React.ReactNode;
-}
+export type SidebarTabContribution = LabeledRenderContribution<SidebarTabRenderContext>;
 
-export interface FileContextPanelRenderContext extends SidebarTabRenderContext {}
+export type PrimaryPanelContribution = LabeledRenderContribution<SidebarTabRenderContext>;
 
-export interface FileContextPanelContribution extends OrderedContribution {
-  label: string;
+export interface FileContextPanelContribution extends LabeledRenderContribution<SidebarTabRenderContext> {
   fileTypes?: string[];
   defaultActive?: boolean;
-  render: (context: FileContextPanelRenderContext) => React.ReactNode;
 }
 
 interface InspectorTabSelectionContext {
@@ -122,10 +117,7 @@ export interface InspectorTabRenderContext {
   environment: PluginEnvironmentContext;
 }
 
-export interface InspectorTabContribution extends OrderedContribution {
-  label: string;
-  render: (context: InspectorTabRenderContext) => React.ReactNode;
-}
+export type InspectorTabContribution = LabeledRenderContribution<InspectorTabRenderContext>;
 
 export interface AuxiliaryPanelContribution extends OrderedContribution {
   label: string;
