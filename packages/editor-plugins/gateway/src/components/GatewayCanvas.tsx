@@ -156,8 +156,9 @@ export function GatewayCanvas({
   );
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
-    const payload = readPaletteDragPayload(event.dataTransfer);
-    if (!payload || payload.kind !== 'gateway-node') {
+    // During dragover, browsers restrict getData() for security.
+    // We can only check if the MIME type is present in dataTransfer.types.
+    if (!event.dataTransfer.types.includes('application/x-shenbi-palette-item')) {
       return;
     }
     event.preventDefault();
