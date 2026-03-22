@@ -1,5 +1,5 @@
 import type { CanvasRendererRenderContext } from '@shenbi/editor-plugin-api';
-import { getPluginNotifications } from '@shenbi/editor-plugin-api';
+import { getPluginFeedbackAccess } from '@shenbi/editor-plugin-api';
 import type { GatewayDocumentSchema } from './types';
 
 export interface GatewayHostAdapter {
@@ -24,7 +24,7 @@ export function createGatewayHostAdapter(
   }
 
   const notifications = context.environment.pluginContext
-    ? getPluginNotifications(context.environment.pluginContext)
+    ? getPluginFeedbackAccess(context.environment.pluginContext).notifications
     : undefined;
   const fileName = context.file.name
     ? stripGatewayFileExtension(context.file.name)

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { Sparkles, Trash2, LoaderCircle } from 'lucide-react';
 import {
-  executePluginCommand,
+  getPluginCommandAccess,
   type PluginContext,
 } from '@shenbi/editor-plugin-api';
 import { useTranslation } from '@shenbi/i18n';
@@ -50,6 +50,10 @@ export function AIPanel({
 }: AIPanelProps) {
   const { t } = useTranslation('pluginAiChat');
   const persistence = pluginContext?.persistence;
+  const commandAccess = useMemo(
+    () => getPluginCommandAccess(pluginContext ?? {}),
+    [pluginContext],
+  );
   const [thinkingEnabled, setThinkingEnabled] = React.useState(false);
   const [blockConcurrency, setBlockConcurrency] = React.useState(3);
   const [draftText, setDraftText] = React.useState('');
@@ -212,8 +216,8 @@ export function AIPanel({
     resetSession();
     setDraftText('');
     setPendingAttachments([]);
-    void executePluginCommand(pluginContext ?? {}, 'workspace.resetDocument');
-  }, [isRunning, pluginContext, resetLoopState, resetSession]);
+    void commandAccess.execute('workspace.resetDocument');
+  }, [commandAccess, isRunning, resetLoopState, resetSession]);
 
   const handleAddFiles = React.useCallback((files: File[]) => {
     const nextAttachments: PendingAttachment[] = [];

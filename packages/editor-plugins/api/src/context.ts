@@ -123,6 +123,20 @@ export function getPluginSelectionAccess(context: PluginContext) {
   };
 }
 
+export function getPluginCommandAccess(context: PluginContext) {
+  return {
+    execute: (commandId: string, payload?: unknown) => (
+      context.commands?.execute(commandId, payload) ?? context.executeCommand?.(commandId, payload)
+    ),
+  };
+}
+
+export function getPluginFeedbackAccess(context: PluginContext) {
+  return {
+    notifications: context.notifications ?? context.notify,
+  };
+}
+
 export function getPluginSchema(context: PluginContext): PageSchema | undefined {
   return getPluginDocumentAccess(context).getSchema();
 }
@@ -148,11 +162,11 @@ export function executePluginCommand(
   commandId: string,
   payload?: unknown,
 ): unknown | Promise<unknown> | undefined {
-  return context.commands?.execute(commandId, payload) ?? context.executeCommand?.(commandId, payload);
+  return getPluginCommandAccess(context).execute(commandId, payload);
 }
 
 export function getPluginNotifications(context: PluginContext): PluginNotifications | undefined {
-  return context.notifications ?? context.notify;
+  return getPluginFeedbackAccess(context).notifications;
 }
 
 export function getPluginWorkspaceId(context: PluginContext): string | undefined {

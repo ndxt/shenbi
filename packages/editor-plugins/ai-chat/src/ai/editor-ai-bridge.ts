@@ -1,6 +1,6 @@
 import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import {
-  executePluginCommand,
+  getPluginCommandAccess,
   getPluginDocumentAccess,
   getPluginSelectionAccess,
   type PluginContext,
@@ -108,6 +108,7 @@ export function createEditorAIBridgeFromPluginContext(
   let lastReplacedSchema: PageSchema | undefined;
   const documentAccess = getPluginDocumentAccess(options.context);
   const selectionAccess = getPluginSelectionAccess(options.context);
+  const commandAccess = getPluginCommandAccess(options.context);
 
   function hasBody(schema: PageSchema | undefined): boolean {
     if (!schema) return false;
@@ -186,7 +187,7 @@ export function createEditorAIBridgeFromPluginContext(
         if (commandId === 'fs.createFolder') {
           const name = typeof commandArgs?.name === 'string' ? commandArgs.name : '';
           const parentId = typeof commandArgs?.parentId === 'string' ? commandArgs.parentId : undefined;
-          const result = await executePluginCommand(options.context, 'fs.createDirectory', { name, parentId: parentId ?? null });
+          const result = await commandAccess.execute('fs.createDirectory', { name, parentId: parentId ?? null });
           const nodeId = result && typeof result === 'object' && typeof (result as { id?: unknown }).id === 'string'
             ? (result as { id: string }).id
             : typeof result === 'string' ? result : undefined;
@@ -220,7 +221,7 @@ export function createEditorAIBridgeFromPluginContext(
 
         const hasCommandHandler = Boolean(options.context.commands?.execute || options.context.executeCommand);
         if (hasCommandHandler) {
-          const data = await executePluginCommand(options.context, commandId, args);
+          const data = await commandAccess.execute(commandId, args);
           return { success: true, data };
         }
         if (commandId === 'schema.replace' && args && typeof args === 'object' && 'schema' in args) {

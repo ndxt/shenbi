@@ -6,8 +6,8 @@ export type {
 export {
   getPluginDocumentAccess,
   getPluginSelectionAccess,
-  executePluginCommand,
-  getPluginNotifications,
+  getPluginCommandAccess,
+  getPluginFeedbackAccess,
 } from './context';
 export * from './contributions';
 export * from './plugin';
