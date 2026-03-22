@@ -1608,7 +1608,6 @@ export function AppShell({
                 <Inspector
                   {...inspectorProps}
                   tabs={inspectorTabs}
-                  pluginContext={resolvedPluginContext}
                 />
               </div>
             )}

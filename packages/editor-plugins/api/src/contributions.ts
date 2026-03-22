@@ -114,7 +114,6 @@ interface InspectorTabEditingContext {
 export interface InspectorTabRenderContext {
   selection: InspectorTabSelectionContext;
   editing: InspectorTabEditingContext;
-  environment: PluginEnvironmentContext;
 }
 
 export type InspectorTabContribution = LabeledRenderContribution<InspectorTabRenderContext>;
