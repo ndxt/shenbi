@@ -49,6 +49,11 @@ export function GatewayEditor({
   const [edges, setEdges] = useState(initialGraph.edges);
   const [viewport, setViewport] = useState(initialGraph.viewport);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hostAdapterRef = useRef(hostAdapter);
+
+  useEffect(() => {
+    hostAdapterRef.current = hostAdapter;
+  }, [hostAdapter]);
 
   useEffect(() => {
     setNodes(initialGraph.nodes);
@@ -57,12 +62,13 @@ export function GatewayEditor({
   }, [initialGraph]);
 
   useEffect(() => {
-    if (!hostAdapter) {
+    const activeHostAdapter = hostAdapterRef.current;
+    if (!activeHostAdapter) {
       return undefined;
     }
 
     let disposed = false;
-    void hostAdapter.loadDocument()
+    void activeHostAdapter.loadDocument()
       .then((loaded) => {
         if (disposed) {
           return;
@@ -83,7 +89,7 @@ export function GatewayEditor({
         if (disposed) {
           return;
         }
-        hostAdapter.notifyError(
+        activeHostAdapter.notifyError(
           error instanceof Error
             ? error.message
             : 'Failed to load gateway document',
@@ -93,7 +99,7 @@ export function GatewayEditor({
     return () => {
       disposed = true;
     };
-  }, [fallbackDocument, hostAdapter]);
+  }, [fallbackDocument, hostAdapter?.fileId, hostAdapter?.fileName]);
 
   useEffect(() => {
     return () => {
