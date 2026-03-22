@@ -8,6 +8,8 @@ export {
   getPluginSelectionAccess,
   getPluginCommandAccess,
   getPluginFeedbackAccess,
+  getPluginWorkspaceAccess,
+  getPluginStorageAccess,
 } from './context';
 export * from './contributions';
 export * from './plugin';

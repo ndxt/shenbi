@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   executePluginCommand,
+  getPluginStorageAccess,
   getPluginDocumentPatchService,
   getPluginNotifications,
   getPluginSchema,
   getPluginSelectedNode,
   getPluginSelectedNodeId,
+  getPluginWorkspaceAccess,
   replacePluginSchema,
   type PluginContext,
 } from './context';
@@ -85,5 +87,28 @@ describe('plugin context helpers', () => {
     );
 
     expect(handled).toBe(false);
+  });
+
+  it('exposes workspace and storage access through grouped helpers', () => {
+    const getWorkspaceId = vi.fn(() => 'workspace-1');
+    const persistence = {
+      getJSON: vi.fn(),
+      setJSON: vi.fn(),
+      remove: vi.fn(),
+    };
+    const filesystem = {
+      createFile: vi.fn(),
+      readFile: vi.fn(),
+      writeFile: vi.fn(),
+    };
+    const context: PluginContext = {
+      workspace: { getWorkspaceId },
+      persistence,
+      filesystem,
+    };
+
+    expect(getPluginWorkspaceAccess(context).getWorkspaceId()).toBe('workspace-1');
+    expect(getPluginStorageAccess(context).persistence).toBe(persistence);
+    expect(getPluginStorageAccess(context).filesystem).toBe(filesystem);
   });
 });

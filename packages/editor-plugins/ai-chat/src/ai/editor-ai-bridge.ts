@@ -3,6 +3,7 @@ import {
   getPluginCommandAccess,
   getPluginDocumentAccess,
   getPluginSelectionAccess,
+  getPluginStorageAccess,
   type PluginContext,
 } from '@shenbi/editor-plugin-api';
 
@@ -109,6 +110,7 @@ export function createEditorAIBridgeFromPluginContext(
   const documentAccess = getPluginDocumentAccess(options.context);
   const selectionAccess = getPluginSelectionAccess(options.context);
   const commandAccess = getPluginCommandAccess(options.context);
+  const storageAccess = getPluginStorageAccess(options.context);
 
   function hasBody(schema: PageSchema | undefined): boolean {
     if (!schema) return false;
@@ -172,7 +174,7 @@ export function createEditorAIBridgeFromPluginContext(
     },
     execute: async (commandId, args) => {
       try {
-        const filesystem = options.context.filesystem;
+        const filesystem = storageAccess.filesystem;
         const commandArgs = getCommandArgRecord(args);
 
         if (filesystem && commandId === 'fs.createFile') {

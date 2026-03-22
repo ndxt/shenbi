@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useMemo } from 'react';
 import { Sparkles, Trash2, LoaderCircle } from 'lucide-react';
 import {
   getPluginCommandAccess,
+  getPluginStorageAccess,
   type PluginContext,
 } from '@shenbi/editor-plugin-api';
 import { useTranslation } from '@shenbi/i18n';
@@ -49,7 +50,11 @@ export function AIPanel({
   defaultBlockModel,
 }: AIPanelProps) {
   const { t } = useTranslation('pluginAiChat');
-  const persistence = pluginContext?.persistence;
+  const storageAccess = useMemo(
+    () => getPluginStorageAccess(pluginContext ?? {}),
+    [pluginContext],
+  );
+  const persistence = storageAccess.persistence;
   const commandAccess = useMemo(
     () => getPluginCommandAccess(pluginContext ?? {}),
     [pluginContext],

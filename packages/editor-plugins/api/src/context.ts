@@ -137,6 +137,19 @@ export function getPluginFeedbackAccess(context: PluginContext) {
   };
 }
 
+export function getPluginWorkspaceAccess(context: PluginContext) {
+  return {
+    getWorkspaceId: () => context.workspace?.getWorkspaceId(),
+  };
+}
+
+export function getPluginStorageAccess(context: PluginContext) {
+  return {
+    persistence: context.persistence,
+    filesystem: context.filesystem,
+  };
+}
+
 export function getPluginSchema(context: PluginContext): PageSchema | undefined {
   return getPluginDocumentAccess(context).getSchema();
 }
@@ -170,9 +183,9 @@ export function getPluginNotifications(context: PluginContext): PluginNotificati
 }
 
 export function getPluginWorkspaceId(context: PluginContext): string | undefined {
-  return context.workspace?.getWorkspaceId();
+  return getPluginWorkspaceAccess(context).getWorkspaceId();
 }
 
 export function getPluginPersistence(context: PluginContext): PluginPersistenceService | undefined {
-  return context.persistence;
+  return getPluginStorageAccess(context).persistence;
 }
