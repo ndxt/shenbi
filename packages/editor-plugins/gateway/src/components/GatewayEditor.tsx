@@ -70,7 +70,16 @@ export function GatewayEditor({
         type: 'typed',
       }));
     }
-    return [];
+    return [
+      {
+        id: 'edge_default',
+        type: 'typed',
+        source: 'start-1',
+        sourceHandle: 'request',
+        target: 'end-1',
+        targetHandle: 'result',
+      },
+    ];
   });
 
   const handleNodesChange = useCallback((nextNodes: GatewayNode[]) => {

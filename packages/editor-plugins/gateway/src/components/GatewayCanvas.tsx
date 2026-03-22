@@ -282,6 +282,13 @@ export function GatewayCanvas({
       return;
     }
 
+    // Read targetHandle from the actual edge data (edgesRef) rather than
+    // React Flow's EdgeProps, because EdgeProps.targetHandle can be null.
+    const originalEdge = edgesRef.current.find((e) => e.id === payload.edgeId);
+    const resolvedTargetHandle = originalEdge?.targetHandle
+      ?? payload.targetHandle
+      ?? undefined;
+
     setSelectorPanel({
       visible: true,
       position: {
@@ -292,7 +299,7 @@ export function GatewayCanvas({
       sourceHandle: resolvedSourceHandle,
       edgeId: payload.edgeId,
       targetNodeId: payload.targetNodeId,
-      targetHandle: payload.targetHandle ?? undefined,
+      targetHandle: resolvedTargetHandle,
     });
   }, []);
 
@@ -372,6 +379,7 @@ export function GatewayCanvas({
       targetHandle: contract.inputs[0]?.id || 'input',
     };
 
+    // 一次性添加新节点 + 所有边
     let nextEdges = [...edgesRef.current, edgeToNewNode];
     if (selectorPanel.edgeId && selectorPanel.targetNodeId) {
       const bridgeOutputHandle = resolveBridgeOutputHandle(
@@ -380,14 +388,25 @@ export function GatewayCanvas({
         selectorPanel.targetHandle,
       );
       nextEdges = nextEdges.filter((edge) => edge.id !== selectorPanel.edgeId);
-      nextEdges.push({
+
+      // Resolve the target handle: use the stored value from the original edge,
+      // or fall back to the target node's first input handle.
+      const targetContract = targetNode
+        ? NODE_CONTRACTS[targetNode.data.kind]
+        : undefined;
+      const resolvedTargetHandle = selectorPanel.targetHandle
+        || targetContract?.inputs[0]?.id
+        || 'input';
+
+      const secondEdge: GatewayEdge = {
         id: `edge_${Date.now()}_insert`,
         type: 'typed',
         source: newNode.id,
         sourceHandle: bridgeOutputHandle || contract.outputs[0]?.id || 'output',
         target: selectorPanel.targetNodeId,
-        targetHandle: selectorPanel.targetHandle || 'input',
-      });
+        targetHandle: resolvedTargetHandle,
+      };
+      nextEdges.push(secondEdge);
     }
 
     const nextNodes = nodesRef.current.map((node) => shiftedNodes.get(node.id) ?? node);

@@ -30,6 +30,16 @@ export default defineConfig(({ command }) => ({
       '@shenbi/i18n': path.resolve(__dirname, '../../packages/i18n/src/index.ts'),
       '@shenbi/schema': path.resolve(__dirname, '../../packages/schema/types/index.ts'),
       '@shenbi/editor-ui': path.resolve(__dirname, '../../packages/editor-ui/src/index.ts'),
+      '@shenbi/editor-plugin-gateway': path.resolve(__dirname, '../../packages/editor-plugins/gateway/src/index.ts'),
+      '@shenbi/editor-plugin-page-canvas': path.resolve(__dirname, '../../packages/editor-plugins/page-canvas/src/index.ts'),
+    },
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        'gateway-debug': path.resolve(__dirname, 'gateway-debug.html'),
+      },
     },
   },
 }));
