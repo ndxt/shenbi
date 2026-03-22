@@ -315,8 +315,14 @@ export function GatewayCanvas({
     // Handle "change node" mode: replace the existing node's type
     if (selectorPanel.changeNodeId) {
       const contract = NODE_CONTRACTS[kind];
+      const nodeId = selectorPanel.changeNodeId;
+
+      // Get old node's contract to know old handle IDs
+      const oldNode = nodesRef.current.find((n) => n.id === nodeId);
+      const oldContract = oldNode ? NODE_CONTRACTS[oldNode.data.kind as GatewayNodeKind] : undefined;
+
       const nextNodes = nodesRef.current.map((n) => {
-        if (n.id !== selectorPanel.changeNodeId) return n;
+        if (n.id !== nodeId) return n;
         return {
           ...n,
           type: kind,
@@ -327,7 +333,35 @@ export function GatewayCanvas({
           },
         };
       });
+
+      // Remap edge handles: old input/output IDs → new contract's first input/output
+      const newInputId = contract.inputs[0]?.id;
+      const newOutputId = contract.outputs[0]?.id;
+      const oldInputIds = new Set(oldContract?.inputs.map((p) => p.id) ?? []);
+      const oldOutputIds = new Set(oldContract?.outputs.map((p) => p.id) ?? []);
+
+      const nextEdges = edgesRef.current
+        .map((e) => {
+          let edge = e;
+          // Remap target handle (this node is the target)
+          if (e.target === nodeId && e.targetHandle && oldInputIds.has(e.targetHandle)) {
+            edge = { ...edge, targetHandle: newInputId ?? null };
+          }
+          // Remap source handle (this node is the source)
+          if (e.source === nodeId && e.sourceHandle && oldOutputIds.has(e.sourceHandle)) {
+            edge = { ...edge, sourceHandle: newOutputId ?? null };
+          }
+          return edge;
+        })
+        // Drop edges where the new contract has no matching port
+        .filter((e) => {
+          if (e.target === nodeId && !newInputId) return false;
+          if (e.source === nodeId && !newOutputId) return false;
+          return true;
+        });
+
       onNodesChangeProp(nextNodes);
+      onEdgesChangeProp(nextEdges);
       onDirty?.();
       setSelectorPanel(null);
       return;
