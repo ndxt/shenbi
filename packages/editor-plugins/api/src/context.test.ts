@@ -1,14 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  executePluginCommand,
+  getPluginCommandAccess,
+  getPluginDocumentAccess,
+  getPluginFeedbackAccess,
+  getPluginSelectionAccess,
   getPluginStorageAccess,
-  getPluginDocumentPatchService,
-  getPluginNotifications,
-  getPluginSchema,
-  getPluginSelectedNode,
-  getPluginSelectedNodeId,
   getPluginWorkspaceAccess,
-  replacePluginSchema,
   type PluginContext,
 } from './context';
 
@@ -25,9 +22,9 @@ describe('plugin context helpers', () => {
       },
     };
 
-    expect(getPluginSchema(context)?.id).toBe('page-1');
-    expect(getPluginSelectedNode(context)).toBe(selectedNode);
-    expect(getPluginSelectedNodeId(context)).toBe('node-1');
+    expect(getPluginDocumentAccess(context).getSchema()?.id).toBe('page-1');
+    expect(getPluginSelectionAccess(context).getSelectedNode()).toBe(selectedNode);
+    expect(getPluginSelectionAccess(context).getSelectedNodeId()).toBe('node-1');
   });
 
   it('falls back to deprecated patch aliases when document service is absent', () => {
@@ -38,7 +35,7 @@ describe('plugin context helpers', () => {
       patchNodeStyle: style,
     };
 
-    const patchService = getPluginDocumentPatchService(context);
+    const patchService = getPluginDocumentAccess(context).patchSelectedNode;
 
     expect(patchService?.props).toBe(props);
     expect(patchService?.style).toBe(style);
@@ -60,8 +57,8 @@ describe('plugin context helpers', () => {
       },
     };
 
-    executePluginCommand(context, 'cmd.run', { ok: true });
-    getPluginNotifications(context)?.success?.('done');
+    getPluginCommandAccess(context).execute('cmd.run', { ok: true });
+    getPluginFeedbackAccess(context).notifications?.success?.('done');
 
     expect(execute).toHaveBeenCalledWith('cmd.run', { ok: true });
     expect(success).toHaveBeenCalledWith('done');
@@ -69,22 +66,20 @@ describe('plugin context helpers', () => {
 
   it('replacePluginSchema falls back to deprecated replaceSchema alias', () => {
     const replaceSchema = vi.fn();
-    const handled = replacePluginSchema(
+    const handled = getPluginDocumentAccess(
       {
         replaceSchema,
       },
-      { id: 'page-2', body: [] },
-    );
+    ).replaceSchema({ id: 'page-2', body: [] });
 
     expect(handled).toBe(true);
     expect(replaceSchema).toHaveBeenCalledWith({ id: 'page-2', body: [] });
   });
 
   it('replacePluginSchema returns false when no replacement service exists', () => {
-    const handled = replacePluginSchema(
+    const handled = getPluginDocumentAccess(
       {},
-      { id: 'page-3', body: [] },
-    );
+    ).replaceSchema({ id: 'page-3', body: [] });
 
     expect(handled).toBe(false);
   });
