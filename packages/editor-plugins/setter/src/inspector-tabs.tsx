@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  getPluginDocumentAccess,
   mergeContributions,
   type InspectorTabContribution,
   type InspectorTabRenderContext,
@@ -12,15 +11,12 @@ export type BuiltinInspectorTabId = 'props' | 'style' | 'events' | 'logic' | 'ac
 export type { InspectorTabContribution, InspectorTabRenderContext } from '@shenbi/editor-plugin-api';
 
 function getPatchHandlers(context: InspectorTabRenderContext) {
-  const patchService = context.environment.pluginContext
-    ? getPluginDocumentAccess(context.environment.pluginContext).patchSelectedNode
-    : undefined;
   return {
-    onPatchProps: patchService?.props ?? context.editing.onPatchProps,
-    onPatchColumns: patchService?.columns ?? context.editing.onPatchColumns,
-    onPatchStyle: patchService?.style ?? context.editing.onPatchStyle,
-    onPatchEvents: patchService?.events ?? context.editing.onPatchEvents,
-    onPatchLogic: patchService?.logic ?? context.editing.onPatchLogic,
+    onPatchProps: context.editing.onPatchProps,
+    onPatchColumns: context.editing.onPatchColumns,
+    onPatchStyle: context.editing.onPatchStyle,
+    onPatchEvents: context.editing.onPatchEvents,
+    onPatchLogic: context.editing.onPatchLogic,
   };
 }
 
