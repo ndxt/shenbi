@@ -84,10 +84,14 @@ export function usePreviewPlugins({
   // Only recreate plugins when truly structural properties change:
   // - appMode (shell vs scenarios)
   // - vfsInitialized (file system becomes available)
-  // - filesPrimaryPanelOptions identity (panel config changes)
-  // All other state (tabs, schemas, dirty flags) flows through proxies/refs.
+  // - hasFilesPrimaryPanel (fallback panel availability changes)
+  // All fast-moving runtime state (tabs, schemas, dirty flags, files options)
+  // flows through proxies/refs so manifests stay stable across shell updates.
   const vfsInitialized = workspace.vfsInitialized;
-  const filesPrimaryPanelOptions = workspace.filesPrimaryPanelOptions;
+  const hasFilesPrimaryPanel = Boolean(workspace.filesPrimaryPanelOptions);
+  const scenarioWorkspaceDependency = appMode === 'shell' ? null : workspace;
+  const scenarioCanvasDependency = appMode === 'shell' ? null : canvas;
+  const scenarioProjectDependency = appMode === 'shell' ? null : project;
 
   return useMemo(() => {
     const context = {
@@ -106,7 +110,7 @@ export function usePreviewPlugins({
       featureFlags: {
         shellMode: appMode === 'shell',
         vfsInitialized,
-        hasFilesPrimaryPanel: Boolean(filesPrimaryPanelOptions),
+        hasFilesPrimaryPanel,
       },
       adapters: {
         files: {
@@ -123,11 +127,10 @@ export function usePreviewPlugins({
     };
 
     return resolvePreviewPlugins(context as any);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     appMode,
+    hasFilesPrimaryPanel,
     vfsInitialized,
-    filesPrimaryPanelOptions,
     executeAppCommand,
     filesT,
     previewT,
@@ -136,5 +139,8 @@ export function usePreviewPlugins({
     workspaceProxy,
     canvasProxy,
     projectProxy,
+    scenarioWorkspaceDependency,
+    scenarioCanvasDependency,
+    scenarioProjectDependency,
   ]);
 }
