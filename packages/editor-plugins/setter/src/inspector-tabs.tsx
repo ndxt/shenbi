@@ -12,15 +12,15 @@ export type BuiltinInspectorTabId = 'props' | 'style' | 'events' | 'logic' | 'ac
 export type { InspectorTabContribution, InspectorTabRenderContext } from '@shenbi/editor-plugin-api';
 
 function getPatchHandlers(context: InspectorTabRenderContext) {
-  const patchService = context.pluginContext
-    ? getPluginDocumentPatchService(context.pluginContext)
+  const patchService = context.environment.pluginContext
+    ? getPluginDocumentPatchService(context.environment.pluginContext)
     : undefined;
   return {
-    onPatchProps: patchService?.props ?? context.onPatchProps,
-    onPatchColumns: patchService?.columns ?? context.onPatchColumns,
-    onPatchStyle: patchService?.style ?? context.onPatchStyle,
-    onPatchEvents: patchService?.events ?? context.onPatchEvents,
-    onPatchLogic: patchService?.logic ?? context.onPatchLogic,
+    onPatchProps: patchService?.props ?? context.editing.onPatchProps,
+    onPatchColumns: patchService?.columns ?? context.editing.onPatchColumns,
+    onPatchStyle: patchService?.style ?? context.editing.onPatchStyle,
+    onPatchEvents: patchService?.events ?? context.editing.onPatchEvents,
+    onPatchLogic: patchService?.logic ?? context.editing.onPatchLogic,
   };
 }
 
@@ -35,8 +35,8 @@ export function createBuiltinInspectorTabs(): InspectorTabContribution[] {
         return (
           <SetterPanel
             activeTab="props"
-            {...(context.selectedNode ? { selectedNode: context.selectedNode } : {})}
-            {...(context.contract ? { contract: context.contract } : {})}
+            {...(context.selection.selectedNode ? { selectedNode: context.selection.selectedNode } : {})}
+            {...(context.selection.contract ? { contract: context.selection.contract } : {})}
             {...(handlers.onPatchProps ? { onPatchProps: handlers.onPatchProps } : {})}
             {...(handlers.onPatchColumns ? { onPatchColumns: handlers.onPatchColumns } : {})}
           />
@@ -52,7 +52,7 @@ export function createBuiltinInspectorTabs(): InspectorTabContribution[] {
         return (
           <SetterPanel
             activeTab="style"
-            {...(context.selectedNode ? { selectedNode: context.selectedNode } : {})}
+            {...(context.selection.selectedNode ? { selectedNode: context.selection.selectedNode } : {})}
             {...(handlers.onPatchStyle ? { onPatchStyle: handlers.onPatchStyle } : {})}
           />
         );
@@ -67,7 +67,7 @@ export function createBuiltinInspectorTabs(): InspectorTabContribution[] {
         return (
           <SetterPanel
             activeTab="events"
-            {...(context.selectedNode ? { selectedNode: context.selectedNode } : {})}
+            {...(context.selection.selectedNode ? { selectedNode: context.selection.selectedNode } : {})}
             {...(handlers.onPatchEvents ? { onPatchEvents: handlers.onPatchEvents } : {})}
           />
         );
@@ -82,7 +82,7 @@ export function createBuiltinInspectorTabs(): InspectorTabContribution[] {
         return (
           <SetterPanel
             activeTab="logic"
-            {...(context.selectedNode ? { selectedNode: context.selectedNode } : {})}
+            {...(context.selection.selectedNode ? { selectedNode: context.selection.selectedNode } : {})}
             {...(handlers.onPatchLogic ? { onPatchLogic: handlers.onPatchLogic } : {})}
           />
         );

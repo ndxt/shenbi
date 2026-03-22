@@ -33,12 +33,15 @@ export interface PageCanvasRendererProps extends CanvasRendererRenderContext {}
 
 export function PageCanvasRenderer(props: PageCanvasRendererProps) {
   const {
+    surface,
+    canvasHost,
+  } = props;
+  const {
     children,
     renderMode = 'direct',
     theme = 'light',
-    canvasReadOnly = false,
-    canvasHost,
-  } = props;
+    readOnly: canvasReadOnly = false,
+  } = surface;
   const {
     selection,
     editing,

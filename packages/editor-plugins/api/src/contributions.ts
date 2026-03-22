@@ -53,15 +53,37 @@ export interface SchemaTreeNode {
   isHidden?: boolean;
 }
 
-export interface SidebarTabRenderContext {
-  contracts?: ComponentContract[];
-  treeNodes?: SchemaTreeNode[];
-  selectedNodeId?: string;
-  onSelectNode?: (nodeId: string) => void;
-  onInsertComponent?: (componentType: string) => void;
-  onStartDragComponent?: (componentType: string) => void;
-  onEndDragComponent?: () => void;
+interface FileContributionContext {
+  id?: string | undefined;
+  name?: string | undefined;
+  type?: string | undefined;
+}
+
+interface PluginEnvironmentContext {
   pluginContext?: PluginContext;
+}
+
+interface SidebarTabSelectionContext {
+  treeNodes?: SchemaTreeNode[];
+  selectedNodeId?: string | undefined;
+  onSelectNode?: ((nodeId: string) => void) | undefined;
+}
+
+interface SidebarTabCommandsContext {
+  onInsertComponent?: ((componentType: string) => void) | undefined;
+  onStartDragComponent?: ((componentType: string) => void) | undefined;
+  onEndDragComponent?: (() => void) | undefined;
+}
+
+interface SidebarTabEnvironmentContext extends PluginEnvironmentContext {
+  contracts?: ComponentContract[];
+}
+
+export interface SidebarTabRenderContext {
+  file?: FileContributionContext;
+  selection: SidebarTabSelectionContext;
+  commands: SidebarTabCommandsContext;
+  environment: SidebarTabEnvironmentContext;
 }
 
 export interface SidebarTabContribution extends OrderedContribution {
@@ -74,11 +96,7 @@ export interface PrimaryPanelContribution extends OrderedContribution {
   render: (context: SidebarTabRenderContext) => React.ReactNode;
 }
 
-export interface FileContextPanelRenderContext extends SidebarTabRenderContext {
-  activeFileId?: string;
-  activeFileName?: string;
-  activeFileType?: string;
-}
+export interface FileContextPanelRenderContext extends SidebarTabRenderContext {}
 
 export interface FileContextPanelContribution extends OrderedContribution {
   label: string;
@@ -87,15 +105,23 @@ export interface FileContextPanelContribution extends OrderedContribution {
   render: (context: FileContextPanelRenderContext) => React.ReactNode;
 }
 
-export interface InspectorTabRenderContext {
+interface InspectorTabSelectionContext {
   selectedNode?: SchemaNode;
   contract?: ComponentContract;
-  onPatchProps?: (patch: Record<string, unknown>) => void;
-  onPatchColumns?: (columns: unknown[]) => void;
-  onPatchStyle?: (patch: Record<string, unknown>) => void;
-  onPatchEvents?: (patch: Record<string, unknown>) => void;
-  onPatchLogic?: (patch: Record<string, unknown>) => void;
-  pluginContext?: PluginContext;
+}
+
+interface InspectorTabEditingContext {
+  onPatchProps?: ((patch: Record<string, unknown>) => void) | undefined;
+  onPatchColumns?: ((columns: unknown[]) => void) | undefined;
+  onPatchStyle?: ((patch: Record<string, unknown>) => void) | undefined;
+  onPatchEvents?: ((patch: Record<string, unknown>) => void) | undefined;
+  onPatchLogic?: ((patch: Record<string, unknown>) => void) | undefined;
+}
+
+export interface InspectorTabRenderContext {
+  selection: InspectorTabSelectionContext;
+  editing: InspectorTabEditingContext;
+  environment: PluginEnvironmentContext;
 }
 
 export interface InspectorTabContribution extends OrderedContribution {
@@ -125,7 +151,7 @@ export interface CanvasRendererHostRuntime {
   hasCanvasDragSession?: (() => boolean) | undefined;
 }
 
-export interface CanvasRendererSelectionContext {
+interface CanvasRendererSelectionContext {
   onSelectNode?: ((nodeId: string) => void) | undefined;
   onDeselectNode?: (() => void) | undefined;
   selectedNodeSchemaId?: string | undefined;
@@ -136,7 +162,7 @@ export interface CanvasRendererSelectionContext {
   onBreadcrumbHover?: ((nodeId: string | null) => void) | undefined;
 }
 
-export interface CanvasRendererEditingContext {
+interface CanvasRendererEditingContext {
   canDropInsideNode?: ((nodeSchemaId: string) => boolean) | undefined;
   onInsertComponent?: ((componentType: string, target: unknown) => void) | undefined;
   onMoveSelectedNode?: ((target: unknown) => void) | undefined;
@@ -146,7 +172,7 @@ export interface CanvasRendererEditingContext {
   canMoveSelectedNodeDown?: boolean | undefined;
 }
 
-export interface CanvasRendererOverlayContext {
+interface CanvasRendererOverlayContext {
   selectionActions?: Array<{
     id: string;
     title: string;
@@ -160,7 +186,7 @@ export interface CanvasRendererOverlayContext {
   onContextMenu?: ((event: React.MouseEvent) => void) | undefined;
 }
 
-export interface CanvasRendererInteractionContext {
+interface CanvasRendererInteractionContext {
   activeTool?: string | undefined;
   setActiveTool?: ((mode: string) => void) | undefined;
   onRuntimeReady?: ((runtime: CanvasRendererHostRuntime | null) => void) | undefined;
@@ -173,11 +199,7 @@ export interface CanvasRendererHostContext {
   interaction: CanvasRendererInteractionContext;
 }
 
-export interface CanvasRendererRenderContext {
-  activeFileId?: string;
-  activeFileName?: string;
-  activeFileType?: string;
-  pluginContext?: PluginContext;
+interface CanvasRendererSurfaceContext {
   /** The actual page content to render inside the canvas surface */
   children?: React.ReactNode;
   /** Render mode: 'direct' DOM or 'iframe' isolation */
@@ -185,7 +207,13 @@ export interface CanvasRendererRenderContext {
   /** Current theme name (e.g. 'light', 'dark') */
   theme?: string;
   /** Whether the canvas is read-only */
-  canvasReadOnly?: boolean;
+  readOnly?: boolean;
+}
+
+export interface CanvasRendererRenderContext {
+  file: FileContributionContext;
+  surface: CanvasRendererSurfaceContext;
+  environment: PluginEnvironmentContext;
   canvasHost: CanvasRendererHostContext;
 }
 

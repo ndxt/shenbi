@@ -22,12 +22,12 @@ export function createBuiltinSidebarTabs(): SidebarTabContribution[] {
       id: 'components',
       label: i18n.t('workbench.components', { ns: 'editorUi' }),
       order: 10,
-      render: (context) => (
+      render: ({ commands, environment }) => (
         <ComponentPanel
-          {...(context.contracts ? { contracts: context.contracts } : {})}
-          {...(context.onInsertComponent ? { onInsert: context.onInsertComponent } : {})}
-          {...(context.onStartDragComponent ? { onStartDrag: context.onStartDragComponent } : {})}
-          {...(context.onEndDragComponent ? { onEndDrag: context.onEndDragComponent } : {})}
+          {...(environment.contracts ? { contracts: environment.contracts } : {})}
+          {...(commands.onInsertComponent ? { onInsert: commands.onInsertComponent } : {})}
+          {...(commands.onStartDragComponent ? { onStartDrag: commands.onStartDragComponent } : {})}
+          {...(commands.onEndDragComponent ? { onEndDrag: commands.onEndDragComponent } : {})}
         />
       ),
     },
@@ -35,12 +35,12 @@ export function createBuiltinSidebarTabs(): SidebarTabContribution[] {
       id: 'outline',
       label: i18n.t('workbench.outline', { ns: 'editorUi' }),
       order: 20,
-      render: (context) => (
+      render: ({ selection, environment }) => (
         <SchemaTree
-          {...(context.treeNodes ? { nodes: context.treeNodes } : {})}
-          {...(context.selectedNodeId ? { selectedNodeId: context.selectedNodeId } : {})}
-          {...(context.onSelectNode ? { onSelect: context.onSelectNode } : {})}
-          {...(context.contracts ? { contracts: context.contracts } : {})}
+          {...(selection.treeNodes ? { nodes: selection.treeNodes } : {})}
+          {...(selection.selectedNodeId ? { selectedNodeId: selection.selectedNodeId } : {})}
+          {...(selection.onSelectNode ? { onSelect: selection.onSelectNode } : {})}
+          {...(environment.contracts ? { contracts: environment.contracts } : {})}
         />
       ),
     },

@@ -16,12 +16,12 @@ function createBuiltinPrimaryPanels(): PrimaryPanelContribution[] {
       id: 'search',
       label: i18n.t('workbench.outline', { ns: 'editorUi' }),
       order: 20,
-      render: (context: SidebarTabRenderContext) => (
+      render: ({ selection, environment }: SidebarTabRenderContext) => (
         <SchemaTree
-          {...(context.treeNodes ? { nodes: context.treeNodes } : {})}
-          {...(context.selectedNodeId ? { selectedNodeId: context.selectedNodeId } : {})}
-          {...(context.onSelectNode ? { onSelect: context.onSelectNode } : {})}
-          {...(context.contracts ? { contracts: context.contracts } : {})}
+          {...(selection.treeNodes ? { nodes: selection.treeNodes } : {})}
+          {...(selection.selectedNodeId ? { selectedNodeId: selection.selectedNodeId } : {})}
+          {...(selection.onSelectNode ? { onSelect: selection.onSelectNode } : {})}
+          {...(environment.contracts ? { contracts: environment.contracts } : {})}
         />
       ),
     },

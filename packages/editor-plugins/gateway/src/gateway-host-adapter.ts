@@ -17,17 +17,17 @@ function stripGatewayFileExtension(fileName: string): string {
 export function createGatewayHostAdapter(
   context: CanvasRendererRenderContext,
 ): GatewayHostAdapter | undefined {
-  const filesystem = context.pluginContext?.filesystem;
-  const fileId = context.activeFileId;
+  const filesystem = context.environment.pluginContext?.filesystem;
+  const fileId = context.file.id;
   if (!filesystem || !fileId) {
     return undefined;
   }
 
-  const notifications = context.pluginContext
-    ? getPluginNotifications(context.pluginContext)
+  const notifications = context.environment.pluginContext
+    ? getPluginNotifications(context.environment.pluginContext)
     : undefined;
-  const fileName = context.activeFileName
-    ? stripGatewayFileExtension(context.activeFileName)
+  const fileName = context.file.name
+    ? stripGatewayFileExtension(context.file.name)
     : 'API Workflow';
 
   return {

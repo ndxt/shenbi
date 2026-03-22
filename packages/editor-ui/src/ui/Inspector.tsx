@@ -35,14 +35,20 @@ export function Inspector({
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>('props');
   const renderContext = useMemo<InspectorTabRenderContext>(() => ({
-    ...(selectedNode ? { selectedNode } : {}),
-    ...(contract ? { contract } : {}),
-    ...(onPatchProps ? { onPatchProps } : {}),
-    ...(onPatchColumns ? { onPatchColumns } : {}),
-    ...(onPatchStyle ? { onPatchStyle } : {}),
-    ...(onPatchEvents ? { onPatchEvents } : {}),
-    ...(onPatchLogic ? { onPatchLogic } : {}),
-    ...(pluginContext ? { pluginContext } : {}),
+    selection: {
+      ...(selectedNode ? { selectedNode } : {}),
+      ...(contract ? { contract } : {}),
+    },
+    editing: {
+      ...(onPatchProps ? { onPatchProps } : {}),
+      ...(onPatchColumns ? { onPatchColumns } : {}),
+      ...(onPatchStyle ? { onPatchStyle } : {}),
+      ...(onPatchEvents ? { onPatchEvents } : {}),
+      ...(onPatchLogic ? { onPatchLogic } : {}),
+    },
+    environment: {
+      ...(pluginContext ? { pluginContext } : {}),
+    },
   }), [
     contract,
     onPatchColumns,

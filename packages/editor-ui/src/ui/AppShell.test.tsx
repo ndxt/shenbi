@@ -411,12 +411,12 @@ describe('AppShell', () => {
                   id: 'command-tab',
                   label: 'CommandTab',
                   order: 99,
-                  render: ({ pluginContext }) => (
+                  render: ({ environment }) => (
                     <div>
-                      <button type="button" onClick={() => void pluginContext?.commands?.execute('plugin.run')}>
+                      <button type="button" onClick={() => void environment.pluginContext?.commands?.execute('plugin.run')}>
                         Run Plugin Command
                       </button>
-                      <button type="button" onClick={() => void pluginContext?.commands?.execute('host.run')}>
+                      <button type="button" onClick={() => void environment.pluginContext?.commands?.execute('host.run')}>
                         Run Host Command
                       </button>
                     </div>

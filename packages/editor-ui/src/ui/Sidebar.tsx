@@ -42,14 +42,20 @@ export function Sidebar({
 }: SidebarProps) {
   const [innerActiveTab, setInnerActiveTab] = useState<string>('components');
   const renderContext = useMemo<SidebarTabRenderContext>(() => ({
-    ...(contracts ? { contracts } : {}),
-    ...(treeNodes ? { treeNodes } : {}),
-    ...(selectedNodeId ? { selectedNodeId } : {}),
-    ...(onSelectNode ? { onSelectNode } : {}),
-    ...(onInsertComponent ? { onInsertComponent } : {}),
-    ...(onStartDragComponent ? { onStartDragComponent } : {}),
-    ...(onEndDragComponent ? { onEndDragComponent } : {}),
-    ...(pluginContext ? { pluginContext } : {}),
+    selection: {
+      ...(treeNodes ? { treeNodes } : {}),
+      ...(selectedNodeId ? { selectedNodeId } : {}),
+      ...(onSelectNode ? { onSelectNode } : {}),
+    },
+    commands: {
+      ...(onInsertComponent ? { onInsertComponent } : {}),
+      ...(onStartDragComponent ? { onStartDragComponent } : {}),
+      ...(onEndDragComponent ? { onEndDragComponent } : {}),
+    },
+    environment: {
+      ...(contracts ? { contracts } : {}),
+      ...(pluginContext ? { pluginContext } : {}),
+    },
   }), [
     contracts,
     onEndDragComponent,

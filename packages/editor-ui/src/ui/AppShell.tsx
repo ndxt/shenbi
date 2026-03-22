@@ -472,9 +472,11 @@ export function AppShell({
         ...(panel.order !== undefined ? { order: panel.order } : {}),
         render: (context: Parameters<typeof panel.render>[0]) => panel.render({
           ...context,
-          activeFileId: activeEditorTab.fileId,
-          activeFileName: activeEditorTab.fileName,
-          activeFileType: activeEditorTab.fileType,
+          file: {
+            id: activeEditorTab.fileId,
+            name: activeEditorTab.fileName,
+            type: activeEditorTab.fileType,
+          },
         }),
       }));
     if (fileType === 'page') {
@@ -812,14 +814,20 @@ export function AppShell({
     return context;
   }, [hostCommandMap, persistence, pluginContext, pluginContributes.commands, workspaceId]);
   const panelRenderContext = React.useMemo(() => ({
-    ...(sidebarProps?.contracts ? { contracts: sidebarProps.contracts } : {}),
-    ...(sidebarProps?.treeNodes ? { treeNodes: sidebarProps.treeNodes } : {}),
-    ...(sidebarProps?.selectedNodeId ? { selectedNodeId: sidebarProps.selectedNodeId } : {}),
-    ...(sidebarProps?.onSelectNode ? { onSelectNode: sidebarProps.onSelectNode } : {}),
-    ...(sidebarProps?.onInsertComponent ? { onInsertComponent: sidebarProps.onInsertComponent } : {}),
-    ...(sidebarProps?.onStartDragComponent ? { onStartDragComponent: sidebarProps.onStartDragComponent } : {}),
-    ...(sidebarProps?.onEndDragComponent ? { onEndDragComponent: sidebarProps.onEndDragComponent } : {}),
-    pluginContext: resolvedPluginContext,
+    selection: {
+      ...(sidebarProps?.treeNodes ? { treeNodes: sidebarProps.treeNodes } : {}),
+      ...(sidebarProps?.selectedNodeId ? { selectedNodeId: sidebarProps.selectedNodeId } : {}),
+      ...(sidebarProps?.onSelectNode ? { onSelectNode: sidebarProps.onSelectNode } : {}),
+    },
+    commands: {
+      ...(sidebarProps?.onInsertComponent ? { onInsertComponent: sidebarProps.onInsertComponent } : {}),
+      ...(sidebarProps?.onStartDragComponent ? { onStartDragComponent: sidebarProps.onStartDragComponent } : {}),
+      ...(sidebarProps?.onEndDragComponent ? { onEndDragComponent: sidebarProps.onEndDragComponent } : {}),
+    },
+    environment: {
+      ...(sidebarProps?.contracts ? { contracts: sidebarProps.contracts } : {}),
+      pluginContext: resolvedPluginContext,
+    },
   }), [
     resolvedPluginContext,
     sidebarProps?.contracts,
@@ -1393,6 +1401,20 @@ export function AppShell({
     selectedNodeTreeId,
     selectionOverlayActions,
   ]);
+  const canvasRendererFile = React.useMemo(() => ({
+    ...(activeEditorTab?.fileId ? { id: activeEditorTab.fileId } : {}),
+    ...(activeEditorTab?.fileName ? { name: activeEditorTab.fileName } : {}),
+    ...(activeEditorTab?.fileType ? { type: activeEditorTab.fileType } : {}),
+  }), [activeEditorTab?.fileId, activeEditorTab?.fileName, activeEditorTab?.fileType]);
+  const canvasRendererSurface = React.useMemo(() => ({
+    children,
+    renderMode,
+    theme,
+    readOnly: canvasReadOnly,
+  }), [canvasReadOnly, children, renderMode, theme]);
+  const canvasRendererEnvironment = React.useMemo(() => ({
+    pluginContext: resolvedPluginContext,
+  }), [resolvedPluginContext]);
 
   const shouldRenderFileContextPanel = Boolean(activeEditorTab) && (activeEditorTab?.fileType === 'page' || Boolean(activeCanvasRenderer)) && showFileContextPanel;
 
@@ -1521,14 +1543,9 @@ export function AppShell({
               {activeCanvasRenderer ? (
                 <div className="flex-1 flex flex-col overflow-hidden">
                   {activeCanvasRenderer.render({
-                    ...(activeEditorTab?.fileId ? { activeFileId: activeEditorTab.fileId } : {}),
-                    ...(activeEditorTab?.fileName ? { activeFileName: activeEditorTab.fileName } : {}),
-                    ...(activeEditorTab?.fileType ? { activeFileType: activeEditorTab.fileType } : {}),
-                    pluginContext: resolvedPluginContext,
-                    children,
-                    renderMode,
-                    theme,
-                    canvasReadOnly,
+                    file: canvasRendererFile,
+                    surface: canvasRendererSurface,
+                    environment: canvasRendererEnvironment,
                     canvasHost,
                   })}
                 </div>

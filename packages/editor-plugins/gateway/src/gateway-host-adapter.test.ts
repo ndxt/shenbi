@@ -7,17 +7,28 @@ describe('createGatewayHostAdapter', () => {
     const writeFile = vi.fn(async () => undefined);
     const notifyError = vi.fn();
     const adapter = createGatewayHostAdapter({
-      activeFileId: 'api-1',
-      activeFileName: 'billing.api.json',
-      pluginContext: {
-        filesystem: {
-          createFile: vi.fn(async () => 'api-1'),
-          readFile,
-          writeFile,
+      file: {
+        id: 'api-1',
+        name: 'billing.api.json',
+      },
+      surface: {},
+      environment: {
+        pluginContext: {
+          filesystem: {
+            createFile: vi.fn(async () => 'api-1'),
+            readFile,
+            writeFile,
+          },
+          notifications: {
+            error: notifyError,
+          },
         },
-        notifications: {
-          error: notifyError,
-        },
+      },
+      canvasHost: {
+        selection: {},
+        editing: {},
+        overlay: {},
+        interaction: {},
       },
     });
 

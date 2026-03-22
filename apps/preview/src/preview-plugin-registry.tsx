@@ -153,13 +153,13 @@ function createSetterDebugPlugin(
         id: 'debug',
         label: context.translations.previewT('plugins.debug.label'),
         order: 99,
-        render: (pluginContext) => (
+        render: ({ selection }) => (
           <div className="p-3 text-xs text-text-secondary">
             {context.translations.previewT('plugins.debug.loaded')}
-            {pluginContext.selectedNode?.id ? (
+            {selection.selectedNode?.id ? (
               <div className="mt-2 text-[11px]">
                 {context.translations.previewT('plugins.debug.selected', {
-                  nodeId: pluginContext.selectedNode.id,
+                  nodeId: selection.selectedNode.id,
                 })}
               </div>
             ) : null}
