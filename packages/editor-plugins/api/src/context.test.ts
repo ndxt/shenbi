@@ -64,6 +64,12 @@ describe('plugin context helpers', () => {
     expect(success).toHaveBeenCalledWith('done');
   });
 
+  it('reports command availability through grouped command access', () => {
+    expect(getPluginCommandAccess({ commands: { execute: vi.fn() } }).canExecute()).toBe(true);
+    expect(getPluginCommandAccess({ executeCommand: vi.fn() }).canExecute()).toBe(true);
+    expect(getPluginCommandAccess({}).canExecute()).toBe(false);
+  });
+
   it('replacePluginSchema falls back to deprecated replaceSchema alias', () => {
     const replaceSchema = vi.fn();
     const handled = getPluginDocumentAccess(

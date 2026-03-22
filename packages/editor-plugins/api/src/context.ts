@@ -125,6 +125,7 @@ export function getPluginSelectionAccess(context: PluginContext) {
 
 export function getPluginCommandAccess(context: PluginContext) {
   return {
+    canExecute: () => Boolean(context.commands?.execute ?? context.executeCommand),
     execute: (commandId: string, payload?: unknown) => (
       context.commands?.execute(commandId, payload) ?? context.executeCommand?.(commandId, payload)
     ),

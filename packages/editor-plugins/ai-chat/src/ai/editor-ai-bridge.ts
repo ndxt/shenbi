@@ -221,8 +221,7 @@ export function createEditorAIBridgeFromPluginContext(
           lastReplacedSchema = undefined;
         }
 
-        const hasCommandHandler = Boolean(options.context.commands?.execute || options.context.executeCommand);
-        if (hasCommandHandler) {
+        if (commandAccess.canExecute()) {
           const data = await commandAccess.execute(commandId, args);
           return { success: true, data };
         }
