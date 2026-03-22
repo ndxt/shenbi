@@ -19,6 +19,7 @@ import { CanvasToolRail, CanvasZoomHud, readPaletteDragPayload, type CanvasToolM
 import { Focus } from 'lucide-react';
 
 import { nodeTypes as baseNodeTypes } from '../nodes/node-registry';
+import type { NodeMenuAction } from '../nodes/BaseNode';
 import { TypedEdge, type TypedEdgeAddNodePayload } from '../edges/TypedEdge';
 import { isValidConnection } from '../validation';
 import type {
@@ -417,14 +418,57 @@ export function GatewayCanvas({
     setSelectorPanel(null);
   }, [selectorPanel, onNodesChangeProp, onEdgesChangeProp, onDirty]);
 
+  const handleNodeMenuAction = useCallback((nodeId: string, action: NodeMenuAction) => {
+    switch (action) {
+      case 'delete': {
+        const nextNodes = nodesRef.current.filter((n) => n.id !== nodeId);
+        const nextEdges = edgesRef.current.filter(
+          (e) => e.source !== nodeId && e.target !== nodeId,
+        );
+        onNodesChangeProp(nextNodes);
+        onEdgesChangeProp(nextEdges);
+        onDirty?.();
+        break;
+      }
+      case 'duplicate': {
+        const sourceNode = nodesRef.current.find((n) => n.id === nodeId);
+        if (!sourceNode) break;
+        const newNode: GatewayNode = {
+          id: `node_${Date.now()}`,
+          type: sourceNode.type,
+          position: {
+            x: sourceNode.position.x + 40,
+            y: sourceNode.position.y + 60,
+          },
+          data: { ...sourceNode.data },
+        };
+        onNodesChangeProp([...nodesRef.current, newNode]);
+        onDirty?.();
+        break;
+      }
+      case 'copy': {
+        const node = nodesRef.current.find((n) => n.id === nodeId);
+        if (node) {
+          void navigator.clipboard.writeText(JSON.stringify(node.data));
+        }
+        break;
+      }
+      case 'change':
+        // TODO: Open node type selector to swap this node
+        break;
+    }
+  }, [onNodesChangeProp, onEdgesChangeProp, onDirty]);
+
   // Create node types with add node handler
   const nodeTypes = useMemo(() => {
     const types: Record<string, React.ComponentType<any>> = {};
     for (const [key, Component] of Object.entries(baseNodeTypes)) {
-      types[key] = (props: any) => <Component {...props} onAddNode={handleAddNode} />;
+      types[key] = (props: any) => (
+        <Component {...props} onAddNode={handleAddNode} onNodeMenuAction={handleNodeMenuAction} />
+      );
     }
     return types;
-  }, [handleAddNode]);
+  }, [handleAddNode, handleNodeMenuAction]);
 
   const edgeTypes = useMemo(() => ({
     typed: (props: any) => <TypedEdge {...props} onAddNode={handleAddNodeFromEdge} />,

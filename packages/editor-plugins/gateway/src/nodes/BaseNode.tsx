@@ -2,7 +2,7 @@
 // BaseNode — shared node shell component for all gateway nodes
 // ---------------------------------------------------------------------------
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Handle, Position, type NodeProps, useUpdateNodeInternals } from '@xyflow/react';
 import type { GatewayNodeData, GatewayNodeKind } from '../types';
 import { NODE_CONTRACTS, PORT_TYPE_COLORS } from '../types';
@@ -17,6 +17,11 @@ import {
   Plus,
   LogOut,
   SkipForward,
+  MoreHorizontal,
+  Copy,
+  Trash2,
+  RefreshCw,
+  ClipboardCopy,
 } from 'lucide-react';
 
 const iconMap = {
@@ -34,10 +39,13 @@ const iconMap = {
 
 type IconName = keyof typeof iconMap;
 
+export type NodeMenuAction = 'duplicate' | 'copy' | 'delete' | 'change';
+
 export interface BaseNodeProps extends NodeProps {
   data: GatewayNodeData;
   children?: React.ReactNode;
   onAddNode?: (sourceNodeId: string, sourceHandle: string) => void;
+  onNodeMenuAction?: (nodeId: string, action: NodeMenuAction) => void;
 }
 
 function getHandleStyle(
@@ -58,11 +66,94 @@ function getHandleStyle(
   };
 }
 
-export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodeProps) {
+interface NodeContextMenuProps {
+  nodeId: string;
+  kind: GatewayNodeKind;
+  description: string;
+  onAction: (nodeId: string, action: NodeMenuAction) => void;
+  onClose: () => void;
+}
+
+function NodeContextMenu({ nodeId, kind, description, onAction, onClose }: NodeContextMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
+  const isStartNode = kind === 'start';
+
+  return (
+    <div
+      ref={menuRef}
+      className="gateway-node__context-menu nodrag nopan"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        className="gateway-node__context-menu-item"
+        onClick={() => { onAction(nodeId, 'change'); onClose(); }}
+      >
+        <RefreshCw size={14} />
+        <span>替换节点</span>
+      </button>
+
+      <button
+        type="button"
+        className="gateway-node__context-menu-item"
+        onClick={() => { onAction(nodeId, 'copy'); onClose(); }}
+      >
+        <Copy size={14} />
+        <span>复制</span>
+        <kbd className="gateway-node__context-menu-shortcut">Ctrl C</kbd>
+      </button>
+
+      <button
+        type="button"
+        className="gateway-node__context-menu-item"
+        onClick={() => { onAction(nodeId, 'duplicate'); onClose(); }}
+      >
+        <ClipboardCopy size={14} />
+        <span>复制为新节点</span>
+        <kbd className="gateway-node__context-menu-shortcut">Ctrl D</kbd>
+      </button>
+
+      <div className="gateway-node__context-menu-separator" />
+
+      <button
+        type="button"
+        className="gateway-node__context-menu-item gateway-node__context-menu-item--danger"
+        disabled={isStartNode}
+        onClick={() => { if (!isStartNode) { onAction(nodeId, 'delete'); onClose(); } }}
+      >
+        <Trash2 size={14} />
+        <span>删除</span>
+        <kbd className="gateway-node__context-menu-shortcut">Del</kbd>
+      </button>
+
+      <div className="gateway-node__context-menu-separator" />
+
+      <div className="gateway-node__context-menu-about">
+        <div className="gateway-node__context-menu-about-label">关于</div>
+        <p className="gateway-node__context-menu-about-text">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAction }: BaseNodeProps) {
   const [mouseDownTime, setMouseDownTime] = useState<number>(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   const contract = NODE_CONTRACTS[data.kind as GatewayNodeKind];
   const updateNodeInternals = useUpdateNodeInternals();
-  
+
   if (!contract) {
     return <div className="gateway-node gateway-node--unknown">Unknown node</div>;
   }
@@ -73,11 +164,14 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
 
   const handleMouseUp = (portId: string) => {
     const clickDuration = Date.now() - mouseDownTime;
-    // If click duration is less than 200ms, treat as click (not drag)
     if (clickDuration < 200 && onAddNode) {
       onAddNode(id!, portId);
     }
   };
+
+  const handleMenuAction = useCallback((nodeId: string, action: NodeMenuAction) => {
+    onNodeMenuAction?.(nodeId, action);
+  }, [onNodeMenuAction]);
 
   useEffect(() => {
     if (id) {
@@ -90,6 +184,36 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
       className={`gateway-node ${selected ? 'gateway-node--selected' : ''}`}
       style={{ '--node-color': contract.color } as React.CSSProperties}
     >
+      {/* Hover toolbar: ▶ ··· */}
+      <div className="gateway-node__toolbar nodrag nopan">
+        <button
+          type="button"
+          className="gateway-node__toolbar-btn"
+          title="运行此步骤"
+          onClick={(e) => { e.stopPropagation(); }}
+        >
+          <Play size={12} fill="currentColor" />
+        </button>
+        <button
+          type="button"
+          className="gateway-node__toolbar-btn"
+          title="更多操作"
+          onClick={(e) => { e.stopPropagation(); setMenuOpen((prev) => !prev); }}
+        >
+          <MoreHorizontal size={14} />
+        </button>
+      </div>
+
+      {menuOpen && id && onNodeMenuAction ? (
+        <NodeContextMenu
+          nodeId={id}
+          kind={data.kind as GatewayNodeKind}
+          description={contract.description}
+          onAction={handleMenuAction}
+          onClose={() => setMenuOpen(false)}
+        />
+      ) : null}
+
       {/* Input Handles */}
       {contract.inputs.map((port, index) => {
         const isSingleInput = contract.inputs.length === 1;
