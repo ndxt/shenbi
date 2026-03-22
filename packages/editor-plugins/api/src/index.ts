@@ -4,10 +4,8 @@ export type {
   PluginContext,
 } from './context';
 export {
-  getPluginSchema,
-  getPluginDocumentPatchService,
-  replacePluginSchema,
-  getPluginSelectedNodeId,
+  getPluginDocumentAccess,
+  getPluginSelectionAccess,
   executePluginCommand,
   getPluginNotifications,
 } from './context';

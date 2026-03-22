@@ -80,50 +80,67 @@ export interface PluginContext {
   notify?: PluginNotifications;
 }
 
+export function getPluginDocumentAccess(context: PluginContext) {
+  const patchSelectedNode = context.document?.patchSelectedNode
+    ?? (
+      context.patchNodeProps
+      || context.patchNodeColumns
+      || context.patchNodeStyle
+      || context.patchNodeEvents
+      || context.patchNodeLogic
+        ? {
+            ...(context.patchNodeProps ? { props: context.patchNodeProps } : {}),
+            ...(context.patchNodeColumns ? { columns: context.patchNodeColumns } : {}),
+            ...(context.patchNodeStyle ? { style: context.patchNodeStyle } : {}),
+            ...(context.patchNodeEvents ? { events: context.patchNodeEvents } : {}),
+            ...(context.patchNodeLogic ? { logic: context.patchNodeLogic } : {}),
+          }
+        : undefined
+    );
+
+  return {
+    getSchema: () => context.document?.getSchema?.() ?? context.getSchema?.(),
+    replaceSchema: (schema: PageSchema) => {
+      if (context.document?.replaceSchema) {
+        context.document.replaceSchema(schema);
+        return true;
+      }
+      if (context.replaceSchema) {
+        context.replaceSchema(schema);
+        return true;
+      }
+      return false;
+    },
+    patchSelectedNode,
+  };
+}
+
+export function getPluginSelectionAccess(context: PluginContext) {
+  const getSelectedNode = () => context.selection?.getSelectedNode?.() ?? context.getSelectedNode?.();
+  return {
+    getSelectedNode,
+    getSelectedNodeId: () => context.selection?.getSelectedNodeId?.() ?? getSelectedNode()?.id,
+  };
+}
+
 export function getPluginSchema(context: PluginContext): PageSchema | undefined {
-  return context.document?.getSchema?.() ?? context.getSchema?.();
+  return getPluginDocumentAccess(context).getSchema();
 }
 
 export function getPluginDocumentPatchService(context: PluginContext): PluginDocumentPatchService | undefined {
-  if (context.document?.patchSelectedNode) {
-    return context.document.patchSelectedNode;
-  }
-  if (
-    context.patchNodeProps
-    || context.patchNodeColumns
-    || context.patchNodeStyle
-    || context.patchNodeEvents
-    || context.patchNodeLogic
-  ) {
-    return {
-      ...(context.patchNodeProps ? { props: context.patchNodeProps } : {}),
-      ...(context.patchNodeColumns ? { columns: context.patchNodeColumns } : {}),
-      ...(context.patchNodeStyle ? { style: context.patchNodeStyle } : {}),
-      ...(context.patchNodeEvents ? { events: context.patchNodeEvents } : {}),
-      ...(context.patchNodeLogic ? { logic: context.patchNodeLogic } : {}),
-    };
-  }
-  return undefined;
+  return getPluginDocumentAccess(context).patchSelectedNode;
 }
 
 export function replacePluginSchema(context: PluginContext, schema: PageSchema): boolean {
-  if (context.document?.replaceSchema) {
-    context.document.replaceSchema(schema);
-    return true;
-  }
-  if (context.replaceSchema) {
-    context.replaceSchema(schema);
-    return true;
-  }
-  return false;
+  return getPluginDocumentAccess(context).replaceSchema(schema);
 }
 
 export function getPluginSelectedNode(context: PluginContext): SchemaNode | undefined {
-  return context.selection?.getSelectedNode?.() ?? context.getSelectedNode?.();
+  return getPluginSelectionAccess(context).getSelectedNode();
 }
 
 export function getPluginSelectedNodeId(context: PluginContext): string | undefined {
-  return context.selection?.getSelectedNodeId?.() ?? getPluginSelectedNode(context)?.id;
+  return getPluginSelectionAccess(context).getSelectedNodeId();
 }
 
 export function executePluginCommand(

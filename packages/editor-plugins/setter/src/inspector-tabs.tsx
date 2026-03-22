@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  getPluginDocumentPatchService,
+  getPluginDocumentAccess,
   mergeContributions,
   type InspectorTabContribution,
   type InspectorTabRenderContext,
@@ -13,7 +13,7 @@ export type { InspectorTabContribution, InspectorTabRenderContext } from '@shenb
 
 function getPatchHandlers(context: InspectorTabRenderContext) {
   const patchService = context.environment.pluginContext
-    ? getPluginDocumentPatchService(context.environment.pluginContext)
+    ? getPluginDocumentAccess(context.environment.pluginContext).patchSelectedNode
     : undefined;
   return {
     onPatchProps: patchService?.props ?? context.editing.onPatchProps,

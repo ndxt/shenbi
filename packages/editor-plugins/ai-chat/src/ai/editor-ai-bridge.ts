@@ -1,9 +1,8 @@
 import type { ComponentContract, PageSchema, SchemaNode } from '@shenbi/schema';
 import {
   executePluginCommand,
-  getPluginSchema,
-  getPluginSelectedNodeId,
-  replacePluginSchema,
+  getPluginDocumentAccess,
+  getPluginSelectionAccess,
   type PluginContext,
 } from '@shenbi/editor-plugin-api';
 
@@ -107,6 +106,8 @@ export function createEditorAIBridgeFromPluginContext(
   // Local cache: the editor host may not reflect replaced schema immediately.
   // When the host still reports an empty body, return the cached version instead.
   let lastReplacedSchema: PageSchema | undefined;
+  const documentAccess = getPluginDocumentAccess(options.context);
+  const selectionAccess = getPluginSelectionAccess(options.context);
 
   function hasBody(schema: PageSchema | undefined): boolean {
     if (!schema) return false;
@@ -115,8 +116,8 @@ export function createEditorAIBridgeFromPluginContext(
   }
 
   const getSnapshot = (): EditorBridgeSnapshot => {
-    const hostSchema = getPluginSchema(options.context);
-    const selectedNodeId = getPluginSelectedNodeId(options.context);
+    const hostSchema = documentAccess.getSchema();
+    const selectedNodeId = selectionAccess.getSelectedNodeId();
 
     // Prefer host schema when it has content; fall back to cache when host is empty.
     let schema: PageSchema;
@@ -164,7 +165,7 @@ export function createEditorAIBridgeFromPluginContext(
     getSnapshot,
     replaceSchema: (schema) => {
       lastReplacedSchema = schema;
-      if (replacePluginSchema(options.context, schema)) {
+      if (documentAccess.replaceSchema(schema)) {
         return;
       }
     },
@@ -223,7 +224,7 @@ export function createEditorAIBridgeFromPluginContext(
           return { success: true, data };
         }
         if (commandId === 'schema.replace' && args && typeof args === 'object' && 'schema' in args) {
-          if (replacePluginSchema(options.context, (args as { schema: PageSchema }).schema)) {
+          if (documentAccess.replaceSchema((args as { schema: PageSchema }).schema)) {
             return { success: true };
           }
         }
