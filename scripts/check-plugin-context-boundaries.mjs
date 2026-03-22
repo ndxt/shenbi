@@ -46,6 +46,28 @@ const helperRules = [
   { name: 'getPluginPersistence', pattern: /\bgetPluginPersistence\b/g },
 ];
 
+const directBridgeServiceRules = [
+  { name: 'pluginContext.filesystem', pattern: /\b(?:[A-Za-z_$][\w$]*\.)*pluginContext(?:\?\.|\.)filesystem\b/g },
+  { name: 'pluginContext.persistence', pattern: /\b(?:[A-Za-z_$][\w$]*\.)*pluginContext(?:\?\.|\.)persistence\b/g },
+  { name: 'pluginContext.workspace', pattern: /\b(?:[A-Za-z_$][\w$]*\.)*pluginContext(?:\?\.|\.)workspace\b/g },
+];
+
+function isValidWhenExpression(expression) {
+  if (expression.includes('||') || expression.includes('(') || expression.includes(')')) {
+    return false;
+  }
+  const tokens = expression
+    .split('&&')
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  if (tokens.length === 0) {
+    return false;
+  }
+
+  return tokens.every((token) => /^!?[A-Za-z_$][\w$]*$/.test(token));
+}
+
 function shouldIgnoreFile(relativePath) {
   const normalizedPath = relativePath.replaceAll('\\', '/');
   return ignoredFileMatchers.some((matcher) => matcher.test(normalizedPath));
@@ -101,6 +123,34 @@ function collectMatches(source, rule) {
   return matches;
 }
 
+function collectInvalidWhenExpressions(source) {
+  const matches = [];
+  const whenLiteralPattern = /\b(when|enabledWhen)\s*:\s*(['"`])((?:\\.|(?!\2)[\s\S])*?)\2/g;
+
+  for (const match of source.matchAll(whenLiteralPattern)) {
+    if (typeof match.index !== 'number') {
+      continue;
+    }
+    const expression = match[3];
+    const quote = match[2];
+    if (quote === '`' && expression.includes('${')) {
+      matches.push({
+        symbol: `${match[1]} template literal`,
+        line: getLineNumber(source, match.index),
+      });
+      continue;
+    }
+    if (!isValidWhenExpression(expression)) {
+      matches.push({
+        symbol: `${match[1]} expression "${expression}"`,
+        line: getLineNumber(source, match.index),
+      });
+    }
+  }
+
+  return matches;
+}
+
 const files = [];
 for (const scanRoot of scanRoots) {
   const fullPath = path.join(rootDir, scanRoot);
@@ -111,7 +161,7 @@ const violations = [];
 for (const filePath of files) {
   const relativePath = path.relative(rootDir, filePath);
   const source = readFileSync(filePath, 'utf8');
-  for (const rule of [...aliasRules, ...helperRules]) {
+  for (const rule of [...aliasRules, ...helperRules, ...directBridgeServiceRules]) {
     for (const match of collectMatches(source, rule)) {
       violations.push({
         file: relativePath,
@@ -120,14 +170,21 @@ for (const filePath of files) {
       });
     }
   }
+  for (const match of collectInvalidWhenExpressions(source)) {
+    violations.push({
+      file: relativePath,
+      line: match.line,
+      symbol: match.symbol,
+    });
+  }
 }
 
 if (violations.length > 0) {
-  console.error('Deprecated PluginContext aliases or field-level helpers detected:');
+  console.error('Plugin boundary violations detected:');
   for (const violation of violations) {
     console.error(`- ${violation.file}:${violation.line} uses ${violation.symbol}`);
   }
-  console.error('Use grouped PluginContext accessors instead.');
+  console.error('Use grouped PluginContext accessors and supported when/enabledWhen expressions instead.');
   process.exit(1);
 }
 

@@ -1,5 +1,5 @@
 import type { CanvasRendererRenderContext } from '@shenbi/editor-plugin-api';
-import { getPluginFeedbackAccess } from '@shenbi/editor-plugin-api';
+import { getPluginFeedbackAccess, getPluginStorageAccess } from '@shenbi/editor-plugin-api';
 import type { GatewayDocumentSchema } from './types';
 
 export interface GatewayHostAdapter {
@@ -17,14 +17,17 @@ function stripGatewayFileExtension(fileName: string): string {
 export function createGatewayHostAdapter(
   context: CanvasRendererRenderContext,
 ): GatewayHostAdapter | undefined {
-  const filesystem = context.environment.pluginContext?.filesystem;
+  const pluginContext = context.environment.pluginContext;
+  const filesystem = pluginContext
+    ? getPluginStorageAccess(pluginContext).filesystem
+    : undefined;
   const fileId = context.file.id;
   if (!filesystem || !fileId) {
     return undefined;
   }
 
-  const notifications = context.environment.pluginContext
-    ? getPluginFeedbackAccess(context.environment.pluginContext).notifications
+  const notifications = pluginContext
+    ? getPluginFeedbackAccess(pluginContext).notifications
     : undefined;
   const fileName = context.file.name
     ? stripGatewayFileExtension(context.file.name)
