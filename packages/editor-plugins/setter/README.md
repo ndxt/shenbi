@@ -29,15 +29,12 @@ Setter 插件对 schema 的写操作应统一通过 `PluginContext.document.patc
 - `getPluginDocumentAccess(...)`
 - `getPluginSelectionAccess(...)`
 
-不要在 setter 包里重新引入或新增 `getPluginSchema()`、`getPluginSelectedNodeId()` 这类字段级 helper 依赖。
+不要在 setter 包里重新引入或新增 `getPluginSchema()`、`getPluginSelectedNodeId()` 这类字段级 helper 依赖，也不要绕开 accessor 直读底层订阅实现。
 
 ## 变更规则
 
 1. Setter 增强优先新增 inspector tab，不要在宿主层加专属 props。
-2. 不允许直接依赖旧 alias：
-   - `patchNodeProps`
-   - `patchNodeEvents`
-   - `getSelectedNode`
+2. 不允许重新引入已删除的旧 alias 或字段级 helper。
 3. 如果需要新的宿主能力，先证明不能仅靠现有 `document / selection / commands / notifications` 或现有 grouped accessor 完成。
 
 ## 不负责什么

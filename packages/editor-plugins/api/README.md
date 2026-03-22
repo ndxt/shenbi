@@ -28,15 +28,6 @@
 
 `workspace / persistence / filesystem` 仍然存在于 `PluginContext`，但它们属于宿主桥接能力，不是默认鼓励所有插件直接扩张依赖的通用服务面。
 
-旧 alias 仍保留兼容，但只允许在 `context.ts` 中兜底，不允许新插件继续直接使用：
-
-- `getSchema`
-- `replaceSchema`
-- `getSelectedNode`
-- `patchNode*`
-- `executeCommand`
-- `notify`
-
 ## Accessor 风格
 
 从包根导出的 `PluginContext` helper 现在只保留聚合 accessor，不再继续暴露零散字段级 helper。
@@ -50,9 +41,14 @@
 - `getPluginWorkspaceAccess(context)`
 - `getPluginStorageAccess(context)`
 
+其中 `document / selection` accessor 不只负责同步读写，也承载订阅能力：
+
+- `getPluginDocumentAccess(context).subscribe(...)`
+- `getPluginSelectionAccess(context).subscribe(...)`
+
 使用原则：
 
-1. 插件 bridge / adapter 层优先消费这些 grouped accessor，而不是自己重复兼容旧 alias。
+1. 插件 bridge / adapter 层优先消费这些 grouped accessor，不要直读 `context.document?.subscribe`、`context.selection?.subscribe` 之类的细节服务。
 2. 新 helper 若只是 `getPluginXxxField()` 这种字段级包装，不进入包根导出面。
 3. 如果某类访问还不值得形成一组能力，就优先直接使用 `PluginContext` 的稳定服务面，而不是继续堆新的 helper 名称。
 
@@ -107,6 +103,7 @@
    - `docs/README.md`
 3. 新服务面没有经过平台准入评审前，不进入 `PluginContext`。
 4. 新 helper 若不能归入现有 accessor 分组，默认不加入包根导出面。
+5. 已删除的旧 alias 与字段级 helper 不得重新引入，仓库根 `pnpm lint:plugin-context-boundaries` 会直接拦截。
 
 ## 参考
 
