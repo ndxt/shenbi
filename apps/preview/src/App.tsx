@@ -314,7 +314,7 @@ export function App() {
       breadcrumbItems={canvasState.breadcrumbItems}
       onBreadcrumbSelect={canvasState.handleBreadcrumbSelect}
       onBreadcrumbHover={canvasState.handleBreadcrumbHover}
-      tabs={appMode === 'shell' && workspaceState.tabSnapshot.tabs.length > 0
+      tabs={appMode === 'shell'
         ? workspaceState.tabSnapshot.tabs
         : undefined}
       activeTabId={workspaceState.tabSnapshot.activeTabId}

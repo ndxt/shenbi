@@ -146,6 +146,136 @@ const THEME_CLASSES = [
   'theme-webstorm-dark',
 ] as const;
 
+const EMPTY_WORKSPACE_SHORTCUTS = [
+  { label: 'Open Command Palette', keybinding: 'Mod+Shift+P' },
+  { label: 'Toggle Sidebar', keybinding: 'Mod+B' },
+  { label: 'Toggle Console', keybinding: 'Mod+J' },
+  { label: 'Toggle Inspector', keybinding: 'Mod+Shift+I' },
+] as const;
+
+function isApplePlatform() {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+  const platform = (
+    navigator as Navigator & { userAgentData?: { platform?: string } }
+  ).userAgentData?.platform ?? navigator.platform ?? '';
+  return /(Mac|iPhone|iPad|iPod)/i.test(platform);
+}
+
+function formatShortcutKeybinding(keybinding: string, isApple: boolean): string[] {
+  return keybinding.split('+').map((segment) => {
+    switch (segment) {
+      case 'Mod':
+        return isApple ? 'Cmd' : 'Ctrl';
+      default:
+        return segment;
+    }
+  });
+}
+
+function EmptyWorkspaceLogo() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 256 256"
+      className="h-32 w-32 drop-shadow-[0_16px_36px_rgba(243,158,29,0.18)]"
+      fill="none"
+    >
+      <defs>
+        <linearGradient id="shenbi-empty-state-logo" x1="32" y1="44" x2="220" y2="208" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#F7C84A" />
+          <stop offset="0.48" stopColor="#F0A722" />
+          <stop offset="1" stopColor="#D8890A" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M63 168c-18.1 0-33-14.9-33-33s14.9-33 33-33c5.2 0 10.1 1.2 14.4 3.3 12.8-24 38.2-40.3 67.4-40.3 37.9 0 69.4 27.2 76.1 63.2 18.2 3.4 31.9 19.4 31.9 38.6 0 21.7-17.6 39.3-39.3 39.3H99.5"
+        stroke="url(#shenbi-empty-state-logo)"
+        strokeWidth="14"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M136 128l62-62 32 32-62 62-39 11 7-43Z"
+        stroke="url(#shenbi-empty-state-logo)"
+        strokeWidth="14"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M183 81l32 32"
+        stroke="url(#shenbi-empty-state-logo)"
+        strokeWidth="14"
+        strokeLinecap="round"
+      />
+      <path
+        d="M128 171l17-4.8c8.2-2.3 14.6-8.7 16.9-16.9l4.8-17.3"
+        stroke="url(#shenbi-empty-state-logo)"
+        strokeWidth="12"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function EmptyWorkspaceShortcutKey({
+  keys,
+}: {
+  keys: readonly string[];
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {keys.map((key, index) => (
+        <React.Fragment key={`${key}-${index}`}>
+          {index > 0 ? <span className="text-text-muted">+</span> : null}
+          <kbd className="min-w-7 rounded-md border border-border-subtle bg-bg-surface px-2 py-1 text-[11px] font-medium text-text-secondary shadow-sm">
+            {key}
+          </kbd>
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+function EmptyWorkspaceState() {
+  const applePlatform = isApplePlatform();
+  return (
+    <div className="flex-1 flex items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(240,167,34,0.08),_transparent_42%)] px-8 py-12 text-text-secondary">
+      <div className="flex w-full max-w-[720px] flex-col items-center gap-8 text-center">
+        <div className="flex flex-col items-center gap-4">
+          <EmptyWorkspaceLogo />
+          <div className="space-y-2">
+            <div className="text-[22px] font-semibold tracking-[-0.02em] text-text-primary">No file open</div>
+            <div className="max-w-[440px] text-sm leading-6 text-text-secondary">
+              Open an existing file from the tree, or create a new page or gateway file to start editing.
+            </div>
+          </div>
+        </div>
+        <div className="w-full max-w-[520px] rounded-2xl border border-border-subtle bg-bg-surface/80 px-5 py-5 shadow-[0_20px_40px_rgba(0,0,0,0.18)] backdrop-blur">
+          <div className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-text-muted">
+            Quick Shortcuts
+          </div>
+          <div className="space-y-3">
+            {EMPTY_WORKSPACE_SHORTCUTS.map((shortcut) => (
+              <div
+                key={shortcut.label}
+                className="flex items-center justify-between gap-4 rounded-xl border border-transparent px-3 py-2 hover:border-border-subtle hover:bg-bg-canvas/55"
+              >
+                <span className="text-sm text-text-secondary">{shortcut.label}</span>
+                <EmptyWorkspaceShortcutKey
+                  keys={formatShortcutKeybinding(shortcut.keybinding, applePlatform)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 
 function isPromiseLike(value: unknown): value is Promise<unknown> {
@@ -444,12 +574,17 @@ export function AppShell({
     () => tabs?.find((tab) => tab.fileId === activeTabId) ?? tabs?.[0],
     [activeTabId, tabs],
   );
+  const isTabWorkspace = tabs !== undefined;
+  const hasOpenEditorTab = Boolean(activeEditorTab);
   const activeCanvasRenderer = React.useMemo(() => {
-    const fileType = activeEditorTab?.fileType ?? 'page'; // Default to page canvas when no tab is active
+    if (isTabWorkspace && !activeEditorTab) {
+      return undefined;
+    }
+    const fileType = activeEditorTab?.fileType ?? 'page';
     return pluginContributes.canvasRenderers.find(
       (renderer) => renderer.fileTypes.includes(fileType),
     );
-  }, [activeEditorTab, pluginContributes.canvasRenderers]);
+  }, [activeEditorTab, isTabWorkspace, pluginContributes.canvasRenderers]);
   const fileContextTabs = React.useMemo(() => {
     const fileType = activeEditorTab?.fileType;
     // Show file context panels for page files and for files that have a canvas renderer
@@ -1504,16 +1639,18 @@ export function AppShell({
             onCloseSavedTabs={onCloseSavedTabs}
             onMoveTab={onMoveTab}
           />
-          <WorkbenchToolbar
-            extra={toolbarExtra}
-            menus={allMenus}
-            breadcrumbItems={breadcrumbItems ?? []}
-            onBreadcrumbSelect={onBreadcrumbSelect}
-            onBreadcrumbHover={onBreadcrumbHover}
-            onRunMenuCommand={(commandId) => {
-              void runCommand(commandId);
-            }}
-          />
+          {(!isTabWorkspace || hasOpenEditorTab) ? (
+            <WorkbenchToolbar
+              extra={toolbarExtra}
+              menus={allMenus}
+              breadcrumbItems={breadcrumbItems ?? []}
+              onBreadcrumbSelect={onBreadcrumbSelect}
+              onBreadcrumbHover={onBreadcrumbHover}
+              onRunMenuCommand={(commandId) => {
+                void runCommand(commandId);
+              }}
+            />
+          ) : null}
           
           <div className="flex-1 flex overflow-hidden">
             {shouldRenderFileContextPanel ? (
@@ -1540,7 +1677,9 @@ export function AppShell({
             ) : null}
             {/* Editor/Canvas Area Container */}
             <div className="flex-1 min-w-[320px] flex flex-col overflow-hidden relative bg-bg-canvas">
-              {activeCanvasRenderer ? (
+              {!hasOpenEditorTab && isTabWorkspace ? (
+                <EmptyWorkspaceState />
+              ) : activeCanvasRenderer ? (
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <React.Fragment>
                     {activeCanvasRenderer.render({

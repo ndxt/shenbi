@@ -79,6 +79,10 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
   const [scenarioPersistenceHydrated, setScenarioPersistenceHydrated] = useState(false);
   const [renderModeHydrated, setRenderModeHydrated] = useState(false);
   const [shellSessionHydrated, setShellSessionHydrated] = useState(false);
+  const setFileExplorerExpandedIdsRef = useRef(setFileExplorerExpandedIds);
+  const setFileExplorerFocusedIdRef = useRef(setFileExplorerFocusedId);
+  setFileExplorerExpandedIdsRef.current = setFileExplorerExpandedIds;
+  setFileExplorerFocusedIdRef.current = setFileExplorerFocusedId;
 
   useEffect(() => {
     let cancelled = false;
@@ -164,6 +168,7 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
 
   useEffect(() => {
     let cancelled = false;
+    let didFinishHydration = false;
 
     if (appMode !== 'shell' || shellSessionHydrated || shellSessionHydratedRef.current) {
       return () => {
@@ -171,20 +176,19 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
       };
     }
 
-    // Mark as hydrated immediately (synchronous) to prevent re-entry.
-    // React state updates (setShellSessionHydrated) are batched and may not
-    // take effect before this effect re-runs due to dep changes, so the ref
-    // serves as a synchronous guard.
-    shellSessionHydratedRef.current = true;
-
     if (!vfsInitialized && !vfsInitializationFailed) {
-      shellSessionHydratedRef.current = false; // allow retry
       return () => {
         cancelled = true;
       };
     }
 
+    // Mark as hydrating immediately (synchronous) to prevent re-entry while the
+    // async restore is in flight. The cleanup resets this guard when React
+    // StrictMode tears down the first effect pass before the real mount pass.
+    shellSessionHydratedRef.current = true;
+
     if (typeof indexedDB === 'undefined' || vfsInitializationFailed) {
+      didFinishHydration = true;
       setShellSessionHydrated(true);
       return () => {
         cancelled = true;
@@ -246,10 +250,10 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
         const directoryIds = new Set(
           nodes.filter((node) => node.type === 'directory').map((node) => node.id),
         );
-        setFileExplorerExpandedIds(
+        setFileExplorerExpandedIdsRef.current(
           (storedSession.expandedIds ?? []).filter((id) => directoryIds.has(id)),
         );
-        setFileExplorerFocusedId(
+        setFileExplorerFocusedIdRef.current(
           storedSession.focusedId && nodeMap.has(storedSession.focusedId)
             ? storedSession.focusedId
             : undefined,
@@ -276,12 +280,16 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
       .catch(() => undefined)
       .finally(() => {
         if (!cancelled) {
+          didFinishHydration = true;
           setShellSessionHydrated(true);
         }
       });
 
     return () => {
       cancelled = true;
+      if (!didFinishHydration) {
+        shellSessionHydratedRef.current = false;
+      }
     };
   }, [
     activeProjectId,
@@ -290,8 +298,6 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
     fileEditor.commands,
     persistenceKeys.namespace,
     persistenceKeys.shellSessionKey,
-    setFileExplorerExpandedIds,
-    setFileExplorerFocusedId,
     shellSessionHydrated,
     tabManager,
     vfs,

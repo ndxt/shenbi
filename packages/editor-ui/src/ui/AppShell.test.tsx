@@ -146,7 +146,7 @@ describe('AppShell', () => {
 
   it('renders all main shell regions', () => {
     render(
-      <AppShell>
+      <AppShell tabs={[createPageTab()]} activeTabId="page-1">
         <div data-testid="test-content">Content</div>
       </AppShell>
     );
@@ -159,6 +159,25 @@ describe('AppShell', () => {
     expect(screen.getByText('Run')).toBeInTheDocument();
     expect(screen.getByText('Editor UI Package')).toBeInTheDocument();
     expect(screen.getByTestId('test-content')).toBeInTheDocument();
+  });
+
+  it('shows an empty state instead of canvas chrome when the tab workspace has no open tabs', () => {
+    render(
+      <AppShell tabs={[]} activeTabId={undefined}>
+        <div data-testid="test-content">Content</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByText('No file open')).toBeInTheDocument();
+    expect(screen.getByText('Quick Shortcuts')).toBeInTheDocument();
+    expect(screen.getByText('Open Command Palette')).toBeInTheDocument();
+    expect(screen.getByText('Toggle Sidebar')).toBeInTheDocument();
+    expect(screen.getByText('Toggle Console')).toBeInTheDocument();
+    expect(screen.getByText('Toggle Inspector')).toBeInTheDocument();
+    expect(screen.getAllByText('Ctrl').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Run')).not.toBeInTheDocument();
+    expect(screen.queryByRole('toolbar', { name: 'Canvas Tools' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Canvas Zoom Controls')).not.toBeInTheDocument();
   });
 
   it('卸载时会清理挂载的主题 class', () => {
