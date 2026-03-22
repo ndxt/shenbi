@@ -23,7 +23,6 @@ export type GatewayNodeKind =
   | 'metadata'
   | 'sql-query'
   | 'branch'
-  | 'loop'
   | 'loop-start'
   | 'loop-end'
   | 'loop-break'
@@ -143,7 +142,6 @@ export const NODE_CONTRACTS: Record<GatewayNodeKind, GatewayNodeContract> = {
     ],
     outputs: [
       { id: 'rows', label: '结果集', dataType: 'array' },
-      { id: 'count', label: '行数', dataType: 'number' },
     ],
   },
   branch: {
@@ -160,20 +158,6 @@ export const NODE_CONTRACTS: Record<GatewayNodeKind, GatewayNodeContract> = {
       { id: 'false', label: '否', dataType: 'any' },
     ],
   },
-  loop: {
-    kind: 'loop',
-    label: '循环',
-    description: '遍历数组或集合',
-    icon: 'Repeat',
-    color: '#14b8a6',
-    inputs: [
-      { id: 'items', label: '数据集', dataType: 'array' },
-    ],
-    outputs: [
-      { id: 'item', label: '当前项', dataType: 'any' },
-      { id: 'done', label: '完成', dataType: 'array' },
-    ],
-  },
   'loop-start': {
     kind: 'loop-start',
     label: '开始循环',
@@ -185,7 +169,6 @@ export const NODE_CONTRACTS: Record<GatewayNodeKind, GatewayNodeContract> = {
     ],
     outputs: [
       { id: 'item', label: '当前项', dataType: 'any' },
-      { id: 'done', label: '完成', dataType: 'array' },
     ],
   },
   'loop-end': {
@@ -236,7 +219,6 @@ export const DRAGGABLE_NODE_KINDS: GatewayNodeKind[] = [
   'metadata',
   'sql-query',
   'branch',
-  'loop',
   'loop-start',
   'loop-end',
   'loop-break',

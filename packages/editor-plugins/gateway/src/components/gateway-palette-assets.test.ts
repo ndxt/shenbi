@@ -28,7 +28,7 @@ describe('buildGatewayPaletteAssets', () => {
   it('exposes the loop parent and loop subnodes as shared assets', () => {
     const sidebarIds = flattenIds('sidebar');
 
-    expect(sidebarIds).toContain('loop');
+    expect(sidebarIds).toContain('loop-group');
     expect(sidebarIds).toContain('loop-start');
     expect(sidebarIds).toContain('loop-end');
     expect(sidebarIds).toContain('loop-break');
@@ -41,7 +41,7 @@ describe('buildGatewayPaletteAssets', () => {
     expect(edgeInsertIds).toContain('data-definition');
     expect(edgeInsertIds).toContain('sql-query');
     expect(edgeInsertIds).toContain('branch');
-    expect(edgeInsertIds).toContain('loop');
+    expect(edgeInsertIds).toContain('loop-group');
     expect(edgeInsertIds).toContain('loop-start');
     expect(edgeInsertIds).toContain('loop-end');
     expect(edgeInsertIds).toContain('loop-break');

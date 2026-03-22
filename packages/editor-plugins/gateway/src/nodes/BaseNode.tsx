@@ -127,6 +127,7 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
       {/* Output Handles double as quick-add affordances on click. */}
       {contract.outputs.map((port, index) => {
         const isSingleOutput = contract.outputs.length === 1;
+        const showLabel = contract.outputs.length > 1;
         return (
           <Handle
             key={port.id}
@@ -138,6 +139,9 @@ export function BaseNode({ id, data, selected, children, onAddNode }: BaseNodePr
             onMouseDown={handleMouseDown}
             onMouseUp={() => handleMouseUp(port.id)}
           >
+            {showLabel ? (
+              <span className="gateway-node__handle-label">{port.label}</span>
+            ) : null}
             {onAddNode ? (
               <span className="gateway-node__handle-plus" aria-hidden="true">
                 <Plus size={10} strokeWidth={3} />

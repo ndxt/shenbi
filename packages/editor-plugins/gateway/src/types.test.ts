@@ -11,7 +11,6 @@ describe('NODE_CONTRACTS', () => {
       'metadata',
       'sql-query',
       'branch',
-      'loop',
       'loop-start',
       'loop-end',
       'loop-break',
@@ -44,8 +43,8 @@ describe('NODE_CONTRACTS', () => {
     const sql = NODE_CONTRACTS['sql-query'];
     expect(sql.inputs).toHaveLength(1);
     expect(sql.inputs[0].dataType).toBe('object');
-    expect(sql.outputs).toHaveLength(2);
-    expect(sql.outputs.map((o) => o.dataType)).toEqual(['array', 'number']);
+    expect(sql.outputs).toHaveLength(1);
+    expect(sql.outputs.map((o) => o.dataType)).toEqual(['array']);
   });
 
   it('branch node has 2 outputs (true/false)', () => {
@@ -54,10 +53,10 @@ describe('NODE_CONTRACTS', () => {
     expect(branch.outputs.map((o) => o.id)).toEqual(['true', 'false']);
   });
 
-  it('loop node has correct input/output types', () => {
-    const loop = NODE_CONTRACTS.loop;
-    expect(loop.inputs[0].dataType).toBe('array');
-    expect(loop.outputs).toHaveLength(2);
+  it('loop-start node has correct input/output types', () => {
+    const loopStart = NODE_CONTRACTS['loop-start'];
+    expect(loopStart.inputs[0].dataType).toBe('array');
+    expect(loopStart.outputs).toHaveLength(1);
   });
 
   it('loop subnodes define bridgeable control-flow ports', () => {
@@ -67,7 +66,7 @@ describe('NODE_CONTRACTS', () => {
     const loopContinue = NODE_CONTRACTS['loop-continue'];
 
     expect(loopStart.inputs[0].dataType).toBe('array');
-    expect(loopStart.outputs).toHaveLength(2);
+    expect(loopStart.outputs).toHaveLength(1);
     expect(loopEnd.inputs).toHaveLength(1);
     expect(loopEnd.outputs).toHaveLength(1);
     expect(loopBreak.inputs).toHaveLength(1);
@@ -88,7 +87,7 @@ describe('DRAGGABLE_NODE_KINDS', () => {
     expect(DRAGGABLE_NODE_KINDS).toContain('metadata');
     expect(DRAGGABLE_NODE_KINDS).toContain('sql-query');
     expect(DRAGGABLE_NODE_KINDS).toContain('branch');
-    expect(DRAGGABLE_NODE_KINDS).toContain('loop');
+    expect(DRAGGABLE_NODE_KINDS).not.toContain('loop');
     expect(DRAGGABLE_NODE_KINDS).toContain('loop-start');
     expect(DRAGGABLE_NODE_KINDS).toContain('loop-end');
     expect(DRAGGABLE_NODE_KINDS).toContain('loop-break');

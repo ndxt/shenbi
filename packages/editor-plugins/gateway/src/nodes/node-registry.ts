@@ -18,7 +18,6 @@ export const nodeTypes: NodeTypes = {
   metadata: MetadataNode,
   'sql-query': SqlQueryNode,
   branch: BranchNode,
-  loop: LoopNode,
   'loop-start': LoopNode,
   'loop-end': LoopNode,
   'loop-break': LoopNode,

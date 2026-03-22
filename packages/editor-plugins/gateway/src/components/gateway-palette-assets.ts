@@ -61,12 +61,12 @@ function buildGatewayNodeAsset(
 }
 
 function buildLoopGroupAsset(groupId: string, groupName: string): PaletteAsset {
-  const loopContract = NODE_CONTRACTS.loop;
+  const loopContract = NODE_CONTRACTS['loop-start'];
 
   return {
-    id: 'loop',
-    type: 'loop',
-    name: loopContract.label,
+    id: 'loop-group',
+    type: 'loop-start',
+    name: '循环',
     description: '循环控制节点集合，包含开始、结束、跳出和继续循环。',
     icon: loopContract.icon,
     color: loopContract.color,
