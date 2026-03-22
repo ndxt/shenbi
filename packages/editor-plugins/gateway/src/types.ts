@@ -105,7 +105,6 @@ export const NODE_CONTRACTS: Record<GatewayNodeKind, GatewayNodeContract> = {
       { id: 'result', label: '返回值', dataType: 'any' },
     ],
     outputs: [],
-    maxInstances: 1,
   },
   'data-definition': {
     kind: 'data-definition',

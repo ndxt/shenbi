@@ -36,7 +36,6 @@ describe('NODE_CONTRACTS', () => {
     expect(end.inputs).toHaveLength(1);
     expect(end.inputs[0].dataType).toBe('any');
     expect(end.outputs).toHaveLength(0);
-    expect(end.maxInstances).toBe(1);
   });
 
   it('sql-query node has correct ports', () => {
