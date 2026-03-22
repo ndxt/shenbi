@@ -147,10 +147,11 @@ const THEME_CLASSES = [
 ] as const;
 
 const EMPTY_WORKSPACE_SHORTCUTS = [
-  { label: 'Open Command Palette', keybinding: 'Mod+Shift+P' },
-  { label: 'Toggle Sidebar', keybinding: 'Mod+B' },
-  { label: 'Toggle Console', keybinding: 'Mod+J' },
-  { label: 'Toggle Inspector', keybinding: 'Mod+Shift+I' },
+  { id: 'openCommandPalette', keybinding: 'Mod+Shift+P' },
+  { id: 'showSidebar', keybinding: 'Mod+B' },
+  { id: 'showConsole', keybinding: 'Mod+J' },
+  { id: 'showInspector', keybinding: 'Mod+Shift+I' },
+  { id: 'showAssistantPanel', keybinding: 'Mod+Shift+A' },
 ] as const;
 
 function isApplePlatform() {
@@ -174,63 +175,17 @@ function formatShortcutKeybinding(keybinding: string, isApple: boolean): string[
   });
 }
 
-function EmptyWorkspaceLogo() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 256 256"
-      className="h-32 w-32 drop-shadow-[0_16px_36px_rgba(243,158,29,0.18)]"
-      fill="none"
-    >
-      <defs>
-        <linearGradient id="shenbi-empty-state-logo" x1="32" y1="44" x2="220" y2="208" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#F7C84A" />
-          <stop offset="0.48" stopColor="#F0A722" />
-          <stop offset="1" stopColor="#D8890A" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M63 168c-18.1 0-33-14.9-33-33s14.9-33 33-33c5.2 0 10.1 1.2 14.4 3.3 12.8-24 38.2-40.3 67.4-40.3 37.9 0 69.4 27.2 76.1 63.2 18.2 3.4 31.9 19.4 31.9 38.6 0 21.7-17.6 39.3-39.3 39.3H99.5"
-        stroke="url(#shenbi-empty-state-logo)"
-        strokeWidth="14"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M136 128l62-62 32 32-62 62-39 11 7-43Z"
-        stroke="url(#shenbi-empty-state-logo)"
-        strokeWidth="14"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M183 81l32 32"
-        stroke="url(#shenbi-empty-state-logo)"
-        strokeWidth="14"
-        strokeLinecap="round"
-      />
-      <path
-        d="M128 171l17-4.8c8.2-2.3 14.6-8.7 16.9-16.9l4.8-17.3"
-        stroke="url(#shenbi-empty-state-logo)"
-        strokeWidth="12"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function EmptyWorkspaceShortcutKey({
   keys,
 }: {
   keys: readonly string[];
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-[4px]">
       {keys.map((key, index) => (
         <React.Fragment key={`${key}-${index}`}>
-          {index > 0 ? <span className="text-text-muted">+</span> : null}
-          <kbd className="min-w-7 rounded-md border border-border-subtle bg-bg-surface px-2 py-1 text-[11px] font-medium text-text-secondary shadow-sm">
+          {index > 0 ? <span className="text-[#666666] text-[11px]">+</span> : null}
+          <kbd className="flex h-[20px] min-w-[20px] items-center justify-center rounded-[3px] border border-[#444444] bg-[#3a3a3a] px-[5px] text-[11px] text-[#999999]">
             {key}
           </kbd>
         </React.Fragment>
@@ -240,37 +195,41 @@ function EmptyWorkspaceShortcutKey({
 }
 
 function EmptyWorkspaceState() {
+  const { t } = useTranslation('editorUi');
   const applePlatform = isApplePlatform();
   return (
-    <div className="flex-1 flex items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(240,167,34,0.08),_transparent_42%)] px-8 py-12 text-text-secondary">
-      <div className="flex w-full max-w-[720px] flex-col items-center gap-8 text-center">
-        <div className="flex flex-col items-center gap-4">
-          <EmptyWorkspaceLogo />
-          <div className="space-y-2">
-            <div className="text-[22px] font-semibold tracking-[-0.02em] text-text-primary">No file open</div>
-            <div className="max-w-[440px] text-sm leading-6 text-text-secondary">
-              Open an existing file from the tree, or create a new page or gateway file to start editing.
-            </div>
+    <div className="flex-1 flex flex-col items-center justify-center bg-bg-canvas px-8 py-12 select-none">
+      <div
+        className="pointer-events-none mb-7 h-48 w-48 bg-gradient-to-br from-[#F7C84A] via-[#F0A722] to-[#D8890A] opacity-20 dark:opacity-25"
+        style={{
+          WebkitMaskImage: 'url(/logo_light_512_transparent.png)',
+          WebkitMaskSize: 'contain',
+          WebkitMaskRepeat: 'no-repeat',
+          WebkitMaskPosition: 'center',
+          maskImage: 'url(/logo_light_512_transparent.png)',
+          maskSize: 'contain',
+          maskRepeat: 'no-repeat',
+          maskPosition: 'center',
+        }}
+      />
+      <div className="mb-6 text-center">
+        <div className="text-[15px] font-medium text-[#999999] mb-1">{t('emptyWorkspace.title')}</div>
+        <div className="text-[12px] text-[#666666] max-w-[360px] leading-[1.6]">{t('emptyWorkspace.description')}</div>
+      </div>
+      <div className="flex flex-col gap-[8px]">
+        {EMPTY_WORKSPACE_SHORTCUTS.map((shortcut) => (
+          <div
+            key={shortcut.id}
+            className="flex items-center justify-between gap-[40px] min-w-[300px]"
+          >
+            <span className="text-[12px] text-[#999999]">
+              {t(`hostCommands.${shortcut.id}`)}
+            </span>
+            <EmptyWorkspaceShortcutKey
+              keys={formatShortcutKeybinding(shortcut.keybinding, applePlatform)}
+            />
           </div>
-        </div>
-        <div className="w-full max-w-[520px] rounded-2xl border border-border-subtle bg-bg-surface/80 px-5 py-5 shadow-[0_20px_40px_rgba(0,0,0,0.18)] backdrop-blur">
-          <div className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-text-muted">
-            Quick Shortcuts
-          </div>
-          <div className="space-y-3">
-            {EMPTY_WORKSPACE_SHORTCUTS.map((shortcut) => (
-              <div
-                key={shortcut.label}
-                className="flex items-center justify-between gap-4 rounded-xl border border-transparent px-3 py-2 hover:border-border-subtle hover:bg-bg-canvas/55"
-              >
-                <span className="text-sm text-text-secondary">{shortcut.label}</span>
-                <EmptyWorkspaceShortcutKey
-                  keys={formatShortcutKeybinding(shortcut.keybinding, applePlatform)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
@@ -425,7 +384,7 @@ export function AppShell({
   const currentLocaleRef = React.useRef(currentLocale);
   currentLocaleRef.current = currentLocale;
   const { t } = useTranslation('editorUi');
-  
+
   // Panel Visibility State
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [showInspector, setShowInspector] = React.useState(true);
@@ -1435,51 +1394,51 @@ export function AppShell({
       title: string;
       icon: React.ReactNode;
     }> = [
-      {
-        id: 'canvas.duplicateSelectedNode',
-        title: 'Duplicate',
-        icon: <Copy size={12} />,
-      },
-      {
-        id: 'canvas.moveSelectedNodeUp',
-        title: 'Move Up',
-        icon: <ArrowUp size={12} />,
-      },
-      {
-        id: 'canvas.moveSelectedNodeDown',
-        title: 'Move Down',
-        icon: <ArrowDown size={12} />,
-      },
-      {
-        id: 'canvas.deleteSelectedNode',
-        title: 'Delete',
-        icon: <Trash2 size={12} />,
-      },
-    ];
+        {
+          id: 'canvas.duplicateSelectedNode',
+          title: 'Duplicate',
+          icon: <Copy size={12} />,
+        },
+        {
+          id: 'canvas.moveSelectedNodeUp',
+          title: 'Move Up',
+          icon: <ArrowUp size={12} />,
+        },
+        {
+          id: 'canvas.moveSelectedNodeDown',
+          title: 'Move Down',
+          icon: <ArrowDown size={12} />,
+        },
+        {
+          id: 'canvas.deleteSelectedNode',
+          title: 'Delete',
+          icon: <Trash2 size={12} />,
+        },
+      ];
 
     const extraActions: SelectionOverlayAction[] = [];
 
     return [
       ...commonActions.reduce<SelectionOverlayAction[]>((actions, action) => {
-          const commandExists = hostCommandMap.has(action.id) || pluginCommandMap.has(action.id);
-          if (!commandExists) {
-            return actions;
-          }
-          const state = resolveCommandState(action.id, 'canvas');
-          if (!state.visible) {
-            return actions;
-          }
-          actions.push({
-            id: action.id,
-            title: action.title,
-            icon: action.icon,
-            disabled: !state.enabled,
-            onRun: () => {
-              void runCommand(action.id);
-            },
-          });
+        const commandExists = hostCommandMap.has(action.id) || pluginCommandMap.has(action.id);
+        if (!commandExists) {
           return actions;
-        }, []),
+        }
+        const state = resolveCommandState(action.id, 'canvas');
+        if (!state.visible) {
+          return actions;
+        }
+        actions.push({
+          id: action.id,
+          title: action.title,
+          icon: action.icon,
+          disabled: !state.enabled,
+          onRun: () => {
+            void runCommand(action.id);
+          },
+        });
+        return actions;
+      }, []),
       ...extraActions,
     ];
   }, [hostCommandMap, pluginCommandMap, resolveCommandState, runCommand]);
@@ -1555,8 +1514,8 @@ export function AppShell({
 
   return (
     <div ref={rootRef} className="h-screen w-screen flex flex-col bg-bg-canvas text-text-primary overflow-hidden font-inter">
-      <TitleBar 
-        theme={theme} 
+      <TitleBar
+        theme={theme}
         onToggleTheme={toggleTheme}
         locale={currentLocale}
         onChangeLocale={handleChangeLocale}
@@ -1588,7 +1547,7 @@ export function AppShell({
         gitlabUrl={gitlabUrl}
         onOpenProjectManager={onOpenProjectManager}
       />
-      
+
       {/* Main Container */}
       <div className="flex-1 flex overflow-hidden">
         <div
@@ -1602,7 +1561,7 @@ export function AppShell({
             onSelectItem={handleActivitySelectItem}
           />
         </div>
-        
+
         {showSidebar ? (
           <div
             style={{ width: sidebarSize }}
@@ -1620,13 +1579,13 @@ export function AppShell({
                 {activePrimaryPanel ? activePrimaryPanel.render(panelRenderContext) : null}
               </div>
             </div>
-            <div 
+            <div
               className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
               onMouseDown={(e) => startSidebarResize(e, 'horizontal', false)}
             />
           </div>
         ) : null}
-        
+
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <EditorTabs
             label={schemaName ?? undefined}
@@ -1651,7 +1610,7 @@ export function AppShell({
               }}
             />
           ) : null}
-          
+
           <div className="flex-1 flex overflow-hidden">
             {shouldRenderFileContextPanel ? (
               <div
@@ -1695,11 +1654,11 @@ export function AppShell({
                   <span>No editor available for this file type</span>
                 </div>
               )}
-                <CommandPalette
-                  commands={commandPaletteCommands}
-                  recentCommandIds={recentCommandIdsRef.current}
-                  open={showCommandPalette}
-                  onClose={() => setShowCommandPalette(false)}
+              <CommandPalette
+                commands={commandPaletteCommands}
+                recentCommandIds={recentCommandIdsRef.current}
+                open={showCommandPalette}
+                onClose={() => setShowCommandPalette(false)}
                 onRunCommand={(commandId) => {
                   void runCommand(commandId);
                 }}
@@ -1713,10 +1672,10 @@ export function AppShell({
                   void runCommand(commandId);
                 }}
               />
-              
+
               {showConsole && (
                 <div style={{ height: consoleSize }} className="relative shrink-0 flex flex-col w-full">
-                  <div 
+                  <div
                     className="absolute top-0 left-0 right-0 h-1 -mt-[2px] cursor-row-resize hover:bg-blue-500 z-20 transition-colors"
                     onMouseDown={(e) => startConsoleResize(e, 'vertical', true)}
                   />
@@ -1727,7 +1686,7 @@ export function AppShell({
 
             {showAssistantPanel && activeAuxiliaryPanel ? (
               <div style={{ width: assistantPanelSize }} className="relative shrink-0 flex flex-col h-full border-r border-border-ide">
-                <div 
+                <div
                   className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
                   onMouseDown={(e) => startAIPanelResize(e, 'horizontal', true)}
                 />
@@ -1742,7 +1701,7 @@ export function AppShell({
                 data-shenbi-shortcut-area="inspector"
                 onContextMenu={(event) => openContextMenu('inspector', event)}
               >
-                <div 
+                <div
                   className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
                   onMouseDown={(e) => startInspectorResize(e, 'horizontal', true)}
                 />

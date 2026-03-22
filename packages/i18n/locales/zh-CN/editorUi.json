@@ -244,6 +244,10 @@
       "layout": "布局"
     }
   },
+  "emptyWorkspace": {
+    "title": "无文件打开",
+    "description": "请从左侧文件树中选择文件进行编辑，或通过 AI 对话创建新页面。"
+  },
   "pagePanel": {
     "title": "页面状态 (Page Data)",
     "params": "页面参数 (Params)",

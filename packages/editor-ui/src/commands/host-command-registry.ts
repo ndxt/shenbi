@@ -179,6 +179,7 @@ export function createHostCommandRegistry(options: HostCommandRegistryOptions): 
           aliases: ['toggle assistant', 'toggle ai panel'],
           keywords: ['assistant', 'ai', 'layout'],
           description: 'Toggle the visibility of the assistant panel.',
+          shortcut: 'Mod+Shift+A',
           when: '!inputFocused',
           priority: 10,
           execute: () => {

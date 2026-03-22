@@ -244,6 +244,10 @@
       "layout": "Layout"
     }
   },
+  "emptyWorkspace": {
+    "title": "No file open",
+    "description": "Open an existing file from the tree, create a new page or gateway file, or start an AI conversation to generate pages."
+  },
   "pagePanel": {
     "title": "Page State (Page Data)",
     "params": "Page Params",
