@@ -183,6 +183,13 @@ export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAc
     <div
       className={`gateway-node ${selected ? 'gateway-node--selected' : ''}`}
       style={{ '--node-color': contract.color } as React.CSSProperties}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (id && onNodeMenuAction) {
+          setMenuOpen(true);
+        }
+      }}
     >
       {/* Hover toolbar: ▶ ··· */}
       <div className="gateway-node__toolbar nodrag nopan">
@@ -192,7 +199,7 @@ export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAc
           title="运行此步骤"
           onClick={(e) => { e.stopPropagation(); }}
         >
-          <Play size={12} fill="currentColor" />
+          <Play size={10} fill="currentColor" />
         </button>
         <button
           type="button"
@@ -200,7 +207,7 @@ export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAc
           title="更多操作"
           onClick={(e) => { e.stopPropagation(); setMenuOpen((prev) => !prev); }}
         >
-          <MoreHorizontal size={14} />
+          <MoreHorizontal size={12} />
         </button>
       </div>
 
