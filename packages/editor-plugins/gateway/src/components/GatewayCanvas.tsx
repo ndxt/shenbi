@@ -44,6 +44,7 @@ type SelectorPanelState = {
   edgeId?: string;
   targetNodeId?: string;
   targetHandle?: string;
+  changeNodeId?: string;
 };
 
 const INSERT_NODE_GAP_X = 280;
@@ -311,6 +312,27 @@ export function GatewayCanvas({
       return;
     }
 
+    // Handle "change node" mode: replace the existing node's type
+    if (selectorPanel.changeNodeId) {
+      const contract = NODE_CONTRACTS[kind];
+      const nextNodes = nodesRef.current.map((n) => {
+        if (n.id !== selectorPanel.changeNodeId) return n;
+        return {
+          ...n,
+          type: kind,
+          data: {
+            ...n.data,
+            kind,
+            label: contract.label,
+          },
+        };
+      });
+      onNodesChangeProp(nextNodes);
+      onDirty?.();
+      setSelectorPanel(null);
+      return;
+    }
+
     const contract = NODE_CONTRACTS[kind];
     if (selectorPanel.edgeId && (contract.inputs.length === 0 || contract.outputs.length === 0)) {
       return;
@@ -446,9 +468,21 @@ export function GatewayCanvas({
         onDirty?.();
         break;
       }
-      case 'change':
-        // TODO: Open node type selector to swap this node
+      case 'change': {
+        const targetNode = nodesRef.current.find((n) => n.id === nodeId);
+        if (!targetNode) break;
+        const flowPos = reactFlowInstance.current?.flowToScreenPosition(targetNode.position);
+        const x = flowPos ? flowPos.x + 220 : 400;
+        const y = flowPos ? flowPos.y : 200;
+        setSelectorPanel({
+          visible: true,
+          position: { x, y },
+          sourceNodeId: nodeId,
+          sourceHandle: '',
+          changeNodeId: nodeId,
+        });
         break;
+      }
     }
   }, [onNodesChangeProp, onEdgesChangeProp, onDirty]);
 

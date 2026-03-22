@@ -20,7 +20,7 @@ import {
   MoreHorizontal,
   Copy,
   Trash2,
-  RefreshCw,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 const iconMap = {
@@ -100,7 +100,7 @@ function NodeContextMenu({ nodeId, kind, description, onAction, onClose }: NodeC
         className="gateway-node__context-menu-item"
         onClick={() => { onAction(nodeId, 'change'); onClose(); }}
       >
-        <RefreshCw size={14} />
+        <ArrowLeftRight size={14} />
         <span>替换节点</span>
       </button>
 
