@@ -25,7 +25,7 @@
 /* ---- Hover Toolbar (▶ ···) ---- */
 .gateway-node__toolbar {
   position: absolute;
-  top: -32px;
+  top: -30px;
   right: 0;
   display: flex;
   align-items: center;
@@ -34,12 +34,20 @@
   border: 1px solid #3d3d42;
   border-radius: 5px;
   padding: 1px;
-  padding-bottom: 9px;
-  margin-bottom: -8px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
   z-index: 10;
+}
+
+/* Invisible bridge so the mouse can travel from node to toolbar */
+.gateway-node__toolbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 8px;
 }
 
 .gateway-node:hover .gateway-node__toolbar {
