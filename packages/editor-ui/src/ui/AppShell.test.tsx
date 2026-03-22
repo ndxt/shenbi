@@ -173,6 +173,75 @@ describe('AppShell', () => {
     expect(document.documentElement.classList.contains('theme-dark')).toBe(false);
   });
 
+  it('switching tabs remounts the canvas renderer for the next file', async () => {
+    const mountSpy = vi.fn();
+    const unmountSpy = vi.fn();
+    const plugins = [
+      defineEditorPlugin({
+        id: 'plugin.gateway-renderer-test',
+        name: 'Gateway Renderer Test',
+        contributes: {
+          canvasRenderers: [
+            {
+              id: 'gateway-renderer-test',
+              fileTypes: ['api'],
+              render: (context) => {
+                const fileId = context.file.id ?? 'unknown';
+                return (
+                  <TestCanvasRenderer
+                    fileId={fileId}
+                    onMount={mountSpy}
+                    onUnmount={unmountSpy}
+                  />
+                );
+              },
+            },
+          ],
+        },
+      }),
+    ];
+    const tabs = [
+      {
+        fileId: 'api-1',
+        filePath: '/api-1.json',
+        fileType: 'api' as const,
+        fileName: 'API 1',
+        schema: { id: 'api-1', name: 'API 1', body: [] },
+        isDirty: false,
+      },
+      {
+        fileId: 'api-2',
+        filePath: '/api-2.json',
+        fileType: 'api' as const,
+        fileName: 'API 2',
+        schema: { id: 'api-2', name: 'API 2', body: [] },
+        isDirty: false,
+      },
+    ];
+
+    const { rerender } = render(
+      <AppShell tabs={tabs} activeTabId="api-1" plugins={plugins}>
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByTestId('test-canvas-renderer')).toHaveTextContent('api-1');
+    expect(mountSpy).toHaveBeenCalledTimes(1);
+    expect(unmountSpy).not.toHaveBeenCalled();
+
+    rerender(
+      <AppShell tabs={tabs} activeTabId="api-2" plugins={plugins}>
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('test-canvas-renderer')).toHaveTextContent('api-2');
+    });
+    expect(mountSpy).toHaveBeenCalledTimes(2);
+    expect(unmountSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('点击画布节点会触发 onCanvasSelectNode', () => {
     const onCanvasSelectNode = vi.fn();
     render(
@@ -1817,3 +1886,22 @@ describe('AppShell', () => {
     expect(screen.getByRole('button', { name: 'Fit' })).toBeInTheDocument();
   });
 });
+
+function TestCanvasRenderer({
+  fileId,
+  onMount,
+  onUnmount,
+}: {
+  fileId: string;
+  onMount: (fileId: string) => void;
+  onUnmount: (fileId: string) => void;
+}) {
+  React.useEffect(() => {
+    onMount(fileId);
+    return () => {
+      onUnmount(fileId);
+    };
+  }, [fileId, onMount, onUnmount]);
+
+  return <div data-testid="test-canvas-renderer">{fileId}</div>;
+}

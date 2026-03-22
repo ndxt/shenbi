@@ -105,9 +105,18 @@ export function GatewayEditor({
     return () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!saveTimerRef.current) {
+      return;
+    }
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = null;
+  }, [hostAdapter?.fileId]);
 
   const persistDocument = useCallback((nextDocument: GatewayDocumentSchema) => {
     onSave?.(nextDocument);
@@ -125,6 +134,7 @@ export function GatewayEditor({
             : 'Failed to save gateway document',
         );
       });
+      saveTimerRef.current = null;
     }, 150);
   }, [hostAdapter, onSave]);
 

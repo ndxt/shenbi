@@ -1,6 +1,6 @@
 import React from 'react';
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GatewayHostAdapter } from '../gateway-host-adapter';
 import { GatewayEditor } from './GatewayEditor';
@@ -16,6 +16,7 @@ vi.mock('./GatewayCanvas', () => ({
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
 });
 
 function createHostAdapter(overrides?: Partial<GatewayHostAdapter>): GatewayHostAdapter {
@@ -143,5 +144,55 @@ describe('GatewayEditor', () => {
     await waitFor(() => {
       expect(secondAdapter.loadDocument).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('cancels delayed saves from the previous file when switching tabs', async () => {
+    vi.useFakeTimers();
+    gatewayCanvasSpy.mockClear();
+    const firstSaveDocument = vi.fn(async () => undefined);
+    const firstAdapter = createHostAdapter({ saveDocument: firstSaveDocument });
+    const { rerender } = render(<GatewayEditor hostAdapter={firstAdapter} />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(firstAdapter.loadDocument).toHaveBeenCalledTimes(1);
+
+    let latestProps = gatewayCanvasSpy.mock.calls.at(-1)?.[0] as {
+      onDocumentChange?: (document: Record<string, unknown>) => void;
+    };
+    latestProps.onDocumentChange?.({
+      id: 'api-1',
+      name: 'Billing API',
+      type: 'api-gateway',
+      nodes: [],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    });
+
+    const secondAdapter = createHostAdapter({
+      fileId: 'api-2',
+      fileName: 'Orders API',
+      loadDocument: vi.fn(async () => ({
+        id: 'api-2',
+        name: 'Orders API',
+        type: 'api-gateway',
+        nodes: [],
+        edges: [],
+      })),
+      saveDocument: vi.fn(async () => undefined),
+    });
+
+    rerender(<GatewayEditor hostAdapter={secondAdapter} />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(secondAdapter.loadDocument).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(firstSaveDocument).not.toHaveBeenCalled();
+    expect(secondAdapter.saveDocument).not.toHaveBeenCalled();
   });
 });

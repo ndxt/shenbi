@@ -1542,12 +1542,14 @@ export function AppShell({
             <div className="flex-1 min-w-[320px] flex flex-col overflow-hidden relative bg-bg-canvas">
               {activeCanvasRenderer ? (
                 <div className="flex-1 flex flex-col overflow-hidden">
-                  {activeCanvasRenderer.render({
-                    file: canvasRendererFile,
-                    surface: canvasRendererSurface,
-                    environment: canvasRendererEnvironment,
-                    canvasHost,
-                  })}
+                  <React.Fragment key={`${activeCanvasRenderer.id}:${activeEditorTab?.fileId ?? 'default'}`}>
+                    {activeCanvasRenderer.render({
+                      file: canvasRendererFile,
+                      surface: canvasRendererSurface,
+                      environment: canvasRendererEnvironment,
+                      canvasHost,
+                    })}
+                  </React.Fragment>
                 </div>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-text-secondary">
