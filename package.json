@@ -8,6 +8,7 @@
     "type-check": "pnpm -r run type-check && pnpm lint:plugin-context-boundaries",
     "test": "pnpm -r run test",
     "lint:plugin-context-boundaries": "node scripts/check-plugin-context-boundaries.mjs",
+    "test:plugin-context-boundaries": "node --test scripts/check-plugin-context-boundaries.test.mjs",
     "perf": "pnpm --filter @shenbi/engine perf",
     "test:gate": "pnpm test && pnpm perf",
     "test:phase1.5": "pnpm --filter @shenbi/engine test && pnpm --filter @shenbi/preview test && pnpm --filter @shenbi/preview test:e2e",

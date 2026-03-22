@@ -1,11 +1,11 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const rootDir = process.cwd();
-const scanRoots = ['apps', 'packages', 'scripts'];
-const allowedExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
-const ignoredPathParts = new Set(['.git', 'node_modules', 'dist', 'coverage']);
-const ignoredFileMatchers = [
+export const defaultScanRoots = ['apps', 'packages', 'scripts'];
+export const allowedExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
+export const ignoredPathParts = new Set(['.git', 'node_modules', 'dist', 'coverage']);
+export const ignoredFileMatchers = [
   /(?:^|\/)\.turbo(?:\/|$)/,
   /(?:^|\/)docs(?:\/|$)/,
   /^packages\/editor-plugins\/api\/src\/context\.ts$/,
@@ -15,14 +15,14 @@ const ignoredFileMatchers = [
   /.*\.spec\.[^.]+$/,
 ];
 
-function createContextAliasPattern(propertyName) {
+export function createContextAliasPattern(propertyName) {
   return new RegExp(
     String.raw`\b(?:[A-Za-z_$][\w$]*\.)*(?:context|pluginContext)(?:\?\.|\.)${propertyName}\b`,
     'g',
   );
 }
 
-const aliasRules = [
+export const aliasRules = [
   { name: 'getSchema', pattern: createContextAliasPattern('getSchema') },
   { name: 'replaceSchema', pattern: createContextAliasPattern('replaceSchema') },
   { name: 'getSelectedNode', pattern: createContextAliasPattern('getSelectedNode') },
@@ -35,7 +35,7 @@ const aliasRules = [
   { name: 'notify', pattern: createContextAliasPattern('notify') },
 ];
 
-const helperRules = [
+export const helperRules = [
   { name: 'getPluginSchema', pattern: /\bgetPluginSchema\b/g },
   { name: 'getPluginDocumentPatchService', pattern: /\bgetPluginDocumentPatchService\b/g },
   { name: 'replacePluginSchema', pattern: /\breplacePluginSchema\b/g },
@@ -46,20 +46,21 @@ const helperRules = [
   { name: 'getPluginPersistence', pattern: /\bgetPluginPersistence\b/g },
 ];
 
-const directBridgeServiceRules = [
+export const directBridgeServiceRules = [
   { name: 'pluginContext.filesystem', pattern: /\b(?:[A-Za-z_$][\w$]*\.)*pluginContext(?:\?\.|\.)filesystem\b/g },
   { name: 'pluginContext.persistence', pattern: /\b(?:[A-Za-z_$][\w$]*\.)*pluginContext(?:\?\.|\.)persistence\b/g },
   { name: 'pluginContext.workspace', pattern: /\b(?:[A-Za-z_$][\w$]*\.)*pluginContext(?:\?\.|\.)workspace\b/g },
 ];
 
-function isValidWhenExpression(expression) {
+export function isValidWhenExpression(expression) {
   if (expression.includes('||') || expression.includes('(') || expression.includes(')')) {
     return false;
   }
-  const tokens = expression
-    .split('&&')
-    .map((token) => token.trim())
-    .filter(Boolean);
+  const rawTokens = expression.split('&&').map((token) => token.trim());
+  if (rawTokens.some((token) => token.length === 0)) {
+    return false;
+  }
+  const tokens = rawTokens.filter(Boolean);
 
   if (tokens.length === 0) {
     return false;
@@ -68,12 +69,12 @@ function isValidWhenExpression(expression) {
   return tokens.every((token) => /^!?[A-Za-z_$][\w$]*$/.test(token));
 }
 
-function shouldIgnoreFile(relativePath) {
+export function shouldIgnoreFile(relativePath) {
   const normalizedPath = relativePath.replaceAll('\\', '/');
   return ignoredFileMatchers.some((matcher) => matcher.test(normalizedPath));
 }
 
-function collectFiles(directory, files) {
+export function collectFiles(rootDir, directory, files) {
   for (const entry of readdirSync(directory)) {
     if (ignoredPathParts.has(entry)) {
       continue;
@@ -81,7 +82,7 @@ function collectFiles(directory, files) {
     const fullPath = path.join(directory, entry);
     const stats = statSync(fullPath);
     if (stats.isDirectory()) {
-      collectFiles(fullPath, files);
+      collectFiles(rootDir, fullPath, files);
       continue;
     }
     if (!stats.isFile()) {
@@ -98,7 +99,7 @@ function collectFiles(directory, files) {
   }
 }
 
-function getLineNumber(source, index) {
+export function getLineNumber(source, index) {
   let line = 1;
   for (let cursor = 0; cursor < index; cursor += 1) {
     if (source.charCodeAt(cursor) === 10) {
@@ -108,7 +109,7 @@ function getLineNumber(source, index) {
   return line;
 }
 
-function collectMatches(source, rule) {
+export function collectMatches(source, rule) {
   const matches = [];
   for (const match of source.matchAll(rule.pattern)) {
     if (typeof match.index !== 'number') {
@@ -123,7 +124,7 @@ function collectMatches(source, rule) {
   return matches;
 }
 
-function collectInvalidWhenExpressions(source) {
+export function collectInvalidWhenExpressions(source) {
   const matches = [];
   const whenLiteralPattern = /\b(when|enabledWhen)\s*:\s*(['"`])((?:\\.|(?!\2)[\s\S])*?)\2/g;
 
@@ -151,16 +152,8 @@ function collectInvalidWhenExpressions(source) {
   return matches;
 }
 
-const files = [];
-for (const scanRoot of scanRoots) {
-  const fullPath = path.join(rootDir, scanRoot);
-  collectFiles(fullPath, files);
-}
-
-const violations = [];
-for (const filePath of files) {
-  const relativePath = path.relative(rootDir, filePath);
-  const source = readFileSync(filePath, 'utf8');
+export function collectSourceViolations(source, relativePath = '<inline>') {
+  const violations = [];
   for (const rule of [...aliasRules, ...helperRules, ...directBridgeServiceRules]) {
     for (const match of collectMatches(source, rule)) {
       violations.push({
@@ -177,15 +170,46 @@ for (const filePath of files) {
       symbol: match.symbol,
     });
   }
+  return violations;
 }
 
-if (violations.length > 0) {
-  console.error('Plugin boundary violations detected:');
-  for (const violation of violations) {
-    console.error(`- ${violation.file}:${violation.line} uses ${violation.symbol}`);
+export function collectWorkspaceViolations(rootDir, scanRoots = defaultScanRoots) {
+  const files = [];
+  for (const scanRoot of scanRoots) {
+    const fullPath = path.join(rootDir, scanRoot);
+    collectFiles(rootDir, fullPath, files);
   }
-  console.error('Use grouped PluginContext accessors and supported when/enabledWhen expressions instead.');
-  process.exit(1);
+
+  const violations = [];
+  for (const filePath of files) {
+    const relativePath = path.relative(rootDir, filePath);
+    const source = readFileSync(filePath, 'utf8');
+    violations.push(...collectSourceViolations(source, relativePath));
+  }
+  return violations;
 }
 
-console.log('PluginContext boundary check passed.');
+export function formatViolations(violations) {
+  return violations.map((violation) => `- ${violation.file}:${violation.line} uses ${violation.symbol}`);
+}
+
+export function runPluginContextBoundaryCheck(rootDir = process.cwd(), scanRoots = defaultScanRoots) {
+  const violations = collectWorkspaceViolations(rootDir, scanRoots);
+  if (violations.length > 0) {
+    console.error('Plugin boundary violations detected:');
+    for (const line of formatViolations(violations)) {
+      console.error(line);
+    }
+    console.error('Use grouped PluginContext accessors and supported when/enabledWhen expressions instead.');
+    return 1;
+  }
+
+  console.log('PluginContext boundary check passed.');
+  return 0;
+}
+
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+
+if (isDirectRun) {
+  process.exit(runPluginContextBoundaryCheck());
+}

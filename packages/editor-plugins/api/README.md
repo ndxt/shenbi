@@ -26,7 +26,7 @@
 - `commands`
 - `notifications`
 
-`workspace / persistence / filesystem` 仍然存在于 `PluginContext`，但它们属于宿主桥接能力，不是默认鼓励所有插件直接扩张依赖的通用服务面。
+`workspace / persistence / filesystem` 仍然存在于 `PluginContext`，但它们属于宿主桥接能力，不是默认鼓励所有插件直接扩张依赖的通用服务面。插件侧如果直接读取 `pluginContext.filesystem / persistence / workspace`，仓库根 `pnpm lint:plugin-context-boundaries` 会直接拦截。
 
 ## Accessor 风格
 
@@ -88,6 +88,8 @@
 - 括号
 - 更复杂的 VS Code when clause 语法
 
+这条限制不是纯文档约定。源码里的 `when / enabledWhen` 字符串字面量会被 `pnpm lint:plugin-context-boundaries` 校验，CI 通过根 `pnpm type-check` 一起执行。
+
 ## 快捷键规则
 
 - `PluginShortcutContribution` 使用独立的 `priority` 解决冲突
@@ -104,6 +106,7 @@
 3. 新服务面没有经过平台准入评审前，不进入 `PluginContext`。
 4. 新 helper 若不能归入现有 accessor 分组，默认不加入包根导出面。
 5. 已删除的旧 alias 与字段级 helper 不得重新引入，仓库根 `pnpm lint:plugin-context-boundaries` 会直接拦截。
+6. `pluginContext.filesystem / persistence / workspace` 的直读，以及不受支持的 `when / enabledWhen` 字面量语法，也会被同一条边界检查直接拦截。
 
 ## 参考
 
