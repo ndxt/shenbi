@@ -89,7 +89,7 @@ describe('AppShell primary panels', () => {
                   label: 'Assets',
                   icon: Rocket,
                   order: 99,
-                  targetSidebarTabId: 'assets',
+                  target: { type: 'tab', tabId: 'assets' },
                 },
               ],
               sidebarTabs: [

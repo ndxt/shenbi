@@ -40,8 +40,6 @@ export interface ActivityBarItemContribution extends OrderedContribution {
   active?: boolean;
   section?: ActivityBarSection;
   target?: ActivityBarTarget;
-  /** @deprecated Use target instead. */
-  targetSidebarTabId?: string;
   onClick?: () => void;
 }
 

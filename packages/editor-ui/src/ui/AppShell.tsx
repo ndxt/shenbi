@@ -162,7 +162,7 @@ function resolveActivityItemPanelId(
 ): string | undefined {
   const targetPanelId = item.target?.type === 'panel'
     ? item.target.panelId
-    : item.targetSidebarTabId;
+    : undefined;
   if (!targetPanelId) {
     return undefined;
   }
@@ -1141,7 +1141,7 @@ export function AppShell({
       }
       return;
     }
-    const tabId = item.target?.type === 'tab' ? item.target.tabId : item.targetSidebarTabId;
+    const tabId = item.target?.type === 'tab' ? item.target.tabId : undefined;
     if (!tabId) {
       setActivePrimaryPanelId('');
       if (!showSidebar) {
