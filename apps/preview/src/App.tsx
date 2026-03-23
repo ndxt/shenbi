@@ -324,6 +324,9 @@ export function App() {
       onCloseAllTabs={workspaceState.handleCloseAllTabs}
       onCloseSavedTabs={workspaceState.handleCloseSavedTabs}
       onMoveTab={workspaceState.handleMoveTab}
+      onCanvasDocumentDirtyChange={useCallback((fileId: string, dirty: boolean) => {
+        tabManager.markDirty(fileId, dirty);
+      }, [tabManager])}
       toolbarExtra={(
         <PreviewToolbar
           previewT={previewT as (...args: any[]) => string}

@@ -30,6 +30,7 @@ import { StatusBar } from './StatusBar';
 import { resolvePrimaryPanels, type PrimaryPanelContribution } from './primary-panels';
 import '../styles/editor-ui.css';
 import { useResize } from '../hooks/useResize';
+import { useCanvasDocumentContext } from '../hooks/useCanvasDocumentContext';
 import {
   createWorkspacePersistenceService,
   LocalWorkspacePersistenceAdapter,
@@ -114,6 +115,8 @@ interface AppShellProps {
   onCloseAllTabs?: (() => void) | undefined;
   onCloseSavedTabs?: (() => void) | undefined;
   onMoveTab?: ((fromIndex: number, toIndex: number) => void) | undefined;
+  /** Called when a non-page canvas renderer changes dirty state (for TabManager integration) */
+  onCanvasDocumentDirtyChange?: ((fileId: string, dirty: boolean) => void) | undefined;
   /** Title displayed in the title bar (defaults to 'Shenbi IDE') */
   title?: string;
   /** Subtitle displayed in the title bar (defaults to 'Editor UI Package') */
@@ -324,6 +327,7 @@ export function AppShell({
   onCloseAllTabs,
   onCloseSavedTabs,
   onMoveTab,
+  onCanvasDocumentDirtyChange,
   title,
   subtitle,
   userAvatarUrl,
@@ -1510,6 +1514,20 @@ export function AppShell({
     pluginContext: resolvedPluginContext,
   }), [resolvedPluginContext]);
 
+  // --- Document lifecycle context for non-page canvas renderers ---
+  const [canvasDocUndoRedoState, setCanvasDocUndoRedoState] = React.useState({ canUndo: false, canRedo: false });
+  const canvasDocContext = useCanvasDocumentContext({
+    onDirtyChange: React.useCallback((dirty: boolean) => {
+      const fileId = activeEditorTab?.fileId;
+      if (fileId && onCanvasDocumentDirtyChange) {
+        onCanvasDocumentDirtyChange(fileId, dirty);
+      }
+    }, [activeEditorTab?.fileId, onCanvasDocumentDirtyChange]),
+    onUndoRedoStateChange: setCanvasDocUndoRedoState,
+  });
+  const canvasDocDispatchRef = React.useRef(canvasDocContext.dispatch);
+  canvasDocDispatchRef.current = canvasDocContext.dispatch;
+
   const shouldRenderFileContextPanel = Boolean(activeEditorTab) && (activeEditorTab?.fileType === 'page' || Boolean(activeCanvasRenderer)) && showFileContextPanel;
 
   return (
@@ -1646,6 +1664,7 @@ export function AppShell({
                       surface: canvasRendererSurface,
                       environment: canvasRendererEnvironment,
                       canvasHost,
+                      document: canvasDocContext.context,
                     })}
                   </React.Fragment>
                 </div>

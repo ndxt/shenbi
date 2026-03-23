@@ -199,11 +199,26 @@ interface CanvasRendererSurfaceContext {
   readOnly?: boolean;
 }
 
+export interface CanvasRendererDocumentContext {
+  /** Notify the host that the document's dirty state changed */
+  markDirty: (dirty: boolean) => void;
+  /** Register callback for host-initiated save (Ctrl+S). Returns unsubscribe. */
+  onSaveRequest: (callback: () => void) => (() => void);
+  /** Register callback for host-initiated undo (Ctrl+Z). Returns unsubscribe. */
+  onUndoRequest: (callback: () => void) => (() => void);
+  /** Register callback for host-initiated redo (Ctrl+Y). Returns unsubscribe. */
+  onRedoRequest: (callback: () => void) => (() => void);
+  /** Report undo/redo availability to the host UI (toolbar buttons) */
+  reportUndoRedoState: (state: { canUndo: boolean; canRedo: boolean }) => void;
+}
+
 export interface CanvasRendererRenderContext {
   file: FileContributionContext;
   surface: CanvasRendererSurfaceContext;
   environment: PluginEnvironmentContext;
   canvasHost: CanvasRendererHostContext;
+  /** Document lifecycle hooks — save, undo/redo, dirty tracking */
+  document?: CanvasRendererDocumentContext;
 }
 
 export interface CanvasRendererContribution extends OrderedContribution {

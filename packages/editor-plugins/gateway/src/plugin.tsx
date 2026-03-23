@@ -40,6 +40,7 @@ export function createGatewayPlugin(): EditorPluginManifest {
                 {...(interaction.activeTool ? { activeCanvasTool: interaction.activeTool as import('@shenbi/editor-ui').CanvasToolMode } : {})}
                 {...(interaction.setActiveTool ? { setActiveCanvasTool: interaction.setActiveTool as (mode: import('@shenbi/editor-ui').CanvasToolMode) => void } : {})}
                 {...(interaction.onRuntimeReady ? { onCanvasRuntimeReady: interaction.onRuntimeReady } : {})}
+                {...(context.document ? { documentContext: context.document } : {})}
               />
             );
           },
