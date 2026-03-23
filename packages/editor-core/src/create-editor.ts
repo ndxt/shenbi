@@ -745,6 +745,21 @@ function registerBuiltinCommands(
   });
 }
 
+function createDefaultApiContent(name: string): Record<string, unknown> {
+  return {
+    id: `gateway-${Date.now()}`,
+    name,
+    type: 'api-gateway',
+    nodes: [
+      { id: 'start-1', kind: 'start', label: '开始', position: { x: 100, y: 200 }, config: {} },
+      { id: 'end-1', kind: 'end', label: '返回结果', position: { x: 600, y: 200 }, config: {} },
+    ],
+    edges: [
+      { id: 'edge_default', source: 'start-1', sourceHandle: 'request', target: 'end-1', targetHandle: 'result' },
+    ],
+  };
+}
+
 function registerVFSCommands(
   commands: CommandManager,
   eventBus: EventBus<EditorEventMap>,
@@ -762,7 +777,11 @@ function registerVFSCommands(
       }
       const parentId = typeof args.parentId === 'string' ? args.parentId : null;
       const fileType = (typeof args.fileType === 'string' ? args.fileType : 'page') as FileType;
-      const content = isRecord(args.content) ? args.content : { id: 'page', name: args.name, body: [] };
+      const content = isRecord(args.content)
+        ? args.content
+        : fileType === 'api'
+          ? createDefaultApiContent(args.name)
+          : { id: 'page', name: args.name, body: [] };
       const node = await vfs.createFile(projectId, parentId, args.name, fileType, content);
       eventBus.emit('fs:nodeCreated', { node });
       eventBus.emit('fs:treeChanged', undefined);
