@@ -202,8 +202,12 @@ interface CanvasRendererSurfaceContext {
 export interface CanvasRendererDocumentContext {
   /** Notify the host that the document's dirty state changed */
   markDirty: (dirty: boolean) => void;
-  /** Sync the renderer-owned document schema into the host tab state. */
-  syncSchema?: (schema: Record<string, unknown>) => void;
+  /** Return the latest renderer-owned working document. */
+  getDocument?: (() => Record<string, unknown> | undefined) | undefined;
+  /** Replace the host-visible working document snapshot for this renderer. */
+  replaceDocument?: ((schema: Record<string, unknown>) => void) | undefined;
+  /** Backward-compatible alias for replaceDocument. */
+  syncSchema?: ((schema: Record<string, unknown>) => void) | undefined;
   /** Register callback for host-initiated save (Ctrl+S). Returns unsubscribe. */
   onSaveRequest: (callback: () => void) => (() => void);
   /** Register callback for host-initiated undo (Ctrl+Z). Returns unsubscribe. */
@@ -216,6 +220,7 @@ export interface CanvasRendererDocumentContext {
 
 export interface CanvasRendererRenderContext {
   file: FileContributionContext;
+  content?: Record<string, unknown> | undefined;
   surface: CanvasRendererSurfaceContext;
   environment: PluginEnvironmentContext;
   canvasHost: CanvasRendererHostContext;

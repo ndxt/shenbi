@@ -36,6 +36,7 @@ export function createGatewayPlugin(): EditorPluginManifest {
             const interaction = context.canvasHost.interaction;
             return (
               <GatewayEditor
+                {...(context.content ? { documentSchema: context.content as unknown as import('./types').GatewayDocumentSchema } : {})}
                 {...(hostAdapter ? { hostAdapter } : {})}
                 {...(interaction.activeTool ? { activeCanvasTool: interaction.activeTool as import('@shenbi/editor-ui').CanvasToolMode } : {})}
                 {...(interaction.setActiveTool ? { setActiveCanvasTool: interaction.setActiveTool as (mode: import('@shenbi/editor-ui').CanvasToolMode) => void } : {})}

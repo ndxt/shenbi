@@ -59,17 +59,12 @@ export function GatewayEditor({
   const [edges, setEdges] = useState(initialGraph.edges);
   const [viewport, setViewport] = useState(initialGraph.viewport);
   const historyCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hostAdapterRef = useRef(hostAdapter);
   const lastLocalDocumentRef = useRef<GatewayDocumentSchema | null>(null);
 
   const getCurrentDocument = useCallback(
     () => lastLocalDocumentRef.current ?? history.document,
     [history.document],
   );
-
-  useEffect(() => {
-    hostAdapterRef.current = hostAdapter;
-  }, [hostAdapter]);
 
   // Sync graph state when history.document changes (undo/redo/reset)
   const prevDocumentRef = useRef(history.document);
@@ -87,41 +82,16 @@ export function GatewayEditor({
     }
   }, [history.document]);
 
-  // Load document from host adapter on mount / file change
   useEffect(() => {
-    const activeHostAdapter = hostAdapterRef.current;
-    if (!activeHostAdapter) {
-      return undefined;
+    const nextDocument = documentSchema && isGatewayDocumentSchema(documentSchema)
+      ? documentSchema
+      : fallbackDocument;
+    if (lastLocalDocumentRef.current === nextDocument) {
+      return;
     }
-
-    let disposed = false;
-    void activeHostAdapter.loadDocument()
-      .then((loaded) => {
-        if (disposed) {
-          return;
-        }
-        if (!loaded || !isGatewayDocumentSchema(loaded)) {
-          history.reset(fallbackDocument);
-          return;
-        }
-        history.reset(loaded);
-      })
-      .catch((error) => {
-        if (disposed) {
-          return;
-        }
-        activeHostAdapter.notifyError(
-          error instanceof Error
-            ? error.message
-            : 'Failed to load gateway document',
-        );
-      });
-
-    return () => {
-      disposed = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fallbackDocument, hostAdapter?.fileId, hostAdapter?.fileName]);
+    history.reset(nextDocument);
+    documentContext?.replaceDocument?.(nextDocument as unknown as Record<string, unknown>);
+  }, [documentContext, documentSchema, fallbackDocument, history]);
 
   // Cleanup save timer
   useEffect(() => {
@@ -173,15 +143,7 @@ export function GatewayEditor({
         event.preventDefault();
         flushPendingHistory();
         const doc = getCurrentDocument();
-        if (hostAdapter) {
-          void hostAdapter.saveDocument(doc).then(() => {
-            history.markSaved();
-          }).catch((error) => {
-            hostAdapter.notifyError(
-              error instanceof Error ? error.message : 'Failed to save',
-            );
-          });
-        }
+        documentContext?.replaceDocument?.(doc as unknown as Record<string, unknown>);
         onSave?.(doc);
       }
     };
@@ -216,17 +178,9 @@ export function GatewayEditor({
         }
         history.commit();
       }
-      // Explicit save: write current document to file system
       const doc = getCurrentDocument();
-      if (hostAdapter) {
-        void hostAdapter.saveDocument(doc).then(() => {
-          history.markSaved();
-        }).catch((error) => {
-          hostAdapter.notifyError(
-            error instanceof Error ? error.message : 'Failed to save',
-          );
-        });
-      }
+      documentContext.replaceDocument?.(doc as unknown as Record<string, unknown>);
+      history.markSaved();
       onSave?.(doc);
     });
   }, [documentContext, getCurrentDocument, history, hostAdapter, onSave]);
@@ -270,7 +224,7 @@ export function GatewayEditor({
 
     lastLocalDocumentRef.current = nextDocument;
     history.pushState(nextDocument);
-    documentContext?.syncSchema?.(nextDocument as unknown as Record<string, unknown>);
+    documentContext?.replaceDocument?.(nextDocument as unknown as Record<string, unknown>);
     onDirty?.();
     onSave?.(nextDocument);
 

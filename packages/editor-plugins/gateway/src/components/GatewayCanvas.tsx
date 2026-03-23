@@ -122,6 +122,9 @@ export function GatewayCanvas({
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isViewportPanning, setIsViewportPanning] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(zoom);
+  const isSpacePressedRef = useRef(isSpacePressed);
+  const isViewportPanningRef = useRef(isViewportPanning);
   const [viewportState, setViewportState] = useState({ x: 0, y: 0, zoom: 1 });
   const viewportStateRef = useRef(viewportState);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
@@ -142,6 +145,18 @@ export function GatewayCanvas({
   React.useEffect(() => {
     viewportStateRef.current = viewportState;
   }, [viewportState]);
+
+  React.useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  React.useEffect(() => {
+    isSpacePressedRef.current = isSpacePressed;
+  }, [isSpacePressed]);
+
+  React.useEffect(() => {
+    isViewportPanningRef.current = isViewportPanning;
+  }, [isViewportPanning]);
 
   const emitDocumentChange = useCallback((
     nextNodes: GatewayNode[],
@@ -271,6 +286,10 @@ export function GatewayCanvas({
     animated: false,
   }), []);
   const selectedNodes = useMemo(() => nodes.filter((node) => Boolean(node.selected)), [nodes]);
+  const selectedNodesRef = useRef(selectedNodes);
+  React.useEffect(() => {
+    selectedNodesRef.current = selectedNodes;
+  }, [selectedNodes]);
   const effectivePan = isSpacePressed || activeTool === 'pan';
   const gatewayAssetGroups = useMemo(() => buildGatewayPaletteAssets(), []);
   const minimapModel = useMemo(() => buildGatewayMinimapModel({
@@ -322,20 +341,21 @@ export function GatewayCanvas({
       reactFlowInstance.current?.fitView({ padding: 0.2, duration: 0 });
     },
     focusSelection: () => {
-      if (selectedNodes.length === 0) {
+      const selected = selectedNodesRef.current;
+      if (selected.length === 0) {
         return;
       }
       void reactFlowInstance.current?.fitView({
-        nodes: selectedNodes.map((node) => ({ id: node.id })),
+        nodes: selected.map((node) => ({ id: node.id })),
         padding: 0.3,
         duration: 200,
       });
     },
-    getScale: () => zoom,
-    isSpacePanActive: () => isSpacePressed,
-    isCanvasPanning: () => isViewportPanning,
+    getScale: () => zoomRef.current,
+    isSpacePanActive: () => isSpacePressedRef.current,
+    isCanvasPanning: () => isViewportPanningRef.current,
     hasCanvasDragSession: () => false,
-  }), [isSpacePressed, isViewportPanning, selectedNodes, zoom]);
+  }), []);
 
   React.useEffect(() => {
     onCanvasRuntimeReady?.(runtime);

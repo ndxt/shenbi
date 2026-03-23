@@ -1,10 +1,16 @@
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import { CommandManager } from './command';
+import { DocumentSessionManager } from './document-session';
 import { EditorState } from './editor-state';
 import { EventBus } from './event-bus';
 import { History } from './history';
 import type { EditorEventMap, EditorStateSnapshot } from './types';
-import { MemoryFileStorageAdapter, type FileStorageAdapter, type FileType } from './adapters/file-storage';
+import {
+  MemoryFileStorageAdapter,
+  type FileContent,
+  type FileStorageAdapter,
+  type FileType,
+} from './adapters/file-storage';
 import type { VirtualFileSystemAdapter } from './adapters/virtual-fs';
 import { TabManager, type TabState } from './tab-manager';
 import {
@@ -72,6 +78,16 @@ function validatePageSchema(schema: unknown): asserts schema is PageSchema {
     : isSchemaNode(body);
   if (!isValidBody) {
     throw new Error('schema.body must be a schema node or schema node array');
+  }
+}
+
+function validateFileContent(fileType: FileType, content: unknown): asserts content is FileContent {
+  if (fileType === 'page') {
+    validatePageSchema(content);
+    return;
+  }
+  if (!isRecord(content)) {
+    throw new Error(`${fileType} file content must be an object`);
   }
 }
 
@@ -173,9 +189,9 @@ function extractWriteSchemaArgs(args: unknown): { fileId: string; schema: PageSc
   };
 }
 
-function extractTabSyncStateArgs(args: unknown): {
+function extractTabSyncStateArgs(args: unknown, fileType: FileType): {
   fileId: string;
-  schema?: PageSchema;
+  schema?: FileContent;
   selectedNodeId?: string;
   isDirty?: boolean;
   isGenerating?: boolean;
@@ -188,7 +204,7 @@ function extractTabSyncStateArgs(args: unknown): {
 
   const result: {
     fileId: string;
-    schema?: PageSchema;
+    schema?: FileContent;
     selectedNodeId?: string;
     isDirty?: boolean;
     isGenerating?: boolean;
@@ -199,7 +215,7 @@ function extractTabSyncStateArgs(args: unknown): {
   };
 
   if (Object.prototype.hasOwnProperty.call(args, 'schema')) {
-    validatePageSchema(args.schema);
+    validateFileContent(fileType, args.schema);
     result.schema = args.schema;
   }
   if (Object.prototype.hasOwnProperty.call(args, 'selectedNodeId')) {
@@ -937,25 +953,59 @@ function registerTabCommands(
   commands: CommandManager,
   eventBus: EventBus<EditorEventMap>,
   tabManager: TabManager,
+  sessions: DocumentSessionManager,
   vfs?: VirtualFileSystemAdapter,
   projectId?: string,
 ): void {
+  const ensureSessionForTab = (tab: TabState) => sessions.ensureSession({
+    fileId: tab.fileId,
+    fileType: tab.fileType,
+    content: tab.schema,
+    dirty: tab.isDirty,
+  });
+  const getSessionSnapshot = (fileId: string) => {
+    const tab = tabManager.getTab(fileId);
+    if (tab) {
+      ensureSessionForTab(tab);
+    }
+    return sessions.getSession(fileId);
+  };
+
+  const syncRendererTabCache = (fileId: string): void => {
+    const tab = tabManager.getTab(fileId);
+    const session = getSessionSnapshot(fileId);
+    if (!tab || !session) {
+      return;
+    }
+    tabManager.updateTab(fileId, {
+      schema: session.workingContent,
+      isDirty: session.dirty,
+    });
+  };
+
   const restoreEditorForTab = async (tab: TabState): Promise<void> => {
-    if (tab.fileType === 'api') {
+    const session = getSessionSnapshot(tab.fileId);
+    if (!session) {
+      throw new Error(`Document session not found: ${tab.fileId}`);
+    }
+
+    if (session.owner === 'renderer') {
       await commands.execute('editor.restoreSnapshot', {
         snapshot: {
           schema: createEmptySchema(),
           currentFileId: tab.fileId,
-          isDirty: tab.isDirty,
+          isDirty: session.dirty,
         },
       });
       return;
     }
+
+    validatePageSchema(session.workingContent);
     await commands.execute('editor.restoreSnapshot', {
       snapshot: {
-        schema: tab.schema,
+        schema: session.workingContent,
         currentFileId: tab.fileId,
-        isDirty: tab.isDirty,
+        isDirty: session.dirty,
         ...(tab.selectedNodeId ? { selectedNodeId: tab.selectedNodeId } : {}),
       },
     });
@@ -963,14 +1013,21 @@ function registerTabCommands(
 
   const syncEditorStateToTab = (tab: TabState, currentState: EditorState): void => {
     const snapshot = currentState.getSnapshot();
-    if (tab.fileType === 'api') {
+    const session = getSessionSnapshot(tab.fileId);
+    if (!session) {
+      return;
+    }
+    if (session.owner === 'renderer') {
+      sessions.markDirty(tab.fileId, snapshot.isDirty);
       tabManager.updateTab(tab.fileId, {
         isDirty: snapshot.isDirty,
       });
       return;
     }
+    const schema = currentState.getSchema();
+    sessions.updateWorkingContent(tab.fileId, schema, snapshot.isDirty);
     tabManager.updateTab(tab.fileId, {
-      schema: currentState.getSchema(),
+      schema,
       selectedNodeId: snapshot.selectedNodeId,
       isDirty: snapshot.isDirty,
     });
@@ -997,35 +1054,33 @@ function registerTabCommands(
       const existingTab = tabManager.getTab(fileId);
 
       if (existingTab) {
-        // Save current active tab state before switching
         const currentTab = tabManager.getActiveTab();
         if (currentTab && currentTab.fileId !== fileId) {
           syncEditorStateToTab(currentTab, currentState);
         }
-
-        // Restore editor state BEFORE switching the active tab to avoid
-        // intermediate renders where tab bar shows B but canvas shows A.
         await restoreEditorForTab(existingTab);
         tabManager.activateTab(fileId);
         eventBus.emit('tab:activated', { fileId });
         return;
       }
 
-      // Read file content
-      let schema: PageSchema;
-      if (vfs && projectId) {
-        const content = await vfs.readFile(projectId, fileId);
-        schema = content as PageSchema;
-      } else {
+      if (!vfs || !projectId) {
         throw new Error('VFS not configured, cannot open tab');
       }
+      const content = await vfs.readFile(projectId, fileId);
 
       const node = await vfs.getNode(projectId, fileId);
       if (!node) {
         throw new Error(`File node not found: ${fileId}`);
       }
+      const fileType = node.fileType ?? 'page';
+      validateFileContent(fileType, content);
+      const session = sessions.ensureSession({
+        fileId,
+        fileType,
+        content,
+      });
 
-      // Save current active tab state before switching
       const currentTab = tabManager.getActiveTab();
       if (currentTab) {
         syncEditorStateToTab(currentTab, currentState);
@@ -1033,20 +1088,12 @@ function registerTabCommands(
 
       tabManager.openTab(fileId, {
         filePath: node.path,
-        fileType: node.fileType ?? 'page',
+        fileType,
         fileName: node.name,
-        schema,
-        isDirty: false,
+        schema: session.workingContent,
+        isDirty: session.dirty,
       });
-
-      await restoreEditorForTab({
-        fileId,
-        filePath: node.path,
-        fileType: node.fileType ?? 'page',
-        fileName: node.name,
-        schema,
-        isDirty: false,
-      });
+      await restoreEditorForTab(tabManager.getTab(fileId)!);
       eventBus.emit('tab:opened', { fileId });
       eventBus.emit('tab:activated', { fileId });
     },
@@ -1064,6 +1111,7 @@ function registerTabCommands(
       const wasActive = tabManager.getActiveTabId() === fileId;
 
       tabManager.closeTab(fileId);
+      sessions.removeSession(fileId);
       eventBus.emit('tab:closed', { fileId });
 
       if (wasActive) {
@@ -1090,17 +1138,11 @@ function registerTabCommands(
       const tab = tabManager.getTab(fileId);
       if (!tab) return;
 
-      // Save current active tab state
       const currentTab = tabManager.getActiveTab();
       if (currentTab && currentTab.fileId !== fileId) {
         syncEditorStateToTab(currentTab, currentState);
       }
 
-      // Restore editor state BEFORE switching the active tab.
-      // This ensures that when tabManager.activateTab() triggers React to
-      // re-render with the new activeTabId, shellSnapshot already holds
-      // the target tab's schema — preventing the UI from briefly showing
-      // stale data (tab bar says B, canvas shows A).
       await restoreEditorForTab(tab);
       tabManager.activateTab(fileId);
       eventBus.emit('tab:activated', { fileId });
@@ -1112,6 +1154,11 @@ function registerTabCommands(
     label: 'Sync Tab State',
     recordHistory: false,
     async execute(_currentState, args) {
+      const incomingFileId = extractFileIdFromArgs(args);
+      const existingTab = tabManager.getTab(incomingFileId);
+      if (!existingTab) {
+        return { synced: false };
+      }
       const {
         fileId,
         schema,
@@ -1120,14 +1167,19 @@ function registerTabCommands(
         isGenerating,
         readOnlyReason,
         generationUpdatedAt,
-      } = extractTabSyncStateArgs(args);
-      const existingTab = tabManager.getTab(fileId);
-      if (!existingTab) {
+      } = extractTabSyncStateArgs(args, existingTab.fileType);
+      const session = getSessionSnapshot(fileId);
+      if (!session) {
         return { synced: false };
+      }
+      if (schema !== undefined) {
+        sessions.updateWorkingContent(fileId, schema, isDirty ?? session.dirty);
+      } else if (typeof isDirty === 'boolean') {
+        sessions.markDirty(fileId, isDirty);
       }
 
       const patch: Partial<Omit<TabState, 'fileId'>> = {
-        ...(schema ? { schema } : {}),
+        ...(schema !== undefined ? { schema } : {}),
         ...(selectedNodeId !== undefined ? { selectedNodeId } : {}),
         ...(isDirty !== undefined ? { isDirty } : {}),
         ...(isGenerating !== undefined ? { isGenerating } : {}),
@@ -1142,6 +1194,9 @@ function registerTabCommands(
       const syncedTab = tabManager.getTab(fileId);
       if (!syncedTab) {
         return { synced: false };
+      }
+      if (session.owner === 'renderer') {
+        syncRendererTabCache(fileId);
       }
 
       if (tabManager.getActiveTabId() === fileId) {
@@ -1175,19 +1230,20 @@ function registerTabCommands(
         .map((t) => t.fileId)
         .filter((id) => id !== fileId);
 
-      // Save current editor state to the surviving tab if it's active
       const currentActiveId = tabManager.getActiveTabId();
       if (currentActiveId === fileId) {
         syncEditorStateToTab({ ...tabManager.getTab(fileId)!, fileId }, currentState);
       }
 
       tabManager.closeOtherTabs(fileId);
+      for (const closedId of closedIds) {
+        sessions.removeSession(closedId);
+      }
 
       for (const closedId of closedIds) {
         eventBus.emit('tab:closed', { fileId: closedId });
       }
 
-      // If the surviving tab wasn't the active one, restore its state
       if (currentActiveId !== fileId) {
         const tab = tabManager.getTab(fileId);
         if (tab) {
@@ -1205,6 +1261,9 @@ function registerTabCommands(
     async execute(currentState) {
       const closedIds = tabManager.getTabs().map((t) => t.fileId);
       tabManager.closeAllTabs();
+      for (const closedId of closedIds) {
+        sessions.removeSession(closedId);
+      }
       for (const closedId of closedIds) {
         eventBus.emit('tab:closed', { fileId: closedId });
       }
@@ -1261,15 +1320,24 @@ function registerTabCommands(
       }
 
       const source = isRecord(args) && args.source === 'auto' ? 'auto' : 'manual';
-      const schema = activeTab.fileType === 'api'
-        ? activeTab.schema
-        : currentState.getSchema();
-      await vfs.writeFile(projectId, activeTab.fileId, schema);
-      if (activeTab.fileType !== 'api') {
-        tabManager.updateTab(activeTab.fileId, { schema });
+      const session = getSessionSnapshot(activeTab.fileId);
+      if (!session) {
+        throw new Error(`Document session not found: ${activeTab.fileId}`);
       }
+      let content = session.workingContent;
+      if (session.owner === 'page-editor') {
+        content = currentState.getSchema();
+        sessions.updateWorkingContent(activeTab.fileId, content, currentState.getIsDirty());
+      }
+      await vfs.writeFile(projectId, activeTab.fileId, content);
+      const savedSession = sessions.replacePersistedContent(activeTab.fileId, content);
+      tabManager.updateTab(activeTab.fileId, {
+        schema: savedSession?.workingContent ?? content,
+      });
       tabManager.markDirty(activeTab.fileId, false);
-      currentState.setDirty(false);
+      if (session.owner === 'page-editor') {
+        currentState.setDirty(false);
+      }
       eventBus.emit('tab:dirtyChanged', { fileId: activeTab.fileId, isDirty: false });
       eventBus.emit('file:saved', { fileId: activeTab.fileId, source });
     },
@@ -1279,6 +1347,7 @@ function registerTabCommands(
 export function createEditor(options: CreateEditorOptions = {}): EditorInstance {
   const initialSchema = options.initialSchema ?? createEmptySchema();
   const state = new EditorState(initialSchema);
+  const sessions = new DocumentSessionManager();
   const history = new History<EditorStateSnapshot>(
     state.getSnapshot(),
     options.historyMaxSize === undefined ? {} : { maxSize: options.historyMaxSize },
@@ -1297,7 +1366,7 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
 
   const tabManager = options.tabManager;
   if (tabManager) {
-    registerTabCommands(commands, eventBus, tabManager, options.vfs, options.projectId);
+    registerTabCommands(commands, eventBus, tabManager, sessions, options.vfs, options.projectId);
   }
 
   const unsubscribeState = tabManager
@@ -1318,10 +1387,15 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
       if (!activeTab) {
         return;
       }
-      if (activeTab.fileType === 'api') {
+      const activeSession = sessions.getSession(activeTabId);
+      if (!activeSession) {
+        return;
+      }
+      if (activeSession.owner === 'renderer') {
         if (activeTab.isDirty === snapshot.isDirty) {
           return;
         }
+        sessions.markDirty(activeTabId, snapshot.isDirty);
         tabManager.updateTab(activeTabId, {
           isDirty: snapshot.isDirty,
         });
@@ -1334,6 +1408,7 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
       ) {
         return;
       }
+      sessions.updateWorkingContent(activeTabId, snapshot.schema, snapshot.isDirty);
       tabManager.updateTab(activeTabId, {
         schema: snapshot.schema,
         selectedNodeId: snapshot.selectedNodeId,

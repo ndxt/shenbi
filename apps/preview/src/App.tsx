@@ -325,11 +325,11 @@ export function App() {
       onCloseSavedTabs={workspaceState.handleCloseSavedTabs}
       onMoveTab={workspaceState.handleMoveTab}
       onCanvasDocumentDirtyChange={useCallback((fileId: string, dirty: boolean) => {
-        tabManager.markDirty(fileId, dirty);
-      }, [tabManager])}
+        void fileEditor.commands.execute('tab.syncState', { fileId, isDirty: dirty });
+      }, [fileEditor.commands])}
       onCanvasDocumentSchemaChange={useCallback((fileId: string, schema: Record<string, unknown>) => {
-        tabManager.updateTab(fileId, { schema: schema as any });
-      }, [tabManager])}
+        void fileEditor.commands.execute('tab.syncState', { fileId, schema });
+      }, [fileEditor.commands])}
       toolbarExtra={(
         <PreviewToolbar
           previewT={previewT as (...args: any[]) => string}

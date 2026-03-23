@@ -31,6 +31,7 @@ export function useCanvasDocumentContext(options: {
   const saveCallbacksRef = useRef(new Set<VoidCallback>());
   const undoCallbacksRef = useRef(new Set<VoidCallback>());
   const redoCallbacksRef = useRef(new Set<VoidCallback>());
+  const documentRef = useRef<Record<string, unknown> | undefined>(undefined);
 
   const onDirtyChangeRef = useRef(options.onDirtyChange);
   onDirtyChangeRef.current = options.onDirtyChange;
@@ -43,9 +44,12 @@ export function useCanvasDocumentContext(options: {
     onDirtyChangeRef.current(dirty);
   }, []);
 
-  const syncSchema = useCallback((schema: Record<string, unknown>) => {
+  const replaceDocument = useCallback((schema: Record<string, unknown>) => {
+    documentRef.current = schema;
     onSchemaChangeRef.current?.(schema);
   }, []);
+
+  const getDocument = useCallback(() => documentRef.current, []);
 
   const onSaveRequest = useCallback((callback: VoidCallback) => {
     saveCallbacksRef.current.add(callback);
@@ -68,12 +72,14 @@ export function useCanvasDocumentContext(options: {
 
   const context = useMemo<CanvasRendererDocumentContext>(() => ({
     markDirty,
-    syncSchema,
+    getDocument,
+    replaceDocument,
+    syncSchema: replaceDocument,
     onSaveRequest,
     onUndoRequest,
     onRedoRequest,
     reportUndoRedoState,
-  }), [markDirty, onSaveRequest, onUndoRequest, onRedoRequest, reportUndoRedoState, syncSchema]);
+  }), [getDocument, markDirty, onSaveRequest, onUndoRequest, onRedoRequest, replaceDocument, reportUndoRedoState]);
 
   const dispatch = useMemo(() => ({
     save: () => { for (const cb of saveCallbacksRef.current) cb(); },

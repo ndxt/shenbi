@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PageSchema } from '@shenbi/schema';
 import { createEditor } from './create-editor';
-import type { FileMetadata, FileStorageAdapter } from './adapters/file-storage';
+import type { FileContent, FileMetadata, FileStorageAdapter } from './adapters/file-storage';
 import type { VirtualFileSystemAdapter } from './adapters/virtual-fs';
 import { TabManager } from './tab-manager';
 
@@ -85,20 +85,20 @@ function createMemoryStorage(initial: PageSchema = createSchema('loaded')): File
   };
 }
 
-function createMemoryVFS(initialSchema: PageSchema = createSchema('loaded')): VirtualFileSystemAdapter {
+function createMemoryVFS(initialSchema: FileContent = createSchema('loaded')): VirtualFileSystemAdapter {
   const nodes = new Map([
     ['demo', {
       id: 'demo',
-      name: initialSchema.name ?? 'demo',
+      name: (initialSchema as { name?: string }).name ?? 'demo',
       type: 'file' as const,
-      fileType: 'page' as const,
+      fileType: ('body' in initialSchema ? 'page' : 'api') as 'page' | 'api',
       parentId: null,
       path: '/demo.page.json',
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }],
   ]);
-  const contents = new Map<string, PageSchema>([['demo', initialSchema]]);
+  const contents = new Map<string, FileContent>([['demo', initialSchema]]);
 
   return {
     async initialize() {
@@ -119,7 +119,7 @@ function createMemoryVFS(initialSchema: PageSchema = createSchema('loaded')): Vi
         updatedAt: Date.now(),
       };
       nodes.set(node.id, node);
-      contents.set(node.id, content as PageSchema);
+      contents.set(node.id, content as FileContent);
       return node;
     },
     async readFile(_projectId, fileId) {
@@ -130,7 +130,7 @@ function createMemoryVFS(initialSchema: PageSchema = createSchema('loaded')): Vi
       return content;
     },
     async writeFile(_projectId, fileId, content) {
-      contents.set(fileId, content as PageSchema);
+      contents.set(fileId, content as FileContent);
       const node = nodes.get(fileId);
       if (node) {
         node.updatedAt = Date.now();
@@ -465,6 +465,31 @@ describe('createEditor', () => {
     expect(tabManager.getTab('demo')?.isDirty).toBe(false);
   });
 
+  it('tab.save writes renderer-owned api content from canonical session state', async () => {
+    const initial = createGatewaySchema('gateway-initial');
+    const updated = createGatewaySchema('gateway-updated');
+    const vfs = createMemoryVFS(initial);
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    await editor.commands.execute('tab.syncState', {
+      fileId: 'demo',
+      schema: updated,
+      isDirty: true,
+    });
+    await editor.commands.execute('tab.save');
+
+    expect(await vfs.readFile('project-1', 'demo')).toEqual(updated);
+    expect(tabManager.getTab('demo')?.schema).toEqual(updated);
+    expect(tabManager.getTab('demo')?.isDirty).toBe(false);
+  });
+
   it('keeps active tab snapshot in sync with editor state and closes saved tabs through command flow', async () => {
     const vfs = createMemoryVFS(createSchema('page-a'));
     const tabManager = new TabManager();
@@ -614,6 +639,29 @@ describe('createEditor', () => {
       generationUpdatedAt: 456,
     });
     expect(dirtyChanged).toHaveBeenCalledWith({ fileId: 'demo', isDirty: true });
+  });
+
+  it('tab.syncState accepts renderer-owned documents without page validation and keeps the page editor isolated', async () => {
+    const vfs = createMemoryVFS(createGatewaySchema('gateway-a'));
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+
+    await editor.commands.execute('tab.open', { fileId: 'demo' });
+    await editor.commands.execute('tab.syncState', {
+      fileId: 'demo',
+      schema: createGatewaySchema('gateway-b'),
+      isDirty: true,
+    });
+
+    expect(editor.state.getCurrentFileId()).toBe('demo');
+    expect(editor.state.getSchema()).toEqual(createSchema('page'));
+    expect(tabManager.getTab('demo')?.schema).toEqual(createGatewaySchema('gateway-b'));
+    expect(tabManager.getTab('demo')?.isDirty).toBe(true);
   });
 
   it('tab.open restores an empty page snapshot for api tabs while preserving the current file id', async () => {

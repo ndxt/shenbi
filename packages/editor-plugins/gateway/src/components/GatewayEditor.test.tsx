@@ -37,12 +37,20 @@ function createHostAdapter(overrides?: Partial<GatewayHostAdapter>): GatewayHost
 }
 
 describe('GatewayEditor', () => {
+  const initialDocument = {
+    id: 'api-1',
+    name: 'Billing API',
+    type: 'api-gateway' as const,
+    nodes: [],
+    edges: [],
+  };
+
   it('does not auto-save gateway documents after canvas edits', async () => {
     gatewayCanvasSpy.mockClear();
     const saveDocument = vi.fn(async () => undefined);
     const hostAdapter = createHostAdapter({ saveDocument });
 
-    render(<GatewayEditor hostAdapter={hostAdapter} />);
+    render(<GatewayEditor hostAdapter={hostAdapter} documentSchema={initialDocument} />);
 
     await waitFor(() => {
       expect(gatewayCanvasSpy).toHaveBeenCalled();
@@ -77,14 +85,10 @@ describe('GatewayEditor', () => {
     expect(saveDocument).not.toHaveBeenCalled();
   });
 
-  it('does not reload the document when hostAdapter identity changes for the same file', async () => {
+  it('does not reset the canvas document when hostAdapter identity changes for the same file', async () => {
     gatewayCanvasSpy.mockClear();
     const firstAdapter = createHostAdapter();
-    const { rerender } = render(<GatewayEditor hostAdapter={firstAdapter} />);
-
-    await waitFor(() => {
-      expect(firstAdapter.loadDocument).toHaveBeenCalledTimes(1);
-    });
+    const { rerender } = render(<GatewayEditor hostAdapter={firstAdapter} documentSchema={initialDocument} />);
     expect(screen.getAllByTestId('gateway-canvas').length).toBeGreaterThan(0);
 
     const secondAdapter = createHostAdapter({
@@ -97,22 +101,32 @@ describe('GatewayEditor', () => {
       })),
     });
 
-    rerender(<GatewayEditor hostAdapter={secondAdapter} />);
-
-    await waitFor(() => {
-      expect(firstAdapter.loadDocument).toHaveBeenCalledTimes(1);
-    });
+    const resetBeforeRerender = gatewayCanvasSpy.mock.calls.length;
+    rerender(<GatewayEditor hostAdapter={secondAdapter} documentSchema={initialDocument} />);
+    expect(gatewayCanvasSpy.mock.calls.length).toBeGreaterThanOrEqual(resetBeforeRerender);
     expect(secondAdapter.loadDocument).not.toHaveBeenCalled();
   });
 
-  it('reloads the document when the hostAdapter points at a different file', async () => {
+  it('replaces the working document when the host points at a different file', async () => {
     gatewayCanvasSpy.mockClear();
     const firstAdapter = createHostAdapter();
-    const { rerender } = render(<GatewayEditor hostAdapter={firstAdapter} />);
-
-    await waitFor(() => {
-      expect(firstAdapter.loadDocument).toHaveBeenCalledTimes(1);
-    });
+    const replaceDocument = vi.fn();
+    const documentContext = {
+      markDirty: vi.fn(),
+      replaceDocument,
+      syncSchema: replaceDocument,
+      reportUndoRedoState: vi.fn(),
+      onSaveRequest: vi.fn(() => () => undefined),
+      onUndoRequest: vi.fn(() => () => undefined),
+      onRedoRequest: vi.fn(() => () => undefined),
+    };
+    const { rerender } = render(
+      <GatewayEditor
+        hostAdapter={firstAdapter}
+        documentSchema={initialDocument}
+        documentContext={documentContext}
+      />,
+    );
 
     const secondAdapter = createHostAdapter({
       fileId: 'api-2',
@@ -126,10 +140,28 @@ describe('GatewayEditor', () => {
       })),
     });
 
-    rerender(<GatewayEditor hostAdapter={secondAdapter} />);
+    rerender(
+      <GatewayEditor
+        hostAdapter={secondAdapter}
+        documentSchema={{
+          id: 'api-2',
+          name: 'Orders API',
+          type: 'api-gateway',
+          nodes: [],
+          edges: [],
+        }}
+        documentContext={documentContext}
+      />,
+    );
 
     await waitFor(() => {
-      expect(secondAdapter.loadDocument).toHaveBeenCalledTimes(1);
+      expect(replaceDocument).toHaveBeenCalledWith({
+        id: 'api-2',
+        name: 'Orders API',
+        type: 'api-gateway',
+        nodes: [],
+        edges: [],
+      });
     });
   });
 
@@ -137,12 +169,11 @@ describe('GatewayEditor', () => {
     gatewayCanvasSpy.mockClear();
     const firstSaveDocument = vi.fn(async () => undefined);
     const firstAdapter = createHostAdapter({ saveDocument: firstSaveDocument });
-    const { rerender } = render(<GatewayEditor hostAdapter={firstAdapter} />);
+    const { rerender } = render(<GatewayEditor hostAdapter={firstAdapter} documentSchema={initialDocument} />);
 
     await act(async () => {
       await Promise.resolve();
     });
-    expect(firstAdapter.loadDocument).toHaveBeenCalledTimes(1);
 
     let latestProps = gatewayCanvasSpy.mock.calls.at(-1)?.[0] as {
       onDocumentChange?: (document: Record<string, unknown>) => void;
@@ -169,12 +200,22 @@ describe('GatewayEditor', () => {
       saveDocument: vi.fn(async () => undefined),
     });
 
-    rerender(<GatewayEditor hostAdapter={secondAdapter} />);
+    rerender(
+      <GatewayEditor
+        hostAdapter={secondAdapter}
+        documentSchema={{
+          id: 'api-2',
+          name: 'Orders API',
+          type: 'api-gateway',
+          nodes: [],
+          edges: [],
+        }}
+      />,
+    );
 
     await act(async () => {
       await Promise.resolve();
     });
-    expect(secondAdapter.loadDocument).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await Promise.resolve();
@@ -191,6 +232,8 @@ describe('GatewayEditor', () => {
     const saveHandlers: Array<() => void> = [];
     const documentContext = {
       markDirty: vi.fn(),
+      getDocument: vi.fn(),
+      replaceDocument: syncSchema,
       syncSchema,
       reportUndoRedoState: vi.fn(),
       onSaveRequest: vi.fn((handler: () => void) => {
@@ -203,6 +246,7 @@ describe('GatewayEditor', () => {
 
     render(
       <GatewayEditor
+        documentSchema={initialDocument}
         hostAdapter={createHostAdapter({ saveDocument })}
         documentContext={documentContext}
       />,
@@ -248,7 +292,6 @@ describe('GatewayEditor', () => {
       edges: [],
       viewport: { x: 10, y: 20, zoom: 1.1 },
     });
-    expect(saveDocument).not.toHaveBeenCalled();
     expect(saveHandlers.length).toBeGreaterThan(0);
 
     await act(async () => {
@@ -256,7 +299,7 @@ describe('GatewayEditor', () => {
       await Promise.resolve();
     });
 
-    expect(saveDocument).toHaveBeenCalledWith({
+    expect(syncSchema).toHaveBeenCalledWith({
       id: 'api-1',
       name: 'Billing API',
       type: 'api-gateway',

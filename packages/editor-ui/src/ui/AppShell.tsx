@@ -346,6 +346,9 @@ export function AppShell({
   const [canvasRuntime, setCanvasRuntime] = React.useState<CanvasRendererHostRuntime | null>(null);
   const canvasRuntimeRef = React.useRef<CanvasRendererHostRuntime | null>(null);
   canvasRuntimeRef.current = canvasRuntime;
+  const handleCanvasRuntimeReady = React.useCallback((runtime: CanvasRendererHostRuntime | null) => {
+    setCanvasRuntime((current) => (current === runtime ? current : runtime));
+  }, []);
   const [activeCanvasTool, setActiveCanvasTool] = React.useState<CanvasToolMode>('select');
   const zoomCanvasIn = React.useCallback(() => {
     canvasRuntimeRef.current?.zoomIn?.();
@@ -1479,7 +1482,7 @@ export function AppShell({
     interaction: {
       activeTool: activeCanvasTool,
       setActiveTool: setActiveCanvasTool as (mode: string) => void,
-      onRuntimeReady: (runtime: CanvasRendererHostRuntime | null) => setCanvasRuntime(runtime),
+      onRuntimeReady: handleCanvasRuntimeReady,
     },
   }), [
     activeCanvasTool,
@@ -1498,6 +1501,7 @@ export function AppShell({
     onCanvasInsertComponent,
     onCanvasMoveSelectedNode,
     onCanvasSelectNode,
+    handleCanvasRuntimeReady,
     selectedNodeSchemaId,
     selectedNodeTreeId,
     selectionOverlayActions,
@@ -1507,6 +1511,11 @@ export function AppShell({
     ...(activeEditorTab?.fileName ? { name: activeEditorTab.fileName } : {}),
     ...(activeEditorTab?.fileType ? { type: activeEditorTab.fileType } : {}),
   }), [activeEditorTab?.fileId, activeEditorTab?.fileName, activeEditorTab?.fileType]);
+  const canvasRendererContent = React.useMemo(() => (
+    activeEditorTab?.fileType && activeEditorTab.fileType !== 'page'
+      ? activeEditorTab.schema as Record<string, unknown>
+      : undefined
+  ), [activeEditorTab?.fileType, activeEditorTab?.schema]);
   const canvasRendererSurface = React.useMemo(() => ({
     children,
     renderMode,
@@ -1670,6 +1679,7 @@ export function AppShell({
                   <React.Fragment>
                     {activeCanvasRenderer.render({
                       file: canvasRendererFile,
+                      ...(canvasRendererContent ? { content: canvasRendererContent } : {}),
                       surface: canvasRendererSurface,
                       environment: canvasRendererEnvironment,
                       canvasHost,

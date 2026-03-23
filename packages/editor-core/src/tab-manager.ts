@@ -1,12 +1,11 @@
-import type { PageSchema } from '@shenbi/schema';
-import type { FileType } from './adapters/file-storage';
+import type { FileContent, FileType } from './adapters/file-storage';
 
 export interface TabState {
   fileId: string;
   filePath: string;
   fileType: FileType;
   fileName: string;
-  schema: PageSchema;
+  schema: FileContent;
   selectedNodeId?: string | undefined;
   isDirty: boolean;
   isGenerating?: boolean | undefined;
