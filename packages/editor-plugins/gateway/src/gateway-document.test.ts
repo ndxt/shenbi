@@ -39,6 +39,12 @@ describe('gateway-document', () => {
 
     expect(graph.nodes).toHaveLength(2);
     expect(graph.nodes.every((node) => node.width === 200 && node.height === 60)).toBe(true);
+    expect(graph.nodes.every((node) => (
+      node.initialWidth === 200
+      && node.initialHeight === 60
+      && node.measured?.width === 200
+      && node.measured?.height === 60
+    ))).toBe(true);
   });
 
   it('hydrates fallback handles from unified contract ports', () => {

@@ -95,6 +95,12 @@ export function withGatewayNodeRuntime<T extends GatewayNode>(node: T): T {
     ...node,
     width,
     height,
+    initialWidth: node.initialWidth ?? width,
+    initialHeight: node.initialHeight ?? height,
+    measured: {
+      width,
+      height,
+    },
     handles: buildGatewayNodeHandles(node.data.kind, width, height),
   };
 }

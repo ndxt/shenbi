@@ -59,7 +59,14 @@ export function GatewayEditor({
   const [edges, setEdges] = useState(initialGraph.edges);
   const [viewport, setViewport] = useState(initialGraph.viewport);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const historyCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hostAdapterRef = useRef(hostAdapter);
+  const lastLocalDocumentRef = useRef<GatewayDocumentSchema | null>(null);
+
+  const getCurrentDocument = useCallback(
+    () => lastLocalDocumentRef.current ?? history.document,
+    [history.document],
+  );
 
   useEffect(() => {
     hostAdapterRef.current = hostAdapter;
@@ -70,6 +77,10 @@ export function GatewayEditor({
   useEffect(() => {
     if (history.document !== prevDocumentRef.current) {
       prevDocumentRef.current = history.document;
+      if (lastLocalDocumentRef.current === history.document) {
+        lastLocalDocumentRef.current = null;
+        return;
+      }
       const graph = gatewayDocumentToGraph(history.document);
       setNodes(graph.nodes);
       setEdges(graph.edges);
@@ -120,35 +131,62 @@ export function GatewayEditor({
         clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
+      if (historyCommitTimerRef.current) {
+        clearTimeout(historyCommitTimerRef.current);
+        historyCommitTimerRef.current = null;
+      }
     };
   }, []);
 
   useEffect(() => {
     if (!saveTimerRef.current) {
+      if (historyCommitTimerRef.current) {
+        clearTimeout(historyCommitTimerRef.current);
+        historyCommitTimerRef.current = null;
+      }
       return;
     }
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = null;
+    if (historyCommitTimerRef.current) {
+      clearTimeout(historyCommitTimerRef.current);
+      historyCommitTimerRef.current = null;
+    }
   }, [hostAdapter?.fileId]);
 
   // --- Keyboard shortcuts (Ctrl+Z/Y/S) ---
   useEffect(() => {
+    const flushPendingHistory = () => {
+      if (!history.isLocked) {
+        return;
+      }
+      if (historyCommitTimerRef.current) {
+        clearTimeout(historyCommitTimerRef.current);
+        historyCommitTimerRef.current = null;
+      }
+      history.commit();
+    };
+
     const handleKeyDown = (event: KeyboardEvent) => {
       const isCtrlOrMeta = event.ctrlKey || event.metaKey;
       if (!isCtrlOrMeta) return;
 
       if (event.key === 'z' && !event.shiftKey) {
         event.preventDefault();
+        flushPendingHistory();
         history.undo();
       } else if (event.key === 'z' && event.shiftKey) {
         event.preventDefault();
+        flushPendingHistory();
         history.redo();
       } else if (event.key === 'y') {
         event.preventDefault();
+        flushPendingHistory();
         history.redo();
       } else if (event.key === 's') {
         event.preventDefault();
-        const doc = history.document;
+        flushPendingHistory();
+        const doc = getCurrentDocument();
         if (hostAdapter) {
           void hostAdapter.saveDocument(doc).then(() => {
             history.markSaved();
@@ -164,7 +202,7 @@ export function GatewayEditor({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [history, hostAdapter, onSave]);
+  }, [getCurrentDocument, history, hostAdapter, onSave]);
 
   // --- Document lifecycle: wire to host context ---
 
@@ -185,8 +223,15 @@ export function GatewayEditor({
   useEffect(() => {
     if (!documentContext) return undefined;
     return documentContext.onSaveRequest(() => {
+      if (history.isLocked) {
+        if (historyCommitTimerRef.current) {
+          clearTimeout(historyCommitTimerRef.current);
+          historyCommitTimerRef.current = null;
+        }
+        history.commit();
+      }
       // Explicit save: write current document to file system
-      const doc = history.document;
+      const doc = getCurrentDocument();
       if (hostAdapter) {
         void hostAdapter.saveDocument(doc).then(() => {
           history.markSaved();
@@ -198,12 +243,19 @@ export function GatewayEditor({
       }
       onSave?.(doc);
     });
-  }, [documentContext, history, hostAdapter, onSave]);
+  }, [documentContext, getCurrentDocument, history, hostAdapter, onSave]);
 
   // Register undo callback
   useEffect(() => {
     if (!documentContext) return undefined;
     return documentContext.onUndoRequest(() => {
+      if (history.isLocked) {
+        if (historyCommitTimerRef.current) {
+          clearTimeout(historyCommitTimerRef.current);
+          historyCommitTimerRef.current = null;
+        }
+        history.commit();
+      }
       history.undo();
     });
   }, [documentContext, history]);
@@ -212,6 +264,13 @@ export function GatewayEditor({
   useEffect(() => {
     if (!documentContext) return undefined;
     return documentContext.onRedoRequest(() => {
+      if (history.isLocked) {
+        if (historyCommitTimerRef.current) {
+          clearTimeout(historyCommitTimerRef.current);
+          historyCommitTimerRef.current = null;
+        }
+        history.commit();
+      }
       history.redo();
     });
   }, [documentContext, history]);
@@ -219,10 +278,22 @@ export function GatewayEditor({
   // --- Persistence (debounced auto-save + history push) ---
 
   const persistDocument = useCallback((nextDocument: GatewayDocumentSchema) => {
-    // Push to history (creates undo point + marks dirty)
+    if (!history.isLocked) {
+      history.lock();
+    }
+
+    lastLocalDocumentRef.current = nextDocument;
     history.pushState(nextDocument);
     onDirty?.();
     onSave?.(nextDocument);
+
+    if (historyCommitTimerRef.current) {
+      clearTimeout(historyCommitTimerRef.current);
+    }
+    historyCommitTimerRef.current = setTimeout(() => {
+      history.commit();
+      historyCommitTimerRef.current = null;
+    }, 180);
 
     // Debounced auto-save to file system
     if (!hostAdapter) {

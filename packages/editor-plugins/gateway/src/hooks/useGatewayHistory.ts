@@ -25,6 +25,12 @@ export interface GatewayHistoryState {
   markSaved: () => void;
   /** Replace the document without creating an undo point (e.g. initial load) */
   reset: (doc: GatewayDocumentSchema) => void;
+  /** Start a batched history update for continuous interactions like dragging */
+  lock: () => void;
+  /** Commit the current batched interaction as a single undo step */
+  commit: () => boolean;
+  /** Whether a batched interaction is currently in progress */
+  isLocked: boolean;
 }
 
 export function useGatewayHistory(
@@ -39,6 +45,7 @@ export function useGatewayHistory(
   const [isDirty, setIsDirty] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
 
   // Track the saved snapshot for dirty comparison
   const savedSnapshotRef = useRef(initialDocument);
@@ -91,7 +98,24 @@ export function useGatewayHistory(
     setIsDirty(false);
     setCanUndo(false);
     setCanRedo(false);
+    setIsLocked(false);
   }, []);
+
+  const lock = useCallback(() => {
+    const h = historyRef.current!;
+    h.lock();
+    setIsLocked(h.isLocked());
+  }, []);
+
+  const commit = useCallback(() => {
+    const h = historyRef.current!;
+    const committed = h.commit();
+    setDocument(h.getCurrent());
+    setIsLocked(h.isLocked());
+    setIsDirty(h.getCurrent() !== savedSnapshotRef.current);
+    syncHistoryFlags();
+    return committed;
+  }, [syncHistoryFlags]);
 
   return {
     document,
@@ -103,5 +127,8 @@ export function useGatewayHistory(
     redo,
     markSaved,
     reset,
+    lock,
+    commit,
+    isLocked,
   };
 }
