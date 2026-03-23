@@ -822,6 +822,8 @@ export function GatewayCanvas({
         elementsSelectable={!effectivePan}
         selectionOnDrag={!effectivePan}
         panOnDrag={effectivePan ? [0, 1] : [1]}
+        fitView={!initialViewport}
+        fitViewOptions={{ padding: 0.3 }}
       >
         <CanvasZoomHud
           className="nopan"
