@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NODE_CONTRACTS, DRAGGABLE_NODE_KINDS, getNodeContract } from './types';
+import { NODE_CONTRACTS, DRAGGABLE_NODE_KINDS, getNodeContract, getContractInputs, getContractOutputs } from './types';
 import type { GatewayNodeKind } from './types';
 
 describe('NODE_CONTRACTS', () => {
@@ -18,60 +18,69 @@ describe('NODE_CONTRACTS', () => {
     ];
     for (const kind of kinds) {
       expect(NODE_CONTRACTS[kind]).toBeDefined();
-      expect(NODE_CONTRACTS[kind].kind).toBe(kind);
-      expect(NODE_CONTRACTS[kind].label).toBeTruthy();
+      expect(NODE_CONTRACTS[kind].componentType).toBeTruthy();
+      expect(NODE_CONTRACTS[kind].description).toBeTruthy();
     }
   });
 
   it('start node has no inputs and 1 output', () => {
-    const start = NODE_CONTRACTS.start;
-    expect(start.inputs).toHaveLength(0);
-    expect(start.outputs).toHaveLength(1);
-    expect(start.outputs[0].dataType).toBe('object');
+    const start = getNodeContract('start');
+    const inputs = getContractInputs(start);
+    const outputs = getContractOutputs(start);
+    expect(inputs).toHaveLength(0);
+    expect(outputs).toHaveLength(1);
+    expect(outputs[0].dataType).toBe('object');
     expect(start.maxInstances).toBe(1);
   });
 
   it('end node has 1 input and no outputs', () => {
-    const end = NODE_CONTRACTS.end;
-    expect(end.inputs).toHaveLength(1);
-    expect(end.inputs[0].dataType).toBe('any');
-    expect(end.outputs).toHaveLength(0);
+    const end = getNodeContract('end');
+    const inputs = getContractInputs(end);
+    const outputs = getContractOutputs(end);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0].dataType).toBe('any');
+    expect(outputs).toHaveLength(0);
   });
 
   it('sql-query node has correct ports', () => {
-    const sql = NODE_CONTRACTS['sql-query'];
-    expect(sql.inputs).toHaveLength(1);
-    expect(sql.inputs[0].dataType).toBe('object');
-    expect(sql.outputs).toHaveLength(1);
-    expect(sql.outputs.map((o) => o.dataType)).toEqual(['array']);
+    const sql = getNodeContract('sql-query');
+    const inputs = getContractInputs(sql);
+    const outputs = getContractOutputs(sql);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0].dataType).toBe('object');
+    expect(outputs).toHaveLength(1);
+    expect(outputs.map((o) => o.dataType)).toEqual(['array']);
   });
 
   it('branch node has 2 outputs (true/false)', () => {
-    const branch = NODE_CONTRACTS.branch;
-    expect(branch.outputs).toHaveLength(2);
-    expect(branch.outputs.map((o) => o.id)).toEqual(['true', 'false']);
+    const branch = getNodeContract('branch');
+    const outputs = getContractOutputs(branch);
+    expect(outputs).toHaveLength(2);
+    expect(outputs.map((o) => o.id)).toEqual(['true', 'false']);
   });
 
   it('loop-start node has correct input/output types', () => {
-    const loopStart = NODE_CONTRACTS['loop-start'];
-    expect(loopStart.inputs[0].dataType).toBe('array');
-    expect(loopStart.outputs).toHaveLength(1);
+    const loopStart = getNodeContract('loop-start');
+    const inputs = getContractInputs(loopStart);
+    const outputs = getContractOutputs(loopStart);
+    expect(inputs[0].dataType).toBe('array');
+    expect(outputs).toHaveLength(1);
   });
 
   it('loop subnodes define bridgeable control-flow ports', () => {
-    const loopStart = NODE_CONTRACTS['loop-start'];
-    const loopEnd = NODE_CONTRACTS['loop-end'];
-    const loopBreak = NODE_CONTRACTS['loop-break'];
-    const loopContinue = NODE_CONTRACTS['loop-continue'];
+    const loopStart = getNodeContract('loop-start');
+    const loopEnd = getNodeContract('loop-end');
+    const loopBreak = getNodeContract('loop-break');
+    const loopContinue = getNodeContract('loop-continue');
 
-    expect(loopStart.inputs[0].dataType).toBe('array');
-    expect(loopStart.outputs).toHaveLength(1);
-    expect(loopEnd.inputs).toHaveLength(1);
-    expect(loopEnd.outputs).toHaveLength(1);
-    expect(loopBreak.inputs).toHaveLength(1);
-    expect(loopBreak.outputs).toHaveLength(1);
-    expect(loopContinue.inputs).toHaveLength(1);
-    expect(loopContinue.outputs).toHaveLength(1);
+    expect(getContractInputs(loopStart)[0].dataType).toBe('array');
+    expect(getContractOutputs(loopStart)).toHaveLength(1);
+    expect(getContractInputs(loopEnd)).toHaveLength(1);
+    expect(getContractOutputs(loopEnd)).toHaveLength(1);
+    expect(getContractInputs(loopBreak)).toHaveLength(1);
+    expect(getContractOutputs(loopBreak)).toHaveLength(1);
+    expect(getContractInputs(loopContinue)).toHaveLength(1);
+    expect(getContractOutputs(loopContinue)).toHaveLength(1);
   });
 });
 
@@ -97,7 +106,7 @@ describe('DRAGGABLE_NODE_KINDS', () => {
 describe('getNodeContract', () => {
   it('returns the correct contract for a kind', () => {
     const contract = getNodeContract('start');
-    expect(contract.kind).toBe('start');
-    expect(contract.label).toBe('开始');
+    expect(contract.componentType).toBe('Gateway.Start');
+    expect(contract.description).toBe('API 入口节点，接收请求参数');
   });
 });

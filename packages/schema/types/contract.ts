@@ -12,6 +12,24 @@ export type ContractValueType =
   | 'Expression'
   | 'any';
 
+/** Data types for flow-node ports — determines connection compatibility */
+export type PortDataType = 'any' | 'string' | 'number' | 'boolean' | 'object' | 'array' | 'void';
+
+/** A single input or output port on a flow node */
+export interface ContractPort {
+  id: string;
+  label: string;
+  dataType: PortDataType;
+  required?: boolean;
+  description?: string;
+}
+
+/** Port definitions for flow-node contracts */
+export interface ContractPorts {
+  inputs?: ContractPort[];
+  outputs?: ContractPort[];
+}
+
 export interface ContractParam {
   name: string;
   type: string;
@@ -62,6 +80,15 @@ export interface ComponentContractV1 {
   version: typeof COMPONENT_CONTRACT_V1_VERSION | string;
   deprecated?: boolean;
   deprecatedMessage?: string;
+
+  /** Component accent color (e.g. for flow-node rendering) */
+  color?: string;
+  /** Human-readable description of the component */
+  description?: string;
+  /** Maximum number of instances allowed (e.g. 1 for start/end nodes) */
+  maxInstances?: number;
+  /** Input/output port definitions for flow-node components */
+  ports?: ContractPorts;
 }
 
 export type ComponentContract = ComponentContractV1;

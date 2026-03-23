@@ -1,10 +1,10 @@
+import type { ComponentContract } from '@shenbi/schema';
 import { isPortTypeCompatible } from '../validation';
-import {
-  NODE_CONTRACTS,
-  type GatewayNode,
-  type GatewayNodeContract,
-  type PortDataType,
+import type {
+  GatewayNode,
+  PortDataType,
 } from '../types';
+import { getNodeContract, getContractInputs, getContractOutputs } from '../types';
 
 function findTargetInputType(
   targetNode: GatewayNode | null,
@@ -14,31 +14,32 @@ function findTargetInputType(
     return undefined;
   }
 
-  const contract = NODE_CONTRACTS[targetNode.data.kind];
-  return contract.inputs.find((port) => port.id === targetHandle)?.dataType;
+  const contract = getNodeContract(targetNode.data.kind);
+  return getContractInputs(contract).find((port) => port.id === targetHandle)?.dataType;
 }
 
 export function resolveBridgeOutputHandle(
-  contract: GatewayNodeContract,
+  contract: ComponentContract,
   targetNode: GatewayNode | null,
   targetHandle?: string,
 ): string | undefined {
-  if (contract.outputs.length === 0) {
+  const outputs = getContractOutputs(contract);
+  if (outputs.length === 0) {
     return undefined;
   }
 
   const targetInputType = findTargetInputType(targetNode, targetHandle);
   if (!targetInputType) {
-    return contract.outputs[0]?.id;
+    return outputs[0]?.id;
   }
 
-  const exactMatch = contract.outputs.find((port) => port.dataType === targetInputType);
+  const exactMatch = outputs.find((port) => port.dataType === targetInputType);
   if (exactMatch) {
     return exactMatch.id;
   }
 
-  const compatibleMatch = contract.outputs.find((port) => (
+  const compatibleMatch = outputs.find((port) => (
     isPortTypeCompatible(port.dataType, targetInputType)
   ));
-  return compatibleMatch?.id ?? contract.outputs[0]?.id;
+  return compatibleMatch?.id ?? outputs[0]?.id;
 }

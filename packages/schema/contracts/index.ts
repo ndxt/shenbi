@@ -213,6 +213,9 @@ export * from './feedback';
 export * from './other';
 export * from './charts';
 
+// ================== Gateway ==================
+export * from './gateway-contracts';
+
 // ================== All Built-in Contracts ==================
 export const builtinContracts: ComponentContract[] = [
   // Layout

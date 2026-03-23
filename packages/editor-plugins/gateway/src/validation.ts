@@ -3,14 +3,17 @@
 // ---------------------------------------------------------------------------
 
 import type { Connection } from '@xyflow/react';
-import {
-  type PortDataType,
-  type PortSchema,
-  type GatewayNodeData,
-  type GatewayNode,
-  type GatewayEdge,
-  NODE_CONTRACTS,
+import type {
+  PortDataType,
+  ContractPort,
+} from '@shenbi/schema';
+import type {
+  GatewayNode,
+  GatewayEdge,
+  GatewayNodeData,
+  GatewayNodeKind,
 } from './types';
+import { getNodeContract, getContractInputs, getContractOutputs } from './types';
 
 /**
  * Check if two port data types are compatible for connection.
@@ -45,12 +48,14 @@ function findPort(
   nodeKind: string,
   handleId: string,
   direction: 'input' | 'output',
-): PortSchema | undefined {
-  const contract = NODE_CONTRACTS[nodeKind as keyof typeof NODE_CONTRACTS];
+): ContractPort | undefined {
+  const contract = getNodeContract(nodeKind as GatewayNodeKind);
   if (!contract) {
     return undefined;
   }
-  const ports = direction === 'input' ? contract.inputs : contract.outputs;
+  const ports = direction === 'input'
+    ? getContractInputs(contract)
+    : getContractOutputs(contract);
   return ports.find((port) => port.id === handleId);
 }
 

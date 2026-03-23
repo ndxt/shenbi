@@ -1,7 +1,7 @@
 export type PaletteAssetInsertKind = 'sidebar' | 'quick-insert' | 'edge-insert';
 
 export interface PaletteDragPayload {
-  kind: 'component' | 'gateway-node';
+  kind: string;
   type: string;
   label: string;
   description?: string | undefined;
@@ -37,7 +37,7 @@ export interface PaletteAsset {
   description?: string | undefined;
   icon?: string | undefined;
   color?: string | undefined;
-  sourceType: PaletteDragPayload['kind'];
+  sourceType: string;
   groupId: string;
   groupName: string;
   dragPayload: PaletteDragPayload;
@@ -45,11 +45,8 @@ export interface PaletteAsset {
   insertable?: boolean | undefined;
   visibility?: PaletteAssetVisibility | undefined;
   children?: PaletteAsset[] | undefined;
-  gateway?: {
-    bridgeable?: boolean | undefined;
-    allowQuickInsert?: boolean | undefined;
-    maxInstances?: number | undefined;
-  } | undefined;
+  /** Extra metadata consumed by specific renderers (e.g. gateway canvas) */
+  extra?: Record<string, unknown> | undefined;
 }
 
 export interface PaletteAssetGroup {

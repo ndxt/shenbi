@@ -30,7 +30,7 @@ import type {
   GatewayNodeKind,
   GatewayNodeData,
 } from '../types';
-import { NODE_CONTRACTS } from '../types';
+import { NODE_CONTRACTS, getNodeContract, getContractInputs, getContractOutputs } from '../types';
 import { NodeSelectorPanel } from './NodeSelectorPanel';
 import { resolveBridgeOutputHandle } from './gateway-edge-insert';
 import { buildGatewayMinimapModel } from './gateway-minimap';
@@ -226,7 +226,7 @@ export function GatewayCanvas({
         return;
       }
 
-      const contract = NODE_CONTRACTS[kind];
+      const contract = getNodeContract(kind);
 
       // Check maxInstances
       if (contract.maxInstances) {
@@ -247,7 +247,7 @@ export function GatewayCanvas({
         position,
         data: {
           kind,
-          label: contract.label,
+          label: contract.displayNameKey ?? kind,
           config: {},
         },
       };
@@ -365,7 +365,7 @@ export function GatewayCanvas({
   const handleAddNodeFromEdge = useCallback((payload: TypedEdgeAddNodePayload) => {
     const sourceNode = nodesRef.current.find((node) => node.id === payload.sourceNodeId);
     const resolvedSourceHandle = payload.sourceHandle
-      ?? (sourceNode ? NODE_CONTRACTS[sourceNode.data.kind].outputs[0]?.id : undefined);
+      ?? (sourceNode ? getContractOutputs(getNodeContract(sourceNode.data.kind))[0]?.id : undefined);
 
     if (!resolvedSourceHandle) {
       return;
@@ -400,12 +400,12 @@ export function GatewayCanvas({
 
     // Handle "change node" mode: replace the existing node's type
     if (selectorPanel.changeNodeId) {
-      const contract = NODE_CONTRACTS[kind];
+      const contract = getNodeContract(kind);
       const nodeId = selectorPanel.changeNodeId;
 
       // Get old node's contract to know old handle IDs
       const oldNode = nodesRef.current.find((n) => n.id === nodeId);
-      const oldContract = oldNode ? NODE_CONTRACTS[oldNode.data.kind as GatewayNodeKind] : undefined;
+      const oldContract = oldNode ? getNodeContract(oldNode.data.kind as GatewayNodeKind) : undefined;
 
       const nextNodes = nodesRef.current.map((n) => {
         if (n.id !== nodeId) return n;
@@ -415,16 +415,16 @@ export function GatewayCanvas({
           data: {
             ...n.data,
             kind,
-            label: contract.label,
+            label: contract.displayNameKey ?? kind,
           },
         };
       });
 
       // Remap edge handles: old input/output IDs → new contract's first input/output
-      const newInputId = contract.inputs[0]?.id;
-      const newOutputId = contract.outputs[0]?.id;
-      const oldInputIds = new Set(oldContract?.inputs.map((p) => p.id) ?? []);
-      const oldOutputIds = new Set(oldContract?.outputs.map((p) => p.id) ?? []);
+      const newInputId = getContractInputs(contract)[0]?.id;
+      const newOutputId = getContractOutputs(contract)[0]?.id;
+      const oldInputIds = new Set(oldContract ? getContractInputs(oldContract).map((p) => p.id) : []);
+      const oldOutputIds = new Set(oldContract ? getContractOutputs(oldContract).map((p) => p.id) : []);
 
       const nextEdges = edgesRef.current
         .map((e) => {
@@ -454,8 +454,8 @@ export function GatewayCanvas({
       return;
     }
 
-    const contract = NODE_CONTRACTS[kind];
-    if (selectorPanel.edgeId && (contract.inputs.length === 0 || contract.outputs.length === 0)) {
+    const contract = getNodeContract(kind);
+    if (selectorPanel.edgeId && (getContractInputs(contract).length === 0 || getContractOutputs(contract).length === 0)) {
       return;
     }
     const sourceNode = nodesRef.current.find((n) => n.id === selectorPanel.sourceNodeId);
@@ -510,7 +510,7 @@ export function GatewayCanvas({
       position: newNodePosition,
       data: {
         kind,
-        label: contract.label,
+        label: contract.displayNameKey ?? kind,
         config: {},
       },
     };
@@ -521,7 +521,7 @@ export function GatewayCanvas({
       source: selectorPanel.sourceNodeId,
       sourceHandle: selectorPanel.sourceHandle,
       target: newNode.id,
-      targetHandle: contract.inputs[0]?.id || 'input',
+      targetHandle: getContractInputs(contract)[0]?.id || 'input',
     };
 
     // 一次性添加新节点 + 所有边
@@ -537,17 +537,17 @@ export function GatewayCanvas({
       // Resolve the target handle: use the stored value from the original edge,
       // or fall back to the target node's first input handle.
       const targetContract = targetNode
-        ? NODE_CONTRACTS[targetNode.data.kind]
+        ? getNodeContract(targetNode.data.kind)
         : undefined;
       const resolvedTargetHandle = selectorPanel.targetHandle
-        || targetContract?.inputs[0]?.id
+        || (targetContract ? getContractInputs(targetContract)[0]?.id : undefined)
         || 'input';
 
       const secondEdge: GatewayEdge = {
         id: `edge_${Date.now()}_insert`,
         type: 'typed',
         source: newNode.id,
-        sourceHandle: bridgeOutputHandle || contract.outputs[0]?.id || 'output',
+        sourceHandle: bridgeOutputHandle || getContractOutputs(contract)[0]?.id || 'output',
         target: selectorPanel.targetNodeId,
         targetHandle: resolvedTargetHandle,
       };

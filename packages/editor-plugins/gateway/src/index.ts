@@ -15,13 +15,20 @@ export {
 } from './gateway-host-adapter';
 export type {
   GatewayNodeKind,
-  GatewayNodeContract,
   GatewayNode,
   GatewayEdge,
   GatewayNodeData,
   GatewayDocumentSchema,
-  PortDataType,
-  PortSchema,
 } from './types';
-export { NODE_CONTRACTS, DRAGGABLE_NODE_KINDS, getNodeContract, PORT_TYPE_COLORS } from './types';
+export {
+  NODE_CONTRACTS,
+  DRAGGABLE_NODE_KINDS,
+  getNodeContract,
+  getContractInputs,
+  getContractOutputs,
+  PORT_TYPE_COLORS,
+  GATEWAY_KIND_TO_COMPONENT_TYPE,
+  GATEWAY_COMPONENT_TYPE_TO_KIND,
+} from './types';
+export type { PortDataType, ContractPort } from './types';
 export { isPortTypeCompatible, isValidConnection } from './validation';

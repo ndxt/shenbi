@@ -5,7 +5,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Handle, Position, type NodeProps, useUpdateNodeInternals } from '@xyflow/react';
 import type { GatewayNodeData, GatewayNodeKind } from '../types';
-import { NODE_CONTRACTS, PORT_TYPE_COLORS } from '../types';
+import { NODE_CONTRACTS, PORT_TYPE_COLORS, getContractInputs, getContractOutputs } from '../types';
 import {
   Play,
   Square,
@@ -141,6 +141,8 @@ export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAc
   const [mouseDownTime, setMouseDownTime] = useState<number>(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const contract = NODE_CONTRACTS[data.kind as GatewayNodeKind];
+  const inputs = contract ? getContractInputs(contract) : [];
+  const outputs = contract ? getContractOutputs(contract) : [];
   const updateNodeInternals = useUpdateNodeInternals();
 
   if (!contract) {
@@ -166,7 +168,7 @@ export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAc
     if (id) {
       updateNodeInternals(id);
     }
-  }, [contract.inputs.length, contract.outputs.length, id, updateNodeInternals]);
+  }, [inputs.length, outputs.length, id, updateNodeInternals]);
 
   return (
     <div
@@ -204,15 +206,15 @@ export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAc
         <NodeContextMenu
           nodeId={id}
           kind={data.kind as GatewayNodeKind}
-          description={contract.description}
+          description={contract.description ?? ''}
           onAction={handleMenuAction}
           onClose={() => setMenuOpen(false)}
         />
       ) : null}
 
       {/* Input Handles */}
-      {contract.inputs.map((port, index) => {
-        const isSingleInput = contract.inputs.length === 1;
+      {inputs.map((port, index) => {
+        const isSingleInput = inputs.length === 1;
         return (
           <Handle
             key={port.id}
@@ -220,7 +222,7 @@ export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAc
             position={Position.Left}
             id={port.id}
             className={`gateway-node__handle gateway-node__handle--input ${isSingleInput ? 'gateway-node__handle--single' : ''}`}
-            style={getHandleStyle(index, contract.inputs.length, PORT_TYPE_COLORS[port.dataType])}
+            style={getHandleStyle(index, inputs.length, PORT_TYPE_COLORS[port.dataType])}
           />
         );
       })}
@@ -245,9 +247,9 @@ export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAc
       {children ? <div className="gateway-node__body">{children}</div> : null}
 
       {/* Output Handles double as quick-add affordances on click. */}
-      {contract.outputs.map((port, index) => {
-        const isSingleOutput = contract.outputs.length === 1;
-        const showLabel = contract.outputs.length > 1;
+      {outputs.map((port, index) => {
+        const isSingleOutput = outputs.length === 1;
+        const showLabel = outputs.length > 1;
         return (
           <Handle
             key={port.id}
@@ -255,7 +257,7 @@ export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAc
             position={Position.Right}
             id={port.id}
             className={`gateway-node__handle gateway-node__handle--output ${isSingleOutput ? 'gateway-node__handle--single' : ''}`}
-            style={getHandleStyle(index, contract.outputs.length, PORT_TYPE_COLORS[port.dataType])}
+            style={getHandleStyle(index, outputs.length, PORT_TYPE_COLORS[port.dataType])}
             onMouseDown={handleMouseDown}
             onMouseUp={() => handleMouseUp(port.id)}
           >
