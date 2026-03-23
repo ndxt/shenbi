@@ -202,6 +202,8 @@ interface CanvasRendererSurfaceContext {
 export interface CanvasRendererDocumentContext {
   /** Notify the host that the document's dirty state changed */
   markDirty: (dirty: boolean) => void;
+  /** Sync the renderer-owned document schema into the host tab state. */
+  syncSchema?: (schema: Record<string, unknown>) => void;
   /** Register callback for host-initiated save (Ctrl+S). Returns unsubscribe. */
   onSaveRequest: (callback: () => void) => (() => void);
   /** Register callback for host-initiated undo (Ctrl+Z). Returns unsubscribe. */

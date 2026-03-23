@@ -18,6 +18,7 @@ type VoidCallback = () => void;
  */
 export function useCanvasDocumentContext(options: {
   onDirtyChange: (dirty: boolean) => void;
+  onSchemaChange?: ((schema: Record<string, unknown>) => void) | undefined;
   onUndoRedoStateChange: (state: { canUndo: boolean; canRedo: boolean }) => void;
 }): {
   context: CanvasRendererDocumentContext;
@@ -33,11 +34,17 @@ export function useCanvasDocumentContext(options: {
 
   const onDirtyChangeRef = useRef(options.onDirtyChange);
   onDirtyChangeRef.current = options.onDirtyChange;
+  const onSchemaChangeRef = useRef(options.onSchemaChange);
+  onSchemaChangeRef.current = options.onSchemaChange;
   const onUndoRedoStateChangeRef = useRef(options.onUndoRedoStateChange);
   onUndoRedoStateChangeRef.current = options.onUndoRedoStateChange;
 
   const markDirty = useCallback((dirty: boolean) => {
     onDirtyChangeRef.current(dirty);
+  }, []);
+
+  const syncSchema = useCallback((schema: Record<string, unknown>) => {
+    onSchemaChangeRef.current?.(schema);
   }, []);
 
   const onSaveRequest = useCallback((callback: VoidCallback) => {
@@ -61,11 +68,12 @@ export function useCanvasDocumentContext(options: {
 
   const context = useMemo<CanvasRendererDocumentContext>(() => ({
     markDirty,
+    syncSchema,
     onSaveRequest,
     onUndoRequest,
     onRedoRequest,
     reportUndoRedoState,
-  }), [markDirty, onSaveRequest, onUndoRequest, onRedoRequest, reportUndoRedoState]);
+  }), [markDirty, onSaveRequest, onUndoRequest, onRedoRequest, reportUndoRedoState, syncSchema]);
 
   const dispatch = useMemo(() => ({
     save: () => { for (const cb of saveCallbacksRef.current) cb(); },

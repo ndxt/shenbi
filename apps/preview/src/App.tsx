@@ -327,6 +327,9 @@ export function App() {
       onCanvasDocumentDirtyChange={useCallback((fileId: string, dirty: boolean) => {
         tabManager.markDirty(fileId, dirty);
       }, [tabManager])}
+      onCanvasDocumentSchemaChange={useCallback((fileId: string, schema: Record<string, unknown>) => {
+        tabManager.updateTab(fileId, { schema: schema as any });
+      }, [tabManager])}
       toolbarExtra={(
         <PreviewToolbar
           previewT={previewT as (...args: any[]) => string}

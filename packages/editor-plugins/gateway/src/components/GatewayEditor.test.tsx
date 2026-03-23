@@ -187,9 +187,11 @@ describe('GatewayEditor', () => {
   it('saves the current gateway document when the host requests an explicit save', async () => {
     gatewayCanvasSpy.mockClear();
     const saveDocument = vi.fn(async () => undefined);
+    const syncSchema = vi.fn();
     const saveHandlers: Array<() => void> = [];
     const documentContext = {
       markDirty: vi.fn(),
+      syncSchema,
       reportUndoRedoState: vi.fn(),
       onSaveRequest: vi.fn((handler: () => void) => {
         saveHandlers.push(handler);
@@ -230,11 +232,27 @@ describe('GatewayEditor', () => {
       viewport: { x: 10, y: 20, zoom: 1.1 },
     });
 
+    expect(syncSchema).toHaveBeenCalledWith({
+      id: 'api-1',
+      name: 'Billing API',
+      type: 'api-gateway',
+      nodes: [
+        {
+          id: 'start-1',
+          kind: 'start',
+          label: '开始',
+          position: { x: 120, y: 200 },
+          config: {},
+        },
+      ],
+      edges: [],
+      viewport: { x: 10, y: 20, zoom: 1.1 },
+    });
     expect(saveDocument).not.toHaveBeenCalled();
-    expect(saveHandlers).toHaveLength(1);
+    expect(saveHandlers.length).toBeGreaterThan(0);
 
     await act(async () => {
-      saveHandlers[0]?.();
+      saveHandlers.at(-1)?.();
       await Promise.resolve();
     });
 

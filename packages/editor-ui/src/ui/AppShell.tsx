@@ -117,6 +117,8 @@ interface AppShellProps {
   onMoveTab?: ((fromIndex: number, toIndex: number) => void) | undefined;
   /** Called when a non-page canvas renderer changes dirty state (for TabManager integration) */
   onCanvasDocumentDirtyChange?: ((fileId: string, dirty: boolean) => void) | undefined;
+  /** Called when a non-page canvas renderer updates its document schema. */
+  onCanvasDocumentSchemaChange?: ((fileId: string, schema: Record<string, unknown>) => void) | undefined;
   /** Title displayed in the title bar (defaults to 'Shenbi IDE') */
   title?: string;
   /** Subtitle displayed in the title bar (defaults to 'Editor UI Package') */
@@ -328,6 +330,7 @@ export function AppShell({
   onCloseSavedTabs,
   onMoveTab,
   onCanvasDocumentDirtyChange,
+  onCanvasDocumentSchemaChange,
   title,
   subtitle,
   userAvatarUrl,
@@ -1523,6 +1526,12 @@ export function AppShell({
         onCanvasDocumentDirtyChange(fileId, dirty);
       }
     }, [activeEditorTab?.fileId, onCanvasDocumentDirtyChange]),
+    onSchemaChange: React.useCallback((schema: Record<string, unknown>) => {
+      const fileId = activeEditorTab?.fileId;
+      if (fileId && onCanvasDocumentSchemaChange) {
+        onCanvasDocumentSchemaChange(fileId, schema);
+      }
+    }, [activeEditorTab?.fileId, onCanvasDocumentSchemaChange]),
     onUndoRedoStateChange: setCanvasDocUndoRedoState,
   });
   const canvasDocDispatchRef = React.useRef(canvasDocContext.dispatch);

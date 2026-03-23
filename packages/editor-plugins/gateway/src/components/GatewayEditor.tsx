@@ -270,6 +270,7 @@ export function GatewayEditor({
 
     lastLocalDocumentRef.current = nextDocument;
     history.pushState(nextDocument);
+    documentContext?.syncSchema?.(nextDocument as unknown as Record<string, unknown>);
     onDirty?.();
     onSave?.(nextDocument);
 
@@ -280,7 +281,7 @@ export function GatewayEditor({
       history.commit();
       historyCommitTimerRef.current = null;
     }, 180);
-  }, [onSave, onDirty, history]);
+  }, [documentContext, onSave, onDirty, history]);
 
   return (
     <ReactFlowProvider>
