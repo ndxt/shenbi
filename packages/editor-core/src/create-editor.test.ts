@@ -39,6 +39,21 @@ function createSchemaWithContainer(name: string): PageSchema {
   };
 }
 
+function createGatewaySchema(name: string): Record<string, unknown> {
+  return {
+    id: `${name}-gateway`,
+    name,
+    type: 'api-gateway',
+    nodes: [
+      { id: 'start-1', kind: 'start', label: '开始', position: { x: 100, y: 200 }, config: {} },
+      { id: 'end-1', kind: 'end', label: '返回结果', position: { x: 600, y: 200 }, config: {} },
+    ],
+    edges: [
+      { id: 'edge_default', source: 'start-1', sourceHandle: 'request', target: 'end-1', targetHandle: 'result' },
+    ],
+  };
+}
+
 function createMemoryStorage(initial: PageSchema = createSchema('loaded')): FileStorageAdapter {
   const files = new Map<string, PageSchema>([['demo', initial]]);
   return {
@@ -599,6 +614,30 @@ describe('createEditor', () => {
       generationUpdatedAt: 456,
     });
     expect(dirtyChanged).toHaveBeenCalledWith({ fileId: 'demo', isDirty: true });
+  });
+
+  it('tab.open restores an empty page snapshot for api tabs while preserving the current file id', async () => {
+    const vfs = createMemoryVFS(createSchema('page-a'));
+    const tabManager = new TabManager();
+    const editor = createEditor({
+      initialSchema: createSchema('empty'),
+      tabManager,
+      vfs,
+      projectId: 'project-1',
+    });
+    const apiNode = await vfs.createFile(
+      'project-1',
+      null,
+      'gateway',
+      'api',
+      createGatewaySchema('gateway-live'),
+    );
+
+    await editor.commands.execute('tab.open', { fileId: apiNode.id });
+
+    expect(editor.state.getCurrentFileId()).toBe(apiNode.id);
+    expect(editor.state.getSchema()).toEqual(createSchema('page'));
+    expect(tabManager.getTab(apiNode.id)?.schema).toEqual(createGatewaySchema('gateway-live'));
   });
 
   it('restores tab manager snapshots in order', () => {

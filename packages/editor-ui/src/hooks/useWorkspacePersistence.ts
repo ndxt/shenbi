@@ -265,12 +265,18 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
 
         await fileEditor.commands.execute('editor.restoreSnapshot', {
           snapshot: activeTab
-            ? {
-              schema: activeTab.schema,
-              currentFileId: activeTab.fileId,
-              isDirty: activeTab.isDirty,
-              ...(activeTab.selectedNodeId ? { selectedNodeId: activeTab.selectedNodeId } : {}),
-            }
+            ? activeTab.fileType === 'api'
+              ? {
+                schema: createEmptySchema(),
+                currentFileId: activeTab.fileId,
+                isDirty: activeTab.isDirty,
+              }
+              : {
+                schema: activeTab.schema,
+                currentFileId: activeTab.fileId,
+                isDirty: activeTab.isDirty,
+                ...(activeTab.selectedNodeId ? { selectedNodeId: activeTab.selectedNodeId } : {}),
+              }
             : {
               schema: createEmptySchema(),
               isDirty: false,

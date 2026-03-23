@@ -941,6 +941,16 @@ function registerTabCommands(
   projectId?: string,
 ): void {
   const restoreEditorForTab = async (tab: TabState): Promise<void> => {
+    if (tab.fileType === 'api') {
+      await commands.execute('editor.restoreSnapshot', {
+        snapshot: {
+          schema: createEmptySchema(),
+          currentFileId: tab.fileId,
+          isDirty: tab.isDirty,
+        },
+      });
+      return;
+    }
     await commands.execute('editor.restoreSnapshot', {
       snapshot: {
         schema: tab.schema,
@@ -948,6 +958,21 @@ function registerTabCommands(
         isDirty: tab.isDirty,
         ...(tab.selectedNodeId ? { selectedNodeId: tab.selectedNodeId } : {}),
       },
+    });
+  };
+
+  const syncEditorStateToTab = (tab: TabState, currentState: EditorState): void => {
+    const snapshot = currentState.getSnapshot();
+    if (tab.fileType === 'api') {
+      tabManager.updateTab(tab.fileId, {
+        isDirty: snapshot.isDirty,
+      });
+      return;
+    }
+    tabManager.updateTab(tab.fileId, {
+      schema: currentState.getSchema(),
+      selectedNodeId: snapshot.selectedNodeId,
+      isDirty: snapshot.isDirty,
     });
   };
 
@@ -975,11 +1000,7 @@ function registerTabCommands(
         // Save current active tab state before switching
         const currentTab = tabManager.getActiveTab();
         if (currentTab && currentTab.fileId !== fileId) {
-          tabManager.updateTab(currentTab.fileId, {
-            schema: currentState.getSchema(),
-            selectedNodeId: currentState.getSnapshot().selectedNodeId,
-            isDirty: currentState.getSnapshot().isDirty,
-          });
+          syncEditorStateToTab(currentTab, currentState);
         }
 
         // Restore editor state BEFORE switching the active tab to avoid
@@ -1007,11 +1028,7 @@ function registerTabCommands(
       // Save current active tab state before switching
       const currentTab = tabManager.getActiveTab();
       if (currentTab) {
-        tabManager.updateTab(currentTab.fileId, {
-          schema: currentState.getSchema(),
-          selectedNodeId: currentState.getSnapshot().selectedNodeId,
-          isDirty: currentState.getSnapshot().isDirty,
-        });
+        syncEditorStateToTab(currentTab, currentState);
       }
 
       tabManager.openTab(fileId, {
@@ -1076,11 +1093,7 @@ function registerTabCommands(
       // Save current active tab state
       const currentTab = tabManager.getActiveTab();
       if (currentTab && currentTab.fileId !== fileId) {
-        tabManager.updateTab(currentTab.fileId, {
-          schema: currentState.getSchema(),
-          selectedNodeId: currentState.getSnapshot().selectedNodeId,
-          isDirty: currentState.getSnapshot().isDirty,
-        });
+        syncEditorStateToTab(currentTab, currentState);
       }
 
       // Restore editor state BEFORE switching the active tab.
@@ -1165,11 +1178,7 @@ function registerTabCommands(
       // Save current editor state to the surviving tab if it's active
       const currentActiveId = tabManager.getActiveTabId();
       if (currentActiveId === fileId) {
-        tabManager.updateTab(fileId, {
-          schema: currentState.getSchema(),
-          selectedNodeId: currentState.getSnapshot().selectedNodeId,
-          isDirty: currentState.getSnapshot().isDirty,
-        });
+        syncEditorStateToTab({ ...tabManager.getTab(fileId)!, fileId }, currentState);
       }
 
       tabManager.closeOtherTabs(fileId);
@@ -1210,11 +1219,7 @@ function registerTabCommands(
     async execute(currentState) {
       const currentActiveTab = tabManager.getActiveTab();
       if (currentActiveTab) {
-        tabManager.updateTab(currentActiveTab.fileId, {
-          schema: currentState.getSchema(),
-          selectedNodeId: currentState.getSnapshot().selectedNodeId,
-          isDirty: currentState.getSnapshot().isDirty,
-        });
+        syncEditorStateToTab(currentActiveTab, currentState);
       }
 
       const previousActiveId = tabManager.getActiveTabId();
@@ -1256,9 +1261,13 @@ function registerTabCommands(
       }
 
       const source = isRecord(args) && args.source === 'auto' ? 'auto' : 'manual';
-      const schema = currentState.getSchema();
+      const schema = activeTab.fileType === 'api'
+        ? activeTab.schema
+        : currentState.getSchema();
       await vfs.writeFile(projectId, activeTab.fileId, schema);
-      tabManager.updateTab(activeTab.fileId, { schema });
+      if (activeTab.fileType !== 'api') {
+        tabManager.updateTab(activeTab.fileId, { schema });
+      }
       tabManager.markDirty(activeTab.fileId, false);
       currentState.setDirty(false);
       eventBus.emit('tab:dirtyChanged', { fileId: activeTab.fileId, isDirty: false });
@@ -1307,6 +1316,15 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
       }
       const activeTab = tabManager.getTab(activeTabId);
       if (!activeTab) {
+        return;
+      }
+      if (activeTab.fileType === 'api') {
+        if (activeTab.isDirty === snapshot.isDirty) {
+          return;
+        }
+        tabManager.updateTab(activeTabId, {
+          isDirty: snapshot.isDirty,
+        });
         return;
       }
       if (
