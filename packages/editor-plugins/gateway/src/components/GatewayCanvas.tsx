@@ -30,7 +30,13 @@ import type {
   GatewayNodeKind,
   GatewayNodeData,
 } from '../types';
-import { NODE_CONTRACTS, getNodeContract, getContractInputs, getContractOutputs } from '../types';
+import {
+  NODE_CONTRACTS,
+  getNodeContract,
+  getContractInputs,
+  getContractOutputs,
+  withGatewayNodeRuntime,
+} from '../types';
 import { NodeSelectorPanel } from './NodeSelectorPanel';
 import { resolveBridgeOutputHandle } from './gateway-edge-insert';
 import { buildGatewayMinimapModel } from './gateway-minimap';
@@ -242,7 +248,7 @@ export function GatewayCanvas({
         y: event.clientY,
       }) ?? { x: event.clientX, y: event.clientY };
 
-      const newNode: GatewayNode = {
+      const newNode: GatewayNode = withGatewayNodeRuntime({
         id: createNodeId(),
         type: kind,
         position,
@@ -251,7 +257,7 @@ export function GatewayCanvas({
           label: contract.displayNameKey ?? kind,
           config: {},
         },
-      };
+      });
 
       onNodesChangeProp([...nodes, newNode]);
       emitDocumentChange([...nodes, newNode], edgesRef.current);
@@ -410,7 +416,7 @@ export function GatewayCanvas({
 
       const nextNodes = nodesRef.current.map((n) => {
         if (n.id !== nodeId) return n;
-        return {
+        return withGatewayNodeRuntime({
           ...n,
           type: kind,
           data: {
@@ -418,7 +424,7 @@ export function GatewayCanvas({
             kind,
             label: contract.displayNameKey ?? kind,
           },
-        };
+        });
       });
 
       // Remap edge handles: old input/output IDs → new contract's first input/output
@@ -505,7 +511,7 @@ export function GatewayCanvas({
       }
     }
 
-    const newNode: GatewayNode = {
+    const newNode: GatewayNode = withGatewayNodeRuntime({
       id: createNodeId(),
       type: kind,
       position: newNodePosition,
@@ -514,7 +520,7 @@ export function GatewayCanvas({
         label: contract.displayNameKey ?? kind,
         config: {},
       },
-    };
+    });
 
     const edgeToNewNode: GatewayEdge = {
       id: `edge_${Date.now()}`,
@@ -579,7 +585,7 @@ export function GatewayCanvas({
       case 'duplicate': {
         const sourceNode = nodesRef.current.find((n) => n.id === nodeId);
         if (!sourceNode) break;
-        const newNode: GatewayNode = {
+        const newNode: GatewayNode = withGatewayNodeRuntime({
           id: `node_${Date.now()}`,
           type: sourceNode.type,
           position: {
@@ -587,7 +593,7 @@ export function GatewayCanvas({
             y: sourceNode.position.y + 60,
           },
           data: { ...sourceNode.data },
-        };
+        });
         onNodesChangeProp([...nodesRef.current, newNode]);
         emitDocumentChange([...nodesRef.current, newNode], edgesRef.current);
         onDirty?.();
@@ -827,8 +833,6 @@ export function GatewayCanvas({
         elementsSelectable={!effectivePan}
         selectionOnDrag={!effectivePan}
         panOnDrag={effectivePan ? [0, 1] : [1]}
-        fitView={!initialViewport}
-        fitViewOptions={{ padding: 0.3 }}
       >
         <CanvasZoomHud
           className="nopan"

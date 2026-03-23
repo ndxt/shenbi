@@ -1,7 +1,8 @@
-import type { GatewayNode } from '../types';
-
-const DEFAULT_GATEWAY_NODE_WIDTH = 200;
-const DEFAULT_GATEWAY_NODE_HEIGHT = 60;
+import {
+  DEFAULT_GATEWAY_NODE_HEIGHT,
+  DEFAULT_GATEWAY_NODE_WIDTH,
+  type GatewayNode,
+} from '../types';
 
 export interface GatewayViewport {
   x: number;

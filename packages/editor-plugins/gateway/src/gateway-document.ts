@@ -5,6 +5,7 @@ import type {
   GatewayNode,
   GatewayNodeData,
 } from './types';
+import { withGatewayNodeRuntime } from './types';
 
 export interface GatewayGraphState {
   nodes: GatewayNode[];
@@ -14,18 +15,18 @@ export interface GatewayGraphState {
 
 function createDefaultNodes(): GatewayNode[] {
   return [
-    {
+    withGatewayNodeRuntime({
       id: 'start-1',
       type: 'start',
       position: { x: 100, y: 200 },
       data: { kind: 'start', label: '开始', config: {} } as GatewayNodeData,
-    },
-    {
+    }),
+    withGatewayNodeRuntime({
       id: 'end-1',
       type: 'end',
       position: { x: 600, y: 200 },
       data: { kind: 'end', label: '返回结果', config: {} } as GatewayNodeData,
-    },
+    }),
   ];
 }
 
@@ -75,7 +76,7 @@ export function gatewayDocumentToGraph(
   }
 
   const nodes = documentSchema.nodes.length > 0
-    ? documentSchema.nodes.map((node) => ({
+    ? documentSchema.nodes.map((node) => withGatewayNodeRuntime({
         id: node.id,
         type: node.kind,
         position: node.position,

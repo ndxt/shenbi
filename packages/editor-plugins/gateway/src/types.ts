@@ -2,7 +2,7 @@
 // Gateway Runtime Types — thin adapter over unified ComponentContract
 // ---------------------------------------------------------------------------
 
-import type { Node, Edge } from '@xyflow/react';
+import { Position, type Node, type Edge } from '@xyflow/react';
 import type {
   ComponentContract,
   ContractPort,
@@ -41,6 +41,67 @@ export interface GatewayNodeData extends Record<string, unknown> {
 
 /** Typed React Flow node */
 export type GatewayNode = Node<GatewayNodeData>;
+
+export const DEFAULT_GATEWAY_NODE_WIDTH = 200;
+export const DEFAULT_GATEWAY_NODE_HEIGHT = 60;
+export const DEFAULT_GATEWAY_HANDLE_SIZE = 16;
+
+type GatewayNodeHandle = NonNullable<GatewayNode['handles']>[number];
+
+function resolveGatewayHandleOffset(index: number, count: number, nodeHeight: number) {
+  const centerY = count === 1
+    ? nodeHeight / 2
+    : (nodeHeight * (index + 1)) / (count + 1);
+
+  return Math.max(0, centerY - DEFAULT_GATEWAY_HANDLE_SIZE / 2);
+}
+
+export function buildGatewayNodeHandles(
+  kind: GatewayNodeKind,
+  nodeWidth = DEFAULT_GATEWAY_NODE_WIDTH,
+  nodeHeight = DEFAULT_GATEWAY_NODE_HEIGHT,
+): GatewayNodeHandle[] {
+  const contract = getNodeContract(kind);
+  const inputs = getContractInputs(contract);
+  const outputs = getContractOutputs(contract);
+
+  return [
+    ...inputs.map((port, index) => ({
+      id: port.id,
+      type: 'target' as const,
+      position: Position.Left,
+      x: 0,
+      y: resolveGatewayHandleOffset(index, inputs.length, nodeHeight),
+      width: DEFAULT_GATEWAY_HANDLE_SIZE,
+      height: DEFAULT_GATEWAY_HANDLE_SIZE,
+    })),
+    ...outputs.map((port, index) => ({
+      id: port.id,
+      type: 'source' as const,
+      position: Position.Right,
+      x: Math.max(0, nodeWidth - DEFAULT_GATEWAY_HANDLE_SIZE),
+      y: resolveGatewayHandleOffset(index, outputs.length, nodeHeight),
+      width: DEFAULT_GATEWAY_HANDLE_SIZE,
+      height: DEFAULT_GATEWAY_HANDLE_SIZE,
+    })),
+  ];
+}
+
+export function withGatewayNodeRuntime<T extends GatewayNode>(node: T): T {
+  const width = node.width ?? DEFAULT_GATEWAY_NODE_WIDTH;
+  const height = node.height ?? DEFAULT_GATEWAY_NODE_HEIGHT;
+
+  return {
+    ...node,
+    width,
+    height,
+    handles: buildGatewayNodeHandles(node.data.kind, width, height),
+  };
+}
+
+export function withGatewayNodeDimensions<T extends GatewayNode>(node: T): T {
+  return withGatewayNodeRuntime(node);
+}
 
 /** Typed React Flow edge */
 export type GatewayEdge = Edge<{

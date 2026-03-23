@@ -1,9 +1,10 @@
 import type { MinimapBounds, MinimapModel } from '@shenbi/editor-ui';
-import type { GatewayNode } from '../types';
-import { NODE_CONTRACTS } from '../types';
-
-const DEFAULT_GATEWAY_NODE_WIDTH = 200;
-const DEFAULT_GATEWAY_NODE_HEIGHT = 60;
+import {
+  DEFAULT_GATEWAY_NODE_HEIGHT,
+  DEFAULT_GATEWAY_NODE_WIDTH,
+  NODE_CONTRACTS,
+  type GatewayNode,
+} from '../types';
 
 export interface GatewayViewportState {
   x: number;
