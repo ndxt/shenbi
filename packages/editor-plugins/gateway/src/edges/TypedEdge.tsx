@@ -5,6 +5,7 @@
 import React from 'react';
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from '@xyflow/react';
 import type { GatewayEdge } from '../types';
+import { useGatewayCanvasCallbacks } from '../components/GatewayCanvasContext';
 
 export interface TypedEdgeAddNodePayload {
   edgeId: string;
@@ -15,9 +16,7 @@ export interface TypedEdgeAddNodePayload {
   position: { x: number; y: number };
 }
 
-export interface TypedEdgeProps extends EdgeProps<GatewayEdge> {
-  onAddNode?: (payload: TypedEdgeAddNodePayload) => void;
-}
+export type TypedEdgeProps = EdgeProps<GatewayEdge>;
 
 export function TypedEdge({
   id,
@@ -34,8 +33,8 @@ export function TypedEdge({
   style,
   markerEnd,
   selected,
-  onAddNode,
 }: TypedEdgeProps) {
+  const { onAddNodeFromEdge } = useGatewayCanvasCallbacks();
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -59,7 +58,7 @@ export function TypedEdge({
           transition: 'stroke 0.2s, stroke-width 0.2s',
         }}
       />
-      {onAddNode && source && target ? (
+      {onAddNodeFromEdge && source && target ? (
         <EdgeLabelRenderer>
           <button
             type="button"
@@ -76,7 +75,7 @@ export function TypedEdge({
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              onAddNode({
+              onAddNodeFromEdge({
                 edgeId: id,
                 sourceNodeId: source,
                 sourceHandle: sourceHandleId ?? null,

@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Handle, Position, type NodeProps, useUpdateNodeInternals } from '@xyflow/react';
 import type { GatewayNodeData, GatewayNodeKind } from '../types';
 import { NODE_CONTRACTS, PORT_TYPE_COLORS, getContractInputs, getContractOutputs } from '../types';
+import { useGatewayCanvasCallbacks } from '../components/GatewayCanvasContext';
 import {
   Play,
   Square,
@@ -43,8 +44,6 @@ export type NodeMenuAction = 'duplicate' | 'delete' | 'change';
 export interface BaseNodeProps extends NodeProps {
   data: GatewayNodeData;
   children?: React.ReactNode;
-  onAddNode?: (sourceNodeId: string, sourceHandle: string) => void;
-  onNodeMenuAction?: (nodeId: string, action: NodeMenuAction) => void;
 }
 
 function getHandleStyle(
@@ -137,7 +136,8 @@ function NodeContextMenu({ nodeId, kind, description, onAction, onClose }: NodeC
   );
 }
 
-export function BaseNode({ id, data, selected, children, onAddNode, onNodeMenuAction }: BaseNodeProps) {
+export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
+  const { onAddNode, onNodeMenuAction } = useGatewayCanvasCallbacks();
   const [mouseDownTime, setMouseDownTime] = useState<number>(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const contract = NODE_CONTRACTS[data.kind as GatewayNodeKind];

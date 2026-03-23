@@ -36,6 +36,7 @@ import { resolveBridgeOutputHandle } from './gateway-edge-insert';
 import { buildGatewayMinimapModel } from './gateway-minimap';
 import { buildGatewayPaletteAssets } from './gateway-palette-assets';
 import { resolveGatewayInitialViewport, type GatewayViewport } from './gateway-viewport';
+import { GatewayCanvasProvider, type GatewayCanvasCallbacks } from './GatewayCanvasContext';
 import { gatewayGraphToDocument } from '../gateway-document';
 import '../styles/gateway.css';
 
@@ -610,20 +611,23 @@ export function GatewayCanvas({
     }
   }, [onNodesChangeProp, onEdgesChangeProp, onDirty]);
 
-  // Create node types with add node handler
-  const nodeTypes = useMemo(() => {
-    const types: Record<string, React.ComponentType<any>> = {};
-    for (const [key, Component] of Object.entries(baseNodeTypes)) {
-      types[key] = (props: any) => (
-        <Component {...props} onAddNode={handleAddNode} onNodeMenuAction={handleNodeMenuAction} />
-      );
-    }
-    return types;
-  }, [handleAddNode, handleNodeMenuAction]);
+  const canvasCallbacks = useMemo<GatewayCanvasCallbacks>(() => ({
+    onAddNode: (...args) => handleAddNodeRef.current?.(...args),
+    onNodeMenuAction: (...args) => handleNodeMenuActionRef.current?.(...args),
+    onAddNodeFromEdge: (...args) => handleAddNodeFromEdgeRef.current?.(...args),
+  }), []);
+
+  // Keep refs so context value stays stable but always calls latest handlers
+  const handleAddNodeRef = useRef(handleAddNode);
+  handleAddNodeRef.current = handleAddNode;
+  const handleNodeMenuActionRef = useRef(handleNodeMenuAction);
+  handleNodeMenuActionRef.current = handleNodeMenuAction;
+  const handleAddNodeFromEdgeRef = useRef(handleAddNodeFromEdge);
+  handleAddNodeFromEdgeRef.current = handleAddNodeFromEdge;
 
   const edgeTypes = useMemo(() => ({
-    typed: (props: any) => <TypedEdge {...props} onAddNode={handleAddNodeFromEdge} />,
-  }), [handleAddNodeFromEdge]);
+    typed: TypedEdge,
+  }), []);
 
   // Zoom control functions — delegate to ReactFlow instance
   const handleZoomIn = useCallback(() => {
@@ -782,6 +786,7 @@ export function GatewayCanvas({
           actions={railActions}
         />
       </div>
+      <GatewayCanvasProvider value={canvasCallbacks}>
       <ReactFlow
         className="canvas-grid"
         nodes={nodes}
@@ -790,7 +795,7 @@ export function GatewayCanvas({
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
         isValidConnection={handleIsValidConnection}
-        nodeTypes={nodeTypes}
+        nodeTypes={baseNodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         onDragOver={handleDragOver}
@@ -838,6 +843,7 @@ export function GatewayCanvas({
           onFit={handleZoomToFit}
         />
       </ReactFlow>
+      </GatewayCanvasProvider>
 
       {selectorPanel?.visible && (
         <NodeSelectorPanel
