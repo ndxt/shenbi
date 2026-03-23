@@ -2,7 +2,7 @@
 // useGatewayHistory — undo/redo + dirty tracking for gateway documents
 // ---------------------------------------------------------------------------
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { History } from '@shenbi/editor-core';
 import type { GatewayDocumentSchema } from '../types';
 
@@ -117,7 +117,7 @@ export function useGatewayHistory(
     return committed;
   }, [syncHistoryFlags]);
 
-  return {
+  return useMemo(() => ({
     document,
     isDirty,
     canUndo,
@@ -130,5 +130,5 @@ export function useGatewayHistory(
     lock,
     commit,
     isLocked,
-  };
+  }), [document, isDirty, canUndo, canRedo, pushState, undo, redo, markSaved, reset, lock, commit, isLocked]);
 }

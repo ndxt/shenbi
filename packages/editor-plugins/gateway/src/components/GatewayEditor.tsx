@@ -90,8 +90,8 @@ export function GatewayEditor({
       return;
     }
     history.reset(nextDocument);
-    documentContext?.replaceDocument?.(nextDocument as unknown as Record<string, unknown>);
-  }, [documentContext, documentSchema, fallbackDocument, history]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentSchema, fallbackDocument, history.reset]);
 
   // Cleanup save timer
   useEffect(() => {

@@ -179,8 +179,17 @@ export function GatewayCanvas({
     (changes) => {
       const next = applyNodeChanges(changes, nodes) as GatewayNode[];
       onNodesChangeProp(next);
-      emitDocumentChange(next, edgesRef.current);
-      if (changes.some((c) => c.type !== 'select')) {
+
+      // Only emit document changes for meaningful mutations.
+      // 'dimensions' changes are ReactFlow's internal node measurement —
+      // persisting them causes an infinite loop because gatewayDocumentToGraph
+      // recreates nodes with default measured dimensions, triggering re-measurement.
+      // 'select' changes are transient UI state.
+      const hasMeaningfulChange = changes.some(
+        (c) => c.type !== 'dimensions' && c.type !== 'select',
+      );
+      if (hasMeaningfulChange) {
+        emitDocumentChange(next, edgesRef.current);
         onDirty?.();
       }
     },
