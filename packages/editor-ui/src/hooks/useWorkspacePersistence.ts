@@ -217,7 +217,8 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
           }
 
           let schema = persistedTab.schema;
-          if (!persistedTab.isDirty) {
+          const shouldRestoreFromFile = persistedTab.fileType === 'api' || !persistedTab.isDirty;
+          if (shouldRestoreFromFile) {
             try {
               schema = await vfs.readFile(activeProjectId, persistedTab.fileId) as typeof persistedTab.schema;
             } catch {
@@ -231,6 +232,7 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
             fileName: liveNode.name,
             filePath: liveNode.path,
             fileType: (liveNode.fileType ?? persistedTab.fileType) as typeof persistedTab.fileType,
+            isDirty: persistedTab.fileType === 'api' ? false : persistedTab.isDirty,
             isGenerating: false,
             readOnlyReason: undefined,
             generationUpdatedAt: undefined,

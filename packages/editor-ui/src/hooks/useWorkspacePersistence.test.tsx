@@ -315,4 +315,108 @@ describe('useWorkspacePersistence', () => {
       expect(execute).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('恢复 api tab 时优先使用磁盘内容而不是旧 session 中的脏 schema', async () => {
+    const restoreSnapshot = vi.fn();
+    const execute = vi.fn(async () => undefined);
+    const workspacePersistence = {
+      getJSON: vi.fn(async <T,>(_: string, key: string) => {
+        if (key === 'shell-session') {
+          return {
+            tabs: {
+              tabs: [
+                {
+                  fileId: 'api-1',
+                  fileName: 'gateway',
+                  filePath: '/gateway.api.json',
+                  fileType: 'api',
+                  schema: { id: 'stale', type: 'api-gateway', nodes: [], edges: [] },
+                  isDirty: true,
+                },
+              ],
+              activeTabId: 'api-1',
+            },
+            expandedIds: [],
+          } as T;
+        }
+        return null;
+      }),
+      setJSON: vi.fn(async () => undefined),
+    } as const;
+
+    Object.defineProperty(globalThis, 'indexedDB', {
+      configurable: true,
+      writable: true,
+      value: {},
+    });
+
+    renderHook(() => {
+      const [activeScenario, setActiveScenario] = useState<'user-management' | 'tree-management'>('user-management');
+      const [renderMode, setRenderMode] = useState<'direct' | 'iframe'>('iframe');
+
+      useWorkspacePersistence({
+        appMode: 'shell',
+        activeProjectId: 'local-1',
+        activeScenario,
+        setActiveScenario,
+        renderMode,
+        setRenderMode,
+        fileEditor: {
+          commands: {
+            execute,
+          },
+        },
+        fileExplorerExpandedIds: [],
+        fileExplorerFocusedId: undefined,
+        setFileExplorerExpandedIds: vi.fn(),
+        setFileExplorerFocusedId: vi.fn(),
+        scenarioValues: ['user-management', 'tree-management'],
+        renderModeValues: ['direct', 'iframe'],
+        tabManager: {
+          restoreSnapshot,
+        },
+        tabSnapshot: {
+          tabs: [],
+          activeTabId: undefined,
+        },
+        vfs: {
+          listTree: vi.fn(async () => [
+            { id: 'api-1', type: 'file', name: 'gateway', path: '/gateway.api.json', fileType: 'api' },
+          ]),
+          readFile: vi.fn(async () => ({ id: 'live', name: 'gateway-live', type: 'api-gateway', nodes: [{ id: 'start-1' }], edges: [] })),
+        },
+        vfsInitialized: true,
+        vfsInitializationFailed: false,
+        workspacePersistence,
+        persistenceKeys: {
+          namespace: 'preview-debug',
+          activeScenarioKey: 'active-scenario',
+          renderModeKey: 'canvas-render-mode',
+          shellSessionKey: 'shell-session',
+        },
+        createEmptySchema: () => ({ id: 'shell-page', body: [] }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(restoreSnapshot).toHaveBeenCalledWith({
+        tabs: [
+          expect.objectContaining({
+            fileId: 'api-1',
+            fileType: 'api',
+            schema: { id: 'live', name: 'gateway-live', type: 'api-gateway', nodes: [{ id: 'start-1' }], edges: [] },
+            isDirty: false,
+          }),
+        ],
+        activeTabId: 'api-1',
+      });
+      expect(execute).toHaveBeenCalledWith('editor.restoreSnapshot', {
+        snapshot: {
+          schema: { id: 'shell-page', body: [] },
+          currentFileId: 'api-1',
+          isDirty: false,
+        },
+      });
+    });
+  });
 });
