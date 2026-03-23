@@ -37,7 +37,7 @@ function createHostAdapter(overrides?: Partial<GatewayHostAdapter>): GatewayHost
 }
 
 describe('GatewayEditor', () => {
-  it('persists gateway documents back through the host filesystem adapter as json', async () => {
+  it('does not auto-save gateway documents after canvas edits', async () => {
     gatewayCanvasSpy.mockClear();
     const saveDocument = vi.fn(async () => undefined);
     const hostAdapter = createHostAdapter({ saveDocument });
@@ -70,24 +70,11 @@ describe('GatewayEditor', () => {
       viewport: { x: 10, y: 20, zoom: 1.1 },
     });
 
-    await waitFor(() => {
-      expect(saveDocument).toHaveBeenCalledWith({
-        id: 'api-1',
-        name: 'Billing API',
-        type: 'api-gateway',
-        nodes: [
-          {
-            id: 'start-1',
-            kind: 'start',
-            label: '开始',
-            position: { x: 120, y: 200 },
-            config: {},
-          },
-        ],
-        edges: [],
-        viewport: { x: 10, y: 20, zoom: 1.1 },
-      });
+    await act(async () => {
+      await Promise.resolve();
     });
+
+    expect(saveDocument).not.toHaveBeenCalled();
   });
 
   it('does not reload the document when hostAdapter identity changes for the same file', async () => {
@@ -146,8 +133,7 @@ describe('GatewayEditor', () => {
     });
   });
 
-  it('cancels delayed saves from the previous file when switching tabs', async () => {
-    vi.useFakeTimers();
+  it('does not auto-save pending edits when switching tabs', async () => {
     gatewayCanvasSpy.mockClear();
     const firstSaveDocument = vi.fn(async () => undefined);
     const firstAdapter = createHostAdapter({ saveDocument: firstSaveDocument });
@@ -190,9 +176,83 @@ describe('GatewayEditor', () => {
     });
     expect(secondAdapter.loadDocument).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(200);
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     expect(firstSaveDocument).not.toHaveBeenCalled();
     expect(secondAdapter.saveDocument).not.toHaveBeenCalled();
+  });
+
+  it('saves the current gateway document when the host requests an explicit save', async () => {
+    gatewayCanvasSpy.mockClear();
+    const saveDocument = vi.fn(async () => undefined);
+    const saveHandlers: Array<() => void> = [];
+    const documentContext = {
+      markDirty: vi.fn(),
+      reportUndoRedoState: vi.fn(),
+      onSaveRequest: vi.fn((handler: () => void) => {
+        saveHandlers.push(handler);
+        return () => undefined;
+      }),
+      onUndoRequest: vi.fn(() => () => undefined),
+      onRedoRequest: vi.fn(() => () => undefined),
+    };
+
+    render(
+      <GatewayEditor
+        hostAdapter={createHostAdapter({ saveDocument })}
+        documentContext={documentContext}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(gatewayCanvasSpy).toHaveBeenCalled();
+    });
+
+    const latestProps = gatewayCanvasSpy.mock.calls.at(-1)?.[0] as {
+      onDocumentChange?: (document: Record<string, unknown>) => void;
+    };
+    latestProps.onDocumentChange?.({
+      id: 'api-1',
+      name: 'Billing API',
+      type: 'api-gateway',
+      nodes: [
+        {
+          id: 'start-1',
+          kind: 'start',
+          label: '开始',
+          position: { x: 120, y: 200 },
+          config: {},
+        },
+      ],
+      edges: [],
+      viewport: { x: 10, y: 20, zoom: 1.1 },
+    });
+
+    expect(saveDocument).not.toHaveBeenCalled();
+    expect(saveHandlers).toHaveLength(1);
+
+    await act(async () => {
+      saveHandlers[0]?.();
+      await Promise.resolve();
+    });
+
+    expect(saveDocument).toHaveBeenCalledWith({
+      id: 'api-1',
+      name: 'Billing API',
+      type: 'api-gateway',
+      nodes: [
+        {
+          id: 'start-1',
+          kind: 'start',
+          label: '开始',
+          position: { x: 120, y: 200 },
+          config: {},
+        },
+      ],
+      edges: [],
+      viewport: { x: 10, y: 20, zoom: 1.1 },
+    });
   });
 });

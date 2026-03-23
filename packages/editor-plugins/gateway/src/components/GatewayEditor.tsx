@@ -58,7 +58,6 @@ export function GatewayEditor({
   const [nodes, setNodes] = useState(initialGraph.nodes);
   const [edges, setEdges] = useState(initialGraph.edges);
   const [viewport, setViewport] = useState(initialGraph.viewport);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hostAdapterRef = useRef(hostAdapter);
   const lastLocalDocumentRef = useRef<GatewayDocumentSchema | null>(null);
@@ -127,10 +126,6 @@ export function GatewayEditor({
   // Cleanup save timer
   useEffect(() => {
     return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-      }
       if (historyCommitTimerRef.current) {
         clearTimeout(historyCommitTimerRef.current);
         historyCommitTimerRef.current = null;
@@ -139,15 +134,6 @@ export function GatewayEditor({
   }, []);
 
   useEffect(() => {
-    if (!saveTimerRef.current) {
-      if (historyCommitTimerRef.current) {
-        clearTimeout(historyCommitTimerRef.current);
-        historyCommitTimerRef.current = null;
-      }
-      return;
-    }
-    clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = null;
     if (historyCommitTimerRef.current) {
       clearTimeout(historyCommitTimerRef.current);
       historyCommitTimerRef.current = null;
@@ -275,7 +261,7 @@ export function GatewayEditor({
     });
   }, [documentContext, history]);
 
-  // --- Persistence (debounced auto-save + history push) ---
+  // --- Persistence (dirty state + history push) ---
 
   const persistDocument = useCallback((nextDocument: GatewayDocumentSchema) => {
     if (!history.isLocked) {
@@ -294,29 +280,7 @@ export function GatewayEditor({
       history.commit();
       historyCommitTimerRef.current = null;
     }, 180);
-
-    // Debounced auto-save to file system
-    if (!hostAdapter) {
-      return;
-    }
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-    saveTimerRef.current = setTimeout(() => {
-      void hostAdapter.saveDocument(nextDocument)
-        .then(() => {
-          history.markSaved();
-        })
-        .catch((error) => {
-          hostAdapter.notifyError(
-            error instanceof Error
-              ? error.message
-              : 'Failed to save gateway document',
-          );
-        });
-      saveTimerRef.current = null;
-    }, 800);
-  }, [hostAdapter, onSave, onDirty, history]);
+  }, [onSave, onDirty, history]);
 
   return (
     <ReactFlowProvider>
