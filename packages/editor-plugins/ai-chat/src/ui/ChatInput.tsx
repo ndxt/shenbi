@@ -334,7 +334,7 @@ export function ChatInput({
                             type="button"
                             onClick={handleSend}
                             disabled={(!text.trim() && attachments.length === 0) || disabled}
-                            className="absolute bottom-2 right-2 p-1.5 text-white bg-blue-600 hover:bg-blue-500 disabled:bg-bg-canvas disabled:text-text-secondary disabled:border disabled:border-border-ide rounded transition-colors shadow-sm flex items-center justify-center h-[28px] w-[28px]"
+                            className="absolute bottom-2 right-2 p-1.5 text-white bg-primary hover:bg-primary disabled:bg-bg-canvas disabled:text-text-secondary disabled:border disabled:border-border-ide rounded transition-colors shadow-sm flex items-center justify-center h-[28px] w-[28px]"
                             style={{ zIndex: 1 }}
                             title="Send"
                         >

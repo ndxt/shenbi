@@ -27,7 +27,7 @@ const ActivityItem = ({ icon: Icon, active = false, label, onClick }: ActivityIt
     w-full h-12 flex items-center justify-center cursor-pointer relative group
     ${active ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}
   `}>
-    {active && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-blue-500" />}
+    {active && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />}
     <Icon size={24} strokeWidth={1.5} />
     <div
       className="pointer-events-none absolute left-full ml-2 rounded border border-border-ide bg-bg-panel px-2 py-1 text-[11px] text-text-primary whitespace-nowrap opacity-0 shadow-md transition-opacity group-hover:opacity-100 z-30"

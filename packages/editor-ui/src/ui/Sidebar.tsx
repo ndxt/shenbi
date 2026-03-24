@@ -118,7 +118,7 @@ function TabItem({ label, active, onClick }: { label: string, active: boolean, o
       onClick={onClick}
       className={`
         flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-wider cursor-pointer border-b-2 transition-colors mx-0.5
-        ${active ? 'border-blue-500 text-text-primary bg-bg-sidebar' : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}
+        ${active ? 'border-primary text-text-primary bg-bg-sidebar' : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}
       `}
     >
       {label}

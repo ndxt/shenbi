@@ -149,7 +149,7 @@ interface FileTypeOption {
 }
 
 const FILE_TYPE_OPTIONS: FileTypeOption[] = [
-  { fileType: 'page',  labelZh: '页面',  labelEn: 'Page',   icon: FileCode,  iconColor: 'text-blue-400' },
+  { fileType: 'page',  labelZh: '页面',  labelEn: 'Page',   icon: FileCode,  iconColor: 'text-primary' },
   { fileType: 'api',   labelZh: 'API',   labelEn: 'API',    icon: Plug,      iconColor: 'text-green-400' },
   { fileType: 'flow',  labelZh: '流程',  labelEn: 'Flow',   icon: Workflow,  iconColor: 'text-purple-400' },
   { fileType: 'db',    labelZh: '数据表', labelEn: 'DB',     icon: Database,  iconColor: 'text-yellow-400' },

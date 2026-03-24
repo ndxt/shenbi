@@ -11,7 +11,7 @@ export function PagePanel() {
       </div>
 
       <div className="p-2 flex flex-col gap-3">
-        <DataGroup title={t('pagePanel.params')} icon={<Database size={14} strokeWidth={1.5} className="text-blue-500" />}>
+        <DataGroup title={t('pagePanel.params')} icon={<Database size={14} strokeWidth={1.5} className="text-primary" />}>
           <DataItem name="id" type="string" value="123" />
           <DataItem name="mode" type="string" value="edit" />
         </DataGroup>
@@ -70,7 +70,7 @@ function DataItem({ name, type, value, isFunction = false }: { name: string, typ
   return (
     <div className="flex flex-col group py-1.5 px-2 rounded-md hover:bg-text-primary/5 cursor-pointer transition-colors border border-transparent hover:border-border-ide/30">
       <div className="flex justify-between items-center mb-1.5">
-        <span className={`text-[12px] font-mono font-medium ${isFunction ? 'text-yellow-600 dark:text-yellow-400' : 'text-blue-500'}`}>{name}</span>
+        <span className={`text-[12px] font-mono font-medium ${isFunction ? 'text-yellow-600 dark:text-yellow-400' : 'text-primary'}`}>{name}</span>
         <span className="text-[10px] text-text-secondary/80">{type}</span>
       </div>
       <div className="text-[11px] font-mono text-text-secondary/90 bg-text-primary/[0.02] px-2 py-1 rounded-sm border border-border-ide/30 truncate">

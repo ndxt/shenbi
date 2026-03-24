@@ -90,9 +90,9 @@ function TabItem({
       onDragEnd={onDragEnd}
     >
       {/* Drop indicator lines */}
-      {dropSide === 'left' && <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-blue-500 z-10" />}
-      {dropSide === 'right' && <div className="absolute right-0 top-1 bottom-1 w-[2px] bg-blue-500 z-10" />}
-      <Icon size={14} className={active ? 'text-blue-400' : 'text-text-secondary'} />
+      {dropSide === 'left' && <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-primary z-10" />}
+      {dropSide === 'right' && <div className="absolute right-0 top-1 bottom-1 w-[2px] bg-primary z-10" />}
+      <Icon size={14} className={active ? 'text-primary' : 'text-text-secondary'} />
       <span className={`text-[13px] truncate flex-1 ${isDirty ? 'italic' : ''}`}>{label}</span>
       {onClose ? (
         <div className="w-[18px] h-[18px] flex items-center justify-center shrink-0">
@@ -118,7 +118,7 @@ function TabItem({
           title={t('editorTabs.unsavedTooltip')}
         />
       ) : null}
-      {active && <div className="absolute top-0 left-0 right-0 h-[2px] bg-blue-500" />}
+      {active && <div className="absolute top-0 left-0 right-0 h-[2px] bg-primary" />}
     </div>
   );
 }

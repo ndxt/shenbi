@@ -36,7 +36,7 @@ export function ReActStepList({ steps, isRunning = false }: ReActStepListProps) 
     <section className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-3 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-text-primary">
-          <Bot size={14} className="text-blue-500" />
+          <Bot size={14} className="text-primary" />
           <span className="font-semibold" style={{ fontSize: '12px' }}>{t('loop.traceTitle')}</span>
         </div>
         <span className="text-text-secondary font-mono tabular-nums" style={{ fontSize: '10px' }}>
@@ -59,7 +59,7 @@ export function ReActStepList({ steps, isRunning = false }: ReActStepListProps) 
               return (
                 <>
                   <div className="flex items-start gap-2">
-              <div className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 flex items-center justify-center shrink-0">
+              <div className="w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
                 <Wrench size={12} />
               </div>
               <div className="min-w-0 flex-1">
@@ -67,7 +67,7 @@ export function ReActStepList({ steps, isRunning = false }: ReActStepListProps) 
                   <span className="font-semibold text-text-primary" style={{ fontSize: '12px' }}>
                     {t('loop.stepLabel', { index: index + 1 })}
                   </span>
-                  <code className="px-1.5 py-0.5 rounded bg-bg-canvas text-blue-500" style={{ fontSize: '11px' }}>
+                  <code className="px-1.5 py-0.5 rounded bg-bg-canvas text-primary" style={{ fontSize: '11px' }}>
                     {step.action}
                   </code>
                   {step.error ? (
@@ -78,7 +78,7 @@ export function ReActStepList({ steps, isRunning = false }: ReActStepListProps) 
                       {t('loop.stepDone')}
                     </span>
                   ) : isRunning && index === steps.length - 1 ? (
-                    <span className="text-blue-500 flex items-center gap-1" style={{ fontSize: '11px' }}>
+                    <span className="text-primary flex items-center gap-1" style={{ fontSize: '11px' }}>
                       <CircleDashed size={11} className="animate-spin" />
                       {t('loop.stepRunning')}
                     </span>

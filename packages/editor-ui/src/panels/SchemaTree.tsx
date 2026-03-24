@@ -126,7 +126,7 @@ export function SchemaTree({ nodes = mockSchemaTree, selectedNodeId, onSelect, c
       <div key={node.id}>
         <div 
           className={`flex items-center h-[28px] cursor-pointer text-[12px] group relative transition-colors rounded-sm mx-1
-            ${isSelected ? 'bg-blue-500/10 text-blue-500' : 'text-text-primary/90 hover:bg-text-primary/5'}
+            ${isSelected ? 'bg-primary/10 text-primary' : 'text-text-primary/90 hover:bg-text-primary/5'}
             ${node.isHidden ? 'opacity-50' : ''}
           `}
           style={{ paddingLeft: `${depth * 14 + 6}px` }}
@@ -142,7 +142,7 @@ export function SchemaTree({ nodes = mockSchemaTree, selectedNodeId, onSelect, c
           </div>
           
           {/* Type Icon */}
-          <div className={`mr-2 flex items-center justify-center ${isSelected ? 'text-blue-500' : 'text-text-secondary'}`}>
+          <div className={`mr-2 flex items-center justify-center ${isSelected ? 'text-primary' : 'text-text-secondary'}`}>
             {getIconFromContract(node.type)}
           </div>
           

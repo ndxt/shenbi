@@ -1623,7 +1623,7 @@ export function AppShell({
               </div>
             </div>
             <div
-              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary z-20 transition-colors"
               onMouseDown={(e) => startSidebarResize(e, 'horizontal', false)}
             />
           </div>
@@ -1672,7 +1672,7 @@ export function AppShell({
                   pluginContext={resolvedPluginContext}
                 />
                 <div
-                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary z-20 transition-colors"
                   onMouseDown={(e) => startFileContextPanelResize(e, 'horizontal', false)}
                 />
               </div>
@@ -1721,7 +1721,7 @@ export function AppShell({
               {showConsole && (
                 <div style={{ height: consoleSize }} className="relative shrink-0 flex flex-col w-full">
                   <div
-                    className="absolute top-0 left-0 right-0 h-1 -mt-[2px] cursor-row-resize hover:bg-blue-500 z-20 transition-colors"
+                    className="absolute top-0 left-0 right-0 h-1 -mt-[2px] cursor-row-resize hover:bg-primary z-20 transition-colors"
                     onMouseDown={(e) => startConsoleResize(e, 'vertical', true)}
                   />
                   <Console />
@@ -1732,7 +1732,7 @@ export function AppShell({
             {showAssistantPanel && activeAuxiliaryPanel ? (
               <div style={{ width: assistantPanelSize }} className="relative shrink-0 flex flex-col h-full border-r border-border-ide">
                 <div
-                  className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+                  className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-primary z-20 transition-colors"
                   onMouseDown={(e) => startAIPanelResize(e, 'horizontal', true)}
                 />
                 {activeAuxiliaryPanel.render(resolvedPluginContext)}
@@ -1747,7 +1747,7 @@ export function AppShell({
                 onContextMenu={(event) => openContextMenu('inspector', event)}
               >
                 <div
-                  className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+                  className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-primary z-20 transition-colors"
                   onMouseDown={(e) => startInspectorResize(e, 'horizontal', true)}
                 />
                 <Inspector

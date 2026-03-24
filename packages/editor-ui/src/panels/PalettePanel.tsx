@@ -161,14 +161,14 @@ function PalettePopover({
                   }}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer transition-colors text-[12px] group ${
                     hoveredItem?.id === child.id
-                      ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium'
+                      ? 'bg-primary/10 text-primary dark:text-primary font-medium'
                       : 'hover:bg-text-primary/5 text-text-primary/80'
                   }`}
                 >
                   <div
                     className={`transition-colors ${
                       hoveredItem?.id === child.id
-                        ? 'text-blue-500 dark:text-blue-400'
+                        ? 'text-primary dark:text-primary'
                         : 'text-text-secondary group-hover:text-text-primary'
                     }`}
                   >
@@ -184,7 +184,7 @@ function PalettePopover({
 
         <div className="p-4 bg-bg-sidebar">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-blue-500/10 dark:bg-blue-500/20 rounded-md text-blue-500 dark:text-blue-400">
+            <div className="p-2 bg-primary/10 dark:bg-primary/20 rounded-md text-primary dark:text-primary">
               {renderPaletteIcon(currentItem.icon)}
             </div>
             <div className="flex flex-col">
@@ -227,7 +227,7 @@ function PaletteDocTooltip({
     >
       <div className="bg-bg-sidebar/95 backdrop-blur-xl border border-border-ide rounded-lg shadow-2xl dark:shadow-[0_16px_60px_rgba(0,0,0,0.6)] ring-1 ring-white/5 p-4 w-full text-[12px] animate-in fade-in zoom-in duration-200">
         <div className="flex items-center gap-3 mb-3 pb-3 border-b border-border-ide/50">
-          <div className="p-2 bg-blue-500/10 dark:bg-blue-500/20 rounded-md text-blue-500 dark:text-blue-400">
+          <div className="p-2 bg-primary/10 dark:bg-primary/20 rounded-md text-primary dark:text-primary">
             {renderPaletteIcon(item.icon)}
           </div>
           <div className="flex flex-col">
@@ -290,14 +290,14 @@ function GridPaletteItem({
         }}
         className={`flex flex-col items-center justify-center h-[72px] w-full p-2 rounded-md transition-colors group/card ${
           active
-            ? 'bg-blue-500/10 text-blue-500'
+            ? 'bg-primary/10 text-primary'
             : 'bg-transparent border border-transparent hover:bg-text-primary/5'
         } ${canInsertItem(item) ? 'cursor-pointer active:scale-95' : 'cursor-default'}`}
       >
         <div
           className={`transition-colors mb-2 ${
             active
-              ? 'text-blue-500'
+              ? 'text-primary'
               : 'text-text-secondary group-hover/card:text-text-primary'
           }`}
         >
@@ -306,7 +306,7 @@ function GridPaletteItem({
         <span
           className={`text-[11px] text-center leading-tight truncate w-full px-0.5 transition-colors ${
             active
-              ? 'text-blue-500 font-medium'
+              ? 'text-primary font-medium'
               : 'text-text-secondary group-hover/card:text-text-primary'
           }`}
         >
@@ -317,7 +317,7 @@ function GridPaletteItem({
           <div
             className={`absolute bottom-1.5 right-1.5 w-0 h-0 border-t-[5px] border-t-transparent border-r-[5px] transition-colors ${
               active
-                ? 'border-r-blue-500'
+                ? 'border-r-primary'
                 : 'border-r-text-secondary/30 group-hover/card:border-r-text-secondary/60'
             }`}
           />
@@ -486,7 +486,7 @@ export function PalettePanel({
             placeholder={searchPlaceholder ?? t('search.placeholder')}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            className="w-full bg-text-primary/[0.03] dark:bg-text-primary/[0.05] border border-transparent rounded-md pl-8 pr-2 py-1.5 text-[12px] text-text-primary focus:outline-none focus:bg-transparent focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 placeholder-text-secondary/60 transition-colors"
+            className="w-full bg-text-primary/[0.03] dark:bg-text-primary/[0.05] border border-transparent rounded-md pl-8 pr-2 py-1.5 text-[12px] text-text-primary focus:outline-none focus:bg-transparent focus:border-primary/50 focus:ring-1 focus:ring-primary/20 placeholder-text-secondary/60 transition-colors"
           />
         </div>
       </div>

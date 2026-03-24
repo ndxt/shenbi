@@ -316,7 +316,7 @@ export function AIPanel({
       <div className="w-full h-full bg-bg-panel border-l border-border-ide flex flex-col shrink-0 overflow-hidden">
         <div className="h-9 px-4 border-b border-border-ide flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-text-primary">
-            <Sparkles size={14} className="text-blue-500" />
+            <Sparkles size={14} className="text-primary" />
             <span className="font-bold uppercase tracking-wider" style={{ fontSize: '11px' }}>{t('panel.title')}</span>
           </div>
           <button
@@ -344,7 +344,7 @@ export function AIPanel({
           </div>
           <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0" title={t('settings.thinking')}>
             <span className="text-text-secondary uppercase tracking-wider" style={{ fontSize: '10px' }}>{t('settings.thinking')}</span>
-            <div className={`relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${thinkingEnabled ? 'bg-blue-500' : 'bg-bg-canvas border border-border-ide'}`}>
+            <div className={`relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${thinkingEnabled ? 'bg-primary' : 'bg-bg-canvas border border-border-ide'}`}>
               <span className={`pointer-events-none inline-block h-[12px] w-[12px] transform rounded-full shadow transition duration-200 ease-in-out ${thinkingEnabled ? 'bg-white translate-x-1.5' : 'bg-text-secondary -translate-x-1.5'}`} />
             </div>
             <input
@@ -367,7 +367,7 @@ export function AIPanel({
             value={blockConcurrency}
             onChange={(e) => setBlockConcurrency(Number(e.target.value))}
             disabled={isRunning}
-            className="flex-1 accent-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 accent-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ height: '4px' }}
             title={`${t('settings.concurrency')}: ${blockConcurrency}`}
           />
@@ -397,10 +397,10 @@ export function AIPanel({
 
           {mode !== 'loop' && isRunning && (
             <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex w-full min-w-0 self-stretch flex-col shadow-sm relative overflow-hidden mt-2">
-              <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-400 to-blue-500 animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
+              <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-primary via-primary-hover to-primary animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
               <div className="flex items-start gap-2 text-text-primary pb-2 mb-2" style={{ fontSize: '11px' }}>
-                <LoaderCircle size={12} className="text-blue-500 shrink-0 mt-0.5" style={{ animation: 'spin 1s linear infinite' }} />
-                <span className="font-semibold text-blue-500 shrink-0 leading-5">{t('status.generating')}</span>
+                <LoaderCircle size={12} className="text-primary shrink-0 mt-0.5" style={{ animation: 'spin 1s linear infinite' }} />
+                <span className="font-semibold text-primary shrink-0 leading-5">{t('status.generating')}</span>
                 <span className="opacity-70 ml-1 flex-1 min-w-0 whitespace-pre-wrap break-words leading-5">{progressText}</span>
                 <span className="text-text-secondary font-mono shrink-0 tabular-nums leading-5 pt-0.5" style={{ fontSize: '10px' }}>
                   {Math.floor(elapsedMs / 1000)}s

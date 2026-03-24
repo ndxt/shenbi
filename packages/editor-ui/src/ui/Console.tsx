@@ -14,7 +14,7 @@ export function Console() {
       <div className="flex-1 overflow-y-auto p-2 font-mono text-[12px] text-text-secondary">
         <div className="flex gap-2">
           <span className="text-text-secondary">[21:05:22]</span>
-          <span className="text-blue-400">INFO</span>
+          <span className="text-primary">INFO</span>
           <span>Shenbi Preview Engine started successfully.</span>
         </div>
         <div className="flex gap-2">
@@ -31,7 +31,7 @@ function ConsoleTab({ label, count, active = false }: { label: string, count?: n
   return (
     <div className={`
       h-full flex items-center px-1 text-[11px] font-medium cursor-pointer border-b-2 transition-colors
-      ${active ? 'border-blue-500 text-text-primary' : 'border-transparent text-text-secondary hover:text-text-primary'}
+      ${active ? 'border-primary text-text-primary' : 'border-transparent text-text-secondary hover:text-text-primary'}
     `}>
       {label}
       {count !== undefined && (

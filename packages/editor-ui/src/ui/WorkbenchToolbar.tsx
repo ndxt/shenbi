@@ -79,7 +79,7 @@ function ToolbarButton({ icon: Icon, active = false }: { icon: any, active?: boo
   return (
     <div className={`
       p-1.5 rounded cursor-pointer transition-colors
-      ${active ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:bg-bg-activity-bar hover:text-text-primary'}
+      ${active ? 'bg-bg-activity-bar text-primary' : 'text-text-secondary hover:bg-bg-activity-bar hover:text-text-primary'}
     `}>
       <Icon size={16} />
     </div>

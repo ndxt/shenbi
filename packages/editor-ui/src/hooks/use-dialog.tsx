@@ -66,7 +66,7 @@ function InlineDialog({
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              className="mt-3 w-full rounded border border-[var(--border-ide)] bg-[var(--bg-activity-bar)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-colors"
+              className="mt-3 w-full rounded border border-[var(--border-ide)] bg-[var(--bg-activity-bar)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 focus:ring-1 focus:ring-primary/30 transition-colors"
               autoFocus
             />
           )}
@@ -87,7 +87,7 @@ function InlineDialog({
           <button
             type="button"
             onClick={onConfirm}
-            className="h-6 rounded bg-blue-600 px-3 text-[12px] text-white hover:bg-blue-500 transition-colors"
+            className="h-6 rounded bg-primary px-3 text-[12px] text-white hover:bg-primary transition-colors"
             autoFocus={state.type === 'confirm'}
           >
             确认
