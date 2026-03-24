@@ -232,6 +232,7 @@ export function GatewayEditor({
 
     lastLocalDocumentRef.current = nextDocument;
     history.pushState(nextDocument);
+    documentContext?.replaceDocument?.(nextDocument as unknown as Record<string, unknown>);
 
     // Schedule a fallback commit. For continuous interactions (drag/pan),
     // onInteractionEnd fires first and cancels this timer.
@@ -240,8 +241,6 @@ export function GatewayEditor({
     }
     historyCommitTimerRef.current = setTimeout(() => {
       history.commit();
-      const doc = lastLocalDocumentRef.current ?? history.document;
-      documentContext?.replaceDocument?.(doc as unknown as Record<string, unknown>);
       historyCommitTimerRef.current = null;
     }, 180);
   }, [documentContext, history]);

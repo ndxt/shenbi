@@ -51,8 +51,12 @@ export function useEditorHostBridge(options: UseEditorHostBridgeOptions): UseEdi
       return executeBaseCommand('file.saveAs', { name: explicitName });
     }
 
+    if (commandId === 'file.saveSchema' && options.mode === 'shell' && options.activeFileId) {
+      return options.shellCommands.execute('tab.save', payload);
+    }
+
     return executeBaseCommand(commandId, payload);
-  }, [executeBaseCommand, options.activeFileId, options.promptFileName, options.schemaName]);
+  }, [executeBaseCommand, options.activeFileId, options.mode, options.promptFileName, options.schemaName, options.shellCommands]);
 
   return {
     executeBaseCommand,

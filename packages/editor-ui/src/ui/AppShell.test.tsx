@@ -256,6 +256,78 @@ describe('AppShell', () => {
     expect(unmountSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('switching renderer tabs reseeds document content for the next file', async () => {
+    const plugins = [
+      defineEditorPlugin({
+        id: 'plugin.gateway-renderer-content-test',
+        name: 'Gateway Renderer Content Test',
+        contributes: {
+          canvasRenderers: [
+            {
+              id: 'gateway-renderer-content-test',
+              fileTypes: ['api'],
+              render: (context) => (
+                <div data-testid="test-canvas-renderer-content">
+                  {String(context.file.id)}:{String((context.content as { id?: string } | undefined)?.id ?? 'none')}
+                </div>
+              ),
+            },
+          ],
+        },
+      }),
+    ];
+    const tabs = [
+      {
+        fileId: 'api-1',
+        filePath: '/api-1.json',
+        fileType: 'api' as const,
+        fileName: 'API 1',
+        schema: { id: 'api-1', name: 'API 1', body: [] },
+        isDirty: false,
+      },
+      {
+        fileId: 'api-2',
+        filePath: '/api-2.json',
+        fileType: 'api' as const,
+        fileName: 'API 2',
+        schema: { id: 'api-2', name: 'API 2', body: [] },
+        isDirty: false,
+      },
+    ];
+    const rendererContentByFileId: Record<string, Record<string, unknown>> = {
+      'api-1': { id: 'doc-api-1', type: 'api-gateway' },
+      'api-2': { id: 'doc-api-2', type: 'api-gateway' },
+    };
+
+    const { rerender } = render(
+      <AppShell
+        tabs={tabs}
+        activeTabId="api-1"
+        plugins={plugins}
+        getRendererContent={(fileId) => rendererContentByFileId[fileId]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByTestId('test-canvas-renderer-content')).toHaveTextContent('api-1:doc-api-1');
+
+    rerender(
+      <AppShell
+        tabs={tabs}
+        activeTabId="api-2"
+        plugins={plugins}
+        getRendererContent={(fileId) => rendererContentByFileId[fileId]}
+      >
+        <div>Content</div>
+      </AppShell>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('test-canvas-renderer-content')).toHaveTextContent('api-2:doc-api-2');
+    });
+  });
+
   it('点击画布节点会触发 onCanvasSelectNode', () => {
     const onCanvasSelectNode = vi.fn();
     render(

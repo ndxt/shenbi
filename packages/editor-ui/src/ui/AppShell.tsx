@@ -1506,6 +1506,8 @@ export function AppShell({
   // --- Document lifecycle context for non-page canvas renderers ---
   const [canvasDocUndoRedoState, setCanvasDocUndoRedoState] = React.useState({ canUndo: false, canRedo: false });
   const canvasDocContext = useCanvasDocumentContext({
+    fileId: activeEditorTab?.fileId,
+    fileType: activeEditorTab?.fileType,
     onDirtyChange: React.useCallback((dirty: boolean) => {
       const fileId = activeEditorTab?.fileId;
       if (fileId && onCanvasDocumentDirtyChange) {

@@ -101,6 +101,24 @@ export interface GatewayCanvasProps {
   initialViewport?: GatewayViewport;
 }
 
+type NodeChangeLike = {
+  type: string;
+};
+
+function getMeaningfulNodeChanges(changes: readonly NodeChangeLike[]): NodeChangeLike[] {
+  return changes.filter((change) => change.type !== 'dimensions' && change.type !== 'select');
+}
+
+export function shouldDeferNodeDocumentEmit(changes: readonly NodeChangeLike[]): boolean {
+  const meaningfulChanges = getMeaningfulNodeChanges(changes);
+  return meaningfulChanges.length > 0 && meaningfulChanges.every((change) => change.type === 'position');
+}
+
+export function shouldEmitNodeDocumentImmediately(changes: readonly NodeChangeLike[]): boolean {
+  const meaningfulChanges = getMeaningfulNodeChanges(changes);
+  return meaningfulChanges.some((change) => change.type !== 'position');
+}
+
 export function GatewayCanvas({
   documentId,
   documentName,
@@ -120,6 +138,10 @@ export function GatewayCanvas({
   const reactFlowInstance = useRef<ReactFlowInstance<GatewayNode, GatewayEdge> | null>(null);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
+  const pendingInteractionDocumentRef = useRef<{
+    nodes: GatewayNode[];
+    edges: GatewayEdge[];
+  } | null>(null);
   const hasInitializedViewportRef = useRef(false);
   const [localActiveTool, setLocalActiveTool] = useState<CanvasToolMode>('select');
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -178,20 +200,31 @@ export function GatewayCanvas({
     }));
   }, [documentId, documentName, onDocumentChange]);
 
+  const flushPendingInteractionDocument = useCallback(() => {
+    const pendingDocument = pendingInteractionDocumentRef.current;
+    pendingInteractionDocumentRef.current = null;
+    if (pendingDocument) {
+      emitDocumentChange(pendingDocument.nodes, pendingDocument.edges);
+    }
+    onInteractionEnd?.();
+  }, [emitDocumentChange, onInteractionEnd]);
+
   const handleNodesChange: OnNodesChange = useCallback(
     (changes) => {
       const next = applyNodeChanges(changes, nodes) as GatewayNode[];
       onNodesChangeProp(next);
 
-      // Only emit document changes for meaningful mutations.
-      // 'dimensions' changes are ReactFlow's internal node measurement —
-      // persisting them causes an infinite loop because gatewayDocumentToGraph
-      // recreates nodes with default measured dimensions, triggering re-measurement.
-      // 'select' changes are transient UI state.
-      const hasMeaningfulChange = changes.some(
-        (c) => c.type !== 'dimensions' && c.type !== 'select',
-      );
-      if (hasMeaningfulChange) {
+      if (shouldDeferNodeDocumentEmit(changes)) {
+        pendingInteractionDocumentRef.current = {
+          nodes: next,
+          edges: edgesRef.current,
+        };
+        onDirty?.();
+        return;
+      }
+
+      if (shouldEmitNodeDocumentImmediately(changes)) {
+        pendingInteractionDocumentRef.current = null;
         emitDocumentChange(next, edgesRef.current);
         onDirty?.();
       }
@@ -851,11 +884,10 @@ export function GatewayCanvas({
         onMove={(_, viewport) => {
           setZoom(viewport.zoom);
           setViewportState(viewport);
-          emitDocumentChange(nodesRef.current, edgesRef.current, viewport);
         }}
         onMoveEnd={() => {
           setIsViewportPanning(false);
-          onInteractionEnd?.();
+          flushPendingInteractionDocument();
         }}
         snapToGrid
         snapGrid={[16, 16]}
@@ -863,7 +895,7 @@ export function GatewayCanvas({
         multiSelectionKeyCode="Shift"
         proOptions={{ hideAttribution: true }}
         nodesDraggable={!effectivePan}
-        onNodeDragStop={() => onInteractionEnd?.()}
+        onNodeDragStop={() => flushPendingInteractionDocument()}
         elementsSelectable={!effectivePan}
         selectionOnDrag={!effectivePan}
         panOnDrag={effectivePan ? [0, 1] : [1]}

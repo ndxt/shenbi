@@ -2,7 +2,11 @@ import React from 'react';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { GatewayCanvas } from './GatewayCanvas';
+import {
+  GatewayCanvas,
+  shouldDeferNodeDocumentEmit,
+  shouldEmitNodeDocumentImmediately,
+} from './GatewayCanvas';
 import type { GatewayNode } from '../types';
 import { createDefaultGatewayDocument, gatewayDocumentToGraph } from '../gateway-document';
 
@@ -51,6 +55,23 @@ function createDataTransferMock(initial: Record<string, string> = {}): DataTrans
 }
 
 describe('GatewayCanvas', () => {
+  it('defers document persistence for pure node position changes', () => {
+    expect(shouldDeferNodeDocumentEmit([
+      { type: 'position' },
+      { type: 'select' },
+    ])).toBe(true);
+    expect(shouldEmitNodeDocumentImmediately([
+      { type: 'position' },
+      { type: 'select' },
+    ])).toBe(false);
+  });
+
+  it('persists structural node changes immediately', () => {
+    expect(shouldDeferNodeDocumentEmit([{ type: 'remove' }])).toBe(false);
+    expect(shouldEmitNodeDocumentImmediately([{ type: 'remove' }])).toBe(true);
+    expect(shouldEmitNodeDocumentImmediately([{ type: 'add' }])).toBe(true);
+  });
+
   it('renders the shared tool rail with gateway-specific actions', () => {
     vi.stubGlobal('ResizeObserver', ResizeObserverMock);
     vi.stubGlobal('DOMMatrixReadOnly', DOMMatrixReadOnlyMock);
@@ -148,6 +169,32 @@ describe('GatewayCanvas', () => {
     await waitFor(() => {
       expect(document.querySelector('.react-flow__edge')).toBeInTheDocument();
     });
+  });
+
+  it('does not emit a document change when the canvas only initializes its viewport', async () => {
+    vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+    vi.stubGlobal('DOMMatrixReadOnly', DOMMatrixReadOnlyMock);
+
+    const graph = gatewayDocumentToGraph(createDefaultGatewayDocument('api-4', 'Viewport API'));
+    const onDocumentChange = vi.fn();
+
+    render(
+      <GatewayCanvas
+        documentId="api-4"
+        documentName="Viewport API"
+        nodes={graph.nodes}
+        edges={graph.edges}
+        onNodesChange={vi.fn()}
+        onEdgesChange={vi.fn()}
+        onDocumentChange={onDocumentChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.querySelector('.react-flow__viewport')).toBeInTheDocument();
+    });
+
+    expect(onDocumentChange).not.toHaveBeenCalled();
   });
 
   it('adds dropped nodes with runtime dimensions and contract-derived handles', async () => {

@@ -317,4 +317,69 @@ describe('GatewayEditor', () => {
       viewport: { x: 10, y: 20, zoom: 1.1 },
     });
   });
+
+  it('syncs the latest gateway document to the host immediately after canvas edits', async () => {
+    gatewayCanvasSpy.mockClear();
+    const replaceDocument = vi.fn();
+    const documentContext = {
+      markDirty: vi.fn(),
+      getDocument: vi.fn(),
+      replaceDocument,
+      syncSchema: replaceDocument,
+      reportUndoRedoState: vi.fn(),
+      onSaveRequest: vi.fn(() => () => undefined),
+      onUndoRequest: vi.fn(() => () => undefined),
+      onRedoRequest: vi.fn(() => () => undefined),
+    };
+
+    render(
+      <GatewayEditor
+        documentSchema={initialDocument}
+        hostAdapter={createHostAdapter()}
+        documentContext={documentContext}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(gatewayCanvasSpy).toHaveBeenCalled();
+    });
+
+    const latestProps = gatewayCanvasSpy.mock.calls.at(-1)?.[0] as {
+      onDocumentChange?: (document: Record<string, unknown>) => void;
+    };
+
+    latestProps.onDocumentChange?.({
+      id: 'api-1',
+      name: 'Billing API',
+      type: 'api-gateway',
+      nodes: [
+        {
+          id: 'start-1',
+          kind: 'start',
+          label: '开始',
+          position: { x: 120, y: 200 },
+          config: {},
+        },
+      ],
+      edges: [],
+      viewport: { x: 10, y: 20, zoom: 1.1 },
+    });
+
+    expect(replaceDocument).toHaveBeenCalledWith({
+      id: 'api-1',
+      name: 'Billing API',
+      type: 'api-gateway',
+      nodes: [
+        {
+          id: 'start-1',
+          kind: 'start',
+          label: '开始',
+          position: { x: 120, y: 200 },
+          config: {},
+        },
+      ],
+      edges: [],
+      viewport: { x: 10, y: 20, zoom: 1.1 },
+    });
+  });
 });

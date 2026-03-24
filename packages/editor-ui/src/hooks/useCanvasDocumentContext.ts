@@ -7,7 +7,7 @@
 // renderer's `documentContext` prop — no extra wrapping needed.
 // ---------------------------------------------------------------------------
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { RendererDocumentProvider } from '@shenbi/editor-core';
 import type { CanvasRendererDocumentContext } from '@shenbi/editor-plugin-api';
 import type { DocumentProvider } from '@shenbi/editor-core';
@@ -36,14 +36,10 @@ export function useCanvasDocumentContext(options: {
   };
   provider: DocumentProvider;
 } {
-  const providerRef = useRef<RendererDocumentProvider | null>(null);
-  if (!providerRef.current) {
-    providerRef.current = new RendererDocumentProvider({
-      fileId: options.fileId ?? '',
-      fileType: (options.fileType ?? 'api') as 'page' | 'api',
-    });
-  }
-  const provider = providerRef.current;
+  const provider = useMemo(() => new RendererDocumentProvider({
+    fileId: options.fileId ?? '',
+    fileType: (options.fileType ?? 'api') as 'page' | 'api',
+  }), [options.fileId, options.fileType]);
 
   const onDirtyChangeRef = useRef(options.onDirtyChange);
   onDirtyChangeRef.current = options.onDirtyChange;
@@ -58,6 +54,10 @@ export function useCanvasDocumentContext(options: {
       onDirtyChangeRef.current(state.isDirty);
       onUndoRedoStateChangeRef.current({ canUndo: state.canUndo, canRedo: state.canRedo });
     });
+  }, [provider]);
+
+  useEffect(() => () => {
+    provider.dispose();
   }, [provider]);
 
   // Intercept replaceDocument to also forward schema to host

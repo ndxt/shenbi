@@ -53,6 +53,21 @@ describe('useEditorHostBridge', () => {
     expect(shellExecute).toHaveBeenCalledWith('file.saveAs', { name: 'Scenario Demo' });
   });
 
+  it('shell 模式下 file.saveSchema 在有活动标签时会走 tab.save', async () => {
+    const shellExecute = vi.fn(async () => 'save-ok');
+    const { result } = renderHook(() => useEditorHostBridge({
+      mode: 'shell',
+      shellCommands: { execute: shellExecute },
+      scenarioCommands: vi.fn(async () => undefined),
+      activeFileId: 'api-1',
+      schemaName: 'Billing API',
+    }));
+
+    await result.current.executePluginCommand('file.saveSchema');
+
+    expect(shellExecute).toHaveBeenCalledWith('tab.save', undefined);
+  });
+
   it('file.saveAs 会优先使用显式名称，否则再询问宿主', async () => {
     const shellExecute = vi.fn(async () => 'save-ok');
     const promptFileName = vi.fn(() => 'Prompt Name');
