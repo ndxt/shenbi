@@ -304,7 +304,7 @@
   width: 16px;
   height: 16px;
   padding: 0;
-  border: 1px solid var(--color-border-ide);
+  border: 1.5px solid var(--color-text-muted);
   border-radius: 999px;
   background: var(--color-bg-canvas);
   color: var(--color-text-secondary);
@@ -330,8 +330,13 @@
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
-  opacity: 1;
+  opacity: 0;
   pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.gateway-edge__add-button:hover .gateway-edge__add-plus {
+  opacity: 1;
 }
 
 /* ---- Canvas container ---- */
