@@ -136,7 +136,7 @@ const metadataContract: ComponentContract = {
 
 const sqlQueryContract: ComponentContract = {
   componentType: 'Gateway.SqlQuery',
-  displayNameKey: 'SQL 查询一下',
+  displayNameKey: 'SQL 查询',
   category: 'gateway-data',
   icon: 'Database',
   color: '#f59e0b',
