@@ -1,4 +1,4 @@
-import type { FileContent, FileType } from './adapters/file-storage';
+import type { FileType } from './adapters/file-storage';
 import type { HistorySnapshot } from './history';
 
 export interface TabState {
@@ -6,7 +6,7 @@ export interface TabState {
   filePath: string;
   fileType: FileType;
   fileName: string;
-  schema: FileContent;
+
   selectedNodeId?: string | undefined;
   isDirty: boolean;
   isGenerating?: boolean | undefined;

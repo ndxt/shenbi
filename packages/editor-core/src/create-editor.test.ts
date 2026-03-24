@@ -486,12 +486,13 @@ describe('createEditor', () => {
     await editor.commands.execute('tab.save');
 
     expect(await vfs.readFile('project-1', 'demo')).toEqual(updated);
-    expect(tabManager.getTab('demo')?.schema).toEqual(updated);
     expect(tabManager.getTab('demo')?.isDirty).toBe(false);
   });
 
   it('keeps active tab snapshot in sync with editor state and closes saved tabs through command flow', async () => {
     const vfs = createMemoryVFS(createSchema('page-a'));
+    // Add dirty-tab file to VFS for proper tab.open flow
+    const dirtyTabNode = await vfs.createFile('project-1', null, 'dirty-tab', 'page', createSchema('dirty-tab'));
     const tabManager = new TabManager();
     const editor = createEditor({
       initialSchema: createSchema('empty'),
@@ -501,15 +502,15 @@ describe('createEditor', () => {
     });
 
     await editor.commands.execute('tab.open', { fileId: 'demo' });
-    tabManager.openTab('dirty-tab', {
-      filePath: '/dirty-tab.page.json',
-      fileType: 'page',
-      fileName: 'dirty-tab',
-      schema: createSchema('dirty-tab'),
-      selectedNodeId: 'dirty-node',
+    await editor.commands.execute('tab.open', { fileId: dirtyTabNode.id });
+    // Set selectedNodeId on the active editor state for this tab
+    editor.state.setSelectedNodeId('dirty-node');
+    // Mark as dirty via syncState
+    await editor.commands.execute('tab.syncState', {
+      fileId: dirtyTabNode.id,
       isDirty: true,
     });
-    tabManager.activateTab('demo');
+    await editor.commands.execute('tab.activate', { fileId: 'demo' });
     editor.state.setSelectedNodeId('node-1');
     await editor.commands.execute('schema.replace', { schema: createSchema('updated-page-a') });
 
@@ -520,13 +521,13 @@ describe('createEditor', () => {
 
     await editor.commands.execute('tab.closeSaved');
 
-    expect(tabManager.getTabs().map((tab) => tab.fileId)).toEqual(['demo', 'dirty-tab']);
+    expect(tabManager.getTabs().map((tab) => tab.fileId)).toEqual(['demo', dirtyTabNode.id]);
 
     await editor.commands.execute('tab.save');
     await editor.commands.execute('tab.closeSaved');
 
-    expect(tabManager.getTabs().map((tab) => tab.fileId)).toEqual(['dirty-tab']);
-    expect(editor.state.getCurrentFileId()).toBe('dirty-tab');
+    expect(tabManager.getTabs().map((tab) => tab.fileId)).toEqual([dirtyTabNode.id]);
+    expect(editor.state.getCurrentFileId()).toBe(dirtyTabNode.id);
     expect(editor.state.getSelectedNodeId()).toBe('dirty-node');
     expect(editor.state.getSchema()).toMatchObject({ name: 'dirty-tab' });
   });
@@ -595,7 +596,6 @@ describe('createEditor', () => {
     expect(editor.state.getCurrentFileId()).toBe('demo');
     expect(editor.state.getSchema()).toMatchObject({ name: 'page-a' });
     expect(tabManager.getTab(secondNode.id)).toMatchObject({
-      schema: expect.objectContaining({ name: 'page-b-updated' }),
       isGenerating: true,
       readOnlyReason: 'AI 正在生成此页面',
       generationUpdatedAt: 123,
@@ -660,7 +660,6 @@ describe('createEditor', () => {
 
     expect(editor.state.getCurrentFileId()).toBe('demo');
     expect(editor.state.getSchema()).toEqual(createSchema('page'));
-    expect(tabManager.getTab('demo')?.schema).toEqual(createGatewaySchema('gateway-b'));
     expect(tabManager.getTab('demo')?.isDirty).toBe(true);
   });
 
@@ -685,7 +684,6 @@ describe('createEditor', () => {
 
     expect(editor.state.getCurrentFileId()).toBe(apiNode.id);
     expect(editor.state.getSchema()).toEqual(createSchema('page'));
-    expect(tabManager.getTab(apiNode.id)?.schema).toEqual(createGatewaySchema('gateway-live'));
   });
 
   it('restores tab manager snapshots in order', () => {
@@ -697,7 +695,6 @@ describe('createEditor', () => {
           filePath: '/b.page.json',
           fileType: 'page',
           fileName: 'B',
-          schema: createSchema('B'),
           isDirty: false,
         },
         {
@@ -705,7 +702,6 @@ describe('createEditor', () => {
           filePath: '/a.page.json',
           fileType: 'page',
           fileName: 'A',
-          schema: createSchema('A'),
           isDirty: true,
         },
       ],
@@ -986,10 +982,9 @@ describe('createEditor', () => {
     // Switch back to tab A
     await editor.commands.execute('tab.activate', { fileId: 'demo' });
 
-    // Tab B must still have its own schema and selection, not A's
+    // Tab B must still have its own selection, not A's
     const tabB = tabManager.getTab('file-page-b');
     expect(tabB).toBeDefined();
-    expect(tabB!.schema.name).toBe('page-b');
     expect(tabB!.selectedNodeId).toBe('selection-b');
 
     // Editor must show tab A
@@ -1015,23 +1010,17 @@ describe('createEditor', () => {
     await editor.commands.execute('tab.open', { fileId: 'file-page-beta' });
 
     // Collect all intermediate TabManager snapshots during activation
-    const snapshots: { activeTabId: string | undefined; tabBSchemaName: string | undefined }[] = [];
+    const snapshots: { activeTabId: string | undefined }[] = [];
     const unsub = tabManager.subscribe((snapshot) => {
-      const tabBData = snapshot.tabs.find((tab) => tab.fileId === 'file-page-beta');
       snapshots.push({
         activeTabId: snapshot.activeTabId,
-        tabBSchemaName: tabBData?.schema?.name,
       });
     });
 
     await editor.commands.execute('tab.activate', { fileId: 'demo' });
     unsub();
 
-    // In EVERY intermediate snapshot, tab B must keep its own schema name
-    for (const snapshot of snapshots) {
-      if (snapshot.tabBSchemaName !== undefined) {
-        expect(snapshot.tabBSchemaName).toBe('page-beta');
-      }
-    }
+    // Verify that tab activation produced intermediate snapshots
+    expect(snapshots.length).toBeGreaterThan(0);
   });
 });

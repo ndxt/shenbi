@@ -3,6 +3,7 @@ import type {
   TabManagerSnapshot,
   VirtualFileSystemAdapter,
 } from '@shenbi/editor-core';
+import type { FileContent } from '@shenbi/editor-core';
 import type { PageSchema } from '@shenbi/schema';
 
 export interface WorkspacePersistenceService {
@@ -12,6 +13,8 @@ export interface WorkspacePersistenceService {
 
 export interface PersistedWorkspaceShellSession {
   tabs: TabManagerSnapshot;
+  /** Dirty tab contents for crash recovery. Keyed by fileId. */
+  dirtyContents?: Record<string, FileContent> | undefined;
   expandedIds: string[];
   focusedId?: string | undefined;
 }
@@ -51,6 +54,10 @@ export interface UseWorkspacePersistenceOptions<TScenario extends string, TRende
   workspacePersistence: WorkspacePersistenceService;
   persistenceKeys: WorkspacePersistenceKeys;
   createEmptySchema: () => PageSchema;
+  sessions: {
+    ensureSession: (args: { fileId: string; fileType: string; content: FileContent; dirty?: boolean }) => unknown;
+    getSession: (fileId: string) => { workingContent: FileContent; dirty: boolean } | undefined;
+  };
 }
 
 export function useWorkspacePersistence<TScenario extends string, TRenderMode extends string>({
@@ -75,6 +82,7 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
   workspacePersistence,
   persistenceKeys,
   createEmptySchema,
+  sessions,
 }: UseWorkspacePersistenceOptions<TScenario, TRenderMode>) {
   const [scenarioPersistenceHydrated, setScenarioPersistenceHydrated] = useState(false);
   const [renderModeHydrated, setRenderModeHydrated] = useState(false);
@@ -216,19 +224,27 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
             continue;
           }
 
-          let schema = persistedTab.schema;
+          let schema: FileContent | undefined = storedSession.dirtyContents?.[persistedTab.fileId]
+            ?? (persistedTab as unknown as { schema?: FileContent }).schema;
           const shouldRestoreFromFile = persistedTab.fileType === 'api' || !persistedTab.isDirty;
-          if (shouldRestoreFromFile) {
+          if (shouldRestoreFromFile || !schema) {
             try {
-              schema = await vfs.readFile(activeProjectId, persistedTab.fileId) as typeof persistedTab.schema;
+              schema = await vfs.readFile(activeProjectId, persistedTab.fileId) as FileContent;
             } catch {
               continue;
             }
           }
 
+          // Seed DocumentSessionManager with the loaded content
+          sessions.ensureSession({
+            fileId: persistedTab.fileId,
+            fileType: persistedTab.fileType,
+            content: schema,
+            dirty: persistedTab.fileType === 'api' ? false : persistedTab.isDirty,
+          });
+
           restoredTabs.push({
             ...persistedTab,
-            schema,
             fileName: liveNode.name,
             filePath: liveNode.path,
             fileType: (liveNode.fileType ?? persistedTab.fileType) as typeof persistedTab.fileType,
@@ -265,6 +281,10 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
           ? restoredTabs.find((tab) => tab.fileId === activeTabId)
           : undefined;
 
+        const activeSession = activeTab
+          ? sessions.getSession(activeTab.fileId)
+          : undefined;
+
         await fileEditor.commands.execute('editor.restoreSnapshot', {
           snapshot: activeTab
             ? activeTab.fileType === 'api'
@@ -274,7 +294,7 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
                 isDirty: activeTab.isDirty,
               }
               : {
-                schema: activeTab.schema,
+                schema: (activeSession?.workingContent as PageSchema) ?? createEmptySchema(),
                 currentFileId: activeTab.fileId,
                 isDirty: activeTab.isDirty,
                 ...(activeTab.selectedNodeId ? { selectedNodeId: activeTab.selectedNodeId } : {}),
@@ -329,14 +349,23 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
               ...tabSnapshot,
               tabs: tabSnapshot.tabs.map((tab) => ({
                 ...tab,
-                // Only persist schema for dirty tabs (user's unsaved work).
-                // Non-dirty tabs will reload content from VFS on next startup.
-                ...(tab.isDirty ? {} : { schema: undefined }),
                 isGenerating: false,
                 readOnlyReason: undefined,
                 generationUpdatedAt: undefined,
-              } as typeof tab)),
+              })),
             },
+            // Only persist content for dirty tabs (crash recovery)
+            dirtyContents: tabSnapshot.tabs.reduce<Record<string, FileContent> | undefined>(
+              (acc, tab) => {
+                if (!tab.isDirty) return acc;
+                const session = sessions.getSession(tab.fileId);
+                if (!session) return acc;
+                const result = acc ?? {};
+                result[tab.fileId] = session.workingContent;
+                return result;
+              },
+              undefined,
+            ),
             expandedIds: fileExplorerExpandedIds,
             ...(fileExplorerFocusedId ? { focusedId: fileExplorerFocusedId } : {}),
           },

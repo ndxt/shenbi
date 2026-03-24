@@ -1490,11 +1490,6 @@ export function AppShell({
     ...(activeEditorTab?.fileName ? { name: activeEditorTab.fileName } : {}),
     ...(activeEditorTab?.fileType ? { type: activeEditorTab.fileType } : {}),
   }), [activeEditorTab?.fileId, activeEditorTab?.fileName, activeEditorTab?.fileType]);
-  const canvasRendererContent = React.useMemo(() => (
-    activeEditorTab?.fileType && activeEditorTab.fileType !== 'page'
-      ? activeEditorTab.schema as Record<string, unknown>
-      : undefined
-  ), [activeEditorTab?.fileType, activeEditorTab?.schema]);
   const canvasRendererSurface = React.useMemo(() => ({
     children,
     renderMode,
@@ -1524,6 +1519,12 @@ export function AppShell({
   });
   const canvasDocDispatchRef = React.useRef(canvasDocContext.dispatch);
   canvasDocDispatchRef.current = canvasDocContext.dispatch;
+
+  const canvasRendererContent = React.useMemo(() => (
+    activeEditorTab?.fileType && activeEditorTab.fileType !== 'page'
+      ? canvasDocContext.provider.getDocument() as Record<string, unknown> | undefined
+      : undefined
+  ), [activeEditorTab?.fileType, canvasDocContext.provider]);
 
   // When the host saves a renderer-owned file (via tab.save), notify the
   // renderer so it can call history.markSaved().

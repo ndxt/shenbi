@@ -3,6 +3,22 @@ import { StrictMode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { useWorkspacePersistence } from './useWorkspacePersistence';
 
+import type { FileContent } from '@shenbi/editor-core';
+
+const createSessionsMock = () => {
+  const store = new Map<string, { content: FileContent; dirty: boolean }>();
+  return {
+    ensureSession: vi.fn(({ fileId, content, dirty }: { fileId: string; content: FileContent; dirty?: boolean }) => {
+      store.set(fileId, { content, dirty: dirty ?? false });
+      return { workingContent: content, dirty: dirty ?? false };
+    }),
+    getSession: vi.fn((fileId: string) => {
+      const s = store.get(fileId);
+      return s ? { workingContent: s.content, dirty: s.dirty } : undefined;
+    }),
+  };
+};
+
 describe('useWorkspacePersistence', () => {
   it('会恢复场景和 render mode，并继续持久化后续变更', async () => {
     const setJSON = vi.fn(async () => undefined);
@@ -170,6 +186,7 @@ describe('useWorkspacePersistence', () => {
           shellSessionKey: 'shell-session',
         },
         createEmptySchema: () => ({ id: 'shell-page', body: [] }),
+        sessions: createSessionsMock(),
       });
     }, {
       wrapper: StrictMode,
@@ -275,6 +292,7 @@ describe('useWorkspacePersistence', () => {
           shellSessionKey: 'shell-session',
         },
         createEmptySchema,
+        sessions: createSessionsMock(),
       });
     }, {
       initialProps: {
@@ -395,6 +413,7 @@ describe('useWorkspacePersistence', () => {
           shellSessionKey: 'shell-session',
         },
         createEmptySchema: () => ({ id: 'shell-page', body: [] }),
+        sessions: createSessionsMock(),
       });
     });
 
@@ -404,7 +423,6 @@ describe('useWorkspacePersistence', () => {
           expect.objectContaining({
             fileId: 'api-1',
             fileType: 'api',
-            schema: { id: 'live', name: 'gateway-live', type: 'api-gateway', nodes: [{ id: 'start-1' }], edges: [] },
             isDirty: false,
           }),
         ],

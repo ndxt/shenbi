@@ -959,12 +959,13 @@ function registerTabCommands(
   vfs?: VirtualFileSystemAdapter,
   projectId?: string,
 ): void {
-  const ensureSessionForTab = (tab: TabState) => sessions.ensureSession({
-    fileId: tab.fileId,
-    fileType: tab.fileType,
-    content: tab.schema,
-    dirty: tab.isDirty,
-  });
+  const ensureSessionForTab = (tab: TabState) => {
+    const existing = sessions.getSession(tab.fileId);
+    if (existing) return existing;
+    // Session not yet initialised — this should only happen during
+    // workspace hydration where content is loaded separately.
+    return undefined;
+  };
   const getSessionSnapshot = (fileId: string) => {
     const tab = tabManager.getTab(fileId);
     if (tab) {
@@ -974,13 +975,11 @@ function registerTabCommands(
   };
 
   const syncRendererTabCache = (fileId: string): void => {
-    const tab = tabManager.getTab(fileId);
-    const session = getSessionSnapshot(fileId);
-    if (!tab || !session) {
+    const session = sessions.getSession(fileId);
+    if (!session) {
       return;
     }
     tabManager.updateTab(fileId, {
-      schema: session.workingContent,
       isDirty: session.dirty,
     });
   };
@@ -1059,7 +1058,6 @@ function registerTabCommands(
     const schema = currentState.getSchema();
     sessions.updateWorkingContent(tab.fileId, schema, snapshot.isDirty);
     tabManager.updateTab(tab.fileId, {
-      schema,
       selectedNodeId: snapshot.selectedNodeId,
       isDirty: snapshot.isDirty,
     });
@@ -1130,7 +1128,6 @@ function registerTabCommands(
         filePath: node.path,
         fileType,
         fileName: node.name,
-        schema: session.workingContent,
         isDirty: session.dirty,
       });
       await restoreEditorForTab(tabManager.getTab(fileId)!);
@@ -1219,7 +1216,6 @@ function registerTabCommands(
       }
 
       const patch: Partial<Omit<TabState, 'fileId'>> = {
-        ...(schema !== undefined ? { schema } : {}),
         ...(selectedNodeId !== undefined ? { selectedNodeId } : {}),
         ...(isDirty !== undefined ? { isDirty } : {}),
         ...(isGenerating !== undefined ? { isGenerating } : {}),
@@ -1382,10 +1378,7 @@ function registerTabCommands(
         sessions.updateWorkingContent(activeTab.fileId, content, currentState.getIsDirty());
       }
       await vfs.writeFile(projectId, activeTab.fileId, content);
-      const savedSession = sessions.replacePersistedContent(activeTab.fileId, content);
-      tabManager.updateTab(activeTab.fileId, {
-        schema: savedSession?.workingContent ?? content,
-      });
+      sessions.replacePersistedContent(activeTab.fileId, content);
       tabManager.markDirty(activeTab.fileId, false);
       if (session.owner === 'page-editor') {
         currentState.setDirty(false);
@@ -1455,18 +1448,18 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
         return;
       }
 
-      // For page-editor tabs, sync schema + dirty + selectedNodeId
-      // (commands modify EditorState, and we need TabManager in sync)
+      // For page-editor tabs, sync dirty + selectedNodeId + DocumentSession
+      // (commands modify EditorState, and we need TabManager + session in sync)
       if (
-        activeTab.schema === snapshot.schema
-        && activeTab.selectedNodeId === snapshot.selectedNodeId
+        activeTab.selectedNodeId === snapshot.selectedNodeId
         && activeTab.isDirty === snapshot.isDirty
       ) {
+        // Still update DocumentSession even if tab metadata unchanged
+        sessions.updateWorkingContent(activeTabId, snapshot.schema, snapshot.isDirty);
         return;
       }
       sessions.updateWorkingContent(activeTabId, snapshot.schema, snapshot.isDirty);
       tabManager.updateTab(activeTabId, {
-        schema: snapshot.schema,
         selectedNodeId: snapshot.selectedNodeId,
         isDirty: snapshot.isDirty,
       });
