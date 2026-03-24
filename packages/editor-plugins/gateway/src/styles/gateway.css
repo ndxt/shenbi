@@ -182,6 +182,13 @@
     0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
+/* Elevate selected, hovered, or menu-open nodes so their toolbars & menus sit above edge buttons */
+.react-flow__node:has(.gateway-node--selected),
+.react-flow__node:has(.gateway-node--menu-open),
+.react-flow__node:has(.gateway-node:hover) {
+  z-index: 1000 !important;
+}
+
 /* ---- Node Content (Horizontal Layout) ---- */
 .gateway-node__content {
   display: flex;
@@ -314,7 +321,7 @@
   cursor: pointer;
   pointer-events: all;
   transform: translate(-50%, -50%);
-  transition: all 0.15s ease;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.15s;
   z-index: 10;
 }
 

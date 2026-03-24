@@ -430,7 +430,7 @@ body {
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--color-text-secondary);
   font-size: 11px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;

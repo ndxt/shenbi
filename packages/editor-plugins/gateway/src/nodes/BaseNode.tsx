@@ -172,7 +172,7 @@ export function BaseNode({ id, data, selected, children }: BaseNodeProps) {
 
   return (
     <div
-      className={`gateway-node ${selected ? 'gateway-node--selected' : ''}`}
+      className={`gateway-node ${selected ? 'gateway-node--selected' : ''} ${menuOpen ? 'gateway-node--menu-open' : ''}`}
       style={{ '--node-color': contract.color } as React.CSSProperties}
       onContextMenu={(e) => {
         e.preventDefault();
