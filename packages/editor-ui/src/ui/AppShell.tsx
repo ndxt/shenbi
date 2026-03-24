@@ -196,8 +196,8 @@ function EmptyWorkspaceShortcutKey({
     <div className="flex items-center gap-[4px]">
       {keys.map((key, index) => (
         <React.Fragment key={`${key}-${index}`}>
-          {index > 0 ? <span className="text-[#666666] text-[11px]">+</span> : null}
-          <kbd className="flex h-[20px] min-w-[20px] items-center justify-center rounded-[3px] border border-[#444444] bg-[#3a3a3a] px-[5px] text-[11px] text-[#999999]">
+          {index > 0 ? <span className="text-text-muted text-[11px]">+</span> : null}
+          <kbd className="flex h-[20px] min-w-[20px] items-center justify-center rounded-[3px] border border-border-ide bg-active-bg px-[5px] text-[11px] text-text-muted">
             {key}
           </kbd>
         </React.Fragment>
@@ -225,8 +225,8 @@ function EmptyWorkspaceState() {
         }}
       />
       <div className="mb-6 text-center">
-        <div className="text-[15px] font-medium text-[#999999] mb-1">{t('emptyWorkspace.title')}</div>
-        <div className="text-[12px] text-[#666666] max-w-[360px] leading-[1.6]">{t('emptyWorkspace.description')}</div>
+        <div className="text-[15px] font-medium text-text-secondary mb-1">{t('emptyWorkspace.title')}</div>
+        <div className="text-[12px] text-text-muted max-w-[360px] leading-[1.6]">{t('emptyWorkspace.description')}</div>
       </div>
       <div className="flex flex-col gap-[8px]">
         {EMPTY_WORKSPACE_SHORTCUTS.map((shortcut) => (
@@ -234,7 +234,7 @@ function EmptyWorkspaceState() {
             key={shortcut.id}
             className="flex items-center justify-between gap-[40px] min-w-[300px]"
           >
-            <span className="text-[12px] text-[#999999]">
+            <span className="text-[12px] text-text-secondary">
               {t(`hostCommands.${shortcut.id}`)}
             </span>
             <EmptyWorkspaceShortcutKey

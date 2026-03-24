@@ -53,8 +53,8 @@ export function TypedEdge({
         {...(markerEnd ? { markerEnd } : {})}
         style={{
           ...style,
-          strokeWidth: selected ? 2 : 1.5,
-          stroke: selected ? '#3b82f6' : '#6b7280',
+          stroke: selected ? 'var(--color-primary)' : 'var(--color-text-muted)',
+          strokeWidth: selected ? 2 : 1,
           transition: 'stroke 0.2s, stroke-width 0.2s',
         }}
       />

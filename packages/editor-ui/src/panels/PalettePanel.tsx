@@ -340,7 +340,7 @@ function ListPaletteItem({
   onEndDrag?: (() => void) | undefined;
   dragEnabled: boolean;
 }) {
-  const iconBg = getItemColor(item) ?? 'rgba(59, 130, 246, 0.14)';
+  const iconBg = getItemColor(item) ?? 'var(--color-primary-bg)';
 
   return (
     <div

@@ -80,7 +80,7 @@ function InlineDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="h-6 rounded px-3 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+            className="h-6 rounded px-3 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-hover-bg transition-colors"
           >
             取消
           </button>

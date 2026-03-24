@@ -107,17 +107,17 @@ export class PageErrorBoundary extends Component<{ children?: ReactNode }, PageE
         style: {
           padding: 24,
           margin: 16,
-          background: '#fff2f0',
-          border: '1px solid #ffccc7',
+          background: 'var(--color-danger-bg, #fff2f0)',
+          border: '1px solid var(--color-danger, #ffccc7)',
           borderRadius: 8,
-          color: '#cf1322',
+          color: 'var(--color-danger, #cf1322)',
           fontFamily: 'monospace',
           fontSize: 13,
         },
       },
         createElement('div', { style: { fontWeight: 600, marginBottom: 8, fontSize: 15 } }, '⚠ 页面渲染出错'),
-        createElement('div', { style: { color: '#595959', marginBottom: 8 } }, '页面组件在渲染时发生异常，请检查 schema 结构或联系开发者。'),
-        createElement('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf1322' } }, String(this.state.error)),
+        createElement('div', { style: { color: 'var(--color-text-secondary, #595959)', marginBottom: 8 } }, '页面组件在渲染时发生异常，请检查 schema 结构或联系开发者。'),
+        createElement('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: 'var(--color-danger, #cf1322)' } }, String(this.state.error)),
       );
     }
     return this.props.children;
