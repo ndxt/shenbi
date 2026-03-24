@@ -120,12 +120,16 @@ interface AppShellProps {
   onCanvasDocumentDirtyChange?: ((fileId: string, dirty: boolean) => void) | undefined;
   /** Called when a non-page canvas renderer updates its document schema. */
   onCanvasDocumentSchemaChange?: ((fileId: string, schema: Record<string, unknown>) => void) | undefined;
+  /** Called when a non-page canvas renderer updates undo/redo availability. */
+  onCanvasDocumentUndoRedoStateChange?: ((fileId: string, state: { canUndo: boolean; canRedo: boolean }) => void) | undefined;
   /** Subscribe to renderer-save-notify events from the host. When called, renderer
    * save dispatch is triggered so the renderer can mark its history as saved.
    * Pass a `subscribe(callback)` function; AppShell calls dispatch.save() in the callback. */
   onRendererSaveNotify?: ((dispatch: () => void) => (() => void)) | undefined;
   /** Read initial content for a renderer-owned tab from DocumentSessionManager. */
   getRendererContent?: ((fileId: string) => Record<string, unknown> | undefined) | undefined;
+  /** Exposes the active renderer document dispatch so host toolbars can trigger save/undo/redo. */
+  onRendererDocumentDispatchChange?: ((dispatch: { save: () => void; undo: () => void; redo: () => void } | null) => void) | undefined;
   /** Title displayed in the title bar (defaults to 'Shenbi IDE') */
   title?: string;
   /** Subtitle displayed in the title bar (defaults to 'Editor UI Package') */
@@ -338,8 +342,10 @@ export function AppShell({
   onMoveTab,
   onCanvasDocumentDirtyChange,
   onCanvasDocumentSchemaChange,
+  onCanvasDocumentUndoRedoStateChange,
   onRendererSaveNotify,
   getRendererContent,
+  onRendererDocumentDispatchChange,
   title,
   subtitle,
   userAvatarUrl,
@@ -1520,10 +1526,30 @@ export function AppShell({
         onCanvasDocumentSchemaChange(fileId, schema);
       }
     }, [activeEditorTab?.fileId, onCanvasDocumentSchemaChange]),
-    onUndoRedoStateChange: setCanvasDocUndoRedoState,
+    onUndoRedoStateChange: React.useCallback((state: { canUndo: boolean; canRedo: boolean }) => {
+      setCanvasDocUndoRedoState(state);
+      const fileId = activeEditorTab?.fileId;
+      if (fileId && onCanvasDocumentUndoRedoStateChange) {
+        onCanvasDocumentUndoRedoStateChange(fileId, state);
+      }
+    }, [activeEditorTab?.fileId, onCanvasDocumentUndoRedoStateChange]),
   });
   const canvasDocDispatchRef = React.useRef(canvasDocContext.dispatch);
   canvasDocDispatchRef.current = canvasDocContext.dispatch;
+
+  React.useEffect(() => {
+    if (!onRendererDocumentDispatchChange) {
+      return undefined;
+    }
+    if (activeEditorTab?.fileType && activeEditorTab.fileType !== 'page') {
+      onRendererDocumentDispatchChange(canvasDocContext.dispatch);
+    } else {
+      onRendererDocumentDispatchChange(null);
+    }
+    return () => {
+      onRendererDocumentDispatchChange(null);
+    };
+  }, [activeEditorTab?.fileType, canvasDocContext.dispatch, onRendererDocumentDispatchChange]);
 
   // When the active tab is a renderer-owned tab, provide its content.
   // If provider is empty (fresh mount / tab switch), seed it from session.

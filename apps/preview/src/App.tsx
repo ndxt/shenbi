@@ -55,6 +55,8 @@ export function App() {
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const [renderMode, setRenderMode] = useState<RenderMode>(DEFAULT_RENDER_MODE);
   const [showProjectManager, setShowProjectManager] = useState(false);
+  const [rendererUndoRedoStateByFile, setRendererUndoRedoStateByFile] = useState<Record<string, { canUndo: boolean; canRedo: boolean }>>({});
+  const activeRendererDispatchRef = useRef<{ save: () => void; undo: () => void; redo: () => void } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const persistenceAdapter = useMemo(() => new LocalWorkspacePersistenceAdapter(), []);
@@ -154,6 +156,35 @@ export function App() {
   const shellSchemaName = appMode === 'shell' && workspaceState.tabSnapshot.tabs.length === 0
     ? undefined
     : activeSchema.name;
+  const activeRendererUndoRedoState = useMemo(() => {
+    const activeTab = workspaceState.tabSnapshot.tabs.find(
+      (tab) => tab.fileId === workspaceState.tabSnapshot.activeTabId,
+    );
+    if (!activeTab || activeTab.fileType === 'page') {
+      return undefined;
+    }
+    return rendererUndoRedoStateByFile[activeTab.fileId];
+  }, [rendererUndoRedoStateByFile, workspaceState.tabSnapshot.activeTabId, workspaceState.tabSnapshot.tabs]);
+  const isRendererTabActive = useMemo(() => {
+    const activeTab = workspaceState.tabSnapshot.tabs.find(
+      (tab) => tab.fileId === workspaceState.tabSnapshot.activeTabId,
+    );
+    return Boolean(activeTab && activeTab.fileType !== 'page');
+  }, [workspaceState.tabSnapshot.activeTabId, workspaceState.tabSnapshot.tabs]);
+  const handleToolbarUndo = useCallback(() => {
+    if (isRendererTabActive) {
+      activeRendererDispatchRef.current?.undo();
+      return;
+    }
+    workspaceState.handleUndoGuarded();
+  }, [isRendererTabActive, workspaceState]);
+  const handleToolbarRedo = useCallback(() => {
+    if (isRendererTabActive) {
+      activeRendererDispatchRef.current?.redo();
+      return;
+    }
+    workspaceState.handleRedoGuarded();
+  }, [isRendererTabActive, workspaceState]);
   const handleExportJSON = useCallback(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') {
       return;
@@ -352,9 +383,21 @@ export function App() {
       onCanvasDocumentSchemaChange={useCallback((fileId: string, schema: Record<string, unknown>) => {
         void fileEditor.commands.execute('tab.syncState', { fileId, schema });
       }, [fileEditor.commands])}
+      onCanvasDocumentUndoRedoStateChange={useCallback((fileId: string, state: { canUndo: boolean; canRedo: boolean }) => {
+        setRendererUndoRedoStateByFile((previous) => {
+          const current = previous[fileId];
+          if (current?.canUndo === state.canUndo && current?.canRedo === state.canRedo) {
+            return previous;
+          }
+          return { ...previous, [fileId]: state };
+        });
+      }, [])}
       onRendererSaveNotify={useCallback((dispatch: () => void) => {
         return fileEditor.eventBus!.on('file:saved', () => { dispatch(); });
       }, [fileEditor.eventBus])}
+      onRendererDocumentDispatchChange={useCallback((dispatch: { save: () => void; undo: () => void; redo: () => void } | null) => {
+        activeRendererDispatchRef.current = dispatch;
+      }, [])}
       getRendererContent={useCallback((fileId: string) => {
         const session = fileEditor.sessions?.getSession(fileId);
         return session?.workingContent as Record<string, unknown> | undefined;
@@ -370,11 +413,11 @@ export function App() {
           onImportJSONFile={workspaceState.handleImportJSONFile}
           onExportJSON={handleExportJSON}
           isDirty={workspaceState.isDirty}
-          canUndo={workspaceState.canUndo}
-          canRedo={workspaceState.canRedo}
+          canUndo={activeRendererUndoRedoState?.canUndo ?? workspaceState.canUndo}
+          canRedo={activeRendererUndoRedoState?.canRedo ?? workspaceState.canRedo}
           shellGenerationLock={workspaceState.shellGenerationLock}
-          onUndo={workspaceState.handleUndoGuarded}
-          onRedo={workspaceState.handleRedoGuarded}
+          onUndo={handleToolbarUndo}
+          onRedo={handleToolbarRedo}
         />
       )}
     >
