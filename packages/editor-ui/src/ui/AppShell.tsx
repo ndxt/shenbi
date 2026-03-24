@@ -420,7 +420,7 @@ export function AppShell({
   const [activeFileContextTabId, setActiveFileContextTabId] = React.useState('components');
   const [activeActivityItemId, setActiveActivityItemId] = React.useState('');
   const [activeAuxiliaryPanelId, setActiveAuxiliaryPanelId] = React.useState<string | undefined>();
-  const [focusVersion, setFocusVersion] = React.useState(0);
+
 
   const [isMaximized, setIsMaximized] = React.useState(false);
   const recentCommandIdsRef = React.useRef<string[]>([]);
@@ -723,19 +723,7 @@ export function AppShell({
     () => [...hostShortcuts, ...pluginContributes.shortcuts],
     [hostShortcuts, pluginContributes.shortcuts],
   );
-  React.useEffect(() => {
-    const syncFocus = () => {
-      setFocusVersion((current) => current + 1);
-    };
-    document.addEventListener('focusin', syncFocus);
-    document.addEventListener('focusout', syncFocus);
-    window.addEventListener('blur', syncFocus);
-    return () => {
-      document.removeEventListener('focusin', syncFocus);
-      document.removeEventListener('focusout', syncFocus);
-      window.removeEventListener('blur', syncFocus);
-    };
-  }, []);
+
   const getRuntimeContext = React.useCallback((area?: ContextMenuArea) => {
     const activeElement = document.activeElement;
     const baseContext = getShortcutEventContext(activeElement, rootRef.current, {
@@ -787,7 +775,6 @@ export function AppShell({
     canMoveSelectedNodeDown,
     canMoveSelectedNodeUp,
     canvasReadOnly,
-    focusVersion,
     pluginContext?.selection,
     selectedNodeSchemaId,
     showInspector,
@@ -811,7 +798,7 @@ export function AppShell({
 
     return { visible: true, enabled: true };
   }, [getRuntimeContext, hostCommandMap, pluginCommandMap]);
-  const allMenus = React.useMemo<ToolbarMenuItem[]>(() => (
+  const computeMenus = React.useCallback((): ToolbarMenuItem[] => (
     [...hostMenus, ...pluginContributes.menus]
       .filter((item) => evaluateWhenExpression(item.when, getRuntimeContext(), true))
       .filter((item) => resolveCommandState(item.commandId).visible)
@@ -828,6 +815,7 @@ export function AppShell({
         ...(item.group ? { group: item.group } : {}),
       }))
   ), [getRuntimeContext, hostMenus, pluginContributes.menus, resolveCommandState]);
+  const allMenus = computeMenus();
   const getContextMenuItems = React.useCallback((area: ContextMenuArea): ContextMenuItem[] => {
     const context = getRuntimeContext(area);
 
@@ -859,7 +847,7 @@ export function AppShell({
     }
     return entries;
   }, [allShortcuts]);
-  const commandPaletteCommands = React.useMemo<CommandPaletteItem[]>(() => {
+  const computeCommandPaletteCommands = React.useCallback((): CommandPaletteItem[] => {
     const items: CommandPaletteItem[] = hostCommands
       .filter((command) => resolveCommandState(command.id).visible)
       .map((command) => ({
@@ -888,6 +876,7 @@ export function AppShell({
     }
     return items;
   }, [hostCommands, pluginContributes.commands, resolveCommandState, shortcutMap]);
+  const commandPaletteCommands = showCommandPalette ? computeCommandPaletteCommands() : [];
   const recordRecentCommand = React.useCallback((commandId: string) => {
     if (commandId === 'commandPalette.open') {
       return;
