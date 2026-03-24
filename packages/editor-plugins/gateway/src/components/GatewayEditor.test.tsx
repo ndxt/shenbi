@@ -382,4 +382,97 @@ describe('GatewayEditor', () => {
       viewport: { x: 10, y: 20, zoom: 1.1 },
     });
   });
+
+  it('preserves undo history after switching away from and back to the same gateway tab', async () => {
+    gatewayCanvasSpy.mockClear();
+    const undoHandlers: Array<() => void> = [];
+    const documentContext = {
+      markDirty: vi.fn(),
+      getDocument: vi.fn(),
+      replaceDocument: vi.fn(),
+      syncSchema: vi.fn(),
+      reportUndoRedoState: vi.fn(),
+      onSaveRequest: vi.fn(() => () => undefined),
+      onUndoRequest: vi.fn((handler: () => void) => {
+        undoHandlers.push(handler);
+        return () => undefined;
+      }),
+      onRedoRequest: vi.fn(() => () => undefined),
+    };
+
+    const modifiedDocument = {
+      id: 'api-1',
+      name: 'Billing API',
+      type: 'api-gateway' as const,
+      nodes: [
+        {
+          id: 'start-1',
+          kind: 'start' as const,
+          label: '开始',
+          position: { x: 120, y: 200 },
+          config: {},
+        },
+      ],
+      edges: [],
+      viewport: { x: 10, y: 20, zoom: 1.1 },
+    };
+
+    const firstRender = render(
+      <GatewayEditor
+        documentSchema={initialDocument}
+        hostAdapter={createHostAdapter()}
+        documentContext={documentContext}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(gatewayCanvasSpy).toHaveBeenCalled();
+    });
+
+    let latestProps = gatewayCanvasSpy.mock.calls.at(-1)?.[0] as {
+      onDocumentChange?: (document: Record<string, unknown>) => void;
+      onInteractionEnd?: () => void;
+    };
+
+    latestProps.onDocumentChange?.(modifiedDocument);
+    latestProps.onInteractionEnd?.();
+
+    await waitFor(() => {
+      expect(documentContext.reportUndoRedoState).toHaveBeenLastCalledWith({
+        canUndo: true,
+        canRedo: false,
+      });
+    });
+
+    firstRender.unmount();
+
+    gatewayCanvasSpy.mockClear();
+    render(
+      <GatewayEditor
+        documentSchema={modifiedDocument}
+        hostAdapter={createHostAdapter()}
+        documentContext={documentContext}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(gatewayCanvasSpy).toHaveBeenCalled();
+      expect(documentContext.reportUndoRedoState).toHaveBeenLastCalledWith({
+        canUndo: true,
+        canRedo: false,
+      });
+    });
+
+    await act(async () => {
+      undoHandlers.at(-1)?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(documentContext.reportUndoRedoState).toHaveBeenLastCalledWith({
+        canUndo: false,
+        canRedo: true,
+      });
+    });
+  });
 });

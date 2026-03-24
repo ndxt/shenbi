@@ -47,7 +47,9 @@ export function GatewayEditor({
   ), [documentSchema?.id, documentSchema?.name, hostAdapter?.fileId, hostAdapter?.fileName]);
 
   // History integration
-  const history = useGatewayHistory(documentSchema ?? fallbackDocument);
+  const history = useGatewayHistory(documentSchema ?? fallbackDocument, {
+    cacheKey: hostAdapter?.fileId ?? documentSchema?.id,
+  });
 
   const initialGraph = useMemo(
     () => gatewayDocumentToGraph(history.document),
