@@ -486,7 +486,7 @@ export function PalettePanel({
             placeholder={searchPlaceholder ?? t('search.placeholder')}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            className="w-full bg-text-primary/[0.03] dark:bg-text-primary/[0.05] border border-transparent rounded-[4px] h-6 pl-7 pr-2 text-[11px] text-text-primary focus:outline-none focus:bg-transparent focus:border-primary/50 focus:ring-1 focus:ring-primary/20 placeholder-text-secondary/60 transition-colors"
+            className="w-full bg-text-primary/[0.03] dark:bg-text-primary/[0.05] border border-transparent rounded-[4px] h-6 pl-7 pr-2 text-xs text-text-primary focus:outline-none focus:bg-transparent focus:border-primary/50 focus:ring-1 focus:ring-primary/20 placeholder:text-text-secondary/60 transition-colors"
           />
         </div>
       </div>
