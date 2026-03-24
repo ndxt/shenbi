@@ -437,4 +437,112 @@ describe('useWorkspacePersistence', () => {
       });
     });
   });
+
+  it('从旧格式（tab.schema）迁移到新格式（dirtyContents）正确读取脏内容', async () => {
+    const restoreSnapshot = vi.fn();
+    const execute = vi.fn(async () => undefined);
+    const sessionsMock = createSessionsMock();
+    // Old persisted format: schema lives on the tab object, no dirtyContents field
+    const legacyStoredSession = {
+      tabs: {
+        tabs: [
+          {
+            fileId: 'page-1',
+            fileName: 'home',
+            filePath: '/home.page.json',
+            fileType: 'page',
+            schema: { id: 'page-home', name: 'home-dirty', body: [{ type: 'text', text: 'unsaved' }] },
+            isDirty: true,
+          },
+        ],
+        activeTabId: 'page-1',
+      },
+      // No dirtyContents — old format
+      expandedIds: [],
+    };
+    const workspacePersistence = {
+      getJSON: vi.fn(async <T,>(_: string, key: string) => {
+        if (key === 'shell-session') {
+          return legacyStoredSession as T;
+        }
+        return null;
+      }),
+      setJSON: vi.fn(async () => undefined),
+    } as const;
+
+    Object.defineProperty(globalThis, 'indexedDB', {
+      configurable: true,
+      writable: true,
+      value: {},
+    });
+
+    renderHook(() => {
+      const [activeScenario, setActiveScenario] = useState<'user-management' | 'tree-management'>('user-management');
+      const [renderMode, setRenderMode] = useState<'direct' | 'iframe'>('iframe');
+
+      useWorkspacePersistence({
+        appMode: 'shell',
+        activeProjectId: 'local-1',
+        activeScenario,
+        setActiveScenario,
+        renderMode,
+        setRenderMode,
+        fileEditor: {
+          commands: {
+            execute,
+          },
+        },
+        fileExplorerExpandedIds: [],
+        fileExplorerFocusedId: undefined,
+        setFileExplorerExpandedIds: vi.fn(),
+        setFileExplorerFocusedId: vi.fn(),
+        scenarioValues: ['user-management', 'tree-management'],
+        renderModeValues: ['direct', 'iframe'],
+        tabManager: {
+          restoreSnapshot,
+        },
+        tabSnapshot: {
+          tabs: [],
+          activeTabId: undefined,
+        },
+        vfs: {
+          listTree: vi.fn(async () => [
+            { id: 'page-1', type: 'file', name: 'home', path: '/home.page.json', fileType: 'page' },
+          ]),
+          // readFile should NOT be called for dirty tabs with legacy schema
+          readFile: vi.fn(async () => { throw new Error('should not read clean content for dirty tab'); }),
+        },
+        vfsInitialized: true,
+        vfsInitializationFailed: false,
+        workspacePersistence,
+        persistenceKeys: {
+          namespace: 'preview-debug',
+          activeScenarioKey: 'active-scenario',
+          renderModeKey: 'canvas-render-mode',
+          shellSessionKey: 'shell-session',
+        },
+        createEmptySchema: () => ({ id: 'shell-page', body: [] }),
+        sessions: sessionsMock,
+      });
+    });
+
+    await waitFor(() => {
+      // ensureSession should have been called with the legacy schema content
+      expect(sessionsMock.ensureSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileId: 'page-1',
+          content: { id: 'page-home', name: 'home-dirty', body: [{ type: 'text', text: 'unsaved' }] },
+          dirty: true,
+        }),
+      );
+      // editor.restoreSnapshot should use the legacy schema content
+      expect(execute).toHaveBeenCalledWith('editor.restoreSnapshot', {
+        snapshot: expect.objectContaining({
+          schema: { id: 'page-home', name: 'home-dirty', body: [{ type: 'text', text: 'unsaved' }] },
+          currentFileId: 'page-1',
+          isDirty: true,
+        }),
+      });
+    });
+  });
 });

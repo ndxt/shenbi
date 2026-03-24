@@ -964,6 +964,12 @@ function registerTabCommands(
     if (existing) return existing;
     // Session not yet initialised — this should only happen during
     // workspace hydration where content is loaded separately.
+    if (typeof console !== 'undefined') {
+      console.warn(
+        `[editor] ensureSessionForTab: no session for "${tab.fileId}". `
+        + 'Ensure tab.open command or sessions.ensureSession was called first.',
+      );
+    }
     return undefined;
   };
   const getSessionSnapshot = (fileId: string) => {
@@ -1450,15 +1456,13 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
 
       // For page-editor tabs, sync dirty + selectedNodeId + DocumentSession
       // (commands modify EditorState, and we need TabManager + session in sync)
+      sessions.updateWorkingContent(activeTabId, snapshot.schema, snapshot.isDirty);
       if (
         activeTab.selectedNodeId === snapshot.selectedNodeId
         && activeTab.isDirty === snapshot.isDirty
       ) {
-        // Still update DocumentSession even if tab metadata unchanged
-        sessions.updateWorkingContent(activeTabId, snapshot.schema, snapshot.isDirty);
         return;
       }
-      sessions.updateWorkingContent(activeTabId, snapshot.schema, snapshot.isDirty);
       tabManager.updateTab(activeTabId, {
         selectedNodeId: snapshot.selectedNodeId,
         isDirty: snapshot.isDirty,
