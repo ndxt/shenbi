@@ -288,7 +288,7 @@ function GridPaletteItem({
             onInsert?.(item.dragPayload, item);
           }
         }}
-        className={`flex flex-col items-center justify-center h-[72px] w-full p-2 rounded-md transition-colors group/card ${
+        className={`flex flex-col items-center justify-center h-full min-h-[72px] w-full p-2 rounded-md transition-colors group/card ${
           active
             ? 'bg-primary/10 text-primary'
             : 'bg-transparent border border-transparent hover:bg-text-primary/5'
@@ -304,7 +304,7 @@ function GridPaletteItem({
           {renderPaletteIcon(item.icon)}
         </div>
         <span
-          className={`text-[11px] text-center leading-tight truncate w-full px-0.5 transition-colors ${
+          className={`text-[11px] text-center leading-tight line-clamp-2 break-words w-full px-0.5 transition-colors ${
             active
               ? 'text-primary font-medium'
               : 'text-text-secondary group-hover/card:text-text-primary'
