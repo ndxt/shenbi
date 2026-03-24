@@ -119,6 +119,10 @@ interface AppShellProps {
   onCanvasDocumentDirtyChange?: ((fileId: string, dirty: boolean) => void) | undefined;
   /** Called when a non-page canvas renderer updates its document schema. */
   onCanvasDocumentSchemaChange?: ((fileId: string, schema: Record<string, unknown>) => void) | undefined;
+  /** Subscribe to renderer-save-notify events from the host. When called, renderer
+   * save dispatch is triggered so the renderer can mark its history as saved.
+   * Pass a `subscribe(callback)` function; AppShell calls dispatch.save() in the callback. */
+  onRendererSaveNotify?: ((dispatch: () => void) => (() => void)) | undefined;
   /** Title displayed in the title bar (defaults to 'Shenbi IDE') */
   title?: string;
   /** Subtitle displayed in the title bar (defaults to 'Editor UI Package') */
@@ -331,6 +335,7 @@ export function AppShell({
   onMoveTab,
   onCanvasDocumentDirtyChange,
   onCanvasDocumentSchemaChange,
+  onRendererSaveNotify,
   title,
   subtitle,
   userAvatarUrl,
@@ -1545,6 +1550,15 @@ export function AppShell({
   });
   const canvasDocDispatchRef = React.useRef(canvasDocContext.dispatch);
   canvasDocDispatchRef.current = canvasDocContext.dispatch;
+
+  // When the host saves a renderer-owned file (via tab.save), notify the
+  // renderer so it can call history.markSaved().
+  React.useEffect(() => {
+    if (!onRendererSaveNotify) return undefined;
+    return onRendererSaveNotify(() => {
+      canvasDocDispatchRef.current.save();
+    });
+  }, [onRendererSaveNotify]);
 
   const shouldRenderFileContextPanel = Boolean(activeEditorTab) && (activeEditorTab?.fileType === 'page' || Boolean(activeCanvasRenderer)) && showFileContextPanel;
 

@@ -95,6 +95,8 @@ export interface GatewayCanvasProps {
   onNodesChange: (nodes: GatewayNode[]) => void;
   onEdgesChange: (edges: GatewayEdge[]) => void;
   onDocumentChange?: (document: import('../types').GatewayDocumentSchema) => void;
+  /** Fired when a continuous interaction ends (e.g. node drag stop, viewport pan stop) */
+  onInteractionEnd?: () => void;
   onDirty?: () => void;
   initialViewport?: GatewayViewport;
 }
@@ -110,6 +112,7 @@ export function GatewayCanvas({
   onNodesChange: onNodesChangeProp,
   onEdgesChange: onEdgesChangeProp,
   onDocumentChange,
+  onInteractionEnd,
   onDirty,
   initialViewport,
 }: GatewayCanvasProps) {
@@ -852,6 +855,7 @@ export function GatewayCanvas({
         }}
         onMoveEnd={() => {
           setIsViewportPanning(false);
+          onInteractionEnd?.();
         }}
         snapToGrid
         snapGrid={[16, 16]}
@@ -859,6 +863,7 @@ export function GatewayCanvas({
         multiSelectionKeyCode="Shift"
         proOptions={{ hideAttribution: true }}
         nodesDraggable={!effectivePan}
+        onNodeDragStop={() => onInteractionEnd?.()}
         elementsSelectable={!effectivePan}
         selectionOnDrag={!effectivePan}
         panOnDrag={effectivePan ? [0, 1] : [1]}

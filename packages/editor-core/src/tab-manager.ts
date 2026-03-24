@@ -69,6 +69,10 @@ export class TabManager {
   updateTab(fileId: string, patch: Partial<Omit<TabState, 'fileId'>>): void {
     const tab = this.tabs.get(fileId);
     if (!tab) return;
+    // Skip notification if nothing actually changed
+    const keys = Object.keys(patch) as (keyof typeof patch)[];
+    const hasChange = keys.some((key) => tab[key] !== patch[key]);
+    if (!hasChange) return;
     Object.assign(tab, patch);
     this.notify();
   }

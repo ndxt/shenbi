@@ -128,40 +128,32 @@ describe('GatewayEditor', () => {
       />,
     );
 
+    const secondDocument = {
+      id: 'api-2',
+      name: 'Orders API',
+      type: 'api-gateway' as const,
+      nodes: [] as typeof initialDocument.nodes,
+      edges: [] as typeof initialDocument.edges,
+    };
+
     const secondAdapter = createHostAdapter({
       fileId: 'api-2',
       fileName: 'Orders API',
-      loadDocument: vi.fn(async () => ({
-        id: 'api-2',
-        name: 'Orders API',
-        type: 'api-gateway',
-        nodes: [],
-        edges: [],
-      })),
+      loadDocument: vi.fn(async () => secondDocument),
     });
 
     rerender(
       <GatewayEditor
         hostAdapter={secondAdapter}
-        documentSchema={{
-          id: 'api-2',
-          name: 'Orders API',
-          type: 'api-gateway',
-          nodes: [],
-          edges: [],
-        }}
+        documentSchema={secondDocument}
         documentContext={documentContext}
       />,
     );
 
+    // After switching files, markDirty(false) should be called via
+    // the history.isDirty useEffect because history.reset clears dirty state.
     await waitFor(() => {
-      expect(replaceDocument).toHaveBeenCalledWith({
-        id: 'api-2',
-        name: 'Orders API',
-        type: 'api-gateway',
-        nodes: [],
-        edges: [],
-      });
+      expect(documentContext.markDirty).toHaveBeenCalledWith(false);
     });
   });
 
@@ -256,6 +248,9 @@ describe('GatewayEditor', () => {
       expect(gatewayCanvasSpy).toHaveBeenCalled();
     });
 
+    // Switch to fake timers AFTER waitFor so polling uses real timers
+    vi.useFakeTimers();
+
     const latestProps = gatewayCanvasSpy.mock.calls.at(-1)?.[0] as {
       onDocumentChange?: (document: Record<string, unknown>) => void;
     };
@@ -276,6 +271,11 @@ describe('GatewayEditor', () => {
       viewport: { x: 10, y: 20, zoom: 1.1 },
     });
 
+    // replaceDocument is now deferred to the 180ms commit timer
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+    });
+
     expect(syncSchema).toHaveBeenCalledWith({
       id: 'api-1',
       name: 'Billing API',
@@ -294,6 +294,7 @@ describe('GatewayEditor', () => {
     });
     expect(saveHandlers.length).toBeGreaterThan(0);
 
+    syncSchema.mockClear();
     await act(async () => {
       saveHandlers.at(-1)?.();
       await Promise.resolve();

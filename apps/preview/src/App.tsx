@@ -330,6 +330,9 @@ export function App() {
       onCanvasDocumentSchemaChange={useCallback((fileId: string, schema: Record<string, unknown>) => {
         void fileEditor.commands.execute('tab.syncState', { fileId, schema });
       }, [fileEditor.commands])}
+      onRendererSaveNotify={useCallback((dispatch: () => void) => {
+        return fileEditor.eventBus.on('file:saved', () => { dispatch(); });
+      }, [fileEditor.eventBus])}
       toolbarExtra={(
         <PreviewToolbar
           previewT={previewT as (...args: any[]) => string}

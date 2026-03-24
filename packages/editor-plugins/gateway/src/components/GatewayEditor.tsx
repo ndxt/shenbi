@@ -60,6 +60,8 @@ export function GatewayEditor({
   const [viewport, setViewport] = useState(initialGraph.viewport);
   const historyCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastLocalDocumentRef = useRef<GatewayDocumentSchema | null>(null);
+  // Track the current file to detect real tab switches vs schema echo.
+  const currentFileIdRef = useRef(hostAdapter?.fileId ?? documentSchema?.id);
 
   const getCurrentDocument = useCallback(
     () => lastLocalDocumentRef.current ?? history.document,
@@ -82,16 +84,22 @@ export function GatewayEditor({
     }
   }, [history.document]);
 
+  // Only reset document when the FILE changes (real tab switch).
+  // Schema echoes from our own replaceDocument are ignored because
+  // the fileId stays the same — this eliminates circular resets.
+  const incomingFileId = hostAdapter?.fileId ?? documentSchema?.id;
   useEffect(() => {
+    if (incomingFileId === currentFileIdRef.current) {
+      return; // Same file — ignore schema echo from our own sync
+    }
+    currentFileIdRef.current = incomingFileId;
+    lastLocalDocumentRef.current = null;
     const nextDocument = documentSchema && isGatewayDocumentSchema(documentSchema)
       ? documentSchema
       : fallbackDocument;
-    if (lastLocalDocumentRef.current === nextDocument) {
-      return;
-    }
     history.reset(nextDocument);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [documentSchema, fallbackDocument, history.reset]);
+  }, [incomingFileId, documentSchema, fallbackDocument, history.reset]);
 
   // Cleanup save timer
   useEffect(() => {
@@ -224,18 +232,31 @@ export function GatewayEditor({
 
     lastLocalDocumentRef.current = nextDocument;
     history.pushState(nextDocument);
-    documentContext?.replaceDocument?.(nextDocument as unknown as Record<string, unknown>);
-    onDirty?.();
-    onSave?.(nextDocument);
 
+    // Schedule a fallback commit. For continuous interactions (drag/pan),
+    // onInteractionEnd fires first and cancels this timer.
     if (historyCommitTimerRef.current) {
       clearTimeout(historyCommitTimerRef.current);
     }
     historyCommitTimerRef.current = setTimeout(() => {
       history.commit();
+      const doc = lastLocalDocumentRef.current ?? history.document;
+      documentContext?.replaceDocument?.(doc as unknown as Record<string, unknown>);
       historyCommitTimerRef.current = null;
     }, 180);
-  }, [documentContext, onSave, onDirty, history]);
+  }, [documentContext, history]);
+
+  // Immediately commit pending history and sync to host — called on mouse release
+  const flushPendingDocument = useCallback(() => {
+    if (!history.isLocked) return;
+    if (historyCommitTimerRef.current) {
+      clearTimeout(historyCommitTimerRef.current);
+      historyCommitTimerRef.current = null;
+    }
+    history.commit();
+    const doc = lastLocalDocumentRef.current ?? history.document;
+    documentContext?.replaceDocument?.(doc as unknown as Record<string, unknown>);
+  }, [documentContext, history]);
 
   return (
     <ReactFlowProvider>
@@ -258,6 +279,7 @@ export function GatewayEditor({
           setViewport(nextDocument.viewport);
           persistDocument(nextDocument);
         }}
+        onInteractionEnd={flushPendingDocument}
         {...(onDirty ? { onDirty } : {})}
         {...(viewport ? { initialViewport: viewport } : {})}
       />
