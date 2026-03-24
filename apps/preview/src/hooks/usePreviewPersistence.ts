@@ -1,4 +1,5 @@
 import { useWorkspacePersistence } from '@shenbi/editor-ui';
+import type { DocumentSessionManager, FileContent } from '@shenbi/editor-core';
 import type { ScenarioKey, RenderMode } from '../preview-types';
 import { createEmptyShellSchema } from '../editor/previewSchemaUtils';
 
@@ -35,6 +36,7 @@ export interface UsePreviewPersistenceOptions {
     getJSON: <T>(namespace: string, key: string) => Promise<T | null | undefined>;
     setJSON: <T>(namespace: string, key: string, value: T) => Promise<void>;
   };
+  sessions: DocumentSessionManager;
 }
 
 export function usePreviewPersistence(options: UsePreviewPersistenceOptions) {

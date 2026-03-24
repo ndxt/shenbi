@@ -40,6 +40,7 @@ export interface EditorInstance {
   commands: CommandManager;
   eventBus: EventBus<EditorEventMap>;
   tabManager?: TabManager | undefined;
+  sessions: DocumentSessionManager;
   destroy(): void;
 }
 
@@ -1476,6 +1477,7 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
     commands,
     eventBus,
     tabManager,
+    sessions,
     destroy() {
       unsubscribeState?.();
       eventBus.clear();

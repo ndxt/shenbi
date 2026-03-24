@@ -147,6 +147,7 @@ export function App() {
     vfsInitialized: workspaceState.vfsInitialized,
     vfsInitializationFailed: workspaceState.vfsInitializationFailed,
     workspacePersistence,
+    sessions: fileEditor.sessions!,
   });
 
   const activeSchema = appMode === 'shell' ? shellSnapshot.schema : activeScenarioSnapshot.schema;

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
+  DocumentSessionManager,
   TabManagerSnapshot,
   VirtualFileSystemAdapter,
 } from '@shenbi/editor-core';
@@ -54,10 +55,7 @@ export interface UseWorkspacePersistenceOptions<TScenario extends string, TRende
   workspacePersistence: WorkspacePersistenceService;
   persistenceKeys: WorkspacePersistenceKeys;
   createEmptySchema: () => PageSchema;
-  sessions: {
-    ensureSession: (args: { fileId: string; fileType: string; content: FileContent; dirty?: boolean }) => unknown;
-    getSession: (fileId: string) => { workingContent: FileContent; dirty: boolean } | undefined;
-  };
+  sessions: Pick<DocumentSessionManager, 'ensureSession' | 'getSession'>;
 }
 
 export function useWorkspacePersistence<TScenario extends string, TRenderMode extends string>({

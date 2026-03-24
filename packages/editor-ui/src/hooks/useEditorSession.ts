@@ -3,6 +3,7 @@ import type { PageSchema } from '@shenbi/schema';
 import {
   createEditor,
   MemoryFileStorageAdapter,
+  type DocumentSessionManager,
   type EditorStateSnapshot,
   type FileStorageAdapter,
 } from '@shenbi/editor-core';
@@ -23,6 +24,7 @@ export interface EditorSessionEditor {
   eventBus?: {
     on: (event: any, listener: (...args: any[]) => void) => () => void;
   } | undefined;
+  sessions?: DocumentSessionManager | undefined;
   destroy(): void;
 }
 
