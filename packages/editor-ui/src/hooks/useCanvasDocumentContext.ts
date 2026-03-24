@@ -1,12 +1,15 @@
 // ---------------------------------------------------------------------------
 // useCanvasDocumentContext — bridges canvas-renderer document lifecycle
 // to the host editor shell (dirty tracking, save, undo/redo dispatch).
+//
+// Internally backed by RendererDocumentProvider (DocumentProvider interface),
+// while exposing the legacy CanvasRendererDocumentContext for backward compat.
 // ---------------------------------------------------------------------------
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { RendererDocumentProvider } from '@shenbi/editor-core';
 import type { CanvasRendererDocumentContext } from '@shenbi/editor-plugin-api';
-
-type VoidCallback = () => void;
+import type { DocumentProvider } from '@shenbi/editor-core';
 
 /**
  * Host-side hook that creates a `CanvasRendererDocumentContext` for canvas
@@ -15,8 +18,13 @@ type VoidCallback = () => void;
  * The returned `context` is passed to the renderer via
  * `CanvasRendererRenderContext.document`. Call the returned `dispatch.*`
  * helpers from the host when the user triggers Ctrl+S / Ctrl+Z / Ctrl+Y.
+ *
+ * Also exposes the underlying `DocumentProvider` for new code that wants
+ * the standard interface.
  */
 export function useCanvasDocumentContext(options: {
+  fileId?: string | undefined;
+  fileType?: string | undefined;
   onDirtyChange: (dirty: boolean) => void;
   onSchemaChange?: ((schema: Record<string, unknown>) => void) | undefined;
   onUndoRedoStateChange: (state: { canUndo: boolean; canRedo: boolean }) => void;
@@ -27,11 +35,16 @@ export function useCanvasDocumentContext(options: {
     undo: () => void;
     redo: () => void;
   };
+  provider: DocumentProvider;
 } {
-  const saveCallbacksRef = useRef(new Set<VoidCallback>());
-  const undoCallbacksRef = useRef(new Set<VoidCallback>());
-  const redoCallbacksRef = useRef(new Set<VoidCallback>());
-  const documentRef = useRef<Record<string, unknown> | undefined>(undefined);
+  const providerRef = useRef<RendererDocumentProvider | null>(null);
+  if (!providerRef.current) {
+    providerRef.current = new RendererDocumentProvider({
+      fileId: options.fileId ?? '',
+      fileType: (options.fileType ?? 'api') as 'page' | 'api',
+    });
+  }
+  const provider = providerRef.current;
 
   const onDirtyChangeRef = useRef(options.onDirtyChange);
   onDirtyChangeRef.current = options.onDirtyChange;
@@ -40,35 +53,42 @@ export function useCanvasDocumentContext(options: {
   const onUndoRedoStateChangeRef = useRef(options.onUndoRedoStateChange);
   onUndoRedoStateChangeRef.current = options.onUndoRedoStateChange;
 
+  // Subscribe to provider state changes and forward to host callbacks
+  useEffect(() => {
+    return provider.subscribe((state) => {
+      onDirtyChangeRef.current(state.isDirty);
+      onUndoRedoStateChangeRef.current({ canUndo: state.canUndo, canRedo: state.canRedo });
+    });
+  }, [provider]);
+
   const markDirty = useCallback((dirty: boolean) => {
-    onDirtyChangeRef.current(dirty);
-  }, []);
+    provider.reportDirty(dirty);
+  }, [provider]);
 
   const replaceDocument = useCallback((schema: Record<string, unknown>) => {
-    documentRef.current = schema;
+    provider.reportDocument(schema);
     onSchemaChangeRef.current?.(schema);
-  }, []);
+  }, [provider]);
 
-  const getDocument = useCallback(() => documentRef.current, []);
+  const getDocument = useCallback(() => {
+    return provider.getDocument() as Record<string, unknown> | undefined;
+  }, [provider]);
 
-  const onSaveRequest = useCallback((callback: VoidCallback) => {
-    saveCallbacksRef.current.add(callback);
-    return () => { saveCallbacksRef.current.delete(callback); };
-  }, []);
+  const onSaveRequest = useCallback((callback: () => void) => {
+    return provider.onSaveRequest(callback);
+  }, [provider]);
 
-  const onUndoRequest = useCallback((callback: VoidCallback) => {
-    undoCallbacksRef.current.add(callback);
-    return () => { undoCallbacksRef.current.delete(callback); };
-  }, []);
+  const onUndoRequest = useCallback((callback: () => void) => {
+    return provider.onUndoRequest(callback);
+  }, [provider]);
 
-  const onRedoRequest = useCallback((callback: VoidCallback) => {
-    redoCallbacksRef.current.add(callback);
-    return () => { redoCallbacksRef.current.delete(callback); };
-  }, []);
+  const onRedoRequest = useCallback((callback: () => void) => {
+    return provider.onRedoRequest(callback);
+  }, [provider]);
 
   const reportUndoRedoState = useCallback((state: { canUndo: boolean; canRedo: boolean }) => {
-    onUndoRedoStateChangeRef.current(state);
-  }, []);
+    provider.reportUndoRedoState(state);
+  }, [provider]);
 
   const context = useMemo<CanvasRendererDocumentContext>(() => ({
     markDirty,
@@ -82,10 +102,10 @@ export function useCanvasDocumentContext(options: {
   }), [getDocument, markDirty, onSaveRequest, onUndoRequest, onRedoRequest, replaceDocument, reportUndoRedoState]);
 
   const dispatch = useMemo(() => ({
-    save: () => { for (const cb of saveCallbacksRef.current) cb(); },
-    undo: () => { for (const cb of undoCallbacksRef.current) cb(); },
-    redo: () => { for (const cb of redoCallbacksRef.current) cb(); },
-  }), []);
+    save: () => provider.save(),
+    undo: () => provider.undo(),
+    redo: () => provider.redo(),
+  }), [provider]);
 
-  return { context, dispatch };
+  return { context, dispatch, provider };
 }
