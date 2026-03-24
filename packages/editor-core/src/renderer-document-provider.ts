@@ -1,10 +1,9 @@
 // ---------------------------------------------------------------------------
 // RendererDocumentProvider — DocumentProvider for renderer-owned documents.
 //
-// Adapts the callback-based CanvasRendererDocumentContext into the standard
-// DocumentProvider interface. The renderer plugin (e.g. Gateway) drives state
-// via markDirty/replaceDocument/reportUndoRedoState; this provider translates
-// those into a unified state snapshot that the host can subscribe to.
+// Structurally compatible with CanvasRendererDocumentContext (duck typing)
+// so it can be passed directly as the renderer's `documentContext` prop.
+// Also implements the standard DocumentProvider interface for host-side use.
 // ---------------------------------------------------------------------------
 
 import type { FileContent, FileType } from './adapters/file-storage';
@@ -14,7 +13,12 @@ type StateListener = (state: DocumentProviderState) => void;
 
 /**
  * Implements DocumentProvider for documents owned by a canvas renderer plugin.
- * The renderer calls `reportDirty`, `reportDocument`, `reportUndoRedoState`
+ *
+ * Structurally satisfies `CanvasRendererDocumentContext` (from editor-plugin-api)
+ * via duck typing — no import needed. This means the provider can be passed
+ * directly as a renderer's `documentContext` prop.
+ *
+ * The renderer calls `markDirty`, `replaceDocument`, `reportUndoRedoState`
  * to push state into this provider, which the host reads via `getState()`.
  */
 export class RendererDocumentProvider implements DocumentProvider {
@@ -78,18 +82,23 @@ export class RendererDocumentProvider implements DocumentProvider {
     this.listeners.clear();
   }
 
-  // ── Renderer-facing API (called by the plugin) ───────────
+  // ── Renderer-facing API (structurally matches CanvasRendererDocumentContext) ──
 
-  /** Renderer reports dirty state change. */
-  reportDirty(dirty: boolean): void {
+  /** Notify dirty state change (matches CRDC.markDirty). */
+  markDirty(dirty: boolean): void {
     if (this.isDirty === dirty) return;
     this.isDirty = dirty;
     this.notify();
   }
 
-  /** Renderer pushes updated document content. */
-  reportDocument(content: FileContent): void {
+  /** Replace the host-visible working document (matches CRDC.replaceDocument). */
+  replaceDocument(content: FileContent): void {
     this.document = content;
+  }
+
+  /** Backward-compatible alias for replaceDocument (matches CRDC.syncSchema). */
+  syncSchema(content: FileContent): void {
+    this.replaceDocument(content);
   }
 
   /** Renderer reports undo/redo availability. */

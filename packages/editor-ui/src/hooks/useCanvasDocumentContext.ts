@@ -2,8 +2,9 @@
 // useCanvasDocumentContext — bridges canvas-renderer document lifecycle
 // to the host editor shell (dirty tracking, save, undo/redo dispatch).
 //
-// Internally backed by RendererDocumentProvider (DocumentProvider interface),
-// while exposing the legacy CanvasRendererDocumentContext for backward compat.
+// Creates a RendererDocumentProvider that structurally satisfies
+// CanvasRendererDocumentContext. The provider is passed directly as the
+// renderer's `documentContext` prop — no extra wrapping needed.
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -12,15 +13,13 @@ import type { CanvasRendererDocumentContext } from '@shenbi/editor-plugin-api';
 import type { DocumentProvider } from '@shenbi/editor-core';
 
 /**
- * Host-side hook that creates a `CanvasRendererDocumentContext` for canvas
+ * Host-side hook that creates a `RendererDocumentProvider` for canvas
  * renderers that manage their own document state (e.g. Gateway editor).
  *
- * The returned `context` is passed to the renderer via
- * `CanvasRendererRenderContext.document`. Call the returned `dispatch.*`
- * helpers from the host when the user triggers Ctrl+S / Ctrl+Z / Ctrl+Y.
+ * The provider structurally satisfies `CanvasRendererDocumentContext`,
+ * so it can be passed directly as `documentContext` to any renderer.
  *
- * Also exposes the underlying `DocumentProvider` for new code that wants
- * the standard interface.
+ * Also returns `dispatch` helpers for host-initiated save/undo/redo.
  */
 export function useCanvasDocumentContext(options: {
   fileId?: string | undefined;
@@ -61,45 +60,22 @@ export function useCanvasDocumentContext(options: {
     });
   }, [provider]);
 
-  const markDirty = useCallback((dirty: boolean) => {
-    provider.reportDirty(dirty);
-  }, [provider]);
+  // Intercept replaceDocument to also forward schema to host
+  const origReplaceDocument = useMemo(() => provider.replaceDocument.bind(provider), [provider]);
+  useEffect(() => {
+    provider.replaceDocument = (content) => {
+      origReplaceDocument(content);
+      onSchemaChangeRef.current?.(content as Record<string, unknown>);
+    };
+    provider.syncSchema = provider.replaceDocument;
+    return () => {
+      provider.replaceDocument = origReplaceDocument;
+      provider.syncSchema = origReplaceDocument;
+    };
+  }, [origReplaceDocument, provider]);
 
-  const replaceDocument = useCallback((schema: Record<string, unknown>) => {
-    provider.reportDocument(schema);
-    onSchemaChangeRef.current?.(schema);
-  }, [provider]);
-
-  const getDocument = useCallback(() => {
-    return provider.getDocument() as Record<string, unknown> | undefined;
-  }, [provider]);
-
-  const onSaveRequest = useCallback((callback: () => void) => {
-    return provider.onSaveRequest(callback);
-  }, [provider]);
-
-  const onUndoRequest = useCallback((callback: () => void) => {
-    return provider.onUndoRequest(callback);
-  }, [provider]);
-
-  const onRedoRequest = useCallback((callback: () => void) => {
-    return provider.onRedoRequest(callback);
-  }, [provider]);
-
-  const reportUndoRedoState = useCallback((state: { canUndo: boolean; canRedo: boolean }) => {
-    provider.reportUndoRedoState(state);
-  }, [provider]);
-
-  const context = useMemo<CanvasRendererDocumentContext>(() => ({
-    markDirty,
-    getDocument,
-    replaceDocument,
-    syncSchema: replaceDocument,
-    onSaveRequest,
-    onUndoRequest,
-    onRedoRequest,
-    reportUndoRedoState,
-  }), [getDocument, markDirty, onSaveRequest, onUndoRequest, onRedoRequest, replaceDocument, reportUndoRedoState]);
+  // The provider structurally satisfies CanvasRendererDocumentContext
+  const context = provider as unknown as CanvasRendererDocumentContext;
 
   const dispatch = useMemo(() => ({
     save: () => provider.save(),
