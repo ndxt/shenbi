@@ -75,8 +75,8 @@ function TabItem({
   return (
     <div
       className={`
-        group relative h-full px-3 flex items-center gap-2 border-r border-border-ide cursor-pointer min-w-[120px] max-w-[200px] transition-colors
-        ${active ? 'bg-bg-sidebar text-text-primary' : 'bg-bg-editor text-text-secondary hover:bg-bg-sidebar/50 hover:text-text-primary'}
+        group relative h-full px-3 flex items-center gap-2 flex-shrink-0 cursor-pointer min-w-[120px] max-w-[200px] transition-colors border-r border-border-ide
+        ${active ? 'bg-bg-editor text-text-primary' : 'bg-bg-panel text-text-secondary hover:bg-hover-bg hover:text-text-primary'}
         ${dragging ? 'opacity-50' : ''}
       `}
       title={isDirty ? `${label} - ${t('editorTabs.unsaved')}` : label}
@@ -93,7 +93,7 @@ function TabItem({
       {dropSide === 'left' && <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-primary z-10" />}
       {dropSide === 'right' && <div className="absolute right-0 top-1 bottom-1 w-[2px] bg-primary z-10" />}
       <Icon size={14} className={active ? 'text-primary' : 'text-text-secondary'} />
-      <span className={`text-[13px] truncate flex-1 ${isDirty ? 'italic' : ''}`}>{label}</span>
+      <span className={`text-[12px] truncate flex-1 ${isDirty ? 'italic' : ''}`}>{label}</span>
       {onClose ? (
         <div className="w-[18px] h-[18px] flex items-center justify-center shrink-0">
           {isDirty && (
@@ -229,12 +229,12 @@ export function EditorTabs({
   // Multi-tab mode
   if (tabs && tabs.length > 0) {
     return (
-      <div className="relative h-9 bg-bg-editor border-b border-border-ide shrink-0">
+      <div className="relative h-9 bg-bg-panel border-b border-border-ide shrink-0 flex items-center">
         {/* Left scroll arrow */}
         {canScrollLeft && (
           <button
             type="button"
-            className="absolute left-0 top-0 bottom-0 z-10 w-6 flex items-center justify-center bg-gradient-to-r from-bg-editor to-transparent hover:from-bg-editor"
+            className="absolute left-0 top-0 bottom-0 z-10 w-6 flex items-center justify-center bg-gradient-to-r from-bg-panel to-transparent hover:from-bg-panel"
             onClick={() => scrollBy(-200)}
           >
             <ChevronLeft size={14} className="text-text-secondary" />
@@ -276,7 +276,7 @@ export function EditorTabs({
         {canScrollRight && (
           <button
             type="button"
-            className="absolute right-0 top-0 bottom-0 z-10 w-6 flex items-center justify-center bg-gradient-to-l from-bg-editor to-transparent hover:from-bg-editor"
+            className="absolute right-0 top-0 bottom-0 z-10 w-6 flex items-center justify-center bg-gradient-to-l from-bg-panel to-transparent hover:from-bg-panel"
             onClick={() => scrollBy(200)}
           >
             <ChevronRight size={14} className="text-text-secondary" />
@@ -292,21 +292,21 @@ export function EditorTabs({
           >
             <button
               type="button"
-              className="w-full px-3 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg-activity-bar"
+              className="w-full px-4 py-1.5 text-left text-[12px] text-text-primary hover:bg-hover-bg transition-colors"
               onClick={() => { onCloseTab?.(ctxMenu.fileId); setCtxMenu(null); }}
             >
               {t('editorTabs.close')}
             </button>
             <button
               type="button"
-              className="w-full px-3 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg-activity-bar"
+              className="w-full px-4 py-1.5 text-left text-[12px] text-text-primary hover:bg-hover-bg transition-colors"
               onClick={() => { onCloseOtherTabs?.(ctxMenu.fileId); setCtxMenu(null); }}
             >
               {t('editorTabs.closeOthers')}
             </button>
             <button
               type="button"
-              className="w-full px-3 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg-activity-bar"
+              className="w-full px-4 py-1.5 text-left text-[12px] text-text-primary hover:bg-hover-bg transition-colors"
               onClick={() => { onCloseSavedTabs?.(); setCtxMenu(null); }}
             >
               {t('editorTabs.closeSaved')}
@@ -314,7 +314,7 @@ export function EditorTabs({
             <div className="border-t border-border-ide my-1" />
             <button
               type="button"
-              className="w-full px-3 py-1.5 text-left text-[12px] text-text-primary hover:bg-bg-activity-bar"
+              className="w-full px-4 py-1.5 text-left text-[12px] text-text-primary hover:bg-hover-bg transition-colors"
               onClick={() => { onCloseAllTabs?.(); setCtxMenu(null); }}
             >
               {t('editorTabs.closeAll')}
@@ -331,7 +331,7 @@ export function EditorTabs({
     return null;
   }
   return (
-    <div className="h-9 bg-bg-editor border-b border-border-ide flex items-center shrink-0 overflow-x-auto scrollbar-hide">
+    <div className="h-9 bg-bg-panel border-b border-border-ide flex items-center shrink-0 overflow-x-auto scrollbar-hide">
       <TabItem label={displayLabel} icon={FileCode} active t={t} />
     </div>
   );
