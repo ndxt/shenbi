@@ -113,7 +113,7 @@ function DropdownMenu({
                         items.map((item, idx) => (
                             <div
                                 key={idx}
-                                className="flex items-center justify-between border-b border-border-ide last:border-b-0 px-3 py-2 transition-colors hover:bg-bg-activity-bar cursor-pointer"
+                                className="group flex items-center justify-between border-b border-border-ide last:border-b-0 px-3 py-2 transition-colors hover:bg-hover-bg cursor-pointer"
                                 style={{ fontSize: '12px' }}
                             >
                                 <button
@@ -138,7 +138,7 @@ function DropdownMenu({
                                 {item.onRemove && (
                                     <button
                                         type="button"
-                                        className="ml-2 text-text-secondary hover:text-text-primary shrink-0"
+                                        className="ml-2 text-text-secondary hover:text-danger shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                                         onClick={(event) => {
                                             event.stopPropagation();
                                             item.onRemove?.(item.value);
