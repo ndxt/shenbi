@@ -30,6 +30,16 @@ export interface UseFileWorkspaceOptions {
   commands: FileCommandExecutor;
   onError?: (message: string) => void;
   promptFileName?: (defaultName: string) => string | null;
+  documentState?: {
+    isDirty: boolean;
+    canUndo: boolean;
+    canRedo: boolean;
+  } | undefined;
+  documentActions?: {
+    save: () => void | Promise<void>;
+    undo: () => void | Promise<void>;
+    redo: () => void | Promise<void>;
+  } | undefined;
 }
 
 export interface UseFileWorkspaceResult {
@@ -92,7 +102,7 @@ function isEditableHotkeyTarget(target: EventTarget | null): boolean {
 }
 
 export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorkspaceResult {
-  const { mode, snapshot, commands, onError, promptFileName } = options;
+  const { mode, snapshot, commands, onError, promptFileName, documentState, documentActions } = options;
   const [storedFiles, setStoredFiles] = useState<FilePanelFileItem[]>([]);
   const [statusState, setStatusState] = useState<FileStatusState>({ kind: 'idle' });
   const { t } = useTranslation('pluginFiles');
@@ -100,9 +110,9 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
 
   const activeFileId = mode === 'shell' ? snapshot.currentFileId : undefined;
   const activeFileType = mode === 'shell' ? snapshot.activeFileType : undefined;
-  const isDirty = mode === 'shell' ? snapshot.isDirty : false;
-  const canUndo = mode === 'shell' ? snapshot.canUndo : false;
-  const canRedo = mode === 'shell' ? snapshot.canRedo : false;
+  const isDirty = mode === 'shell' ? (documentState?.isDirty ?? snapshot.isDirty) : false;
+  const canUndo = mode === 'shell' ? (documentState?.canUndo ?? snapshot.canUndo) : false;
+  const canRedo = mode === 'shell' ? (documentState?.canRedo ?? snapshot.canRedo) : false;
 
   const commandsRef = useRef(commands);
   commandsRef.current = commands;
@@ -110,6 +120,8 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
   onErrorRef.current = onError;
   const promptFileNameRef = useRef(promptFileName);
   promptFileNameRef.current = promptFileName;
+  const documentActionsRef = useRef(documentActions);
+  documentActionsRef.current = documentActions;
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
   const activeFileIdRef = useRef(activeFileId);
@@ -185,6 +197,19 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
 
   const handleSave = useCallback(() => {
     if (mode === 'shell') {
+      if (documentActionsRef.current) {
+        void Promise.resolve(documentActionsRef.current.save())
+          .then(() => {
+            if (activeFileIdRef.current) {
+              setStatusState({ kind: 'saved', fileId: activeFileIdRef.current });
+            }
+            refreshFiles();
+          })
+          .catch((error) => {
+            reportError('status.saveFailed', error);
+          });
+        return;
+      }
       if (!activeFileIdRef.current) {
         const translationKey = 'status.createOrOpenFirst';
         setStatusState({ kind: 'error', translationKey });
@@ -224,6 +249,12 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
     if (!canUndoRef.current) {
       return;
     }
+    if (documentActionsRef.current) {
+      void Promise.resolve(documentActionsRef.current.undo()).catch((error) => {
+        reportError('status.undoFailed', error);
+      });
+      return;
+    }
     void commandsRef.current.execute('editor.undo').catch((error) => {
       reportError('status.undoFailed', error);
     });
@@ -231,6 +262,12 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
 
   const handleRedo = useCallback(() => {
     if (!canRedoRef.current) {
+      return;
+    }
+    if (documentActionsRef.current) {
+      void Promise.resolve(documentActionsRef.current.redo()).catch((error) => {
+        reportError('status.redoFailed', error);
+      });
       return;
     }
     void commandsRef.current.execute('editor.redo').catch((error) => {

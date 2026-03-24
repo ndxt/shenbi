@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as antd from 'antd';
 import { builtinContracts } from '@shenbi/schema';
 import {
   IndexedDBFileSystemAdapter,
+  PageDocumentProvider,
   TabManager,
   createEditor,
 } from '@shenbi/editor-core';
@@ -17,6 +18,7 @@ import {
   usePluginContext,
   useScenarioSession,
   useShellModeUrl,
+  useTabManager,
 } from '@shenbi/editor-ui';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
 import { PREVIEW_WORKSPACE_ID } from './constants';
@@ -116,6 +118,90 @@ export function App() {
       projectId: projectState.activeProjectId,
     }),
   });
+  const documentTabSnapshot = useTabManager(tabManager);
+  const activeDocumentTab = useMemo(
+    () => documentTabSnapshot.tabs.find((tab) => tab.fileId === documentTabSnapshot.activeTabId),
+    [documentTabSnapshot.activeTabId, documentTabSnapshot.tabs],
+  );
+  const pageDocumentProvider = useMemo(() => {
+    if (!activeDocumentTab || activeDocumentTab.fileType !== 'page') {
+      return undefined;
+    }
+    return new PageDocumentProvider({
+      fileId: activeDocumentTab.fileId,
+      state: fileEditor.state,
+      commands: fileEditor.commands,
+    });
+  }, [activeDocumentTab, fileEditor.commands, fileEditor.state]);
+  const [pageDocumentState, setPageDocumentState] = useState<ReturnType<PageDocumentProvider['getState']> | undefined>(() => {
+    return pageDocumentProvider?.getState();
+  });
+  useEffect(() => {
+    if (!pageDocumentProvider) {
+      setPageDocumentState(undefined);
+      return undefined;
+    }
+    setPageDocumentState(pageDocumentProvider.getState());
+    const unsubscribe = pageDocumentProvider.subscribe((state) => {
+      setPageDocumentState(state);
+    });
+    return () => {
+      unsubscribe();
+      pageDocumentProvider.dispose();
+    };
+  }, [pageDocumentProvider]);
+  const activeDocument = useMemo(() => {
+    if (appMode !== 'shell' || !activeDocumentTab) {
+      return undefined;
+    }
+
+    if (activeDocumentTab.fileType !== 'page') {
+      const undoRedoState = rendererUndoRedoStateByFile[activeDocumentTab.fileId] ?? { canUndo: false, canRedo: false };
+      return {
+        state: {
+          isDirty: activeDocumentTab.isDirty,
+          canUndo: undoRedoState.canUndo,
+          canRedo: undoRedoState.canRedo,
+        },
+        actions: {
+          save: () => fileEditor.commands.execute('tab.save').then(() => undefined),
+          undo: () => {
+            activeRendererDispatchRef.current?.undo();
+          },
+          redo: () => {
+            activeRendererDispatchRef.current?.redo();
+          },
+        },
+      };
+    }
+
+    return {
+      state: {
+        isDirty: pageDocumentState?.isDirty ?? shellSnapshot.isDirty,
+        canUndo: pageDocumentState?.canUndo ?? shellSnapshot.canUndo,
+        canRedo: pageDocumentState?.canRedo ?? shellSnapshot.canRedo,
+      },
+      actions: {
+        save: () => fileEditor.commands.execute('tab.save').then(() => undefined),
+        undo: () => {
+          pageDocumentProvider?.undo();
+        },
+        redo: () => {
+          pageDocumentProvider?.redo();
+        },
+      },
+    };
+  }, [
+    activeDocumentTab,
+    appMode,
+    fileEditor.commands,
+    pageDocumentProvider,
+    pageDocumentState,
+    rendererUndoRedoStateByFile,
+    shellSnapshot.canRedo,
+    shellSnapshot.canUndo,
+    shellSnapshot.isDirty,
+  ]);
 
   const workspaceState = usePreviewWorkspaceState({
     appMode,
@@ -128,6 +214,7 @@ export function App() {
     shellSnapshot,
     tabManager,
     vfs,
+    activeDocument,
   });
 
   usePreviewPersistence({
@@ -156,35 +243,6 @@ export function App() {
   const shellSchemaName = appMode === 'shell' && workspaceState.tabSnapshot.tabs.length === 0
     ? undefined
     : activeSchema.name;
-  const activeRendererUndoRedoState = useMemo(() => {
-    const activeTab = workspaceState.tabSnapshot.tabs.find(
-      (tab) => tab.fileId === workspaceState.tabSnapshot.activeTabId,
-    );
-    if (!activeTab || activeTab.fileType === 'page') {
-      return undefined;
-    }
-    return rendererUndoRedoStateByFile[activeTab.fileId];
-  }, [rendererUndoRedoStateByFile, workspaceState.tabSnapshot.activeTabId, workspaceState.tabSnapshot.tabs]);
-  const isRendererTabActive = useMemo(() => {
-    const activeTab = workspaceState.tabSnapshot.tabs.find(
-      (tab) => tab.fileId === workspaceState.tabSnapshot.activeTabId,
-    );
-    return Boolean(activeTab && activeTab.fileType !== 'page');
-  }, [workspaceState.tabSnapshot.activeTabId, workspaceState.tabSnapshot.tabs]);
-  const handleToolbarUndo = useCallback(() => {
-    if (isRendererTabActive) {
-      activeRendererDispatchRef.current?.undo();
-      return;
-    }
-    workspaceState.handleUndoGuarded();
-  }, [isRendererTabActive, workspaceState]);
-  const handleToolbarRedo = useCallback(() => {
-    if (isRendererTabActive) {
-      activeRendererDispatchRef.current?.redo();
-      return;
-    }
-    workspaceState.handleRedoGuarded();
-  }, [isRendererTabActive, workspaceState]);
   const handleExportJSON = useCallback(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') {
       return;
@@ -413,11 +471,11 @@ export function App() {
           onImportJSONFile={workspaceState.handleImportJSONFile}
           onExportJSON={handleExportJSON}
           isDirty={workspaceState.isDirty}
-          canUndo={activeRendererUndoRedoState?.canUndo ?? workspaceState.canUndo}
-          canRedo={activeRendererUndoRedoState?.canRedo ?? workspaceState.canRedo}
+          canUndo={workspaceState.canUndo}
+          canRedo={workspaceState.canRedo}
           shellGenerationLock={workspaceState.shellGenerationLock}
-          onUndo={handleToolbarUndo}
-          onRedo={handleToolbarRedo}
+          onUndo={workspaceState.handleUndoGuarded}
+          onRedo={workspaceState.handleRedoGuarded}
         />
       )}
     >

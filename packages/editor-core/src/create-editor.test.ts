@@ -730,7 +730,7 @@ describe('createEditor', () => {
     expect(editor.history.getSize()).toBe(1);
   });
 
-  it('node.append appends without recording history', async () => {
+  it('node.append appends and records history', async () => {
     const editor = createEditor({
       initialSchema: createSchemaWithContainer('append-target'),
       fileStorage: createMemoryStorage(),
@@ -742,13 +742,14 @@ describe('createEditor', () => {
     });
 
     expect(editor.state.getIsDirty()).toBe(true);
-    expect(editor.history.getSize()).toBe(0);
+    expect(editor.history.getSize()).toBe(1);
+    expect(editor.state.getSnapshot().canUndo).toBe(true);
     expect(Array.isArray(editor.state.getSchema().body) ? undefined : editor.state.getSchema().body.children).toEqual([
       { id: 'text-1', component: 'Text', children: 'hello' },
     ]);
   });
 
-  it('node.insertAt and node.remove mutate schema without recording history', async () => {
+  it('node.insertAt and node.remove mutate schema and update history flags', async () => {
     const editor = createEditor({
       initialSchema: {
         id: 'insert-remove-id',
@@ -767,14 +768,15 @@ describe('createEditor', () => {
     });
     await editor.commands.execute('node.remove', { treeId: 'body.0' });
 
-    expect(editor.history.getSize()).toBe(0);
+    expect(editor.history.getSize()).toBe(2);
+    expect(editor.state.getSnapshot().canUndo).toBe(true);
     expect(editor.state.getSchema().body).toEqual([
       { id: 'mid', component: 'Button' },
       { id: 'b', component: 'Text' },
     ]);
   });
 
-  it('node.move reorders siblings and moves across containers without recording history', async () => {
+  it('node.move reorders siblings and moves across containers while recording history', async () => {
     const editor = createEditor({
       initialSchema: {
         id: 'move-id',
@@ -806,7 +808,8 @@ describe('createEditor', () => {
       index: 1,
     });
 
-    expect(editor.history.getSize()).toBe(0);
+    expect(editor.history.getSize()).toBe(2);
+    expect(editor.state.getSnapshot().canUndo).toBe(true);
     expect(editor.state.getSchema().body).toEqual([
       {
         id: 'container-1',
@@ -832,7 +835,7 @@ describe('createEditor', () => {
       node: { id: 'temp-node', component: 'Text' },
     });
     expect(editor.state.getIsDirty()).toBe(true);
-    expect(editor.history.getSize()).toBe(0);
+    expect(editor.history.getSize()).toBe(1);
 
     await editor.commands.execute('schema.restore', { schema: initialSchema });
 

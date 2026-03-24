@@ -55,6 +55,10 @@ describe('usePreviewPersistence', () => {
         vfsInitialized: false,
         vfsInitializationFailed: true,
         workspacePersistence: workspacePersistence as any,
+        sessions: {
+          snapshotAll: vi.fn(() => ({})),
+          restoreAll: vi.fn(),
+        } as any,
       });
 
       return {

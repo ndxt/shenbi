@@ -398,19 +398,16 @@ function registerBuiltinCommands(
     recordHistory: false,
     execute(currentState, args) {
       const { schema, isDirty } = extractRestoreArgs(args);
-      const currentSnapshot = history.getCurrent();
-      if (currentSnapshot.schema === schema) {
-        currentState.restoreSnapshot({
-          ...currentSnapshot,
-          canUndo: history.canUndo(),
-          canRedo: history.canRedo(),
-        });
-      } else {
-        currentState.setSchema(schema);
-        if (typeof isDirty === 'boolean') {
-          currentState.setDirty(isDirty);
-        }
-      }
+      const currentSnapshot = currentState.getSnapshot();
+      const restoredSnapshot = {
+        ...currentSnapshot,
+        schema,
+        isDirty: typeof isDirty === 'boolean' ? isDirty : false,
+        canUndo: false,
+        canRedo: false,
+      };
+      currentState.restoreSnapshot(restoredSnapshot);
+      history.clear(restoredSnapshot);
       eventBus.emit('schema:changed', { schema });
     },
   });
@@ -435,7 +432,6 @@ function registerBuiltinCommands(
   commands.register({
     id: 'node.append',
     label: 'Append Node',
-    recordHistory: false,
     execute(currentState, args) {
       const node = extractSchemaNodeFromArgs(args, 'node.append');
       const parentTreeId = extractOptionalParentTreeIdFromArgs(args, 'node.append');
@@ -453,7 +449,6 @@ function registerBuiltinCommands(
   commands.register({
     id: 'node.insertAt',
     label: 'Insert Node At',
-    recordHistory: false,
     execute(currentState, args) {
       const node = extractSchemaNodeFromArgs(args, 'node.insertAt');
       const index = extractIndexFromArgs(args, 'node.insertAt');
@@ -472,7 +467,6 @@ function registerBuiltinCommands(
   commands.register({
     id: 'node.remove',
     label: 'Remove Node',
-    recordHistory: false,
     execute(currentState, args) {
       const treeId = extractTreeIdFromArgs(args, 'node.remove');
       const previousSchema = currentState.getSchema();
@@ -489,7 +483,6 @@ function registerBuiltinCommands(
   commands.register({
     id: 'node.move',
     label: 'Move Node',
-    recordHistory: false,
     execute(currentState, args) {
       const { sourceTreeId, targetParentTreeId, index } = extractMoveNodeArgs(args);
       const previousSchema = currentState.getSchema();

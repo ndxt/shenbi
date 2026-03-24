@@ -140,6 +140,18 @@ export interface UseWorkspaceHostOptions {
   messages: WorkspaceHostMessages;
   dialogs?: WorkspaceHostDialogs;
   notifications: WorkspaceHostNotifications;
+  activeDocument?: {
+    state: {
+      isDirty: boolean;
+      canUndo: boolean;
+      canRedo: boolean;
+    };
+    actions: {
+      save: () => void | Promise<void>;
+      undo: () => void | Promise<void>;
+      redo: () => void | Promise<void>;
+    };
+  } | undefined;
 }
 
 export function useWorkspaceHost({
@@ -155,6 +167,7 @@ export function useWorkspaceHost({
   messages,
   dialogs,
   notifications,
+  activeDocument,
 }: UseWorkspaceHostOptions): WorkspaceHostState {
   const tabSnapshot = useTabManager(tabManager);
   const [vfsInitialized, setVfsInitialized] = useState(false);
@@ -270,6 +283,8 @@ export function useWorkspaceHost({
     commands: fileEditor.commands,
     onError: notifications.error,
     promptFileName,
+    documentState: appMode === 'shell' ? activeDocument?.state : undefined,
+    documentActions: appMode === 'shell' ? activeDocument?.actions : undefined,
   });
 
   const dirtyFileIds = useMemo(

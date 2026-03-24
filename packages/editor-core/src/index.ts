@@ -12,5 +12,6 @@ export * from './adapters/fs-tree-utils';
 export * from './tab-manager';
 export * from './document-session';
 export * from './document-provider';
+export * from './page-document-provider';
 export * from './renderer-document-provider';
 export * from './schema-tree-utils';

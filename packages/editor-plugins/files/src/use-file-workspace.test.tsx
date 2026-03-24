@@ -160,6 +160,50 @@ describe('useFileWorkspace', () => {
     });
   });
 
+  it('提供活动文档动作时会优先走统一文档入口', async () => {
+    const commands = createCommands();
+    const save = vi.fn();
+    const undo = vi.fn();
+    const redo = vi.fn();
+
+    const { result } = renderHook(() => useFileWorkspace({
+      mode: 'shell',
+      snapshot: {
+        currentFileId: 'file-1',
+        schemaName: 'Demo',
+        isDirty: false,
+        canUndo: false,
+        canRedo: false,
+      },
+      commands,
+      documentState: {
+        isDirty: true,
+        canUndo: true,
+        canRedo: true,
+      },
+      documentActions: {
+        save,
+        undo,
+        redo,
+      },
+    }));
+
+    act(() => {
+      result.current.handleSave();
+      result.current.handleUndo();
+      result.current.handleRedo();
+    });
+
+    await waitFor(() => {
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(undo).toHaveBeenCalledTimes(1);
+      expect(redo).toHaveBeenCalledTimes(1);
+    });
+    expect(commands.execute).not.toHaveBeenCalledWith('tab.save');
+    expect(commands.execute).not.toHaveBeenCalledWith('editor.undo');
+    expect(commands.execute).not.toHaveBeenCalledWith('editor.redo');
+  });
+
   it('输入框聚焦时不劫持 Ctrl+Z', async () => {
     const commands = createCommands();
     renderHook(() => useFileWorkspace({
