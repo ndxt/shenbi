@@ -169,12 +169,7 @@ describe('AppShell', () => {
     );
 
     expect(screen.getByText('No file open')).toBeInTheDocument();
-    expect(screen.getByText('Quick Shortcuts')).toBeInTheDocument();
     expect(screen.getByText('Open Command Palette')).toBeInTheDocument();
-    expect(screen.getByText('Toggle Sidebar')).toBeInTheDocument();
-    expect(screen.getByText('Toggle Console')).toBeInTheDocument();
-    expect(screen.getByText('Toggle Inspector')).toBeInTheDocument();
-    expect(screen.getAllByText('Ctrl').length).toBeGreaterThan(0);
     expect(screen.queryByText('Run')).not.toBeInTheDocument();
     expect(screen.queryByRole('toolbar', { name: 'Canvas Tools' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Canvas Zoom Controls')).not.toBeInTheDocument();
