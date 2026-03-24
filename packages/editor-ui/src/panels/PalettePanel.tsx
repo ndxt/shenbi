@@ -291,7 +291,7 @@ function GridPaletteItem({
         className={`flex flex-col items-center justify-center h-full min-h-[72px] w-full p-2 rounded-md transition-colors group/card ${
           active
             ? 'bg-primary/10 text-primary'
-            : 'bg-transparent border border-transparent hover:bg-text-primary/5'
+            : 'bg-transparent hover:bg-text-primary/5'
         } ${canInsertItem(item) ? 'cursor-pointer active:scale-95' : 'cursor-default'}`}
       >
         <div
