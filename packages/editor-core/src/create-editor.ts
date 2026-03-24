@@ -950,6 +950,8 @@ function registerVFSCommands(
 }
 
 function registerTabCommands(
+  state: EditorState,
+  history: History<EditorStateSnapshot>,
   commands: CommandManager,
   eventBus: EventBus<EditorEventMap>,
   tabManager: TabManager,
@@ -989,26 +991,52 @@ function registerTabCommands(
       throw new Error(`Document session not found: ${tab.fileId}`);
     }
 
+    // Restore per-tab history snapshot if available
+    const savedHistory = tabManager.getHistorySnapshot(tab.fileId);
+    const previousFileId = state.getCurrentFileId();
+
     if (session.owner === 'renderer') {
-      await commands.execute('editor.restoreSnapshot', {
-        snapshot: {
-          schema: createEmptySchema(),
-          currentFileId: tab.fileId,
-          isDirty: session.dirty,
-        },
-      });
+      const snapshot: EditorStateSnapshot = {
+        schema: createEmptySchema(),
+        currentFileId: tab.fileId,
+        isDirty: session.dirty,
+        canUndo: false,
+        canRedo: false,
+      };
+      state.restoreSnapshot(snapshot);
+      if (savedHistory) {
+        history.importSnapshot(savedHistory as ReturnType<typeof history.exportSnapshot>);
+      } else {
+        history.clear(state.getSnapshot());
+      }
+      state.setHistoryFlags(history.canUndo(), history.canRedo());
+      if (previousFileId !== tab.fileId) {
+        eventBus.emit('file:currentChanged', { fileId: tab.fileId });
+      }
+      eventBus.emit('schema:changed', { schema: snapshot.schema });
       return;
     }
 
     validatePageSchema(session.workingContent);
-    await commands.execute('editor.restoreSnapshot', {
-      snapshot: {
-        schema: session.workingContent,
-        currentFileId: tab.fileId,
-        isDirty: session.dirty,
-        ...(tab.selectedNodeId ? { selectedNodeId: tab.selectedNodeId } : {}),
-      },
-    });
+    const snapshot: EditorStateSnapshot = {
+      schema: session.workingContent as PageSchema,
+      currentFileId: tab.fileId,
+      isDirty: session.dirty,
+      ...(tab.selectedNodeId ? { selectedNodeId: tab.selectedNodeId } : {}),
+      canUndo: false,
+      canRedo: false,
+    };
+    state.restoreSnapshot(snapshot);
+    if (savedHistory) {
+      history.importSnapshot(savedHistory as ReturnType<typeof history.exportSnapshot>);
+    } else {
+      history.clear(state.getSnapshot());
+    }
+    state.setHistoryFlags(history.canUndo(), history.canRedo());
+    if (previousFileId !== tab.fileId) {
+      eventBus.emit('file:currentChanged', { fileId: tab.fileId });
+    }
+    eventBus.emit('schema:changed', { schema: snapshot.schema });
   };
 
   const syncEditorStateToTab = (tab: TabState, currentState: EditorState): void => {
@@ -1017,6 +1045,10 @@ function registerTabCommands(
     if (!session) {
       return;
     }
+
+    // Save per-tab history snapshot before switching away
+    tabManager.saveHistorySnapshot(tab.fileId, history.exportSnapshot());
+
     if (session.owner === 'renderer') {
       sessions.markDirty(tab.fileId, snapshot.isDirty);
       tabManager.updateTab(tab.fileId, {
@@ -1034,12 +1066,20 @@ function registerTabCommands(
   };
 
   const restoreEmptyEditor = async (): Promise<void> => {
-    await commands.execute('editor.restoreSnapshot', {
-      snapshot: {
-        schema: createEmptySchema(),
-        isDirty: false,
-      },
-    });
+    const previousFileId = state.getCurrentFileId();
+    const snapshot: EditorStateSnapshot = {
+      schema: createEmptySchema(),
+      isDirty: false,
+      canUndo: false,
+      canRedo: false,
+    };
+    state.restoreSnapshot(snapshot);
+    history.clear(state.getSnapshot());
+    state.setHistoryFlags(false, false);
+    if (previousFileId) {
+      eventBus.emit('file:currentChanged', {});
+    }
+    eventBus.emit('schema:changed', { schema: snapshot.schema });
   };
 
   commands.register({
@@ -1200,7 +1240,19 @@ function registerTabCommands(
       }
 
       if (tabManager.getActiveTabId() === fileId) {
-        await restoreEditorForTab(syncedTab);
+        // Lightweight state refresh for the active tab — do NOT call
+        // restoreEditorForTab here, as that would clear/import history.
+        // tab.syncState is an incremental update, not a tab switch.
+        if (session.owner !== 'renderer' && schema !== undefined) {
+          state.restoreSnapshot({
+            ...state.getSnapshot(),
+            schema: schema as PageSchema,
+            isDirty: isDirty ?? session.dirty,
+            ...(selectedNodeId !== undefined ? { selectedNodeId } : {}),
+          });
+        } else if (typeof isDirty === 'boolean') {
+          state.setDirty(isDirty);
+        }
       }
 
       if (dirtyChanged) {
@@ -1366,7 +1418,7 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
 
   const tabManager = options.tabManager;
   if (tabManager) {
-    registerTabCommands(commands, eventBus, tabManager, sessions, options.vfs, options.projectId);
+    registerTabCommands(state, history, commands, eventBus, tabManager, sessions, options.vfs, options.projectId);
   }
 
   const unsubscribeState = tabManager
@@ -1377,7 +1429,6 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
       }
       // During a tab switch, tabManager.activeTabId is already set to the
       // new tab but EditorState still holds the *previous* tab's data.
-      // Syncing in this window would corrupt the new tab with stale data.
       // Skip the update when the active tab doesn't match the editor's
       // current file — restoreEditorForTab will set the correct state soon.
       if (snapshot.currentFileId && activeTabId !== snapshot.currentFileId) {
@@ -1391,16 +1442,21 @@ export function createEditor(options: CreateEditorOptions = {}): EditorInstance 
       if (!activeSession) {
         return;
       }
+
+      // Only sync dirty state and history flags back to TabManager.
+      // Schema and selectedNodeId are synced explicitly within commands.
       if (activeSession.owner === 'renderer') {
-        if (activeTab.isDirty === snapshot.isDirty) {
-          return;
+        if (activeTab.isDirty !== snapshot.isDirty) {
+          sessions.markDirty(activeTabId, snapshot.isDirty);
+          tabManager.updateTab(activeTabId, {
+            isDirty: snapshot.isDirty,
+          });
         }
-        sessions.markDirty(activeTabId, snapshot.isDirty);
-        tabManager.updateTab(activeTabId, {
-          isDirty: snapshot.isDirty,
-        });
         return;
       }
+
+      // For page-editor tabs, sync schema + dirty + selectedNodeId
+      // (commands modify EditorState, and we need TabManager in sync)
       if (
         activeTab.schema === snapshot.schema
         && activeTab.selectedNodeId === snapshot.selectedNodeId

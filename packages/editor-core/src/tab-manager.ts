@@ -1,4 +1,5 @@
 import type { FileContent, FileType } from './adapters/file-storage';
+import type { HistorySnapshot } from './history';
 
 export interface TabState {
   fileId: string;
@@ -11,7 +12,7 @@ export interface TabState {
   isGenerating?: boolean | undefined;
   readOnlyReason?: string | undefined;
   generationUpdatedAt?: number | undefined;
-  historySnapshot?: unknown | undefined; // reserved for per-tab undo/redo
+  historySnapshot?: HistorySnapshot<unknown> | undefined; // per-tab undo/redo
 }
 
 export interface TabManagerSnapshot {
@@ -171,6 +172,16 @@ export class TabManager {
     if (!id) return;
     this.tabOrder.splice(toIndex, 0, id);
     this.notify();
+  }
+
+  saveHistorySnapshot(fileId: string, snapshot: HistorySnapshot<unknown>): void {
+    const tab = this.tabs.get(fileId);
+    if (!tab) return;
+    tab.historySnapshot = snapshot;
+  }
+
+  getHistorySnapshot(fileId: string): HistorySnapshot<unknown> | undefined {
+    return this.tabs.get(fileId)?.historySnapshot;
   }
 
   subscribe(listener: TabManagerListener): () => void {

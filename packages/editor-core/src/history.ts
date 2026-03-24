@@ -1,3 +1,9 @@
+export interface HistorySnapshot<T> {
+  current: T;
+  undoStack: T[];
+  redoStack: T[];
+}
+
 export interface HistoryOptions {
   maxSize?: number;
 }
@@ -127,5 +133,22 @@ export class History<T> {
 
   getSize(): number {
     return this.undoStack.length;
+  }
+
+  exportSnapshot(): HistorySnapshot<T> {
+    return {
+      current: this.current,
+      undoStack: [...this.undoStack],
+      redoStack: [...this.redoStack],
+    };
+  }
+
+  importSnapshot(snapshot: HistorySnapshot<T>): void {
+    this.current = snapshot.current;
+    this.undoStack = [...snapshot.undoStack];
+    this.redoStack = [...snapshot.redoStack];
+    this.locked = false;
+    this.snapshotBeforeLock = undefined;
+    this.batchDirty = false;
   }
 }
