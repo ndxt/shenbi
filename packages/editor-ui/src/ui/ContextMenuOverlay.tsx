@@ -79,7 +79,7 @@ export function ContextMenuOverlay({
                 role="menuitem"
                 type="button"
                 disabled={item.disabled}
-                className={`flex w-full items-center px-3 py-2 text-left text-[12px] ${
+                className={`flex w-full items-center px-3 py-1.5 text-left text-xs ${
                   item.disabled
                     ? 'cursor-not-allowed text-text-secondary/50'
                     : 'text-text-primary hover:bg-hover-bg transition-colors'

@@ -292,21 +292,21 @@ export function EditorTabs({
           >
             <button
               type="button"
-              className="w-full px-4 py-1.5 text-left text-[12px] text-text-primary hover:bg-hover-bg transition-colors"
+              className="w-full px-3 py-1 text-left text-xs text-text-primary hover:bg-hover-bg transition-colors leading-relaxed"
               onClick={() => { onCloseTab?.(ctxMenu.fileId); setCtxMenu(null); }}
             >
               {t('editorTabs.close')}
             </button>
             <button
               type="button"
-              className="w-full px-4 py-1.5 text-left text-[12px] text-text-primary hover:bg-hover-bg transition-colors"
+              className="w-full px-3 py-1 text-left text-xs text-text-primary hover:bg-hover-bg transition-colors leading-relaxed"
               onClick={() => { onCloseOtherTabs?.(ctxMenu.fileId); setCtxMenu(null); }}
             >
               {t('editorTabs.closeOthers')}
             </button>
             <button
               type="button"
-              className="w-full px-4 py-1.5 text-left text-[12px] text-text-primary hover:bg-hover-bg transition-colors"
+              className="w-full px-3 py-1 text-left text-xs text-text-primary hover:bg-hover-bg transition-colors leading-relaxed"
               onClick={() => { onCloseSavedTabs?.(); setCtxMenu(null); }}
             >
               {t('editorTabs.closeSaved')}
@@ -314,7 +314,7 @@ export function EditorTabs({
             <div className="border-t border-border-ide my-1" />
             <button
               type="button"
-              className="w-full px-4 py-1.5 text-left text-[12px] text-text-primary hover:bg-hover-bg transition-colors"
+              className="w-full px-3 py-1 text-left text-xs text-text-primary hover:bg-hover-bg transition-colors leading-relaxed"
               onClick={() => { onCloseAllTabs?.(); setCtxMenu(null); }}
             >
               {t('editorTabs.closeAll')}
