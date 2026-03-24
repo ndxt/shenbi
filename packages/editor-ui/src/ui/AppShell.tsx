@@ -124,6 +124,8 @@ interface AppShellProps {
    * save dispatch is triggered so the renderer can mark its history as saved.
    * Pass a `subscribe(callback)` function; AppShell calls dispatch.save() in the callback. */
   onRendererSaveNotify?: ((dispatch: () => void) => (() => void)) | undefined;
+  /** Read initial content for a renderer-owned tab from DocumentSessionManager. */
+  getRendererContent?: ((fileId: string) => Record<string, unknown> | undefined) | undefined;
   /** Title displayed in the title bar (defaults to 'Shenbi IDE') */
   title?: string;
   /** Subtitle displayed in the title bar (defaults to 'Editor UI Package') */
@@ -337,6 +339,7 @@ export function AppShell({
   onCanvasDocumentDirtyChange,
   onCanvasDocumentSchemaChange,
   onRendererSaveNotify,
+  getRendererContent,
   title,
   subtitle,
   userAvatarUrl,
@@ -1520,11 +1523,24 @@ export function AppShell({
   const canvasDocDispatchRef = React.useRef(canvasDocContext.dispatch);
   canvasDocDispatchRef.current = canvasDocContext.dispatch;
 
-  const canvasRendererContent = React.useMemo(() => (
-    activeEditorTab?.fileType && activeEditorTab.fileType !== 'page'
-      ? canvasDocContext.provider.getDocument() as Record<string, unknown> | undefined
-      : undefined
-  ), [activeEditorTab?.fileType, canvasDocContext.provider]);
+  // When the active tab is a renderer-owned tab, provide its content.
+  // If provider is empty (fresh mount / tab switch), seed it from session.
+  const canvasRendererContent = React.useMemo(() => {
+    if (!activeEditorTab?.fileType || activeEditorTab.fileType === 'page') {
+      return undefined;
+    }
+    let doc = canvasDocContext.provider.getDocument() as Record<string, unknown> | undefined;
+    if (!doc && getRendererContent && activeEditorTab.fileId) {
+      doc = getRendererContent(activeEditorTab.fileId);
+      if (doc) {
+        // Seed the provider so subsequent reads and GatewayEditor mounts
+        // pick up the correct content instead of falling back to empty.
+        (canvasDocContext.provider as import('@shenbi/editor-core').RendererDocumentProvider)
+          .replaceDocument(doc as import('@shenbi/editor-core').FileContent);
+      }
+    }
+    return doc;
+  }, [activeEditorTab?.fileId, activeEditorTab?.fileType, canvasDocContext.provider, getRendererContent]);
 
   // When the host saves a renderer-owned file (via tab.save), notify the
   // renderer so it can call history.markSaved().

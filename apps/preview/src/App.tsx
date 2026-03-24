@@ -332,8 +332,12 @@ export function App() {
         void fileEditor.commands.execute('tab.syncState', { fileId, schema });
       }, [fileEditor.commands])}
       onRendererSaveNotify={useCallback((dispatch: () => void) => {
-        return fileEditor.eventBus.on('file:saved', () => { dispatch(); });
+        return fileEditor.eventBus!.on('file:saved', () => { dispatch(); });
       }, [fileEditor.eventBus])}
+      getRendererContent={useCallback((fileId: string) => {
+        const session = fileEditor.sessions?.getSession(fileId);
+        return session?.workingContent as Record<string, unknown> | undefined;
+      }, [fileEditor.sessions])}
       toolbarExtra={(
         <PreviewToolbar
           previewT={previewT as (...args: any[]) => string}
