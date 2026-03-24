@@ -65,6 +65,11 @@ export class DocumentSessionManager {
     } : undefined;
   }
 
+  /**
+   * Update the working content of a session. The `content` is stored **by
+   * reference** (no defensive clone) for performance. Callers MUST pass a
+   * fresh/immutable object and NOT mutate it after calling this method.
+   */
   updateWorkingContent(fileId: string, content: FileContent, dirty?: boolean): Readonly<DocumentSession> | undefined {
     const session = this.sessions.get(fileId);
     if (!session) {
