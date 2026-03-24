@@ -75,8 +75,11 @@ export function gatewayDocumentToGraph(
     };
   }
 
-  const nodes = documentSchema.nodes.length > 0
-    ? documentSchema.nodes.map((node) => withGatewayNodeRuntime({
+  const rawNodes = Array.isArray(documentSchema.nodes) ? documentSchema.nodes : [];
+  const rawEdges = Array.isArray(documentSchema.edges) ? documentSchema.edges : [];
+
+  const nodes = rawNodes.length > 0
+    ? rawNodes.map((node) => withGatewayNodeRuntime({
         id: node.id,
         type: node.kind,
         position: node.position,
@@ -88,8 +91,8 @@ export function gatewayDocumentToGraph(
       }))
     : createDefaultNodes();
 
-  const edges = documentSchema.edges.length > 0
-    ? documentSchema.edges.map((edge) => ({
+  const edges = rawEdges.length > 0
+    ? rawEdges.map((edge) => ({
         id: edge.id,
         source: edge.source,
         sourceHandle: edge.sourceHandle,
