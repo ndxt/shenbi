@@ -31,6 +31,7 @@ import { resolvePrimaryPanels, type PrimaryPanelContribution } from './primary-p
 import '../styles/editor-ui.css';
 import { useResize } from '../hooks/useResize';
 import { useCanvasDocumentContext } from '../hooks/useCanvasDocumentContext';
+import { useCanvasRuntime } from '../hooks/useCanvasRuntime';
 import {
   createWorkspacePersistenceService,
   LocalWorkspacePersistenceAdapter,
@@ -347,42 +348,26 @@ export function AppShell({
   onOpenProjectManager,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
-  const [canvasSurface, setCanvasSurface] = React.useState<CanvasSurfaceHandle | null>(null);
-  const [canvasRuntime, setCanvasRuntime] = React.useState<CanvasRendererHostRuntime | null>(null);
-  const canvasRuntimeRef = React.useRef<CanvasRendererHostRuntime | null>(null);
-  canvasRuntimeRef.current = canvasRuntime;
-  const handleCanvasRuntimeReady = React.useCallback((runtime: CanvasRendererHostRuntime | null) => {
-    setCanvasRuntime((current) => (current === runtime ? current : runtime));
-  }, []);
-  const [activeCanvasTool, setActiveCanvasTool] = React.useState<CanvasToolMode>('select');
-  const zoomCanvasIn = React.useCallback(() => {
-    canvasRuntimeRef.current?.zoomIn?.();
-  }, []);
-  const zoomCanvasOut = React.useCallback(() => {
-    canvasRuntimeRef.current?.zoomOut?.();
-  }, []);
-  const resetCanvasZoom = React.useCallback(() => {
-    canvasRuntimeRef.current?.resetZoom?.();
-  }, []);
-  const fitCanvasToViewport = React.useCallback(() => {
-    canvasRuntimeRef.current?.fitCanvas?.();
-  }, []);
-  const centerCanvasStage = React.useCallback(() => {
-    canvasRuntimeRef.current?.centerCanvas?.();
-  }, []);
-  const focusCanvasSelection = React.useCallback(() => {
-    canvasRuntimeRef.current?.focusSelection?.();
-  }, []);
-  const handleSidebarStartDragComponent = React.useCallback((componentType: string) => {
-    canvasRuntimeRef.current?.startSidebarDragComponent?.(componentType);
-  }, []);
-  const handleSidebarEndDragComponent = React.useCallback(() => {
-    canvasRuntimeRef.current?.endSidebarDragComponent?.();
-  }, []);
-  const canvasScale = canvasRuntime?.getScale?.() ?? 1;
-  const isCanvasPanning = canvasRuntime?.isCanvasPanning?.() ?? false;
-  const isSpacePressed = canvasRuntime?.isSpacePanActive?.() ?? false;
-  const canvasDragSession = canvasRuntime?.hasCanvasDragSession?.() ?? false;
+  const {
+    canvasSurface,
+    setCanvasSurface,
+    canvasRuntime,
+    handleCanvasRuntimeReady,
+    activeCanvasTool,
+    setActiveCanvasTool,
+    canvasScale,
+    isCanvasPanning,
+    isSpacePressed,
+    canvasDragSession,
+    zoomCanvasIn,
+    zoomCanvasOut,
+    resetCanvasZoom,
+    fitCanvasToViewport,
+    centerCanvasStage,
+    focusCanvasSelection,
+    handleSidebarStartDragComponent,
+    handleSidebarEndDragComponent,
+  } = useCanvasRuntime();
   const resolvedPersistenceAdapter = React.useMemo(
     () => persistenceAdapter ?? new LocalWorkspacePersistenceAdapter(),
     [persistenceAdapter],
