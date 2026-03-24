@@ -116,7 +116,7 @@ export function TitleBar({
   return (
     <div className="h-10 bg-bg-activity-bar border-b border-border-ide flex items-center justify-between px-4 shrink-0 select-none">
       <div className="flex items-center gap-2">
-        <img src="/logo_light_128_transparent.png" alt="Shenbi" className="w-[32px] h-[32px] object-contain ml-1" />
+        <img src="/logo_light_128_transparent.png" alt="Shenbi" className="w-[26px] h-[26px] object-contain ml-1" />
         <span
           className={`text-[13px] font-bold tracking-tight text-text-primary ${onOpenProjectManager ? 'cursor-pointer hover:text-blue-400 transition-colors' : ''}`}
           onClick={onOpenProjectManager}

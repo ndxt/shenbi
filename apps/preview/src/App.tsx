@@ -154,6 +154,27 @@ export function App() {
   const shellSchemaName = appMode === 'shell' && workspaceState.tabSnapshot.tabs.length === 0
     ? undefined
     : activeSchema.name;
+  const handleExportJSON = useCallback(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    const fileNameBase = (shellSchemaName ?? activeSchema.name ?? 'schema')
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .replace(/\s+/g, '-');
+    const blob = new Blob([JSON.stringify(activeSchema, null, 2)], {
+      type: 'application/json;charset=utf-8',
+    });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = downloadUrl;
+    anchor.download = `${fileNameBase || 'schema'}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+  }, [activeSchema, shellSchemaName]);
 
   const canvasState = usePreviewCanvasState({
     appMode,
@@ -342,31 +363,18 @@ export function App() {
         <PreviewToolbar
           previewT={previewT as (...args: any[]) => string}
           appMode={appMode}
-          modeOptions={modeOptions}
-          onAppModeChange={(mode) => setAppMode(mode)}
-          renderMode={renderMode}
-          onRenderModeChange={setRenderMode}
           activeScenario={activeScenario}
           scenarioOptions={scenarioOptions}
           onActiveScenarioChange={setActiveScenario}
           fileInputRef={fileInputRef}
           onImportJSONFile={workspaceState.handleImportJSONFile}
-          activeFileName={workspaceState.activeFileName}
-          activeTabId={workspaceState.tabSnapshot.activeTabId}
-          activeTabFileName={
-            workspaceState.tabSnapshot.tabs.find(
-              (tab) => tab.fileId === workspaceState.tabSnapshot.activeTabId,
-            )?.fileName
-          }
+          onExportJSON={handleExportJSON}
           isDirty={workspaceState.isDirty}
           canUndo={workspaceState.canUndo}
           canRedo={workspaceState.canRedo}
           shellGenerationLock={workspaceState.shellGenerationLock}
           onUndo={workspaceState.handleUndoGuarded}
           onRedo={workspaceState.handleRedoGuarded}
-          onClearPage={() => {
-            void executeAppCommand('workspace.resetDocument');
-          }}
         />
       )}
     >

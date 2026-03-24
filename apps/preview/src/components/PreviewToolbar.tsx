@@ -1,4 +1,4 @@
-import { FileUp, Redo2, Trash2, Undo2 } from 'lucide-react';
+import { FileDown, FileUp, Redo2, Undo2 } from 'lucide-react';
 import type { ChangeEvent, RefObject } from 'react';
 import type { AppMode, RenderMode, ScenarioKey } from '../preview-types';
 
@@ -10,81 +10,38 @@ interface Option<T extends string> {
 interface PreviewToolbarProps {
   previewT: (...args: any[]) => string;
   appMode: AppMode;
-  modeOptions: Option<AppMode>[];
-  onAppModeChange: (mode: AppMode) => void;
-  renderMode: RenderMode;
-  onRenderModeChange: (mode: RenderMode) => void;
   activeScenario: ScenarioKey;
   scenarioOptions: Option<ScenarioKey>[];
   onActiveScenarioChange: (scenario: ScenarioKey) => void;
   fileInputRef: RefObject<HTMLInputElement | null>;
   onImportJSONFile: (event: ChangeEvent<HTMLInputElement>) => void | Promise<void>;
-  activeFileName?: string | undefined;
-  activeTabId?: string | undefined;
-  activeTabFileName?: string | undefined;
+  onExportJSON: () => void;
   isDirty: boolean;
   canUndo: boolean;
   canRedo: boolean;
   shellGenerationLock: boolean;
   onUndo: () => void;
   onRedo: () => void;
-  onClearPage: () => void;
 }
 
 export function PreviewToolbar({
   previewT,
   appMode,
-  modeOptions,
-  onAppModeChange,
-  renderMode,
-  onRenderModeChange,
   activeScenario,
   scenarioOptions,
   onActiveScenarioChange,
   fileInputRef,
   onImportJSONFile,
-  activeFileName,
-  activeTabId,
-  activeTabFileName,
-  isDirty,
+  onExportJSON,
+  isDirty: _isDirty,
   canUndo,
   canRedo,
   shellGenerationLock,
   onUndo,
   onRedo,
-  onClearPage,
 }: PreviewToolbarProps) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-text-secondary" style={{ fontSize: '11px' }}>
-        {previewT('mode')}
-      </span>
-      <select
-        className="h-7 w-[110px] rounded border border-border-ide bg-bg-panel px-2 text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
-        style={{ fontSize: '12px' }}
-        aria-label={previewT('aria.modeSwitch')}
-        value={appMode}
-        onChange={(event) => onAppModeChange(event.target.value as AppMode)}
-      >
-        {modeOptions.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <span className="text-text-secondary" style={{ fontSize: '11px' }}>
-        Render
-      </span>
-      <select
-        className="h-7 w-[110px] rounded border border-border-ide bg-bg-panel px-2 text-text-primary outline-none transition-colors hover:bg-bg-activity-bar focus:border-blue-500"
-        style={{ fontSize: '12px' }}
-        aria-label="Canvas render mode"
-        value={renderMode}
-        onChange={(event) => onRenderModeChange(event.target.value as RenderMode)}
-      >
-        <option value="iframe">iframe</option>
-        <option value="direct">direct</option>
-      </select>
       {appMode === 'scenarios' ? (
         <>
           <span className="text-text-secondary" style={{ fontSize: '11px' }}>
@@ -124,14 +81,15 @@ export function PreviewToolbar({
           >
             <FileUp size={15} />
           </button>
-          <span
-            aria-label={previewT('toolbar.currentFile')}
-            className="max-w-[220px] truncate text-text-secondary"
-            style={{ fontSize: '11px' }}
+          <button
+            type="button"
+            aria-label="导出 JSON 文件"
+            className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary"
+            onClick={onExportJSON}
+            title="导出 JSON 文件"
           >
-            {activeFileName ?? (activeTabId ? activeTabFileName : previewT('toolbar.untitled'))}
-            {isDirty ? ' *' : ''}
-          </span>
+            <FileDown size={15} />
+          </button>
           <button
             type="button"
             aria-label={previewT('toolbar.undo')}
@@ -154,15 +112,6 @@ export function PreviewToolbar({
           </button>
         </>
       ) : null}
-      <button
-        type="button"
-        aria-label={previewT('toolbar.clearPage')}
-        className="p-1.5 rounded text-text-secondary transition-colors hover:bg-bg-activity-bar hover:text-text-primary"
-        onClick={onClearPage}
-        title={previewT('toolbar.clearPage')}
-      >
-        <Trash2 size={15} />
-      </button>
     </div>
   );
 }
