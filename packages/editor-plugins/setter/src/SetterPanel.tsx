@@ -488,7 +488,7 @@ function PropsSetter({ selectedNode, contract, onPatchProps, onPatchColumns }: P
                   setPropsJsonError(message);
                 }
               }}
-              className="w-full min-h-[140px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500"
+              className="w-full min-h-[140px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
             />
             {propsJsonError ? <div className="text-[11px] text-red-400">{propsJsonError}</div> : null}
             <div className="text-[11px] text-text-secondary">
@@ -654,7 +654,7 @@ function FormItemRulesField({
             const nextRules = updateRulesRequired(rulesValue, event.target.checked, messageDraft);
             onChange(nextRules);
           }}
-          className="size-4 accent-blue-500"
+          className="size-4 accent-primary"
         />
         {t('validation.required')}
       </label>
@@ -730,7 +730,7 @@ function TableColumnsField({
         <span className="text-[10px] uppercase text-text-secondary">{label}</span>
         <button
           type="button"
-          className="text-[11px] text-blue-400 hover:text-blue-300"
+          className="text-[11px] text-primary hover:text-blue-300"
           onClick={handleAddColumn}
         >
           {t('columns.newColumn')}
@@ -927,7 +927,7 @@ function StyleSetter({ selectedNode, onPatchStyle }: StyleSetterProps) {
               setError(message);
             }
           }}
-          className="w-full min-h-[140px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500"
+          className="w-full min-h-[140px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
         />
         {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
         <div className="text-[11px] text-text-secondary"
@@ -988,7 +988,7 @@ function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
       <div className="flex justify-between items-center mb-2">
         <span className="text-[11px] font-bold text-text-secondary uppercase">{t('events.boundEvents')}</span>
         <button
-          className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded flex items-center gap-1 hover:bg-blue-600 transition-colors"
+          className="text-[10px] bg-primary text-white px-2 py-0.5 rounded flex items-center gap-1 hover:bg-primary transition-colors"
           onClick={() => {
             if (eventRecord.onClick) {
               return;
@@ -1015,7 +1015,7 @@ function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
         return (
           <div key={eventName} className="border border-border-ide rounded bg-bg-canvas overflow-hidden">
             <div className="flex justify-between items-center bg-bg-activity-bar px-2 py-1.5 border-b border-border-ide">
-              <span className="text-[12px] font-semibold text-blue-400">{eventName}</span>
+              <span className="text-[12px] font-semibold text-primary">{eventName}</span>
               <span className="text-[10px] text-text-secondary">
                 {actionsCount}
               </span>
@@ -1038,7 +1038,7 @@ function EventSetter({ selectedNode, onPatchEvents }: EventSetterProps) {
                     setErrorByEvent((prev) => ({ ...prev, [eventName]: message }));
                   }
                 }}
-                className="w-full min-h-[104px] bg-bg-sidebar border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500"
+                className="w-full min-h-[104px] bg-bg-sidebar border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
               />
               {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
               <div className="flex items-center gap-2 text-[11px] text-text-secondary bg-bg-sidebar p-1.5 rounded border border-border-ide border-dashed">
@@ -1129,7 +1129,7 @@ function LogicSetter({ selectedNode, onPatchLogic }: LogicSetterProps) {
               setError(message);
             }
           }}
-          className="w-full min-h-[140px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500"
+          className="w-full min-h-[140px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
         />
         {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
         <div className="text-[11px] text-text-secondary">
@@ -1229,7 +1229,7 @@ function PropertyField({
               onChange?.(event.target.checked);
               onCommit?.(event.target.checked);
             }}
-            className="size-4 accent-blue-500"
+            className="size-4 accent-primary"
           />
         ) : null}
 
@@ -1245,7 +1245,7 @@ function PropertyField({
                 onCommit?.((event.target as HTMLInputElement).value);
               }
             }}
-            className={`flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-blue-500 w-full min-w-0 ${
+            className={`flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 w-full min-w-0 ${
               isExpression ? 'font-mono text-yellow-400 border-yellow-500/50 bg-yellow-500/5' : ''
             }`}
           />
@@ -1259,7 +1259,7 @@ function PropertyField({
             value={displayValue}
             onChange={(event) => onChange?.(event.target.value)}
             onBlur={(event) => onCommit?.(event.target.value)}
-            className={`flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-blue-500 w-full min-w-0 ${
+            className={`flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 w-full min-w-0 ${
               isExpression ? 'font-mono text-yellow-400 border-yellow-500/50 bg-yellow-500/5' : ''
             }`}
           />
@@ -1274,7 +1274,7 @@ function PropertyField({
               onChange?.(event.target.value);
               onCommit?.(event.target.value);
             }}
-            className="flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-blue-500 appearance-none w-full min-w-0"
+            className="flex-1 bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[12px] text-text-primary focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 appearance-none w-full min-w-0"
           >
             {selectOptions.map((opt) => (
               <option key={opt} value={opt}>
@@ -1291,7 +1291,7 @@ function PropertyField({
             value={displayValue}
             onChange={(event) => onChange?.(event.target.value)}
             onBlur={(event) => onCommit?.(event.target.value)}
-            className={`flex-1 min-h-[88px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-blue-500 w-full min-w-0 ${
+            className={`flex-1 min-h-[88px] bg-bg-canvas border border-border-ide rounded px-2 py-1 text-[11px] font-mono text-text-primary focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 w-full min-w-0 ${
               isExpression ? 'text-yellow-400 border-yellow-500/50 bg-yellow-500/5' : ''
             }`}
           />

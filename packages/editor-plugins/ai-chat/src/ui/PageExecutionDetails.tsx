@@ -47,7 +47,7 @@ function OpRow({
     >
       <span className="text-text-primary opacity-80 truncate flex-1 leading-none translate-y-[1px]" title={label}>{label}</span>
       {isDone && metrics && <MetricsBadge durationMs={metrics.durationMs} inputTokens={metrics.inputTokens} outputTokens={metrics.outputTokens} />}
-      {isPending && <LoaderCircle size={11} className="text-blue-500 shrink-0 animate-spin" />}
+      {isPending && <LoaderCircle size={11} className="text-primary shrink-0 animate-spin" />}
       {isDone && !isPending && (
         <CheckCircle2
           size={11}

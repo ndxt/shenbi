@@ -27,11 +27,11 @@ export function ChatMessageList({ messages, onDismissRunResult }: ChatMessageLis
                         <>
                             <div className="flex items-center gap-2">
                                 {msg.role === 'user' ? (
-                                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500/10 text-text-primary border border-border-ide">
+                                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-text-primary border border-border-ide">
                                         <User size={12} />
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-center w-5 h-5 text-blue-500">
+                                    <div className="flex items-center justify-center w-5 h-5 text-primary">
                                         <Sparkles size={14} />
                                     </div>
                                 )}
@@ -115,7 +115,7 @@ function AttachmentCard({ attachment }: { attachment: NonNullable<ChatMessage['a
                 href={downloadUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="w-[148px] rounded border border-border-ide bg-bg-canvas p-2 flex flex-col gap-2 hover:border-blue-500 transition-colors"
+                className="w-[148px] rounded border border-border-ide bg-bg-canvas p-2 flex flex-col gap-2 hover:border-primary transition-colors"
             >
                 <img src={downloadUrl} alt={attachment.name} className="h-24 w-full rounded object-cover bg-black/10" />
                 <div className="flex items-center gap-1.5 text-text-primary" style={{ fontSize: '11px' }}>
@@ -142,7 +142,7 @@ function AttachmentCard({ attachment }: { attachment: NonNullable<ChatMessage['a
         <a
             href={downloadUrl}
             download={attachment.name}
-            className="rounded border border-border-ide bg-bg-canvas px-3 py-2 flex items-center gap-2 text-text-primary hover:border-blue-500 transition-colors"
+            className="rounded border border-border-ide bg-bg-canvas px-3 py-2 flex items-center gap-2 text-text-primary hover:border-primary transition-colors"
             style={{ fontSize: '11px' }}
         >
             <FileText size={12} />

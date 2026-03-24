@@ -67,7 +67,7 @@ export function buildGatewayMinimapModel({
       width: getNodeWidth(node),
       height: getNodeHeight(node),
       style: {
-        fill: contract.color ?? '#888888',
+        fill: contract.color ?? 'var(--color-node-border)',
         stroke: 'var(--canvas-minimap-stage-border)',
         strokeWidth: 1,
         radius: 4,

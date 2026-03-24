@@ -90,23 +90,23 @@ function displayDir(path: string): string {
 // ---------------------------------------------------------------------------
 
 const color = {
-  bg: '#1e1e1e',
-  bgPanel: '#252526',
-  bgHover: '#2a2d2e',
-  bgInput: '#3c3c3c',
-  border: '#393939',
-  borderLight: '#4a4a4a',
-  text: '#cccccc',
-  textDim: '#858585',
-  textBright: '#e0e0e0',
-  accent: '#0078d4',
-  accentHover: '#1a8aeb',
+  bg: 'transparent',
+  bgPanel: 'transparent',
+  bgHover: 'var(--color-hover-bg)',
+  bgInput: 'var(--color-active-bg)',
+  border: 'var(--color-border-ide)',
+  borderLight: 'var(--color-border-hover, var(--color-border-ide))',
+  text: 'var(--color-text-primary)',
+  textDim: 'var(--color-text-secondary)',
+  textBright: 'var(--color-text-primary)',
+  accent: 'var(--color-primary)',
+  accentHover: 'var(--color-primary-hover)',
   green: '#4ade80',
-  greenBg: '#1a3a2a',
+  greenBg: 'var(--color-hover-bg)',
   yellow: '#facc15',
-  yellowBg: '#3a3520',
-  red: '#f87171',
-  redBg: '#3a1a1a',
+  yellowBg: 'var(--color-hover-bg)',
+  red: 'var(--color-danger, #f87171)',
+  redBg: 'transparent',
 } as const;
 
 const S = {

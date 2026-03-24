@@ -118,7 +118,7 @@ export function TitleBar({
       <div className="flex items-center gap-2">
         <img src="/logo_light_128_transparent.png" alt="Shenbi" className="w-[26px] h-[26px] object-contain ml-1" />
         <span
-          className={`text-[13px] font-bold tracking-tight text-text-primary ${onOpenProjectManager ? 'cursor-pointer hover:text-blue-400 transition-colors' : ''}`}
+          className={`text-[13px] font-bold tracking-tight text-text-primary ${onOpenProjectManager ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
           onClick={onOpenProjectManager}
           title={onOpenProjectManager ? '管理项目' : undefined}
         >
@@ -154,21 +154,21 @@ export function TitleBar({
         <div className="flex items-center gap-1 bg-bg-panel border border-border-ide rounded p-0.5 mr-2">
           <button
             onClick={onToggleSidebar}
-            className={`p-1 rounded transition-colors ${showSidebar ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}`}
+            className={`p-1 rounded transition-colors ${showSidebar ? 'bg-bg-activity-bar text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}`}
             title="Toggle Sidebar"
           >
             <PanelLeft size={14} />
           </button>
           <button
             onClick={onToggleConsole}
-            className={`p-1 rounded transition-colors ${showConsole ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}`}
+            className={`p-1 rounded transition-colors ${showConsole ? 'bg-bg-activity-bar text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}`}
             title="Toggle Console"
           >
             <PanelBottom size={14} />
           </button>
           <button
             onClick={onToggleInspector}
-            className={`p-1 rounded transition-colors ${showInspector ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}`}
+            className={`p-1 rounded transition-colors ${showInspector ? 'bg-bg-activity-bar text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'}`}
             title="Toggle Inspector"
           >
             <PanelRight size={14} />
@@ -176,7 +176,7 @@ export function TitleBar({
           <button
             onClick={onToggleAssistantPanel}
             disabled={!hasAssistantPanel}
-            className={`p-1 rounded transition-colors ${showAssistantPanel ? 'bg-bg-activity-bar text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'} ${!hasAssistantPanel ? 'cursor-not-allowed opacity-40' : ''}`}
+            className={`p-1 rounded transition-colors ${showAssistantPanel ? 'bg-bg-activity-bar text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-activity-bar'} ${!hasAssistantPanel ? 'cursor-not-allowed opacity-40' : ''}`}
             title="Toggle AI Assistant"
           >
             <Sparkles size={14} />
@@ -193,7 +193,7 @@ export function TitleBar({
 
         <button
           onClick={onToggleMaximize}
-          className={`p-1.5 rounded transition-colors ${isMaximized ? 'bg-bg-panel text-blue-500' : 'text-text-secondary hover:text-text-primary hover:bg-bg-panel'}`}
+          className={`p-1.5 rounded transition-colors ${isMaximized ? 'bg-bg-panel text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-panel'}`}
           title={isMaximized ? "Restore Layout" : "Maximize Center Area"}
         >
           {isMaximized ? <Minimize size={16} /> : <Maximize size={16} />}
@@ -203,7 +203,7 @@ export function TitleBar({
           <button
             onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
             className={`flex items-center gap-1.5 p-1.5 rounded transition-colors ${isLanguageDropdownOpen
-                ? 'bg-bg-panel text-blue-500'
+                ? 'bg-bg-panel text-primary'
                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-panel'
               }`}
             title={t('titleBar.changeLanguage')}
@@ -227,7 +227,7 @@ export function TitleBar({
                   className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-text-primary hover:bg-bg-activity-bar transition-colors text-left"
                 >
                   <div className="w-4 flex justify-center">
-                    {locale === option.id ? <Check size={14} className="text-blue-500" /> : null}
+                    {locale === option.id ? <Check size={14} className="text-primary" /> : null}
                   </div>
                   {option.name}
                 </button>
@@ -260,7 +260,7 @@ export function TitleBar({
                   className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-text-primary hover:bg-bg-activity-bar transition-colors text-left"
                 >
                   <div className="w-4 flex justify-center">
-                    {theme === t.id && <Check size={14} className="text-blue-500" />}
+                    {theme === t.id && <Check size={14} className="text-primary" />}
                   </div>
                   {t.name}
                 </button>

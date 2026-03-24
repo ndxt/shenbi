@@ -200,8 +200,8 @@ function EmptyWorkspaceShortcutKey({
     <div className="flex items-center gap-[4px]">
       {keys.map((key, index) => (
         <React.Fragment key={`${key}-${index}`}>
-          {index > 0 ? <span className="text-[#666666] text-[11px]">+</span> : null}
-          <kbd className="flex h-[20px] min-w-[20px] items-center justify-center rounded-[3px] border border-[#444444] bg-[#3a3a3a] px-[5px] text-[11px] text-[#999999]">
+          {index > 0 ? <span className="text-text-muted text-[11px]">+</span> : null}
+          <kbd className="flex h-[20px] min-w-[20px] items-center justify-center rounded-[3px] border border-border-ide bg-active-bg px-[5px] text-[11px] text-text-muted">
             {key}
           </kbd>
         </React.Fragment>
@@ -229,8 +229,8 @@ function EmptyWorkspaceState() {
         }}
       />
       <div className="mb-6 text-center">
-        <div className="text-[15px] font-medium text-[#999999] mb-1">{t('emptyWorkspace.title')}</div>
-        <div className="text-[12px] text-[#666666] max-w-[360px] leading-[1.6]">{t('emptyWorkspace.description')}</div>
+        <div className="text-[15px] font-medium text-text-secondary mb-1">{t('emptyWorkspace.title')}</div>
+        <div className="text-[12px] text-text-muted max-w-[360px] leading-[1.6]">{t('emptyWorkspace.description')}</div>
       </div>
       <div className="flex flex-col gap-[8px]">
         {EMPTY_WORKSPACE_SHORTCUTS.map((shortcut) => (
@@ -238,7 +238,7 @@ function EmptyWorkspaceState() {
             key={shortcut.id}
             className="flex items-center justify-between gap-[40px] min-w-[300px]"
           >
-            <span className="text-[12px] text-[#999999]">
+            <span className="text-[12px] text-text-secondary">
               {t(`hostCommands.${shortcut.id}`)}
             </span>
             <EmptyWorkspaceShortcutKey
@@ -1649,7 +1649,7 @@ export function AppShell({
               </div>
             </div>
             <div
-              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary z-20 transition-colors"
               onMouseDown={(e) => startSidebarResize(e, 'horizontal', false)}
             />
           </div>
@@ -1698,7 +1698,7 @@ export function AppShell({
                   pluginContext={resolvedPluginContext}
                 />
                 <div
-                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary z-20 transition-colors"
                   onMouseDown={(e) => startFileContextPanelResize(e, 'horizontal', false)}
                 />
               </div>
@@ -1747,7 +1747,7 @@ export function AppShell({
               {showConsole && (
                 <div style={{ height: consoleSize }} className="relative shrink-0 flex flex-col w-full">
                   <div
-                    className="absolute top-0 left-0 right-0 h-1 -mt-[2px] cursor-row-resize hover:bg-blue-500 z-20 transition-colors"
+                    className="absolute top-0 left-0 right-0 h-1 -mt-[2px] cursor-row-resize hover:bg-primary z-20 transition-colors"
                     onMouseDown={(e) => startConsoleResize(e, 'vertical', true)}
                   />
                   <Console />
@@ -1758,7 +1758,7 @@ export function AppShell({
             {showAssistantPanel && activeAuxiliaryPanel ? (
               <div style={{ width: assistantPanelSize }} className="relative shrink-0 flex flex-col h-full border-r border-border-ide">
                 <div
-                  className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+                  className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-primary z-20 transition-colors"
                   onMouseDown={(e) => startAIPanelResize(e, 'horizontal', true)}
                 />
                 {activeAuxiliaryPanel.render(resolvedPluginContext)}
@@ -1773,7 +1773,7 @@ export function AppShell({
                 onContextMenu={(event) => openContextMenu('inspector', event)}
               >
                 <div
-                  className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-blue-500 z-20 transition-colors"
+                  className="absolute left-0 top-0 bottom-0 w-1 -ml-[2px] cursor-col-resize hover:bg-primary z-20 transition-colors"
                   onMouseDown={(e) => startInspectorResize(e, 'horizontal', true)}
                 />
                 <Inspector

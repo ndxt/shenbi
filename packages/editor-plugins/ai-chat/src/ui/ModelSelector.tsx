@@ -16,7 +16,7 @@ export function ModelSelector({ label, models, value, onChange, disabled }: Mode
             <div className="relative">
                 <select
                     aria-label={label}
-                    className="w-full h-[26px] bg-bg-canvas border border-border-ide text-text-primary rounded px-2 outline-none transition-colors hover:bg-bg-panel focus:border-blue-500 disabled:opacity-50 appearance-none pr-5 cursor-pointer"
+                    className="w-full h-[26px] bg-bg-canvas border border-border-ide text-text-primary rounded px-2 outline-none transition-colors hover:bg-bg-panel focus:border-primary/50 focus:ring-1 focus:ring-primary/20 disabled:opacity-50 appearance-none pr-5 cursor-pointer"
                     style={{ fontSize: '12px' }}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}

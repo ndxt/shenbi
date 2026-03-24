@@ -345,7 +345,7 @@ export function PageCanvasRenderer(props: PageCanvasRendererProps) {
                   </CanvasSurface>
                   {canvasDropIndicator ? (
                     <div
-                      className={`absolute z-[55] ${canvasDropIndicator.variant === 'line' ? 'bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]' : 'border-2 border-dashed border-blue-500 bg-blue-500/8'}`}
+                      className={`absolute z-[55] ${canvasDropIndicator.variant === 'line' ? 'bg-primary ring-1 ring-primary-bg' : 'border-2 border-dashed border-primary bg-primary-bg'}`}
                       style={{
                         top: canvasDropIndicator.top,
                         left: canvasDropIndicator.left,
@@ -371,7 +371,7 @@ export function PageCanvasRenderer(props: PageCanvasRendererProps) {
                 </CanvasSurface>
                 {canvasDropIndicator ? (
                   <div
-                    className={`absolute z-[55] ${canvasDropIndicator.variant === 'line' ? 'bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]' : 'border-2 border-dashed border-blue-500 bg-blue-500/8'}`}
+                    className={`absolute z-[55] ${canvasDropIndicator.variant === 'line' ? 'bg-primary ring-1 ring-primary-bg' : 'border-2 border-dashed border-primary bg-primary-bg'}`}
                     style={{
                       top: canvasDropIndicator.top,
                       left: canvasDropIndicator.left,

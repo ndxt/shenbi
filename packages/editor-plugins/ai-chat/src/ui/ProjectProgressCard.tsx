@@ -13,7 +13,7 @@ function getStatusClass(status: AgentLoopPageProgress['status']): string {
     case 'done':
       return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
     case 'running':
-      return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
+      return 'text-primary bg-primary/10 border-primary/20';
     case 'failed':
       return 'text-red-400 bg-red-400/10 border-red-400/20';
     case 'skipped':
@@ -46,7 +46,7 @@ export function ProjectProgressCard({ pages }: ProjectProgressCardProps) {
     <section className="bg-bg-canvas border border-border-ide rounded-md p-3 flex flex-col gap-3 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-text-primary">
-          <FileStack size={14} className="text-blue-500" />
+          <FileStack size={14} className="text-primary" />
           <span className="font-semibold" style={{ fontSize: '12px' }}>{t('loop.progressTitle')}</span>
         </div>
         <span className="text-text-secondary" style={{ fontSize: '10px' }}>

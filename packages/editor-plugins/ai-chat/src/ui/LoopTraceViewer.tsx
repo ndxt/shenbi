@@ -23,7 +23,7 @@ export function LoopTraceViewer({ steps }: LoopTraceViewerProps) {
         onClick={() => setExpanded((value) => !value)}
       >
         <div className="flex items-center gap-2 text-text-primary">
-          <FileCode2 size={14} className="text-blue-500" />
+          <FileCode2 size={14} className="text-primary" />
           <span className="font-semibold" style={{ fontSize: '12px' }}>{t('loop.traceViewerTitle')}</span>
         </div>
         <span className="text-text-secondary flex items-center gap-1" style={{ fontSize: '10px' }}>

@@ -69,7 +69,7 @@ export function FilePanel({
               key={file.id}
               className={`rounded border px-2 py-2 ${
                 file.id === activeFileId
-                  ? 'border-blue-500 bg-bg-activity-bar'
+                  ? 'border-primary bg-bg-activity-bar'
                   : 'border-border-ide bg-bg-panel'
               }`}
             >

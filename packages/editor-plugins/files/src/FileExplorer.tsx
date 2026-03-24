@@ -60,15 +60,15 @@ function useDialog() {
           style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onMouseDown={(e) => { if (e.target === e.currentTarget) handleCancel(); }}
         >
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }} />
           <div
-            style={{ position: 'relative', zIndex: 10, width: 340, borderRadius: 8, border: '1px solid #454545', background: '#252526', boxShadow: '0 8px 32px rgba(0,0,0,0.6)', overflow: 'hidden' }}
+            style={{ position: 'relative', zIndex: 10, width: 340, borderRadius: 8, border: '1px solid var(--color-border-ide)', background: 'var(--color-bg-panel)', boxShadow: '0 8px 32px rgba(0,0,0,0.6)', overflow: 'hidden' }}
             onKeyDown={(e) => { if (e.key === 'Enter') handleOk(); else if (e.key === 'Escape') handleCancel(); }}
           >
             <div style={{ padding: '20px 24px 16px' }}>
-              <p style={{ fontSize: 13, color: '#cccccc', lineHeight: 1.6, margin: 0 }}>{dlg.message}</p>
+              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>{dlg.message}</p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 24px', background: '#1e1e1e' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 24px', background: 'var(--color-bg-activity-bar)' }}>
               <DialogButton label="取消" onClick={handleCancel} />
               <DialogButton label="确认" onClick={handleOk} primary autoFocus />
             </div>
@@ -95,8 +95,8 @@ function DialogButton({ label, onClick, primary, autoFocus }: { label: string; o
         height: 28, borderRadius: 4, padding: '0 16px', fontSize: 13, border: 'none', cursor: 'pointer',
         transition: 'background 0.15s, color 0.15s',
         ...(primary
-          ? { background: hover ? '#1a8cd8' : '#007acc', color: '#fff' }
-          : { background: hover ? 'rgba(255,255,255,0.1)' : 'transparent', color: hover ? '#fff' : '#cccccc' }),
+          ? { background: hover ? 'var(--color-primary-hover)' : 'var(--color-primary)', color: 'var(--color-text-inverse)' }
+          : { background: hover ? 'var(--color-hover-bg)' : 'transparent', color: hover ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }),
       }}
     >
       {label}
@@ -149,7 +149,7 @@ interface FileTypeOption {
 }
 
 const FILE_TYPE_OPTIONS: FileTypeOption[] = [
-  { fileType: 'page',  labelZh: '页面',  labelEn: 'Page',   icon: FileCode,  iconColor: 'text-blue-400' },
+  { fileType: 'page',  labelZh: '页面',  labelEn: 'Page',   icon: FileCode,  iconColor: 'text-primary' },
   { fileType: 'api',   labelZh: 'API',   labelEn: 'API',    icon: Plug,      iconColor: 'text-green-400' },
   { fileType: 'flow',  labelZh: '流程',  labelEn: 'Flow',   icon: Workflow,  iconColor: 'text-purple-400' },
   { fileType: 'db',    labelZh: '数据表', labelEn: 'DB',     icon: Database,  iconColor: 'text-yellow-400' },
@@ -204,8 +204,8 @@ function MenuItemBtn({ children, onClick, danger }: { children: React.ReactNode;
       style={{
         display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '5px 12px',
         fontSize: 12, border: 'none', cursor: 'pointer', textAlign: 'left',
-        color: hover ? '#fff' : (danger ? '#f87171' : '#cccccc'),
-        background: hover ? '#04395e' : 'transparent',
+        color: hover ? 'var(--color-text-primary)' : (danger ? 'var(--color-danger)' : 'var(--color-text-secondary)'),
+        background: hover ? 'var(--color-hover-bg)' : 'transparent',
         transition: 'background 0.1s, color 0.1s',
         whiteSpace: 'nowrap',
       }}
@@ -248,7 +248,7 @@ function FileTypeDropdown({
   return (
     <div
       ref={ref}
-      style={{ position: 'fixed', zIndex: 50, minWidth: 160, borderRadius: 5, border: '1px solid #454545', background: '#252526', padding: '4px 0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', top, left }}
+      style={{ position: 'fixed', zIndex: 50, minWidth: 160, borderRadius: 5, border: '1px solid var(--color-border-ide)', background: 'var(--color-bg-panel)', padding: '4px 0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', top, left }}
     >
       {FILE_TYPE_OPTIONS.map((opt) => (
         <MenuItemBtn key={opt.fileType} onClick={() => { onSelect(opt.fileType); onClose(); }}>
@@ -312,7 +312,7 @@ function InlineCreateInput({
       <input
         ref={inputRef}
         className="flex-1 min-w-0 outline-none"
-        style={{ height: 20, borderRadius: 2, border: '1px solid #007acc', background: 'var(--bg-panel)', padding: '0 4px', fontSize: 12, color: 'var(--text-primary)' }}
+        style={{ height: 20, borderRadius: 2, border: '1px solid var(--color-primary)', background: 'var(--color-bg-panel)', padding: '0 4px', fontSize: 12, color: 'var(--color-text-primary)' }}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
@@ -447,11 +447,11 @@ function TreeNodeItem({
 
   // VS Code row style
   const rowBgColor = isActive
-    ? '#37373d'
+    ? 'var(--color-active-bg)'
     : dropZone === 'inside'
-    ? '#2a2d2e'
+    ? 'var(--color-hover-bg)'
     : (rowHover && !isDragSource)
-    ? '#2a2d2e'
+    ? 'var(--color-hover-bg)'
     : 'transparent';
 
   const textColor = isActive
@@ -471,7 +471,7 @@ function TreeNodeItem({
           background: rowBgColor,
           color: textColor,
           opacity: isDragSource ? 0.4 : 1,
-          outline: isFocused && !isActive ? '1px solid rgba(0,122,204,0.5)' : 'none',
+          outline: isFocused && !isActive ? '1px solid var(--color-primary-bg)' : 'none',
           outlineOffset: -1,
           transition: 'background 0.1s',
         }}
@@ -488,10 +488,10 @@ function TreeNodeItem({
         onDragEnd={(e) => onDragEnd?.(e)}
       >
         {dropZone === 'before' && (
-          <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 2, background: '#007acc', marginLeft: depth * 16 + 4, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 2, background: 'var(--color-primary)', marginLeft: depth * 16 + 4, pointerEvents: 'none' }} />
         )}
         {dropZone === 'after' && (
-          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, background: '#007acc', marginLeft: depth * 16 + 4, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, background: 'var(--color-primary)', marginLeft: depth * 16 + 4, pointerEvents: 'none' }} />
         )}
 
         {/* Indent guide lines */}
@@ -528,7 +528,7 @@ function TreeNodeItem({
           <input
             ref={inputRef}
             className="flex-1 min-w-0 outline-none"
-            style={{ height: 16, borderRadius: 2, border: '1px solid #007acc', background: 'var(--bg-panel)', padding: '0 4px', fontSize: 12, color: 'var(--text-primary)' }}
+            style={{ height: 16, borderRadius: 2, border: '1px solid var(--color-primary)', background: 'var(--color-bg-panel)', padding: '0 4px', fontSize: 12, color: 'var(--color-text-primary)' }}
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={handleRenameKeyDown}
@@ -646,8 +646,8 @@ function ToolbarBtn({
       style={{
         display: 'flex', height: 22, width: 22, alignItems: 'center', justifyContent: 'center',
         borderRadius: 4, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
-        color: hover && !disabled ? 'var(--text-primary)' : 'var(--text-secondary)',
-        background: hover && !disabled ? 'rgba(255,255,255,0.1)' : 'transparent',
+        color: hover && !disabled ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+        background: hover && !disabled ? 'var(--color-hover-bg)' : 'transparent',
         opacity: disabled ? 0.3 : 1,
         transition: 'background 0.15s, color 0.15s',
       }}
@@ -683,14 +683,14 @@ function ContextMenuPanel({
 
   const panelStyle: React.CSSProperties = {
     position: 'fixed', zIndex: 50, minWidth: 200, borderRadius: 5,
-    border: '1px solid #454545', background: '#252526',
+    border: '1px solid var(--color-border-ide)', background: 'var(--color-bg-panel)',
     padding: '4px 0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
     left: contextMenu.x, top: contextMenu.y,
   };
 
   const subStyle: React.CSSProperties = {
     position: 'absolute', left: 'calc(100% - 4px)', top: 0, minWidth: 200, borderRadius: 5,
-    border: '1px solid #454545', background: '#252526',
+    border: '1px solid var(--color-border-ide)', background: 'var(--color-bg-panel)',
     padding: '4px 0', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
   };
 
@@ -699,9 +699,9 @@ function ContextMenuPanel({
       {/* New File -> submenu */}
       <div style={{ position: 'relative' }} onMouseEnter={openSubmenu} onMouseLeave={closeSubmenu}>
         <MenuItemBtn>
-          <FilePlus size={14} style={{ color: '#999' }} />
+          <FilePlus size={14} style={{ color: 'var(--color-text-secondary)' }} />
           <span style={{ flex: 1 }}>{t('menu.newFile')}</span>
-          <ChevronRight size={14} style={{ color: '#999' }} />
+          <ChevronRight size={14} style={{ color: 'var(--color-text-secondary)' }} />
         </MenuItemBtn>
         {submenuOpen && (
           <div style={subStyle} onMouseEnter={keepSubmenu} onMouseLeave={closeSubmenu}>
@@ -716,15 +716,15 @@ function ContextMenuPanel({
       </div>
 
       <MenuItemBtn onClick={() => { closeContextMenu(); startCreating(contextMenu.targetParentId, 'directory'); }}>
-        <FolderPlus size={14} style={{ color: '#999' }} />
+        <FolderPlus size={14} style={{ color: 'var(--color-text-secondary)' }} />
         <span>{t('menu.newFolder')}</span>
       </MenuItemBtn>
 
       {contextMenu.node && (
         <>
-          <div style={{ margin: '4px 4px', height: 1, background: '#454545' }} />
+          <div style={{ margin: '4px 4px', height: 1, background: 'var(--color-border-ide)' }} />
           <MenuItemBtn onClick={() => { closeContextMenu(); startRename(contextMenu.node!.id); }}>
-            <Pencil size={14} style={{ color: '#999' }} />
+            <Pencil size={14} style={{ color: 'var(--color-text-secondary)' }} />
             <span>{t('menu.rename')}</span>
           </MenuItemBtn>
           <MenuItemBtn danger onClick={() => { closeContextMenu(); void handleDelete(contextMenu.node!.id); }}>
