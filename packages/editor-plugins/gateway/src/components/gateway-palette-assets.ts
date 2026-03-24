@@ -131,11 +131,11 @@ const GATEWAY_GROUPS: Record<string, GatewayGroupConfig> = {
     ],
   },
   data: {
-    name: '数据处理',
+    name: '数据',
     assets: [
-      buildGatewayNodeAsset(gatewayContractByKind['data-definition']!, 'data', '数据处理'),
-      buildGatewayNodeAsset(gatewayContractByKind['metadata']!, 'data', '数据处理'),
-      buildGatewayNodeAsset(gatewayContractByKind['sql-query']!, 'data', '数据处理'),
+      buildGatewayNodeAsset(gatewayContractByKind['data-definition']!, 'data', '数据'),
+      buildGatewayNodeAsset(gatewayContractByKind['metadata']!, 'data', '数据'),
+      buildGatewayNodeAsset(gatewayContractByKind['sql-query']!, 'data', '数据'),
     ],
   },
   flow: {
@@ -144,6 +144,56 @@ const GATEWAY_GROUPS: Record<string, GatewayGroupConfig> = {
       buildGatewayNodeAsset(gatewayContractByKind['branch']!, 'flow', '流程控制'),
       buildLoopGroupAsset('flow', '流程控制'),
     ],
+  },
+  database: {
+    name: '数据库',
+    assets: [
+      buildGatewayNodeAsset(gatewayContractByKind['query']!, 'database', '数据库'),
+      buildGatewayNodeAsset(gatewayContractByKind['update']!, 'database', '数据库'),
+      buildGatewayNodeAsset(gatewayContractByKind['sql-run']!, 'database', '数据库'),
+      buildGatewayNodeAsset(gatewayContractByKind['sql-write']!, 'database', '数据库'),
+      buildGatewayNodeAsset(gatewayContractByKind['commit']!, 'database', '数据库'),
+    ],
+  },
+  'http-module': {
+    name: 'HTTP / 模块',
+    assets: [
+      buildGatewayNodeAsset(gatewayContractByKind['http']!, 'http-module', 'HTTP / 模块'),
+      buildGatewayNodeAsset(gatewayContractByKind['call-module']!, 'http-module', 'HTTP / 模块'),
+    ],
+  },
+  'data-proc': {
+    name: '数据处理',
+    assets: [buildDataProcGroupAsset('data-proc', '数据处理')],
+  },
+  'es-redis': {
+    name: 'ES / Redis',
+    assets: [
+      buildGatewayNodeAsset(gatewayContractByKind['es-query']!, 'es-redis', 'ES / Redis'),
+      buildGatewayNodeAsset(gatewayContractByKind['es-write']!, 'es-redis', 'ES / Redis'),
+      buildGatewayNodeAsset(gatewayContractByKind['redis-read']!, 'es-redis', 'ES / Redis'),
+      buildGatewayNodeAsset(gatewayContractByKind['redis-write']!, 'es-redis', 'ES / Redis'),
+    ],
+  },
+  file: {
+    name: '文件',
+    assets: [buildFileGroupAsset('file', '文件')],
+  },
+  workflow: {
+    name: '工作流',
+    assets: [
+      buildGatewayNodeAsset(gatewayContractByKind['create-flow']!, 'workflow', '工作流'),
+      buildGatewayNodeAsset(gatewayContractByKind['submit-flow']!, 'workflow', '工作流'),
+      buildGatewayNodeAsset(gatewayContractByKind['task-list']!, 'workflow', '工作流'),
+      buildGatewayNodeAsset(gatewayContractByKind['task-manager']!, 'workflow', '工作流'),
+      buildGatewayNodeAsset(gatewayContractByKind['flow-runtime']!, 'workflow', '工作流'),
+      buildGatewayNodeAsset(gatewayContractByKind['flow-status']!, 'workflow', '工作流'),
+      buildGatewayNodeAsset(gatewayContractByKind['flow-dispatch']!, 'workflow', '工作流'),
+    ],
+  },
+  system: {
+    name: '系统',
+    assets: [buildSystemGroupAsset('system', '系统')],
   },
 };
 
