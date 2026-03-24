@@ -114,37 +114,44 @@ export function TitleBar({
     { id: 'en-US', name: 'English' },
   ];
   return (
-    <div className="h-10 bg-bg-activity-bar border-b border-border-ide flex items-center justify-between pl-3 pr-4 shrink-0 select-none">
-      <div className="flex items-center gap-2">
-        <img src="/logo_light_128_transparent.png" alt="Shenbi" className="w-6 h-6 object-contain" />
-        <span
-          className={`text-[13px] font-bold tracking-tight text-text-primary ${onOpenProjectManager ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
-          onClick={onOpenProjectManager}
-          title={onOpenProjectManager ? '管理项目' : undefined}
-        >
-          <FolderOpen size={13} className="inline mr-1 opacity-60" />
-          {title ?? 'Shenbi IDE'}
-        </span>
-        {branches && branches.length > 0 && onBranchChange ? (
-          <select
-            className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary bg-transparent cursor-pointer outline-none"
-            value={subtitle ?? ''}
-            onChange={(e) => onBranchChange(e.target.value)}
+    <div className="h-10 bg-bg-activity-bar border-b border-border-ide flex items-center justify-between pr-4 shrink-0 select-none">
+      <div className="flex items-center h-full">
+        {/* ActivityBar Column Header */}
+        <div className="w-12 h-full flex items-center justify-center shrink-0">
+          <img src="/logo_light_128_transparent.png" alt="Shenbi" className="w-[30px] h-[30px] object-contain" />
+        </div>
+        
+        {/* Sidebar Column Header */}
+        <div className="flex items-center gap-2 pl-4">
+          <span
+            className={`text-[13px] font-bold tracking-tight text-text-primary flex items-center ${onOpenProjectManager ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+            onClick={onOpenProjectManager}
+            title={onOpenProjectManager ? '管理项目' : undefined}
           >
-            {branches.map((b) => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
-        ) : (
-          <span className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary flex items-center gap-1">
-            {subtitle ? <><GitBranch size={10} /> {subtitle}</> : 'Editor UI Package'}
+            <FolderOpen size={14} className="mr-1.5 opacity-70" />
+            {title ?? 'Shenbi IDE'}
           </span>
-        )}
-        {gitlabUrl && (
-          <a href={gitlabUrl} target="_blank" rel="noreferrer" className="text-text-secondary hover:text-text-primary transition-colors" title="在 GitLab 中打开">
-            <ExternalLink size={12} />
-          </a>
-        )}
+          {branches && branches.length > 0 && onBranchChange ? (
+            <select
+              className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary bg-transparent cursor-pointer outline-none"
+              value={subtitle ?? ''}
+              onChange={(e) => onBranchChange(e.target.value)}
+            >
+              {branches.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary flex items-center gap-1">
+              {subtitle ? <><GitBranch size={10} /> {subtitle}</> : 'Editor UI Package'}
+            </span>
+          )}
+          {gitlabUrl && (
+            <a href={gitlabUrl} target="_blank" rel="noreferrer" className="text-text-secondary hover:text-text-primary transition-colors" title="在 GitLab 中打开">
+              <ExternalLink size={12} />
+            </a>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 text-center text-[11px] text-text-secondary font-medium">
