@@ -52,7 +52,11 @@ export class DocumentSessionManager {
     return session;
   }
 
-  getSession(fileId: string): DocumentSession | undefined {
+  getSession(fileId: string): Readonly<DocumentSession> | undefined {
+    return this.sessions.get(fileId);
+  }
+
+  getSessionCopy(fileId: string): DocumentSession | undefined {
     const session = this.sessions.get(fileId);
     return session ? {
       ...session,
@@ -61,40 +65,39 @@ export class DocumentSessionManager {
     } : undefined;
   }
 
-  updateWorkingContent(fileId: string, content: FileContent, dirty?: boolean): DocumentSession | undefined {
+  updateWorkingContent(fileId: string, content: FileContent, dirty?: boolean): Readonly<DocumentSession> | undefined {
     const session = this.sessions.get(fileId);
     if (!session) {
       return undefined;
     }
-    session.workingContent = cloneContent(content);
+    session.workingContent = content;
     session.revision += 1;
     if (typeof dirty === 'boolean') {
       session.dirty = dirty;
     }
-    return this.getSession(fileId);
+    return session;
   }
 
-  replacePersistedContent(fileId: string, content: FileContent): DocumentSession | undefined {
+  replacePersistedContent(fileId: string, content: FileContent): Readonly<DocumentSession> | undefined {
     const session = this.sessions.get(fileId);
     if (!session) {
       return undefined;
     }
-    const next = cloneContent(content);
-    session.persistedContent = next;
-    session.workingContent = cloneContent(next);
+    session.persistedContent = cloneContent(content);
+    session.workingContent = cloneContent(content);
     session.revision += 1;
     session.savedRevision = session.revision;
     session.dirty = false;
-    return this.getSession(fileId);
+    return session;
   }
 
-  markDirty(fileId: string, dirty: boolean): DocumentSession | undefined {
+  markDirty(fileId: string, dirty: boolean): Readonly<DocumentSession> | undefined {
     const session = this.sessions.get(fileId);
     if (!session) {
       return undefined;
     }
     session.dirty = dirty;
-    return this.getSession(fileId);
+    return session;
   }
 
   removeSession(fileId: string): void {

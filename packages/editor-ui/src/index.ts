@@ -29,6 +29,7 @@ export * from './hooks/useScenarioSession';
 export * from './hooks/useEditorHostBridge';
 export * from './hooks/useHostCommandPolicy';
 export * from './hooks/useTabManager';
+export * from './hooks/useTabManagerSelectors';
 export * from './hooks/useWorkspaceHost';
 export * from './hooks/useWorkspacePersistence';
 export * from './hooks/useCanvasZoom';

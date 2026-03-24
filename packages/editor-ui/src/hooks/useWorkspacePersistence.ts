@@ -319,25 +319,32 @@ export function useWorkspacePersistence<TScenario extends string, TRenderMode ex
       return;
     }
 
-    void workspacePersistence
-      .setJSON<PersistedWorkspaceShellSession>(
-        persistenceKeys.namespace,
-        persistenceKeys.shellSessionKey,
-        {
-          tabs: {
-            ...tabSnapshot,
-            tabs: tabSnapshot.tabs.map((tab) => ({
-              ...tab,
-              isGenerating: false,
-              readOnlyReason: undefined,
-              generationUpdatedAt: undefined,
-            })),
+    const timer = setTimeout(() => {
+      void workspacePersistence
+        .setJSON<PersistedWorkspaceShellSession>(
+          persistenceKeys.namespace,
+          persistenceKeys.shellSessionKey,
+          {
+            tabs: {
+              ...tabSnapshot,
+              tabs: tabSnapshot.tabs.map((tab) => ({
+                ...tab,
+                // Only persist schema for dirty tabs (user's unsaved work).
+                // Non-dirty tabs will reload content from VFS on next startup.
+                ...(tab.isDirty ? {} : { schema: undefined }),
+                isGenerating: false,
+                readOnlyReason: undefined,
+                generationUpdatedAt: undefined,
+              } as typeof tab)),
+            },
+            expandedIds: fileExplorerExpandedIds,
+            ...(fileExplorerFocusedId ? { focusedId: fileExplorerFocusedId } : {}),
           },
-          expandedIds: fileExplorerExpandedIds,
-          ...(fileExplorerFocusedId ? { focusedId: fileExplorerFocusedId } : {}),
-        },
-      )
-      .catch(() => undefined);
+        )
+        .catch(() => undefined);
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [
     appMode,
     fileExplorerExpandedIds,
