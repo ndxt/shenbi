@@ -695,6 +695,7 @@ export function useAgentLoop(
         fileId,
       }));
 
+      const workspaceFileIds = (await listWorkspaceFiles()).map((file) => file.id);
       const request: RunRequest = {
         prompt: input.prompt,
         intent: 'schema.create',
@@ -706,6 +707,7 @@ export function useAgentLoop(
           schemaSummary: 'pageId=empty; pageName=empty; nodeCount=0',
           componentSummary: summarizeComponents(bridge),
           schemaJson: openedSchema,
+          workspaceFileIds,
         },
       };
 
@@ -843,6 +845,7 @@ export function useAgentLoop(
     }));
     setProgressText(`正在修改页面 ${page.pageName}`);
 
+    const workspaceFileIds = (await listWorkspaceFiles()).map((file) => file.id);
     const request: RunRequest = {
       prompt: input.prompt,
       intent: 'schema.modify',
@@ -854,6 +857,7 @@ export function useAgentLoop(
         schemaSummary: summarizeSchema(existingSchema),
         componentSummary: summarizeComponents(bridge),
         schemaJson: existingSchema,
+        workspaceFileIds,
       },
     };
 

@@ -40,6 +40,9 @@ export interface CreateMastraAgentRuntimeOptions {
   writeMemoryDump?: (input: { category: 'finalize'; memory: unknown }) => string;
 }
 
+const PAGE_STREAM_INTENTS: ReadonlySet<AgentIntent> = new Set(['schema.create', 'schema.modify']);
+const LEGACY_STREAM_FALLBACK_INTENTS: ReadonlySet<AgentIntent> = new Set(['chat']);
+
 class AsyncEventQueue<T> implements AsyncIterable<T> {
   private readonly items: T[] = [];
   private readonly waiters: Array<(result: IteratorResult<T>) => void> = [];
@@ -213,7 +216,7 @@ function buildSyntheticRunRequest(request: ClassifyRouteRequest): RunRequest {
 }
 
 function isPageIntent(intent: AgentIntent): intent is 'schema.create' | 'schema.modify' {
-  return intent === 'schema.create' || intent === 'schema.modify';
+  return PAGE_STREAM_INTENTS.has(intent);
 }
 
 function getRunContextTag(request: RunRequest): 'single-page' | 'multi-page-loop' {
@@ -223,7 +226,7 @@ function getRunContextTag(request: RunRequest): 'single-page' | 'multi-page-loop
 }
 
 function isLegacyFallbackIntent(intent: AgentIntent): boolean {
-  return intent === 'chat';
+  return LEGACY_STREAM_FALLBACK_INTENTS.has(intent);
 }
 
 function logInfo(

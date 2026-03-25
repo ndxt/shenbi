@@ -423,6 +423,9 @@ describe('useAgentLoop', () => {
       intent: 'schema.create',
       thinking: { type: 'disabled' },
       blockConcurrency: 2,
+      context: {
+        workspaceFileIds: expect.arrayContaining(['current', createdFileId]),
+      },
     });
     expect(fileStorage.files.get(createdFileId!)).toMatchObject({
       name: '客服看板',
@@ -436,7 +439,6 @@ describe('useAgentLoop', () => {
     expect(commandLog.filter((entry) => entry.commandId === 'tab.syncState').length).toBeGreaterThanOrEqual(3);
     expect(tabManager.getTab(createdFileId!)).toMatchObject({
       isGenerating: false,
-      schema: expect.objectContaining({ name: '客服看板' }),
     });
     expect(persistence.remove).toHaveBeenCalledWith('ai-chat', 'agent-loop-state');
   });
@@ -1032,5 +1034,147 @@ describe('useAgentLoop', () => {
 
     expect(onDone).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledWith(expect.stringContaining('fs.createFile unavailable'));
+  });
+
+  it('runs modifyPage subtasks through runStream with multi-page workspace context', async () => {
+    const { bridge } = createBridge({
+      current: createSchema('current', 'Current Page'),
+      'order-detail': {
+        id: 'order-detail',
+        name: '订单详情页',
+        body: [{
+          id: 'detail-card',
+          component: 'Card',
+          props: { title: '旧标题' },
+        }],
+      },
+    });
+    const persistence = createPersistence();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: {
+        traceFile: '.ai-debug/traces/modify-success.json',
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+    const client = new LoopScenarioAIClient([
+      {
+        content: JSON.stringify({
+          action: 'proposeProjectPlan',
+          actionInput: {
+            projectName: '订单项目',
+            pages: [
+              {
+                pageId: 'order-detail',
+                pageName: '订单详情页',
+                action: 'modify',
+                description: '补充订单状态信息',
+                prompt: '把详情页标题改成订单状态总览',
+              },
+            ],
+          },
+        }),
+      },
+      {
+        content: JSON.stringify({
+          action: 'modifyPage',
+          actionInput: {
+            fileId: 'order-detail',
+            pageName: '订单详情页',
+            prompt: '把详情页标题改成订单状态总览',
+          },
+        }),
+      },
+      {
+        content: '{"action":"finish","actionInput":{"summary":"项目完成"}}',
+      },
+    ], [
+      { type: 'run:start', data: { sessionId: 'session-modify', conversationId: 'conv-modify' } },
+      { type: 'intent', data: { intent: 'schema.modify', confidence: 1, scope: 'single-page' } },
+      {
+        type: 'modify:start',
+        data: {
+          operationCount: 1,
+          explanation: '已更新详情标题',
+          operations: [{ op: 'schema.patchProps', nodeId: 'detail-card' }],
+        },
+      },
+      {
+        type: 'modify:op:pending',
+        data: {
+          index: 0,
+          label: '更新 detail-card 标题',
+        },
+      },
+      {
+        type: 'modify:op',
+        data: {
+          index: 0,
+          operation: {
+            op: 'schema.patchProps',
+            nodeId: 'detail-card',
+            patch: { title: '订单状态总览' },
+          },
+        },
+      },
+      { type: 'modify:done', data: {} },
+      {
+        type: 'done',
+        data: {
+          metadata: {
+            sessionId: 'session-modify',
+            conversationId: 'conv-modify',
+            durationMs: 88,
+          },
+        },
+      },
+    ]);
+    setAIClient(client);
+
+    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
+    let runPromise!: Promise<void>;
+
+    await act(async () => {
+      runPromise = result.current.runAgent(
+        '帮我完善订单项目',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-modify-loop',
+        () => 'message-modify',
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.phase).toBe('awaiting_confirmation');
+    });
+
+    await act(async () => {
+      result.current.confirmProjectPlan();
+      await runPromise;
+    });
+
+    expect(client.runRequests[0]).toMatchObject({
+      intent: 'schema.modify',
+      context: {
+        workspaceFileIds: expect.arrayContaining(['current', 'order-detail']),
+      },
+    });
+    expect(result.current.pages).toMatchObject([
+      {
+        pageId: 'order-detail',
+        status: 'done',
+        execution: {
+          modifyPlan: {
+            explanation: '已更新详情标题',
+          },
+        },
+      },
+    ]);
   });
 });

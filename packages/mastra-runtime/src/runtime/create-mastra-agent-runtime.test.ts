@@ -133,6 +133,10 @@ describe('createMastraAgentRuntime', () => {
       id: 'page-user-list',
       body: [blockNode],
     };
+    const logger = {
+      info: vi.fn(),
+      error: vi.fn(),
+    };
     const deps = createDeps([
       {
         name: 'planPage',
@@ -163,7 +167,7 @@ describe('createMastraAgentRuntime', () => {
           return finalSchema;
         },
       },
-    ]);
+    ], { logger });
     const runtime = createMastraAgentRuntime({
       legacyRuntime: createLegacyRuntime([]),
       createDeps: () => deps,
@@ -198,6 +202,14 @@ describe('createMastraAgentRuntime', () => {
     const doneEvent = events.at(-1);
     expect(doneEvent?.type).toBe('done');
     expect(doneEvent && doneEvent.type === 'done' ? doneEvent.data.metadata.tokensUsed : undefined).toBe(12);
+    expect(logger.info).toHaveBeenCalledWith('mastra.runtime.run_stream.start', expect.objectContaining({
+      runtime: 'mastra',
+      runContext: 'single-page',
+    }));
+    expect(logger.info).toHaveBeenCalledWith('mastra.runtime.run_stream.done', expect.objectContaining({
+      runtime: 'mastra',
+      runContext: 'single-page',
+    }));
   });
 
   it('streams page-modify events in the existing AgentEvent format', async () => {
@@ -258,9 +270,13 @@ describe('createMastraAgentRuntime', () => {
       { type: 'run:start', data: { sessionId: 'legacy-session', conversationId: 'conv-chat' } },
       { type: 'done', data: { metadata: { sessionId: 'legacy-session', conversationId: 'conv-chat' } } },
     ];
+    const logger = {
+      info: vi.fn(),
+      error: vi.fn(),
+    };
     const runtime = createMastraAgentRuntime({
       legacyRuntime: createLegacyRuntime(legacyEvents),
-      createDeps: () => createDeps([]),
+      createDeps: () => createDeps([], { logger }),
       prepareRunRequest: async (request) => request,
     });
 
@@ -273,6 +289,12 @@ describe('createMastraAgentRuntime', () => {
     }
 
     expect(events).toEqual(legacyEvents);
+    expect(logger.info).toHaveBeenCalledWith('mastra.runtime.run_stream.fallback_legacy', expect.objectContaining({
+      runtime: 'mastra',
+      resolvedIntent: 'chat',
+      fallbackReason: 'legacy_whitelist_intent',
+      runContext: 'single-page',
+    }));
   });
 
   it('classifies routes through the mastra classifier path', async () => {
@@ -428,6 +450,90 @@ describe('createMastraAgentRuntime', () => {
       runtime: 'mastra',
       outcome: 'patched',
       memoryDebugFile: '.ai-debug/memory/mastra-finalize.json',
+    }));
+  });
+
+  it('marks multi-page loop sub-runs in mastra run-stream logs', async () => {
+    const logger = {
+      info: vi.fn(),
+      error: vi.fn(),
+    };
+    const deps = createDeps([
+      {
+        name: 'planPage',
+        async execute() {
+          return {
+            pageTitle: '订单列表页',
+            pageType: 'list',
+            blocks: [
+              {
+                id: 'table-block',
+                description: '订单表格',
+                components: ['Table'],
+                priority: 1,
+                complexity: 'simple',
+              },
+            ],
+          };
+        },
+      },
+      {
+        name: 'buildSkeletonSchema',
+        async execute() {
+          return {
+            id: 'page-order-list',
+            body: [],
+          };
+        },
+      },
+      {
+        name: 'generateBlock',
+        async execute() {
+          return {
+            blockId: 'table-block',
+            node: {
+              id: 'order-table',
+              component: 'Table',
+            },
+            summary: '订单表格完成',
+          };
+        },
+      },
+      {
+        name: 'assembleSchema',
+        async execute() {
+          return {
+            id: 'page-order-list',
+            body: [{
+              id: 'order-table',
+              component: 'Table',
+            }],
+          };
+        },
+      },
+    ], { logger });
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime: createLegacyRuntime([]),
+      createDeps: () => deps,
+      prepareRunRequest: async (request) => request,
+    });
+
+    const events = await Array.fromAsync(runtime.runStream(createRequest({
+      context: {
+        schemaSummary: 'empty',
+        componentSummary: 'Card, Table, Form',
+        workspaceFileIds: ['current', 'page-order-list'],
+      },
+    })));
+
+    expect(events.at(-1)?.type).toBe('done');
+    expect(logger.info).toHaveBeenCalledWith('mastra.runtime.run_stream.start', expect.objectContaining({
+      runtime: 'mastra',
+      runContext: 'multi-page-loop',
+    }));
+    expect(logger.info).toHaveBeenCalledWith('mastra.runtime.run_stream.done', expect.objectContaining({
+      runtime: 'mastra',
+      runContext: 'multi-page-loop',
     }));
   });
 });
