@@ -30,17 +30,29 @@ const writeBanner = (line) => {
 writeBanner(`[dev:mastra] log file: ${sessionLogPath}`);
 writeBanner(`[dev:mastra] latest log: ${latestLogPath}`);
 
-const child = spawn(
-  process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-  ['--filter', '@shenbi/ai-api', 'dev'],
-  {
-    stdio: ['inherit', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      AI_RUNTIME: 'mastra',
+const child = process.platform === 'win32'
+  ? spawn(
+    process.env.ComSpec ?? 'cmd.exe',
+    ['/d', '/s', '/c', 'pnpm --filter @shenbi/ai-api dev'],
+    {
+      stdio: ['inherit', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        AI_RUNTIME: 'mastra',
+      },
     },
-  },
-);
+  )
+  : spawn(
+    'pnpm',
+    ['--filter', '@shenbi/ai-api', 'dev'],
+    {
+      stdio: ['inherit', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        AI_RUNTIME: 'mastra',
+      },
+    },
+  );
 
 child.stdout?.on('data', (chunk) => {
   process.stdout.write(chunk);
