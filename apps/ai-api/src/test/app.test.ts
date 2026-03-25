@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { createApp } from '../app.ts';
 import type { AgentRuntime } from '../runtime/types.ts';
-import type { AgentEvent, ChatRequest, ChatResponse, FinalizeRequest, RunMetadata } from '@shenbi/ai-contracts';
+import type {
+  AgentEvent,
+  ChatRequest,
+  ChatResponse,
+  ClassifyRouteResponse,
+  FinalizeRequest,
+  RunMetadata,
+} from '@shenbi/ai-contracts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,6 +61,13 @@ function makeRuntime(overrides: Partial<AgentRuntime> = {}): AgentRuntime {
     async *chatStream() {
       yield { delta: 'chat ' };
       yield { delta: 'response' };
+    },
+    async classifyRoute(): Promise<ClassifyRouteResponse> {
+      return {
+        scope: 'single-page',
+        intent: 'schema.create',
+        confidence: 0.95,
+      };
     },
     async finalize() {
       return {};
@@ -358,6 +372,43 @@ describe('POST /api/ai/chat', () => {
     const json = await res.json() as { success: boolean; error: string };
     expect(json.success).toBe(false);
     expect(json.error).toMatch(/model|messages/i);
+  });
+});
+
+describe('POST /api/ai/classify-route', () => {
+  it('delegates to runtime.classifyRoute', async () => {
+    const app = createApp({
+      runtime: makeRuntime({
+        async classifyRoute() {
+          return {
+            scope: 'multi-page',
+            intent: 'chat',
+            confidence: 0.88,
+            preparedPrompt: 'prepared prompt',
+          };
+        },
+      }),
+    });
+
+    const res = await app.request('/api/ai/classify-route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: '帮我生成多个页面',
+        context: { schemaSummary: 'pageId=empty; pageName=empty; nodeCount=0' },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      success: true,
+      data: {
+        scope: 'multi-page',
+        intent: 'chat',
+        confidence: 0.88,
+        preparedPrompt: 'prepared prompt',
+      },
+    });
   });
 });
 

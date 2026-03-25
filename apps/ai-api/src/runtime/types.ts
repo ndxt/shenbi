@@ -6,6 +6,8 @@ import type {
   AgentEvent,
   ChatRequest,
   ChatResponse,
+  ClassifyRouteRequest,
+  ClassifyRouteResponse,
   FinalizeRequest,
   FinalizeResult,
   RunMetadata,
@@ -17,5 +19,6 @@ export interface AgentRuntime {
   runStream(request: RunRequest): AsyncIterable<AgentEvent>;
   chat(request: ChatRequest): Promise<ChatResponse>;
   chatStream(request: ChatRequest): AsyncIterable<{ delta: string }>;
+  classifyRoute(request: ClassifyRouteRequest): Promise<ClassifyRouteResponse>;
   finalize(request: FinalizeRequest): Promise<FinalizeResult>;
 }

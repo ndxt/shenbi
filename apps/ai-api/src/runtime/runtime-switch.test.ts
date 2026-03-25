@@ -20,6 +20,9 @@ function createFakeRuntime(): AgentRuntime {
     async *chatStream() {
       yield { delta: 'ok' };
     },
+    async classifyRoute() {
+      return { scope: 'single-page', intent: 'schema.create', confidence: 0.9 };
+    },
     async finalize() {
       return {};
     },

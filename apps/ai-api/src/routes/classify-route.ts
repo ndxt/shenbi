@@ -8,9 +8,7 @@ import { Hono } from 'hono';
 import { handleError } from '../middleware/error-handler.ts';
 import { logRequest, logger } from '../adapters/logger.ts';
 import type { ClassifyRouteRequest, ClassifyRouteResponse } from '@shenbi/ai-contracts';
-import type { ClassifyIntentInput, IntentClassification } from '@shenbi/ai-agents';
-import { classifyIntentWithModel } from '../runtime/classify-intent.ts';
-import { prepareRunRequest } from '../runtime/request-attachments.ts';
+import type { AgentRuntime } from '../runtime/types.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -31,7 +29,7 @@ function validateClassifyRouteRequest(body: unknown): ClassifyRouteRequest {
   return body as unknown as ClassifyRouteRequest;
 }
 
-export function createClassifyRouteRoute(): Hono {
+export function createClassifyRouteRoute(runtime: AgentRuntime): Hono {
   const app = new Hono();
 
   app.post('/', async (c) => {
@@ -47,52 +45,7 @@ export function createClassifyRouteRoute(): Hono {
     }
 
     try {
-      // Build a synthetic RunRequest for the classify-intent pipeline
-      const syntheticRunRequest = {
-        prompt: req.prompt,
-        ...(req.attachments ? { attachments: req.attachments } : {}),
-        ...(req.plannerModel ? { plannerModel: req.plannerModel } : {}),
-        ...(req.thinking ? { thinking: req.thinking } : {}),
-        context: {
-          schemaSummary: req.context.schemaSummary,
-          componentSummary: '',
-        },
-      };
-
-      // Prepare attachments (extract document text etc.)
-      const preparedRequest = await prepareRunRequest(syntheticRunRequest);
-
-      const classifyInput: ClassifyIntentInput = {
-        request: preparedRequest,
-        context: {
-          prompt: preparedRequest.prompt,
-          document: {
-            exists: req.context.schemaSummary !== 'pageId=empty; pageName=empty; nodeCount=0',
-            summary: req.context.schemaSummary,
-          },
-          componentSummary: '',
-          conversation: {
-            history: [],
-            turnCount: 0,
-          },
-          lastBlockIds: [],
-        },
-      };
-
-      const result: IntentClassification = await classifyIntentWithModel(classifyInput);
-
-      // preparedRequest.prompt already contains extracted document text (from prepareRunRequest)
-      // Only include it when it differs from the original prompt (i.e. when docs were present)
-      const preparedPrompt = preparedRequest.prompt !== req.prompt
-        ? preparedRequest.prompt
-        : undefined;
-
-      const response: ClassifyRouteResponse = {
-        scope: result.scope ?? 'single-page',
-        intent: result.intent,
-        confidence: result.confidence,
-        ...(preparedPrompt ? { preparedPrompt } : {}),
-      };
+      const response: ClassifyRouteResponse = await runtime.classifyRoute(req);
 
       logRequest({
         requestId,

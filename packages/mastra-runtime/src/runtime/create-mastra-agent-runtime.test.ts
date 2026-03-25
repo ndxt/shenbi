@@ -10,6 +10,8 @@ import type {
   AgentOperation,
   ChatRequest,
   ChatResponse,
+  ClassifyRouteRequest,
+  ClassifyRouteResponse,
   FinalizeRequest,
   FinalizeResult,
   PagePlan,
@@ -51,6 +53,13 @@ function createLegacyRuntime(events: AgentEvent[]): MastraAgentRuntime {
     },
     async *chatStream() {
       yield { delta: 'legacy chat' };
+    },
+    async classifyRoute(_request: ClassifyRouteRequest): Promise<ClassifyRouteResponse> {
+      return {
+        scope: 'single-page',
+        intent: 'schema.create',
+        confidence: 0.9,
+      };
     },
     async finalize(_request: FinalizeRequest): Promise<FinalizeResult> {
       return {};
@@ -247,5 +256,34 @@ describe('createMastraAgentRuntime', () => {
     }
 
     expect(events).toEqual(legacyEvents);
+  });
+
+  it('classifies routes through the mastra classifier path', async () => {
+    const deps = createDeps([
+      {
+        name: 'classifyIntent',
+        async execute() {
+          return {
+            intent: 'chat',
+            confidence: 0.91,
+            scope: 'multi-page',
+          };
+        },
+      },
+    ]);
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime: createLegacyRuntime([]),
+      createDeps: () => deps,
+      prepareRunRequest: async (request) => request,
+    });
+
+    await expect(runtime.classifyRoute({
+      prompt: '帮我生成一个多页面项目',
+      context: { schemaSummary: 'pageId=empty; pageName=empty; nodeCount=0' },
+    })).resolves.toEqual({
+      scope: 'multi-page',
+      intent: 'chat',
+      confidence: 0.91,
+    });
   });
 });

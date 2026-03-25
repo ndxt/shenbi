@@ -47,6 +47,7 @@ import {
   validateGeneratedBlockNodeWithDiagnostics,
 } from '@shenbi/ai-agents';
 import type { AgentEvent, ChatRequest, ChatResponse } from '@shenbi/ai-contracts';
+import type { ClassifyRouteRequest, ClassifyRouteResponse } from '@shenbi/ai-contracts';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import { LLMError } from '../adapters/errors.ts';
 import {
@@ -1340,6 +1341,47 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
       for await (const chunk of client.streamChat(model, messages, request.thinking)) {
         yield { delta: chunk.text };
       }
+    },
+
+    async classifyRoute(request: ClassifyRouteRequest): Promise<ClassifyRouteResponse> {
+      const syntheticRunRequest = {
+        prompt: request.prompt,
+        ...(request.attachments ? { attachments: request.attachments } : {}),
+        ...(request.plannerModel ? { plannerModel: request.plannerModel } : {}),
+        ...(request.thinking ? { thinking: request.thinking } : {}),
+        context: {
+          schemaSummary: request.context.schemaSummary,
+          componentSummary: '',
+        },
+      };
+      const preparedRequest = await prepareRunRequest(syntheticRunRequest);
+      const classifyInput: ClassifyIntentInput = {
+        request: preparedRequest,
+        context: {
+          prompt: preparedRequest.prompt,
+          document: {
+            exists: request.context.schemaSummary !== 'pageId=empty; pageName=empty; nodeCount=0',
+            summary: request.context.schemaSummary,
+          },
+          componentSummary: '',
+          conversation: {
+            history: [],
+            turnCount: 0,
+          },
+          lastBlockIds: [],
+        },
+      };
+      const result: IntentClassification = await classifyIntentWithModel(classifyInput);
+      const preparedPrompt = preparedRequest.prompt !== request.prompt
+        ? preparedRequest.prompt
+        : undefined;
+
+      return {
+        scope: result.scope ?? 'single-page',
+        intent: result.intent,
+        confidence: result.confidence,
+        ...(preparedPrompt ? { preparedPrompt } : {}),
+      };
     },
 
     async finalize(request: FinalizeRequest) {

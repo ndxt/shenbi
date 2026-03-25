@@ -53,7 +53,7 @@ export function createApp(options: AppOptions = {}): Hono {
   app.route('/api/ai/run', createRunRoute(runtime));
   app.route('/api/ai/run/finalize', createFinalizeRoute(runtime));
   app.route('/api/ai/chat', createChatRoute(runtime));
-  app.route('/api/ai/classify-route', createClassifyRouteRoute());
+  app.route('/api/ai/classify-route', createClassifyRouteRoute(runtime));
   app.route('/api/ai/debug', createDebugRoute());
   app.route('/api/ai/models', createModelsRoute());
 

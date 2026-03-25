@@ -12,6 +12,8 @@ import type {
   AgentIntent,
   ChatRequest,
   ChatResponse,
+  ClassifyRouteRequest,
+  ClassifyRouteResponse,
   FinalizeRequest,
   FinalizeResult,
   RunMetadata,
@@ -26,6 +28,7 @@ export interface MastraAgentRuntime {
   runStream(request: RunRequest): AsyncIterable<AgentEvent>;
   chat(request: ChatRequest): Promise<ChatResponse>;
   chatStream(request: ChatRequest): AsyncIterable<{ delta: string }>;
+  classifyRoute(request: ClassifyRouteRequest): Promise<ClassifyRouteResponse>;
   finalize(request: FinalizeRequest): Promise<FinalizeResult>;
 }
 
@@ -131,6 +134,7 @@ async function classifyIntent(
   request: RunRequest,
   context: AgentRuntimeContext,
   deps: AgentRuntimeDeps,
+  options: { preferTool?: boolean } = {},
 ): Promise<IntentClassification> {
   if (request.intent) {
     return {
@@ -141,7 +145,7 @@ async function classifyIntent(
   }
 
   const ruleResult = classifyIntentByRules(context);
-  if (ruleResult.confidence >= 0.85) {
+  if (!options.preferTool && ruleResult.confidence >= 0.85) {
     return ruleResult;
   }
 
@@ -190,6 +194,19 @@ async function resolvePreparedContext(
     preparedRequest,
     conversationId,
     context,
+  };
+}
+
+function buildSyntheticRunRequest(request: ClassifyRouteRequest): RunRequest {
+  return {
+    prompt: request.prompt,
+    ...(request.attachments ? { attachments: request.attachments } : {}),
+    ...(request.plannerModel ? { plannerModel: request.plannerModel } : {}),
+    ...(request.thinking ? { thinking: request.thinking } : {}),
+    context: {
+      schemaSummary: request.context.schemaSummary,
+      componentSummary: '',
+    },
   };
 }
 
@@ -356,6 +373,28 @@ export function createMastraAgentRuntime(options: CreateMastraAgentRuntimeOption
     },
     chatStream(request: ChatRequest): AsyncIterable<{ delta: string }> {
       return options.legacyRuntime.chatStream(request);
+    },
+    async classifyRoute(request: ClassifyRouteRequest): Promise<ClassifyRouteResponse> {
+      const deps = options.createDeps();
+      const preparedRequest = await options.prepareRunRequest(buildSyntheticRunRequest(request));
+      const conversationId = preparedRequest.conversationId ?? `classify_${Date.now().toString(36)}`;
+      const { context } = await resolvePreparedContext({ ...preparedRequest, conversationId }, deps);
+      const resolvedIntent = await classifyIntent(
+        { ...preparedRequest, conversationId },
+        context,
+        deps,
+        { preferTool: true },
+      );
+      const preparedPrompt = preparedRequest.prompt !== request.prompt
+        ? preparedRequest.prompt
+        : undefined;
+
+      return {
+        scope: resolvedIntent.scope ?? 'single-page',
+        intent: resolvedIntent.intent,
+        confidence: resolvedIntent.confidence,
+        ...(preparedPrompt ? { preparedPrompt } : {}),
+      };
     },
     finalize(request: FinalizeRequest): Promise<FinalizeResult> {
       return options.legacyRuntime.finalize(request);
