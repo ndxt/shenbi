@@ -3,6 +3,7 @@ import path from 'node:path';
 
 export interface Env {
   PORT: number;
+  AI_RUNTIME: 'legacy' | 'mastra';
   AI_PROVIDER: string;
   AI_OPENAI_COMPAT_BASE_URL?: string | undefined;
   AI_OPENAI_COMPAT_API_KEY?: string | undefined;
@@ -266,6 +267,7 @@ export function loadEnv(): Env {
 
   return {
     PORT: parseInt(readEnvValue(loaded, ['PORT']) ?? '3100', 10),
+    AI_RUNTIME: readEnvValue(loaded, ['AI_RUNTIME']) === 'mastra' ? 'mastra' : 'legacy',
     AI_PROVIDER: provider,
     AI_OPENAI_COMPAT_BASE_URL: activeProviderConfig?.baseUrl,
     AI_OPENAI_COMPAT_API_KEY: activeProviderConfig?.apiKey,

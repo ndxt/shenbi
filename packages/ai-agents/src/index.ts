@@ -12,6 +12,7 @@ export * from './memory/conversation-memory';
 export * from './memory/page-memory';
 export * from './tools/registry';
 export * from './orchestrators/chat-orchestrator';
+export * from './orchestrators/block-quality';
 export * from './orchestrators/modify-orchestrator';
 export * from './orchestrators/page-builder-orchestrator';
 export * from './orchestrators/registry';

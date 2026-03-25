@@ -18,7 +18,7 @@ import { createModelsRoute } from './routes/models.ts';
 import { createClassifyRouteRoute } from './routes/classify-route.ts';
 import { createGitLabRoute } from './routes/gitlab.ts';
 import { loadEnv } from './adapters/env.ts';
-import { agentRuntime } from './runtime/agent-runtime.ts';
+import { configuredRuntime } from './runtime/runtime-switch.ts';
 import type { AgentRuntime } from './runtime/types.ts';
 
 export interface AppOptions {
@@ -31,7 +31,7 @@ export interface AppOptions {
 }
 
 export function createApp(options: AppOptions = {}): Hono {
-  const runtime = options.runtime ?? agentRuntime;
+  const runtime = options.runtime ?? configuredRuntime;
   const env = loadEnv();
 
   const app = new Hono();

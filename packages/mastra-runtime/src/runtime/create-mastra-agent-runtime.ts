@@ -1,0 +1,365 @@
+import {
+  buildRuntimeContext,
+  classifyIntentByRules,
+  type AgentMemoryAttachment,
+  type AgentRuntimeContext,
+  type AgentRuntimeDeps,
+  type IntentClassification,
+  type RunRequest,
+} from '@shenbi/ai-agents';
+import type {
+  AgentEvent,
+  AgentIntent,
+  ChatRequest,
+  ChatResponse,
+  FinalizeRequest,
+  FinalizeResult,
+  RunMetadata,
+} from '@shenbi/ai-contracts';
+import {
+  createPageCreateWorkflow,
+  createPageModifyWorkflow,
+} from './workflows';
+
+export interface MastraAgentRuntime {
+  run(request: RunRequest): Promise<{ events: AgentEvent[]; metadata: RunMetadata }>;
+  runStream(request: RunRequest): AsyncIterable<AgentEvent>;
+  chat(request: ChatRequest): Promise<ChatResponse>;
+  chatStream(request: ChatRequest): AsyncIterable<{ delta: string }>;
+  finalize(request: FinalizeRequest): Promise<FinalizeResult>;
+}
+
+export interface CreateMastraAgentRuntimeOptions {
+  legacyRuntime: MastraAgentRuntime;
+  createDeps: () => AgentRuntimeDeps;
+  prepareRunRequest: (request: RunRequest) => Promise<RunRequest>;
+}
+
+class AsyncEventQueue<T> implements AsyncIterable<T> {
+  private readonly items: T[] = [];
+  private readonly waiters: Array<(result: IteratorResult<T>) => void> = [];
+  private closed = false;
+  private error: unknown;
+
+  push(item: T): void {
+    if (this.closed) {
+      return;
+    }
+    const waiter = this.waiters.shift();
+    if (waiter) {
+      waiter({ value: item, done: false });
+      return;
+    }
+    this.items.push(item);
+  }
+
+  close(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    while (this.waiters.length > 0) {
+      const waiter = this.waiters.shift();
+      waiter?.({ value: undefined as T, done: true });
+    }
+  }
+
+  fail(error: unknown): void {
+    this.error = error;
+    this.close();
+  }
+
+  async next(): Promise<IteratorResult<T>> {
+    if (this.items.length > 0) {
+      return { value: this.items.shift() as T, done: false };
+    }
+    if (this.error) {
+      throw this.error;
+    }
+    if (this.closed) {
+      return { value: undefined as T, done: true };
+    }
+    return new Promise<IteratorResult<T>>((resolve) => {
+      this.waiters.push(resolve);
+    });
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<T> {
+    return {
+      next: () => this.next(),
+    };
+  }
+}
+
+function createSessionId(): string {
+  return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getOriginalPrompt(request: RunRequest): string {
+  const originalPrompt = (request as RunRequest & { _originalPrompt?: unknown })._originalPrompt;
+  return typeof originalPrompt === 'string' ? originalPrompt : request.prompt;
+}
+
+function getMemoryAttachments(request: RunRequest): AgentMemoryAttachment[] | undefined {
+  const internalAttachments = (request as RunRequest & { _memoryAttachments?: unknown })._memoryAttachments;
+  if (Array.isArray(internalAttachments)) {
+    return internalAttachments as AgentMemoryAttachment[];
+  }
+  if (!request.attachments || request.attachments.length === 0) {
+    return undefined;
+  }
+  return request.attachments.map((attachment) => ({
+    id: attachment.id,
+    kind: attachment.kind,
+    name: attachment.name,
+    mimeType: attachment.mimeType,
+    sizeBytes: attachment.sizeBytes,
+  }));
+}
+
+function extractMetadata(events: AgentEvent[]): RunMetadata {
+  const doneEvent = [...events]
+    .reverse()
+    .find((event): event is Extract<AgentEvent, { type: 'done' }> => event.type === 'done');
+  if (!doneEvent) {
+    throw new Error('Mastra runtime completed without done metadata');
+  }
+  return doneEvent.data.metadata;
+}
+
+async function classifyIntent(
+  request: RunRequest,
+  context: AgentRuntimeContext,
+  deps: AgentRuntimeDeps,
+): Promise<IntentClassification> {
+  if (request.intent) {
+    return {
+      intent: request.intent,
+      confidence: 1,
+      scope: request.intent === 'schema.create' ? 'single-page' : 'single-page',
+    };
+  }
+
+  const ruleResult = classifyIntentByRules(context);
+  if (ruleResult.confidence >= 0.85) {
+    return ruleResult;
+  }
+
+  const classifyIntentTool = deps.tools.get('classifyIntent');
+  if (!classifyIntentTool) {
+    return ruleResult;
+  }
+
+  try {
+    const result = await classifyIntentTool.execute({ request, context });
+    if (
+      result
+      && typeof result === 'object'
+      && 'intent' in result
+      && 'confidence' in result
+      && (result.intent === 'schema.create' || result.intent === 'schema.modify' || result.intent === 'chat')
+      && Number.isFinite(result.confidence)
+    ) {
+      return result as IntentClassification;
+    }
+  } catch {
+    // Fall through to the rule-based result.
+  }
+
+  return ruleResult;
+}
+
+async function resolvePreparedContext(
+  preparedRequest: RunRequest & { conversationId: string },
+  deps: AgentRuntimeDeps,
+) {
+  const conversationId = preparedRequest.conversationId;
+  const [conversation, lastRunMetadata, lastBlockIds] = await Promise.all([
+    deps.memory.getConversation(conversationId),
+    deps.memory.getLastRunMetadata(conversationId),
+    deps.memory.getLastBlockIds(conversationId),
+  ]);
+  const context = buildRuntimeContext({
+    request: preparedRequest,
+    conversation,
+    ...(lastRunMetadata ? { lastRunMetadata } : {}),
+    lastBlockIds,
+  });
+
+  return {
+    preparedRequest,
+    conversationId,
+    context,
+  };
+}
+
+function isPageIntent(intent: AgentIntent): intent is 'schema.create' | 'schema.modify' {
+  return intent === 'schema.create' || intent === 'schema.modify';
+}
+
+async function* runMastraPageStream(
+  request: RunRequest,
+  options: CreateMastraAgentRuntimeOptions,
+): AsyncGenerator<AgentEvent> {
+  const deps = options.createDeps();
+  const preparedRequest = await options.prepareRunRequest(request);
+  const sessionId = createSessionId();
+  const conversationId = preparedRequest.conversationId ?? sessionId;
+  const { context } = await resolvePreparedContext(
+    { ...preparedRequest, conversationId },
+    deps,
+  );
+
+  const resolvedIntent = await classifyIntent(
+    { ...preparedRequest, conversationId },
+    context,
+    deps,
+  );
+
+  if (!isPageIntent(resolvedIntent.intent)) {
+    yield* options.legacyRuntime.runStream(request);
+    return;
+  }
+
+  const metadata: RunMetadata = {
+    sessionId,
+    conversationId,
+    ...(preparedRequest.plannerModel ? { plannerModel: preparedRequest.plannerModel } : {}),
+    ...(preparedRequest.blockModel ? { blockModel: preparedRequest.blockModel } : {}),
+  };
+  const startedAt = Date.now();
+  const events: AgentEvent[] = [];
+  const queue = new AsyncEventQueue<AgentEvent>();
+  const emit = (event: AgentEvent) => {
+    queue.push(event);
+  };
+
+  try {
+    const memoryAttachments = getMemoryAttachments(preparedRequest);
+    await deps.memory.appendConversationMessage(conversationId, {
+      role: 'user',
+      text: getOriginalPrompt(request),
+      ...(memoryAttachments ? { attachments: memoryAttachments } : {}),
+    });
+
+    const startEvent: AgentEvent = { type: 'run:start', data: { sessionId, conversationId } };
+    events.push(startEvent);
+    yield startEvent;
+
+    const intentEvent: AgentEvent = {
+      type: 'intent',
+      data: {
+        intent: resolvedIntent.intent,
+        confidence: resolvedIntent.confidence,
+        ...(resolvedIntent.scope ? { scope: resolvedIntent.scope } : {}),
+      },
+    };
+    events.push(intentEvent);
+    yield intentEvent;
+
+    const workflowInput = {
+      request: { ...preparedRequest, conversationId },
+      context,
+      metadata,
+    };
+
+    const workflow = resolvedIntent.intent === 'schema.create'
+      ? createPageCreateWorkflow(deps, emit)
+      : createPageModifyWorkflow(deps, emit);
+    const workflowRun = await workflow.createRun();
+    const workflowPromise = (async () => {
+      try {
+        const result = await workflowRun.start({ inputData: workflowInput });
+        queue.close();
+        return result;
+      } catch (error) {
+        queue.fail(error);
+        throw error;
+      }
+    })();
+
+    for await (const event of queue) {
+      events.push(event);
+      yield event;
+    }
+
+    const workflowResult = await workflowPromise;
+
+    if (workflowResult.status !== 'success') {
+      throw ('error' in workflowResult && workflowResult.error)
+        ? workflowResult.error
+        : new Error(`Mastra workflow failed with status ${workflowResult.status}`);
+    }
+
+    metadata.durationMs = Date.now() - startedAt;
+    const totalTokensUsed = events
+      .filter((event): event is Extract<AgentEvent, { type: 'schema:block' }> => event.type === 'schema:block')
+      .reduce((sum, event) => sum + (event.data.tokensUsed ?? 0), 0);
+    if (totalTokensUsed > 0) {
+      metadata.tokensUsed = totalTokensUsed;
+    }
+
+    const assistantText = events
+      .filter((event): event is Extract<AgentEvent, { type: 'message:delta' }> => event.type === 'message:delta')
+      .map((event) => event.data.text)
+      .join('');
+    const operations = events
+      .filter((event): event is Extract<AgentEvent, { type: 'modify:op' }> => event.type === 'modify:op')
+      .map((event) => event.data.operation);
+    const finalSchemaBlocks = events
+      .filter((event): event is Extract<AgentEvent, { type: 'schema:block' }> => event.type === 'schema:block')
+      .map((event) => event.data.blockId);
+
+    await Promise.all([
+      deps.memory.appendConversationMessage(conversationId, {
+        role: 'assistant',
+        text: assistantText,
+        meta: {
+          sessionId,
+          intent: resolvedIntent.intent,
+          ...(operations.length > 0 ? { operations } : {}),
+        },
+      }),
+      deps.memory.setLastRunMetadata(conversationId, metadata),
+      deps.memory.setLastBlockIds(conversationId, finalSchemaBlocks),
+    ]);
+
+    const doneEvent: AgentEvent = { type: 'done', data: { metadata } };
+    yield doneEvent;
+  } catch (error) {
+    yield {
+      type: 'error',
+      data: {
+        message: error instanceof Error ? error.message : 'Mastra runtime failed',
+      },
+    };
+  }
+}
+
+export function createMastraAgentRuntime(options: CreateMastraAgentRuntimeOptions): MastraAgentRuntime {
+  const runtime: MastraAgentRuntime = {
+    async run(request) {
+      const events: AgentEvent[] = [];
+      for await (const event of runtime.runStream(request)) {
+        events.push(event);
+      }
+      return {
+        events,
+        metadata: extractMetadata(events),
+      };
+    },
+    async *runStream(request) {
+      yield* runMastraPageStream(request, options);
+    },
+    chat(request: ChatRequest): Promise<ChatResponse> {
+      return options.legacyRuntime.chat(request);
+    },
+    chatStream(request: ChatRequest): AsyncIterable<{ delta: string }> {
+      return options.legacyRuntime.chatStream(request);
+    },
+    finalize(request: FinalizeRequest): Promise<FinalizeResult> {
+      return options.legacyRuntime.finalize(request);
+    },
+  };
+  return runtime;
+}
