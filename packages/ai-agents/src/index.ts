@@ -16,6 +16,7 @@ export * from './orchestrators/block-quality';
 export * from './orchestrators/modify-node-generation';
 export * from './orchestrators/modify-plan-prompt';
 export * from './orchestrators/modify-planning';
+export * from './orchestrators/page-block-prompt';
 export * from './orchestrators/page-schema';
 export * from './orchestrators/page-planner-prompt';
 export * from './orchestrators/modify-orchestrator';
