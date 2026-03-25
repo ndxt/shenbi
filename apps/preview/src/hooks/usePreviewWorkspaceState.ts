@@ -2,6 +2,7 @@ import * as antd from 'antd';
 import {
   useWorkspaceHost,
   type UseWorkspaceHostOptions,
+  type WorkspaceHostDialogs,
 } from '@shenbi/editor-ui';
 import type { PreviewWorkspaceState } from '../preview-types';
 import { createEmptyShellSchema } from '../editor/previewSchemaUtils';
@@ -12,11 +13,13 @@ type UsePreviewWorkspaceStateOptions = Omit<
 > & {
   previewT: (...args: any[]) => string;
   filesT: (...args: any[]) => string;
+  dialogs?: WorkspaceHostDialogs;
 };
 
 export function usePreviewWorkspaceState({
   previewT,
   filesT,
+  dialogs,
   ...options
 }: UsePreviewWorkspaceStateOptions): PreviewWorkspaceState {
   return useWorkspaceHost({
@@ -36,20 +39,7 @@ export function usePreviewWorkspaceState({
       statusAutoSaved: filesT('status.autoSaved'),
       statusSavedShort: filesT('status.savedShort'),
     },
-    dialogs: {
-      promptFileName: (defaultName) => {
-        if (typeof window === 'undefined') {
-          return null;
-        }
-        return window.prompt(previewT('prompt.enterFileName'), defaultName);
-      },
-      confirmClose: (message) => {
-        if (typeof window === 'undefined') {
-          return true;
-        }
-        return window.confirm(message);
-      },
-    },
+    ...(dialogs ? { dialogs } : {}),
     notifications: {
       warning: (message) => antd.message.warning(message),
       error: (message) => antd.message.error(message),

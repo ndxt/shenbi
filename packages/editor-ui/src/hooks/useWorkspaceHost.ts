@@ -47,8 +47,8 @@ export interface WorkspaceHostMessages {
 }
 
 export interface WorkspaceHostDialogs {
-  promptFileName?: (defaultName: string) => string | null;
-  confirmClose?: (message: string) => boolean;
+  promptFileName?: (defaultName: string) => string | null | Promise<string | null>;
+  confirmClose?: (message: string) => boolean | Promise<boolean>;
 }
 
 export interface WorkspaceHostNotifications {
@@ -255,8 +255,8 @@ export function useWorkspaceHost({
     return unsubscribe;
   }, [fileEditor.eventBus]);
 
-  const promptFileName = useCallback((defaultName: string) => {
-    return dialogs?.promptFileName?.(defaultName) ?? null;
+  const promptFileName = useCallback(async (defaultName: string) => {
+    return await dialogs?.promptFileName?.(defaultName) ?? null;
   }, [dialogs]);
 
   const {
@@ -407,11 +407,14 @@ export function useWorkspaceHost({
     void fileEditor.commands.execute('tab.activate', { fileId });
   }, [fileEditor.commands]);
 
-  const handleCloseTab = useCallback((fileId: string) => {
+  const handleCloseTab = useCallback(async (fileId: string) => {
     const isActive = tabManager.getActiveTabId() === fileId;
-    const isDirtyCheck = isActive ? shellSnapshot.isDirty : tabManager.getTab(fileId)?.isDirty;
-    if (isDirtyCheck && dialogs?.confirmClose && !dialogs.confirmClose(messages.promptConfirmClose)) {
-      return;
+    const tabDirty = tabManager.getTab(fileId)?.isDirty;
+    const isDirtyCheck = isActive ? (shellSnapshot.isDirty || tabDirty) : tabDirty;
+    console.log('[handleCloseTab]', { fileId, isActive, shellDirty: shellSnapshot.isDirty, tabDirty, isDirtyCheck, hasDialogs: !!dialogs, hasConfirmClose: !!dialogs?.confirmClose });
+    if (isDirtyCheck && dialogs?.confirmClose) {
+      const confirmed = await dialogs.confirmClose(messages.promptConfirmClose);
+      if (!confirmed) return;
     }
     void fileEditor.commands.execute('tab.close', { fileId });
   }, [dialogs, fileEditor.commands, messages.promptConfirmClose, shellSnapshot.isDirty, tabManager]);

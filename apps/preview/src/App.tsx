@@ -13,6 +13,7 @@ import {
   LocalWorkspacePersistenceAdapter,
   isCommandBlockedDuringGeneration,
   useHostCommandPolicy,
+  useDialog,
   useEditorHostBridge,
   useEditorSession,
   usePluginContext,
@@ -60,6 +61,7 @@ export function App() {
   const [rendererUndoRedoStateByFile, setRendererUndoRedoStateByFile] = useState<Record<string, { canUndo: boolean; canRedo: boolean }>>({});
   const activeRendererDispatchRef = useRef<{ save: () => void; undo: () => void; redo: () => void } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { confirm: dialogConfirm, prompt: dialogPrompt, DialogPortal } = useDialog();
 
   const persistenceAdapter = useMemo(() => new LocalWorkspacePersistenceAdapter(), []);
   const workspacePersistence = useMemo(
@@ -215,6 +217,10 @@ export function App() {
     tabManager,
     vfs,
     activeDocument,
+    dialogs: {
+      confirmClose: (message: string) => dialogConfirm(message),
+      promptFileName: (defaultName: string) => dialogPrompt(previewT('prompt.enterFileName'), defaultName),
+    },
   });
 
   usePreviewPersistence({
@@ -284,12 +290,9 @@ export function App() {
     warning: (message: string) => antd.message.warning(message),
     error: (message: string) => antd.message.error(message),
   }), []);
-  const promptFileName = useCallback((defaultName: string) => {
-    if (typeof window === 'undefined') {
-      return null;
-    }
-    return window.prompt(previewT('prompt.enterFileName'), defaultName);
-  }, [previewT]);
+  const promptFileName = useCallback(async (defaultName: string) => {
+    return await dialogPrompt(previewT('prompt.enterFileName'), defaultName);
+  }, [dialogPrompt, previewT]);
   const { executePluginCommand: executeHostPluginCommand } = useEditorHostBridge({
     mode: appMode,
     shellCommands: fileEditor.commands,
@@ -382,6 +385,7 @@ export function App() {
   });
 
   return (
+    <>
     <AppShell
       workspaceId={PREVIEW_WORKSPACE_ID}
       persistenceAdapter={persistenceAdapter}
@@ -497,5 +501,8 @@ export function App() {
         onDeleteProject={projectState.handleDeleteProject}
       />
     </AppShell>
+
+    {DialogPortal}
+    </>
   );
 }

@@ -29,7 +29,7 @@ export interface UseFileWorkspaceOptions {
   snapshot: FileWorkspaceSnapshot;
   commands: FileCommandExecutor;
   onError?: (message: string) => void;
-  promptFileName?: (defaultName: string) => string | null;
+  promptFileName?: (defaultName: string) => string | null | Promise<string | null>;
   documentState?: {
     isDirty: boolean;
     canUndo: boolean;
@@ -166,9 +166,9 @@ export function useFileWorkspace(options: UseFileWorkspaceOptions): UseFileWorks
       });
   }, [reportError]);
 
-  const requestSaveAs = useCallback(() => {
+  const requestSaveAs = useCallback(async () => {
     const defaultName = snapshotRef.current.schemaName?.trim() || 'new-page';
-    const nextName = promptFileNameRef.current?.(defaultName) ?? null;
+    const nextName = await promptFileNameRef.current?.(defaultName) ?? null;
     if (!nextName || !nextName.trim()) {
       return;
     }

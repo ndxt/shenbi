@@ -35,6 +35,7 @@ export * from './hooks/useWorkspacePersistence';
 export * from './hooks/useCanvasZoom';
 export * from './hooks/useCanvasPan';
 export * from './hooks/useCanvasDragDrop';
+export * from './hooks/use-dialog';
 export * from './canvas/types';
 export * from './canvas/constants';
 export * from './canvas/page-minimap-model';

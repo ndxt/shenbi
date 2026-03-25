@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useDialog } from '@shenbi/editor-ui';
 import {
   ChevronRight,
   ChevronDown,
@@ -23,86 +23,6 @@ import type { FSTreeNode, FileType } from '@shenbi/editor-core';
 import { useTranslation } from '@shenbi/i18n';
 import './i18n';
 
-// ─── Inline Dialog Hook ───────────────────────────────────────────────────────
-
-interface _DialogState {
-  open: boolean;
-  message: string;
-  resolve: ((ok: boolean) => void) | null;
-}
-
-function useDialog() {
-  const [dlg, setDlg] = useState<_DialogState>({ open: false, message: '', resolve: null });
-  const resolveRef = useRef<((ok: boolean) => void) | null>(null);
-
-  const confirm = useCallback((message: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-      resolveRef.current = resolve;
-      setDlg({ open: true, message, resolve });
-    });
-  }, []);
-
-  const handleOk = useCallback(() => {
-    resolveRef.current?.(true);
-    resolveRef.current = null;
-    setDlg({ open: false, message: '', resolve: null });
-  }, []);
-
-  const handleCancel = useCallback(() => {
-    resolveRef.current?.(false);
-    resolveRef.current = null;
-    setDlg({ open: false, message: '', resolve: null });
-  }, []);
-
-  const DialogPortal = dlg.open
-    ? createPortal(
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onMouseDown={(e) => { if (e.target === e.currentTarget) handleCancel(); }}
-        >
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }} />
-          <div
-            style={{ position: 'relative', zIndex: 10, width: 340, borderRadius: 8, border: '1px solid var(--color-border-ide)', background: 'var(--color-bg-panel)', boxShadow: '0 8px 32px rgba(0,0,0,0.6)', overflow: 'hidden' }}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleOk(); else if (e.key === 'Escape') handleCancel(); }}
-          >
-            <div style={{ padding: '20px 24px 16px' }}>
-              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>{dlg.message}</p>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 24px', background: 'var(--color-bg-activity-bar)' }}>
-              <DialogButton label="取消" onClick={handleCancel} />
-              <DialogButton label="确认" onClick={handleOk} primary autoFocus />
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )
-    : null;
-
-  return { confirm, DialogPortal };
-}
-
-// Dialog button with inline hover
-function DialogButton({ label, onClick, primary, autoFocus }: { label: string; onClick: () => void; primary?: boolean; autoFocus?: boolean }) {
-  const [hover, setHover] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      autoFocus={autoFocus}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        height: 28, borderRadius: 4, padding: '0 16px', fontSize: 13, border: 'none', cursor: 'pointer',
-        transition: 'background 0.15s, color 0.15s',
-        ...(primary
-          ? { background: hover ? 'var(--color-primary-hover)' : 'var(--color-primary)', color: 'var(--color-text-inverse)' }
-          : { background: hover ? 'var(--color-hover-bg)' : 'transparent', color: hover ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }),
-      }}
-    >
-      {label}
-    </button>
-  );
-}
 
 export interface FileExplorerProps {
   tree: FSTreeNode[];

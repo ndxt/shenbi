@@ -14,7 +14,7 @@ export interface UseEditorHostBridgeOptions {
   scenarioCommands: (commandId: string, payload?: unknown) => Promise<unknown>;
   activeFileId: string | undefined;
   schemaName: string | undefined;
-  promptFileName?: (defaultName: string) => string | null;
+  promptFileName?: (defaultName: string) => string | null | Promise<string | null>;
 }
 
 export interface UseEditorHostBridgeResult {
@@ -30,23 +30,23 @@ export function useEditorHostBridge(options: UseEditorHostBridgeOptions): UseEdi
     return options.scenarioCommands(commandId, payload);
   }, [options.mode, options.scenarioCommands, options.shellCommands]);
 
-  const executePluginCommand = useCallback((commandId: string, payload?: unknown) => {
+  const executePluginCommand = useCallback(async (commandId: string, payload?: unknown) => {
     const defaultName = options.schemaName?.trim() || 'new-page';
 
     if (commandId === 'file.saveAs') {
       const explicitName = isRecord(payload) && typeof payload.name === 'string' && payload.name.trim().length > 0
         ? payload.name.trim()
-        : options.promptFileName?.(defaultName);
+        : await options.promptFileName?.(defaultName);
       if (!explicitName) {
-        return Promise.resolve(undefined);
+        return undefined;
       }
       return executeBaseCommand(commandId, { name: explicitName });
     }
 
     if (commandId === 'file.saveSchema' && !options.activeFileId && (!isRecord(payload) || payload.fileId === undefined)) {
-      const explicitName = options.promptFileName?.(defaultName);
+      const explicitName = await options.promptFileName?.(defaultName);
       if (!explicitName) {
-        return Promise.resolve(undefined);
+        return undefined;
       }
       return executeBaseCommand('file.saveAs', { name: explicitName });
     }

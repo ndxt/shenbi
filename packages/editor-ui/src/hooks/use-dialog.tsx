@@ -1,5 +1,6 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { AlertTriangle, X } from 'lucide-react';
 
 interface DialogState {
   open: boolean;
@@ -29,66 +30,140 @@ function InlineDialog({
   inputValue: string;
   setInputValue: (v: string) => void;
 }) {
+  // Focus logic
+  useEffect(() => {
+    if (state.open && state.type === 'confirm') {
+      const btn = document.getElementById('dialog-confirm-btn');
+      btn?.focus();
+    }
+  }, [state.open, state.type]);
+
   if (!state.open) return null;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      onConfirm();
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Escape') {
       onCancel();
     }
   };
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
+      {/* Backdrop - extremely faint, mostly relying on shadow to separate */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" />
 
-      {/* Dialog */}
+      {/* Dialog Box - Matches VS Code / Cursor width and shadow */}
       <div
-        className="relative z-10 w-[320px] rounded-lg border border-[var(--border-ide)] bg-[var(--bg-panel)] shadow-2xl"
+        className="relative z-10 w-full max-w-[440px] rounded outline-none"
+        style={{
+          background: 'var(--color-bg-panel)',
+          border: '1px solid var(--color-border-ide)',
+          boxShadow: '0 12px 48px rgba(0,0,0,0.6)',
+        }}
+        tabIndex={-1}
         onKeyDown={handleKeyDown}
       >
-        {/* Message */}
-        <div className="px-4 pt-4 pb-3">
-          <p className="text-[13px] text-[var(--text-primary)] leading-relaxed">
-            {state.message}
-          </p>
-          {state.type === 'prompt' && (
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              className="mt-3 w-full rounded border border-[var(--border-ide)] bg-[var(--bg-activity-bar)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 focus:ring-1 focus:ring-primary/30 transition-colors"
-              autoFocus
-            />
-          )}
+        {/* Top right close button */}
+        <button
+          type="button"
+          onClick={onCancel}
+          className="absolute top-3 right-3 p-1 rounded transition-colors"
+          style={{ color: 'var(--color-text-secondary)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+            e.currentTarget.style.background = 'var(--color-hover-bg)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-secondary)';
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          <X size={16} />
+        </button>
+
+        {/* Content Area */}
+        <div className="flex px-6 pt-8 pb-4">
+          <div className="flex-shrink-0 mr-5 mt-1">
+            {state.type === 'confirm' ? (
+              <AlertTriangle size={52} strokeWidth={1.5} color="#cca700" />
+            ) : null}
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col justify-center pt-1">
+            <p 
+              className="leading-[1.5]" 
+              style={{ fontSize: 16, color: 'var(--color-text-primary)', wordBreak: 'break-word' }}
+            >
+              {state.message}
+            </p>
+            {state.type === 'prompt' && (
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                className="mt-4 w-full rounded outline-none transition-colors"
+                style={{
+                  border: '1px solid var(--color-border-ide)',
+                  background: 'var(--color-active-bg)',
+                  padding: '6px 12px',
+                  fontSize: 14,
+                  color: 'var(--color-text-primary)',
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--color-border-ide)'}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onConfirm();
+                  }
+                }}
+              />
+            )}
+          </div>
         </div>
 
-        {/* Divider */}
-        <div className="h-px bg-[var(--border-ide)]" />
-
-        {/* Actions */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3">
+        {/* Actions Area - No horizontal divider */}
+        <div className="flex items-center justify-end gap-3 px-6 pt-6 pb-6">
           <button
             type="button"
             onClick={onCancel}
-            className="h-6 rounded px-3 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-hover-bg transition-colors"
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-hover-bg)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-active-bg)'}
+            className="rounded px-5 transition-colors"
+            style={{
+              height: 32,
+              fontSize: 13,
+              fontWeight: 500,
+              color: 'var(--color-text-primary)',
+              background: 'var(--color-active-bg)',
+              border: '1px solid var(--color-border-ide)',
+              cursor: 'pointer',
+            }}
           >
             取消
           </button>
+          
           <button
+            id="dialog-confirm-btn"
             type="button"
             onClick={onConfirm}
-            className="h-6 rounded bg-primary px-3 text-[12px] text-white hover:bg-primary transition-colors"
-            autoFocus={state.type === 'confirm'}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-primary-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--color-primary)'}
+            className="rounded px-5 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1"
+            style={{
+              height: 32,
+              fontSize: 13,
+              fontWeight: 500,
+              color: 'var(--color-text-inverse)',
+              background: 'var(--color-primary)',
+              border: 'none',
+              cursor: 'pointer',
+            }}
           >
             确认
           </button>
