@@ -4,6 +4,7 @@ import {
   compareRegressionReports,
   evaluateCreateEventSequence,
   evaluateModifyEventSequence,
+  representativePageFixtures,
   representativeSchemaCases,
   runOfflineSchemaRegression,
 } from './offline-regression.ts';
@@ -55,10 +56,26 @@ describe('offline regression harness', () => {
   });
 
   it('keeps a representative regression corpus for phase-1 coverage', () => {
-    expect(representativeSchemaCases.length).toBeGreaterThanOrEqual(8);
+    expect(representativeSchemaCases.length).toBeGreaterThanOrEqual(12);
     expect(representativeSchemaCases.some((item) => item.sourceId === 'llm-gen:button-001')).toBe(true);
     expect(representativeSchemaCases.some((item) => item.sourceId === 'llm-gen:table-001')).toBe(true);
     expect(representativeSchemaCases.some((item) => item.sourceId === 'llm-gen:action-setstate-001')).toBe(true);
+    expect(representativeSchemaCases.some((item) => item.id === 'rep-page-list-001')).toBe(true);
+    expect(representativeSchemaCases.some((item) => item.id === 'rep-page-form-001')).toBe(true);
+    expect(representativeSchemaCases.some((item) => item.id === 'rep-page-dashboard-001')).toBe(true);
+    expect(representativeSchemaCases.some((item) => item.id === 'rep-page-detail-001')).toBe(true);
+  });
+
+  it('validates built-in representative page fixtures for list/form/dashboard/detail coverage', async () => {
+    const pageCases = representativeSchemaCases.filter((item) => item.scenario && item.scenario !== 'atomic');
+    const report = await runOfflineSchemaRegression(representativePageFixtures, pageCases);
+
+    expect(report.summary).toEqual({
+      total: 4,
+      passed: 4,
+      failed: 0,
+      passRate: 100,
+    });
   });
 
   it('validates create and modify event sequences for offline regression', () => {
