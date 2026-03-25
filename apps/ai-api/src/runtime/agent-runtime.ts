@@ -6,6 +6,13 @@ import {
   assessBlockQuality,
   assembleSchema,
   buildPageBlockPromptSpec,
+  expandComponents,
+  getDesignPolicySummary,
+  getFreeLayoutPatternSummary,
+  getFullComponentContracts,
+  getPageSkeleton,
+  getPageSkeletonSummary,
+  getPlannerContractSummary,
   buildSkeletonSchema,
   buildPagePlannerPromptSpec,
   createInMemoryAgentMemoryStore,
@@ -68,15 +75,6 @@ import {
   classifyIntentWithModel,
   type ClassifyIntentTraceEntry,
 } from './classify-intent.ts';
-import {
-  getDesignPolicySummary,
-  getFreeLayoutPatternSummary,
-  getPageSkeleton,
-  getPageSkeletonSummary,
-  getPlannerContractSummary,
-  expandComponents,
-  getFullComponentContracts,
-} from './component-catalog.ts';
 import { executeModifySchema, planModify, executeComplexOp as executeComplexOpFn, type ModifySchemaTraceEntry } from './modify-schema.ts';
 import type { AgentRuntime } from './types.ts';
 

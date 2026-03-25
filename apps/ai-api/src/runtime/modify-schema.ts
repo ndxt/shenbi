@@ -4,6 +4,7 @@ import {
   buildFocusedNodeContext,
   createModifyResult,
   formatConversationHistory,
+  getComponentSchemaContracts,
   mergePlannedOperations,
   needsPhase2,
   splitPlannedOperations,
@@ -23,7 +24,6 @@ import {
   writeInvalidJsonDump,
   type InvalidJsonSource,
 } from '../adapters/debug-dump.ts';
-import { getComponentSchemaContracts } from './component-catalog.ts';
 import { loadEnv } from '../adapters/env.ts';
 import { logger } from '../adapters/logger.ts';
 import {

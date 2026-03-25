@@ -1,9 +1,9 @@
+import { supportedComponents, supportedComponentList, supportedComponentSet } from '@shenbi/ai-agents';
 import type { ColumnSchema, PropValue, SchemaNode } from '@shenbi/schema';
 import type { ComponentContract, ContractProp } from '../../../../packages/schema/types/contract.ts';
 import * as schemaContractsModule from '../../../../packages/schema/contracts/index.ts';
-import { supportedComponents, supportedComponentList, supportedComponentSet } from './component-catalog.ts';
 
-export { supportedComponents, supportedComponentList, supportedComponentSet } from './component-catalog.ts';
+export { supportedComponents, supportedComponentList, supportedComponentSet } from '@shenbi/ai-agents';
 
 const htmlComponentMapping: Record<string, string> = {
   div: 'Container',
