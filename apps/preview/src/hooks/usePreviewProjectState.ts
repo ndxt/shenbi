@@ -21,8 +21,8 @@ interface UsePreviewProjectStateOptions {
 export function usePreviewProjectState({
   gitlabService,
 }: UsePreviewProjectStateOptions): PreviewProjectState {
-  const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig>(
-    () => loadActiveProject() ?? createLocalProjectConfig(),
+  const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig | null>(
+    () => loadActiveProject() ?? null,
   );
   const [lastGitLabProjectConfig, setLastGitLabProjectConfig] = useState<ActiveProjectConfig | null>(
     () => loadLastGitLabProject(),
@@ -30,7 +30,8 @@ export function usePreviewProjectState({
   const [gitlabUser, setGitlabUser] = useState<{ username: string; avatarUrl: string } | null>(null);
   const [gitlabBranches, setGitlabBranches] = useState<string[]>([]);
   const pendingMigrationRef = useRef<{ sourceProjectId: string; targetProjectId: string } | null>(null);
-  const activeProjectId = activeProjectConfig.vfsProjectId;
+  const activeProjectId = activeProjectConfig?.vfsProjectId ?? null;
+  const isFirstLaunch = activeProjectConfig === null;
 
   useEffect(() => {
     gitlabService.getAuthStatus()
@@ -46,7 +47,7 @@ export function usePreviewProjectState({
   }, [gitlabService]);
 
   useEffect(() => {
-    if (!activeProjectConfig.gitlabProjectId) {
+    if (!activeProjectConfig?.gitlabProjectId) {
       setGitlabBranches([]);
       return;
     }
@@ -54,9 +55,10 @@ export function usePreviewProjectState({
     gitlabService.listBranches(activeProjectConfig.gitlabProjectId)
       .then(setGitlabBranches)
       .catch(() => setGitlabBranches([]));
-  }, [activeProjectConfig.gitlabProjectId, gitlabService]);
+  }, [activeProjectConfig?.gitlabProjectId, gitlabService]);
 
   const handleBranchChange = useCallback((branch: string) => {
+    if (!activeProjectConfig) return;
     const updated = { ...activeProjectConfig, branch };
     saveActiveProject(updated);
     setActiveProjectConfig(updated);
@@ -84,7 +86,7 @@ export function usePreviewProjectState({
   const handleSelectGitLabProject = useCallback((project: PreviewGitLabProject) => {
     const nextConfig = gitlabService.selectProjectMetadata(project);
     const nextProjectId = nextConfig.vfsProjectId;
-    if (activeProjectId !== nextProjectId) {
+    if (activeProjectId !== null && activeProjectId !== nextProjectId) {
       pendingMigrationRef.current = {
         sourceProjectId: activeProjectId,
         targetProjectId: nextProjectId,
@@ -103,6 +105,7 @@ export function usePreviewProjectState({
   }, []);
 
   const handleUnbindProject = useCallback(() => {
+    if (!activeProjectConfig) return;
     const updated = {
       ...activeProjectConfig,
       gitlabProjectId: undefined,
@@ -128,6 +131,7 @@ export function usePreviewProjectState({
     activeProjectConfig,
     lastGitLabProjectConfig,
     activeProjectId,
+    isFirstLaunch,
     gitlabUser,
     gitlabBranches,
     consumePendingMigration,

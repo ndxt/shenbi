@@ -69,9 +69,10 @@ export interface PreviewServiceContainer {
 }
 
 export interface PreviewProjectState {
-  activeProjectConfig: ActiveProjectConfig;
+  activeProjectConfig: ActiveProjectConfig | null;
   lastGitLabProjectConfig: ActiveProjectConfig | null;
-  activeProjectId: string;
+  activeProjectId: string | null;
+  isFirstLaunch: boolean;
   gitlabUser: { username: string; avatarUrl: string } | null;
   gitlabBranches: string[];
   consumePendingMigration: () => { sourceProjectId: string; targetProjectId: string } | null;

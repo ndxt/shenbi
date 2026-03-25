@@ -19,16 +19,16 @@ export function createPreviewGitLabSyncAdapter({
 }: CreatePreviewGitLabSyncAdapterOptions): PreviewGitLabSyncAdapter {
   return {
     activeProjectId:
-      project.activeProjectConfig.gitlabProjectId
+      project.activeProjectConfig?.gitlabProjectId
       ?? project.lastGitLabProjectConfig?.gitlabProjectId,
     activeBranch:
-      project.activeProjectConfig.branch
+      project.activeProjectConfig?.branch
       ?? project.lastGitLabProjectConfig?.branch,
     onSelectProject: project.handleSelectGitLabProject,
-    onUnbindProject: project.activeProjectConfig.gitlabProjectId
+    onUnbindProject: project.activeProjectConfig?.gitlabProjectId
       ? project.handleUnbindProject
       : undefined,
-    projectName: project.activeProjectConfig.projectName,
+    projectName: project.activeProjectConfig?.projectName,
     async getLocalFiles() {
       const nodes = await vfs.listTree(activeProjectId);
       const files = new Map<string, string>();

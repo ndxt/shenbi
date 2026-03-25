@@ -40,6 +40,7 @@ import { usePreviewPersistence } from './hooks/usePreviewPersistence';
 import { usePreviewPlugins } from './hooks/usePreviewPlugins';
 import { usePreviewProjectState } from './hooks/usePreviewProjectState';
 import { usePreviewWorkspaceState } from './hooks/usePreviewWorkspaceState';
+import { WelcomeScreen } from './WelcomeScreen';
 import {
   type AppMode,
   DEFAULT_RENDER_MODE,
@@ -62,6 +63,13 @@ export function App() {
   const activeRendererDispatchRef = useRef<{ save: () => void; undo: () => void; redo: () => void } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { confirm: dialogConfirm, prompt: dialogPrompt, DialogPortal } = useDialog();
+
+  // Listen for Clone button event from WelcomeScreen
+  useEffect(() => {
+    const handleOpenProjectManager = () => setShowProjectManager(true);
+    window.addEventListener('shenbi:open-project-manager', handleOpenProjectManager);
+    return () => window.removeEventListener('shenbi:open-project-manager', handleOpenProjectManager);
+  }, []);
 
   const persistenceAdapter = useMemo(() => new LocalWorkspacePersistenceAdapter(), []);
   const workspacePersistence = useMemo(
@@ -117,7 +125,7 @@ export function App() {
       initialSchema: createEmptyShellSchema(),
       vfs,
       tabManager,
-      projectId: projectState.activeProjectId,
+      projectId: projectState.activeProjectId ?? '',
     }),
   });
   const documentTabSnapshot = useTabManager(tabManager);
@@ -207,7 +215,7 @@ export function App() {
 
   const workspaceState = usePreviewWorkspaceState({
     appMode,
-    activeProjectId: projectState.activeProjectId,
+    activeProjectId: projectState.activeProjectId ?? '',
     activeScenarioSnapshot,
     consumePendingMigration: projectState.consumePendingMigration,
     fileEditor,
@@ -225,7 +233,7 @@ export function App() {
 
   usePreviewPersistence({
     appMode,
-    activeProjectId: projectState.activeProjectId,
+    activeProjectId: projectState.activeProjectId ?? '',
     activeScenario,
     setActiveScenario,
     renderMode,
@@ -391,14 +399,14 @@ export function App() {
       persistenceAdapter={persistenceAdapter}
       renderMode={renderMode}
       canvasReadOnly={workspaceState.shellGenerationLock}
-      title={projectState.activeProjectConfig.projectName}
-      subtitle={projectState.activeProjectConfig.branch}
+      title={projectState.activeProjectConfig?.projectName ?? ''}
+      subtitle={projectState.activeProjectConfig?.branch}
       userAvatarUrl={projectState.gitlabUser?.avatarUrl}
       userName={projectState.gitlabUser?.username}
       branches={projectState.gitlabBranches.length > 0 ? projectState.gitlabBranches : undefined}
       onBranchChange={projectState.handleBranchChange}
       onLogout={projectState.gitlabUser ? projectState.handleLogout : undefined}
-      gitlabUrl={projectState.activeProjectConfig.gitlabUrl}
+      gitlabUrl={projectState.activeProjectConfig?.gitlabUrl}
       onOpenProjectManager={() => setShowProjectManager(true)}
       sidebarProps={{
         contracts: builtinContracts,
@@ -493,7 +501,7 @@ export function App() {
 
       <ProjectManagerDialog
         open={showProjectManager}
-        activeProjectId={projectState.activeProjectId}
+        activeProjectId={projectState.activeProjectId ?? ''}
         gitlabUser={projectState.gitlabUser}
         gitlabService={services.gitlab}
         onClose={() => setShowProjectManager(false)}
@@ -503,6 +511,13 @@ export function App() {
     </AppShell>
 
     {DialogPortal}
+    {projectState.isFirstLaunch && (
+      <WelcomeScreen
+        gitlabUser={projectState.gitlabUser}
+        gitlabService={services.gitlab}
+        onSelectProject={projectState.handleSelectProject}
+      />
+    )}
     </>
   );
 }
