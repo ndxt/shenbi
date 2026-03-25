@@ -1,6 +1,7 @@
 import { createInMemoryAgentMemoryStore } from '@shenbi/ai-agents';
 import { createMastraAgentRuntime } from '@shenbi/mastra-runtime';
 import { logger } from '../adapters/logger.ts';
+import { writeMemoryDump } from '../adapters/debug-dump.ts';
 import { loadEnv } from '../adapters/env.ts';
 import { createAgentRuntime, createLegacyRuntimeDeps } from './agent-runtime.ts';
 import { prepareRunRequest } from './request-attachments.ts';
@@ -25,6 +26,7 @@ export function createConfiguredRuntime(): AgentRuntime {
     legacyRuntime,
     createDeps: () => createLegacyRuntimeDeps(sharedMemory),
     prepareRunRequest,
+    writeMemoryDump,
   });
 }
 

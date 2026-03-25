@@ -34,8 +34,10 @@ import {
   runAgentStream,
   type AgentRuntimeDeps,
   type AssembleSchemaInput,
+  captureAgentMemorySnapshot,
   type GenerateBlockInput,
   type GenerateBlockResult,
+  finalizeAgentSessionMemory,
   type PagePlan,
   type PageType,
   type PlanPageInput,
@@ -1174,50 +1176,20 @@ function finalizeTrace(
   return debugFile;
 }
 
-function buildFailedAssistantText(existingText: string, error?: string): string {
-  const prefix = '[修改失败]';
-  const trimmed = existingText.trim();
-  if (trimmed.startsWith(prefix)) {
-    return trimmed;
-  }
-  const detail = error ? `${prefix} ${error}` : prefix;
-  return trimmed ? `${detail}\n${trimmed}` : detail;
-}
-
-function findAssistantMessageBySessionId(
-  conversation: AgentMemoryMessage[],
-  sessionId: string,
-): AgentMemoryMessage | undefined {
-  return [...conversation]
-    .reverse()
-    .find((message) => message.role === 'assistant' && message.meta?.sessionId === sessionId);
-}
-
 async function captureMemoryDebugSnapshot(
   memory: AgentMemoryStore,
   conversationId: string,
   sessionId?: string,
 ): Promise<MemoryDebugSnapshot> {
-  const [conversation, lastRunMetadata, lastBlockIds] = await Promise.all([
-    memory.getConversation(conversationId),
-    memory.getLastRunMetadata(conversationId),
-    memory.getLastBlockIds(conversationId),
-  ]);
-
+  const snapshot = await captureAgentMemorySnapshot(memory, conversationId, sessionId);
   return {
-    conversationId,
-    ...(sessionId ? { sessionId } : {}),
-    conversationSize: conversation.length,
-    ...(() => {
-      if (!sessionId) {
-        return {};
-      }
-      const assistantMessage = findAssistantMessageBySessionId(conversation, sessionId);
-      return assistantMessage ? { assistantMessage: cloneDebugValue(assistantMessage) } : {};
-    })(),
-    conversationTail: cloneDebugValue(conversation.slice(-6)),
-    ...(lastRunMetadata ? { lastRunMetadata: cloneDebugValue(lastRunMetadata) } : {}),
-    lastBlockIds: cloneDebugValue(lastBlockIds),
+    conversationId: snapshot.conversationId,
+    ...(snapshot.sessionId ? { sessionId: snapshot.sessionId } : {}),
+    conversationSize: snapshot.conversationSize,
+    ...(snapshot.assistantMessage ? { assistantMessage: snapshot.assistantMessage } : {}),
+    conversationTail: snapshot.conversationTail,
+    ...(snapshot.lastRunMetadata ? { lastRunMetadata: snapshot.lastRunMetadata } : {}),
+    lastBlockIds: snapshot.lastBlockIds,
   };
 }
 
@@ -1398,52 +1370,17 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
     },
 
     async finalize(request: FinalizeRequest) {
-      if (typeof memory.patchAssistantMessage !== 'function') {
+      const finalized = await finalizeAgentSessionMemory(memory, request);
+      if (!finalized) {
         return {};
       }
-
-      const before = await captureMemoryDebugSnapshot(
-        memory,
-        request.conversationId,
-        request.sessionId,
-      );
-      let outcome: 'patched' | 'skipped_missing_schema_digest' = 'patched';
-
-      if (request.success) {
-        if (!request.schemaDigest) {
-          outcome = 'skipped_missing_schema_digest';
-        } else {
-          await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
-            meta: {
-              schemaDigest: request.schemaDigest,
-            },
-          });
-        }
-      } else {
-        const nextText = buildFailedAssistantText(before.assistantMessage?.text ?? '', request.error);
-
-        await memory.patchAssistantMessage(request.conversationId, request.sessionId, {
-          text: nextText,
-          meta: {
-            failed: true,
-            ...(request.schemaDigest ? { schemaDigest: request.schemaDigest } : {}),
-          },
-          clearOperations: true,
-        });
-      }
-
-      const after = await captureMemoryDebugSnapshot(
-        memory,
-        request.conversationId,
-        request.sessionId,
-      );
       const debugFile = writeMemoryDump({
         category: 'finalize',
         memory: {
           request,
-          outcome,
-          before,
-          after,
+          outcome: finalized.outcome,
+          before: finalized.before,
+          after: finalized.after,
         },
       });
       logger.info('ai.runtime.memory_dump', {

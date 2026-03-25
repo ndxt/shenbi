@@ -51,6 +51,9 @@ describe('configuredRuntime', () => {
     vi.doMock('@shenbi/mastra-runtime', () => ({
       createMastraAgentRuntime,
     }));
+    vi.doMock('../adapters/debug-dump.ts', () => ({
+      writeMemoryDump: vi.fn(() => '.ai-debug/memory/test-finalize.json'),
+    }));
     vi.doMock('../adapters/env.ts', () => ({
       loadEnv: () => ({
         AI_RUNTIME: 'legacy',
@@ -89,6 +92,10 @@ describe('configuredRuntime', () => {
     vi.doMock('@shenbi/mastra-runtime', () => ({
       createMastraAgentRuntime,
     }));
+    const writeMemoryDump = vi.fn(() => '.ai-debug/memory/test-finalize.json');
+    vi.doMock('../adapters/debug-dump.ts', () => ({
+      writeMemoryDump,
+    }));
     vi.doMock('../adapters/env.ts', () => ({
       loadEnv: () => ({
         AI_RUNTIME: 'mastra',
@@ -107,10 +114,11 @@ describe('configuredRuntime', () => {
     expect(runtimeModule.configuredRuntime).toBe(mastraRuntime);
     expect(createMastraAgentRuntime).toHaveBeenCalledOnce();
     const options = createMastraAgentRuntime.mock.calls[0]?.[0] as (
-      | {
+        | {
           legacyRuntime: AgentRuntime;
           prepareRunRequest: typeof prepareRunRequest;
           createDeps: () => unknown;
+          writeMemoryDump: typeof writeMemoryDump;
         }
       | undefined
     );
@@ -121,6 +129,7 @@ describe('configuredRuntime', () => {
     expect(options.legacyRuntime).toBe(legacyRuntime);
     expect(options.prepareRunRequest).toBe(prepareRunRequest);
     expect(options.createDeps()).toBe(legacyDeps);
+    expect(options.writeMemoryDump).toBe(writeMemoryDump);
     expect(createLegacyRuntimeDeps).toHaveBeenCalledWith(sharedMemory);
   });
 });

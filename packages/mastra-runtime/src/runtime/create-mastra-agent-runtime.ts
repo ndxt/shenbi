@@ -1,5 +1,6 @@
 import {
   buildRuntimeContext,
+  finalizeAgentSessionMemory,
   classifyIntentByRules,
   type AgentMemoryAttachment,
   type AgentRuntimeContext,
@@ -36,6 +37,7 @@ export interface CreateMastraAgentRuntimeOptions {
   legacyRuntime: MastraAgentRuntime;
   createDeps: () => AgentRuntimeDeps;
   prepareRunRequest: (request: RunRequest) => Promise<RunRequest>;
+  writeMemoryDump?: (input: { category: 'finalize'; memory: unknown }) => string;
 }
 
 class AsyncEventQueue<T> implements AsyncIterable<T> {
@@ -214,6 +216,16 @@ function isPageIntent(intent: AgentIntent): intent is 'schema.create' | 'schema.
   return intent === 'schema.create' || intent === 'schema.modify';
 }
 
+function getRunContextTag(request: RunRequest): 'single-page' | 'multi-page-loop' {
+  return Array.isArray(request.context.workspaceFileIds) && request.context.workspaceFileIds.length > 0
+    ? 'multi-page-loop'
+    : 'single-page';
+}
+
+function isLegacyFallbackIntent(intent: AgentIntent): boolean {
+  return intent === 'chat';
+}
+
 function logInfo(
   deps: AgentRuntimeDeps,
   message: string,
@@ -298,12 +310,17 @@ async function* runMastraPageStream(
     resolvedIntent: resolvedIntent.intent,
     confidence: resolvedIntent.confidence,
     scope: resolvedIntent.scope ?? 'single-page',
+    runContext: getRunContextTag(preparedRequest),
   });
 
   if (!isPageIntent(resolvedIntent.intent)) {
     logInfo(deps, 'mastra.runtime.run_stream.fallback_legacy', {
       conversationId,
       resolvedIntent: resolvedIntent.intent,
+      fallbackReason: isLegacyFallbackIntent(resolvedIntent.intent)
+        ? 'legacy_whitelist_intent'
+        : 'unsupported_intent',
+      runContext: getRunContextTag(preparedRequest),
     });
     yield* options.legacyRuntime.runStream(request);
     return;
@@ -327,6 +344,7 @@ async function* runMastraPageStream(
       conversationId,
       sessionId,
       intent: resolvedIntent.intent,
+      runContext: getRunContextTag(preparedRequest),
       plannerModel: preparedRequest.plannerModel ?? null,
       blockModel: preparedRequest.blockModel ?? null,
       promptPreview: getOriginalPrompt(request).slice(0, 120),
@@ -426,6 +444,7 @@ async function* runMastraPageStream(
       conversationId,
       sessionId,
       intent: resolvedIntent.intent,
+      runContext: getRunContextTag(preparedRequest),
       durationMs: metadata.durationMs ?? null,
       tokensUsed: metadata.tokensUsed ?? null,
       finalSchemaBlockCount: finalSchemaBlocks.length,
@@ -437,6 +456,7 @@ async function* runMastraPageStream(
       conversationId,
       sessionId,
       intent: resolvedIntent.intent,
+      runContext: getRunContextTag(preparedRequest),
       message: error instanceof Error ? error.message : 'Mastra runtime failed',
     });
     yield {
@@ -514,7 +534,45 @@ export function createMastraAgentRuntime(options: CreateMastraAgentRuntimeOption
       };
     },
     finalize(request: FinalizeRequest): Promise<FinalizeResult> {
-      return options.legacyRuntime.finalize(request);
+      const deps = options.createDeps();
+      logInfo(deps, 'mastra.runtime.finalize.start', {
+        conversationId: request.conversationId,
+        sessionId: request.sessionId,
+        success: request.success,
+      });
+      return finalizeAgentSessionMemory(deps.memory, request)
+        .then((finalized) => {
+          const memoryDebugFile = finalized && options.writeMemoryDump
+            ? options.writeMemoryDump({
+              category: 'finalize',
+              memory: {
+                request,
+                outcome: finalized.outcome,
+                before: finalized.before,
+                after: finalized.after,
+              },
+            })
+            : undefined;
+
+          logInfo(deps, 'mastra.runtime.finalize.done', {
+            conversationId: request.conversationId,
+            sessionId: request.sessionId,
+            success: request.success,
+            outcome: finalized?.outcome ?? 'unsupported_memory_store',
+            memoryDebugFile: memoryDebugFile ?? null,
+          });
+
+          return memoryDebugFile ? { memoryDebugFile } : {};
+        })
+        .catch((error) => {
+          logError(deps, 'mastra.runtime.finalize.error', {
+            conversationId: request.conversationId,
+            sessionId: request.sessionId,
+            success: request.success,
+            message: error instanceof Error ? error.message : 'Mastra finalize failed',
+          });
+          throw error;
+        });
     },
   };
   return runtime;

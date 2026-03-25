@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   type ChatChunk,
   createInMemoryAgentMemoryStore,
   createToolRegistry,
   type AgentRuntimeDeps,
+  type AgentLogger,
   type AgentTool,
 } from '@shenbi/ai-agents';
 import type {
@@ -73,6 +74,7 @@ function createDeps(
   overrides: {
     chat?: (request: unknown) => Promise<unknown>;
     streamChat?: (request: unknown) => AsyncIterable<ChatChunk>;
+    logger?: AgentLogger;
   } = {},
 ): AgentRuntimeDeps {
   return {
@@ -93,6 +95,7 @@ function createDeps(
     },
     tools: createToolRegistry(tools),
     memory: createInMemoryAgentMemoryStore(),
+    ...(overrides.logger ? { logger: overrides.logger } : {}),
   };
 }
 
@@ -365,5 +368,66 @@ describe('createMastraAgentRuntime', () => {
       ],
       stream: true,
     }]);
+  });
+
+  it('finalizes through mastra memory instead of delegating to legacy finalize', async () => {
+    const logger = {
+      info: vi.fn(),
+      error: vi.fn(),
+    };
+    const deps = createDeps([], { logger });
+    await deps.memory.appendConversationMessage('conv-finalize', {
+      role: 'assistant',
+      text: '会更新当前卡片标题。',
+      meta: {
+        sessionId: 'run-finalize',
+        intent: 'schema.modify',
+        operations: [{ op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '本月营收' } }],
+      },
+    });
+    const legacyRuntime = createLegacyRuntime([]);
+    legacyRuntime.finalize = vi.fn(async () => ({ memoryDebugFile: 'legacy-finalize.json' }));
+    const writeMemoryDump = vi.fn(() => '.ai-debug/memory/mastra-finalize.json');
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime,
+      createDeps: () => deps,
+      prepareRunRequest: async (request) => request,
+      writeMemoryDump,
+    });
+
+    await expect(runtime.finalize({
+      conversationId: 'conv-finalize',
+      sessionId: 'run-finalize',
+      success: false,
+      error: 'op 1 failed',
+      schemaDigest: 'fnv1a-deadbeef',
+    })).resolves.toEqual({
+      memoryDebugFile: '.ai-debug/memory/mastra-finalize.json',
+    });
+
+    expect(legacyRuntime.finalize).not.toHaveBeenCalled();
+    expect(writeMemoryDump).toHaveBeenCalledOnce();
+    await expect(deps.memory.getConversation('conv-finalize')).resolves.toEqual([
+      {
+        role: 'assistant',
+        text: '[修改失败] op 1 failed\n会更新当前卡片标题。',
+        meta: {
+          sessionId: 'run-finalize',
+          intent: 'schema.modify',
+          failed: true,
+          schemaDigest: 'fnv1a-deadbeef',
+        },
+      },
+    ]);
+    expect(logger.info).toHaveBeenCalledWith('mastra.runtime.finalize.start', expect.objectContaining({
+      runtime: 'mastra',
+      conversationId: 'conv-finalize',
+      sessionId: 'run-finalize',
+    }));
+    expect(logger.info).toHaveBeenCalledWith('mastra.runtime.finalize.done', expect.objectContaining({
+      runtime: 'mastra',
+      outcome: 'patched',
+      memoryDebugFile: '.ai-debug/memory/mastra-finalize.json',
+    }));
   });
 });

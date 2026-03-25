@@ -2,6 +2,7 @@ export * from './types';
 export * from './runtime/run-agent';
 export * from './runtime/stream-agent';
 export * from './runtime/event-writer';
+export * from './runtime/finalize-session';
 export * from './context/build-context';
 export * from './context/conversation-history';
 export * from './context/schema-tree';
