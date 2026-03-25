@@ -1,11 +1,6 @@
-import { createRequire } from 'node:module';
 import type { PageType } from './types';
+import { builtinContracts } from '@shenbi/schema';
 import type { ComponentContract } from '../../schema/types/contract';
-
-const require = createRequire(import.meta.url);
-const { builtinContracts } = require('@shenbi/schema') as {
-  builtinContracts: ComponentContract[];
-};
 
 type ComponentGroupName =
   | 'layout-shell'

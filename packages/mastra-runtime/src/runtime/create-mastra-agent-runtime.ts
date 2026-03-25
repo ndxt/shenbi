@@ -214,6 +214,28 @@ function isPageIntent(intent: AgentIntent): intent is 'schema.create' | 'schema.
   return intent === 'schema.create' || intent === 'schema.modify';
 }
 
+function logInfo(
+  deps: AgentRuntimeDeps,
+  message: string,
+  payload: Record<string, unknown>,
+): void {
+  deps.logger?.info(message, {
+    runtime: 'mastra',
+    ...payload,
+  });
+}
+
+function logError(
+  deps: AgentRuntimeDeps,
+  message: string,
+  payload: Record<string, unknown>,
+): void {
+  deps.logger?.error(message, {
+    runtime: 'mastra',
+    ...payload,
+  });
+}
+
 function getChatContent(result: unknown): string {
   if (!result || typeof result !== 'object') {
     return '';
@@ -270,7 +292,19 @@ async function* runMastraPageStream(
     deps,
   );
 
+  logInfo(deps, 'mastra.runtime.run_stream.classified', {
+    conversationId,
+    requestedIntent: request.intent ?? null,
+    resolvedIntent: resolvedIntent.intent,
+    confidence: resolvedIntent.confidence,
+    scope: resolvedIntent.scope ?? 'single-page',
+  });
+
   if (!isPageIntent(resolvedIntent.intent)) {
+    logInfo(deps, 'mastra.runtime.run_stream.fallback_legacy', {
+      conversationId,
+      resolvedIntent: resolvedIntent.intent,
+    });
     yield* options.legacyRuntime.runStream(request);
     return;
   }
@@ -289,6 +323,15 @@ async function* runMastraPageStream(
   };
 
   try {
+    logInfo(deps, 'mastra.runtime.run_stream.start', {
+      conversationId,
+      sessionId,
+      intent: resolvedIntent.intent,
+      plannerModel: preparedRequest.plannerModel ?? null,
+      blockModel: preparedRequest.blockModel ?? null,
+      promptPreview: getOriginalPrompt(request).slice(0, 120),
+    });
+
     const memoryAttachments = getMemoryAttachments(preparedRequest);
     await deps.memory.appendConversationMessage(conversationId, {
       role: 'user',
@@ -379,8 +422,23 @@ async function* runMastraPageStream(
     ]);
 
     const doneEvent: AgentEvent = { type: 'done', data: { metadata } };
+    logInfo(deps, 'mastra.runtime.run_stream.done', {
+      conversationId,
+      sessionId,
+      intent: resolvedIntent.intent,
+      durationMs: metadata.durationMs ?? null,
+      tokensUsed: metadata.tokensUsed ?? null,
+      finalSchemaBlockCount: finalSchemaBlocks.length,
+      operationCount: operations.length,
+    });
     yield doneEvent;
   } catch (error) {
+    logError(deps, 'mastra.runtime.run_stream.error', {
+      conversationId,
+      sessionId,
+      intent: resolvedIntent.intent,
+      message: error instanceof Error ? error.message : 'Mastra runtime failed',
+    });
     yield {
       type: 'error',
       data: {
@@ -407,11 +465,22 @@ export function createMastraAgentRuntime(options: CreateMastraAgentRuntimeOption
     },
     async chat(request: ChatRequest): Promise<ChatResponse> {
       const deps = options.createDeps();
+      logInfo(deps, 'mastra.runtime.chat.request', {
+        model: request.model,
+        messageCount: request.messages.length,
+      });
       const result = await deps.llm.chat(request);
+      logInfo(deps, 'mastra.runtime.chat.response', {
+        model: request.model,
+      });
       return toChatResponse(result);
     },
     async *chatStream(request: ChatRequest): AsyncIterable<{ delta: string }> {
       const deps = options.createDeps();
+      logInfo(deps, 'mastra.runtime.chat_stream.request', {
+        model: request.model,
+        messageCount: request.messages.length,
+      });
       for await (const chunk of deps.llm.streamChat(request)) {
         yield { delta: chunk.text };
       }
@@ -427,6 +496,12 @@ export function createMastraAgentRuntime(options: CreateMastraAgentRuntimeOption
         deps,
         { preferTool: true },
       );
+      logInfo(deps, 'mastra.runtime.classify_route.result', {
+        conversationId,
+        intent: resolvedIntent.intent,
+        confidence: resolvedIntent.confidence,
+        scope: resolvedIntent.scope ?? 'single-page',
+      });
       const preparedPrompt = preparedRequest.prompt !== request.prompt
         ? preparedRequest.prompt
         : undefined;

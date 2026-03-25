@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
-      '@shenbi/schema': path.resolve(__dirname, '../../packages/schema/types/index.ts'),
+      '@shenbi/schema': path.resolve(__dirname, '../schema/types/index.ts'),
     },
   },
 });

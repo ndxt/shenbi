@@ -1,13 +1,8 @@
-import { createRequire } from 'node:module';
 import { supportedComponents, supportedComponentList, supportedComponentSet } from './knowledge-component-catalog';
 import type { GenerateBlockResult, RepairSchemaResult } from './types';
+import { builtinContracts } from '@shenbi/schema';
 import type { ColumnSchema, PageSchema, PropValue, SchemaNode } from '@shenbi/schema';
 import type { ComponentContract, ContractProp } from '../../schema/types/contract';
-
-const require = createRequire(import.meta.url);
-const { builtinContracts } = require('@shenbi/schema') as {
-  builtinContracts: ComponentContract[];
-};
 
 export { supportedComponents, supportedComponentList, supportedComponentSet } from './knowledge-component-catalog';
 

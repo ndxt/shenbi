@@ -1129,11 +1129,11 @@ export function createLegacyRuntimeDeps(memory: AgentMemoryStore, trace?: RunTra
     ]),
     memory,
     logger: {
-      info() {
-        // API host already handles request-level logging.
+      info(message, payload) {
+        logger.info(message, payload);
       },
-      error() {
-        // API host already handles request-level logging.
+      error(message, payload) {
+        logger.error(message, payload);
       },
     },
   };
