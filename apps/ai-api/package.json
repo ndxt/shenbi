@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:mastra": "node ../../scripts/dev-mastra-ai-api.mjs",
     "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "test": "node ./node_modules/vitest/vitest.mjs run --passWithNoTests",
