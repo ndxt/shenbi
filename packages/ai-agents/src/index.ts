@@ -7,6 +7,7 @@ export * from './context/conversation-history';
 export * from './context/schema-tree';
 export * from './context/selected-node-context';
 export * from './knowledge-component-catalog';
+export * from './schema-normalization';
 export * from './intent/rule-classifier';
 export * from './memory/memory-store';
 export * from './memory/conversation-memory';

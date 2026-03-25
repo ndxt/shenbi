@@ -13,6 +13,7 @@ import {
   getPageSkeleton,
   getPageSkeletonSummary,
   getPlannerContractSummary,
+  repairPageSchema,
   buildSkeletonSchema,
   buildPagePlannerPromptSpec,
   createInMemoryAgentMemoryStore,
@@ -40,6 +41,10 @@ import {
   type PlanPageInput,
   type RunMetadata,
   type RunRequest,
+  type RepairSchemaInput,
+  type RepairSchemaResult,
+  validateGeneratedBlockNode,
+  validateGeneratedBlockNodeWithDiagnostics,
 } from '@shenbi/ai-agents';
 import type { AgentEvent, ChatRequest, ChatResponse } from '@shenbi/ai-contracts';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
@@ -64,9 +69,6 @@ import {
   prepareRunRequest,
 } from './request-attachments.ts';
 import {
-  isNodeLike,
-  normalizeGeneratedNode,
-  normalizeGeneratedNodeWithDiagnostics,
   type SanitizationDiagnostic,
   supportedComponents,
   supportedComponentList,
@@ -79,6 +81,7 @@ import { executeModifySchema, planModify, executeComplexOp as executeComplexOpFn
 import type { AgentRuntime } from './types.ts';
 
 export { assessBlockQuality };
+export { validateGeneratedBlockNode, validateGeneratedBlockNodeWithDiagnostics };
 
 const defaultMemory = createInMemoryAgentMemoryStore();
 const env = loadEnv();
@@ -772,81 +775,6 @@ function createPlacementSummary(plan: PagePlan, blockId: string): string {
   return '默认纵向堆叠区域';
 }
 
-function wrapStandaloneRoot(node: GenerateBlockResult['node'], blockId: string): GenerateBlockResult['node'] {
-  const wrappedComponents = new Set([
-    'Table',
-    'Statistic',
-    'Timeline',
-    'Descriptions',
-    'Result',
-    'Empty',
-    'Steps',
-    'Progress',
-    'Breadcrumb',
-    'Pagination',
-  ]);
-
-  if (!wrappedComponents.has(node.component)) {
-    return node;
-  }
-
-  return {
-    id: `${blockId}-card-shell`,
-    component: 'Card',
-    props: {},
-    children: [node],
-  };
-}
-
-function normalizeBlockRootChild(child: unknown, blockId: string, index: number): SchemaNode {
-  if (isNodeLike(child)) {
-    return normalizeGeneratedNode(child);
-  }
-
-  return {
-    id: `${blockId}-text-${index + 1}`,
-    component: 'Typography.Text',
-    props: {},
-    children: String(child ?? ''),
-  };
-}
-
-export function validateGeneratedBlockNodeWithDiagnostics(
-  node: GenerateBlockResult['node'] | SchemaNode[],
-  blockId: string,
-): { node: GenerateBlockResult['node']; diagnostics: SanitizationDiagnostic[] } {
-  if (Array.isArray(node)) {
-    const normalizedRoot: SchemaNode = {
-      id: `${blockId}-block-root`,
-      component: 'Container',
-      props: {
-        direction: 'column',
-        gap: 16,
-      },
-      children: node.map((child, index) => normalizeBlockRootChild(child, blockId, index)),
-    };
-
-    return {
-      node: wrapStandaloneRoot(normalizedRoot, blockId),
-      diagnostics: [],
-    };
-  }
-
-  const normalizedRoot = normalizeGeneratedNodeWithDiagnostics(node);
-
-  return {
-    node: wrapStandaloneRoot(normalizedRoot.node, blockId),
-    diagnostics: normalizedRoot.diagnostics,
-  };
-}
-
-export function validateGeneratedBlockNode(
-  node: GenerateBlockResult['node'] | SchemaNode[],
-  blockId: string,
-): GenerateBlockResult['node'] {
-  return validateGeneratedBlockNodeWithDiagnostics(node, blockId).node;
-}
-
 function validateNode(node: GenerateBlockResult['node'], blockId: string): GenerateBlockResult['node'] {
   return validateGeneratedBlockNode(node, blockId);
 }
@@ -1172,6 +1100,16 @@ export function createLegacyRuntimeDeps(memory: AgentMemoryStore, trace?: RunTra
             trace.finalSchema = schema;
           }
           return schema;
+        },
+      },
+      {
+        name: 'repairSchema',
+        async execute(input: unknown) {
+          const result = repairPageSchema((input as RepairSchemaInput).schema);
+          if (trace) {
+            trace.finalSchema = result.schema;
+          }
+          return result as RepairSchemaResult;
         },
       },
     ]),
