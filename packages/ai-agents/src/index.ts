@@ -13,6 +13,7 @@ export * from './memory/page-memory';
 export * from './tools/registry';
 export * from './orchestrators/chat-orchestrator';
 export * from './orchestrators/block-quality';
+export * from './orchestrators/page-schema';
 export * from './orchestrators/modify-orchestrator';
 export * from './orchestrators/page-builder-orchestrator';
 export * from './orchestrators/registry';
