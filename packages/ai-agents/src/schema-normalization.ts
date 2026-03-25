@@ -1,8 +1,11 @@
 import { supportedComponents, supportedComponentList, supportedComponentSet } from './knowledge-component-catalog';
 import type { GenerateBlockResult, RepairSchemaResult } from './types';
-import { builtinContracts } from '@shenbi/schema';
 import type { ColumnSchema, PageSchema, PropValue, SchemaNode } from '@shenbi/schema';
 import type { ComponentContract, ContractProp } from '../../schema/types/contract';
+const schemaTypesModuleUrl = new URL('../../schema/types/index.ts', import.meta.url).href;
+const { builtinContracts } = await import(schemaTypesModuleUrl) as {
+  builtinContracts: ComponentContract[];
+};
 
 export { supportedComponents, supportedComponentList, supportedComponentSet } from './knowledge-component-catalog';
 

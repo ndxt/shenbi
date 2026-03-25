@@ -1,6 +1,9 @@
 import type { PageType } from './types';
-import { builtinContracts } from '@shenbi/schema';
 import type { ComponentContract } from '../../schema/types/contract';
+const schemaTypesModuleUrl = new URL('../../schema/types/index.ts', import.meta.url).href;
+const { builtinContracts } = await import(schemaTypesModuleUrl) as {
+  builtinContracts: ComponentContract[];
+};
 
 type ComponentGroupName =
   | 'layout-shell'
