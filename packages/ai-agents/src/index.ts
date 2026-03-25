@@ -17,6 +17,7 @@ export * from './orchestrators/modify-node-generation';
 export * from './orchestrators/modify-plan-prompt';
 export * from './orchestrators/modify-planning';
 export * from './orchestrators/page-schema';
+export * from './orchestrators/page-planner-prompt';
 export * from './orchestrators/modify-orchestrator';
 export * from './orchestrators/page-builder-orchestrator';
 export * from './orchestrators/registry';
