@@ -1,9 +1,19 @@
 import {
   buildFocusedNodeContext,
+  createModifyResult,
   formatConversationHistory,
+  mergePlannedOperations,
+  needsPhase2,
+  splitPlannedOperations,
   summarizeOperations,
+  type ComplexOpResult,
   type ModifyResult,
   type ModifySchemaInput,
+  type PlanInsertNodeSkeleton,
+  type PlanModifyResult,
+  type PlanResult,
+  type PlanOperation,
+  isPlanResult,
 } from '@shenbi/ai-agents';
 import type { AgentOperation } from '@shenbi/ai-contracts';
 import { LLMError } from '../adapters/errors.ts';
@@ -449,62 +459,6 @@ function extractJson<T>(
   }
 }
 
-function isModifyResult(value: unknown): value is ModifyResult {
-  if (!isRecord(value) || typeof value.explanation !== 'string' || !Array.isArray(value.operations)) {
-    return false;
-  }
-  return value.operations.every((operation) => isRecord(operation) && typeof operation.op === 'string');
-}
-
-// ---------------------------------------------------------------------------
-//  Plan operation: internal type returned by Phase 1 planner.
-//  For insertNode, the planner MAY return a lightweight skeleton with
-//  `description` + `components` instead of a full `node`, signalling that
-//  Phase 2 should generate the actual node with component contracts.
-// ---------------------------------------------------------------------------
-
-interface PlanInsertNodeSkeleton {
-  op: 'schema.insertNode';
-  parentId?: string;
-  container?: 'body' | 'dialogs';
-  index?: number;
-  /** What to generate – set by planner when it defers to Phase 2 */
-  description?: string;
-  /** Component types needed – drives contract injection in Phase 2 */
-  components?: string[];
-  /** If the planner already generated the full node, it lands here */
-  node?: unknown;
-}
-
-type PlanOperation = AgentOperation | PlanInsertNodeSkeleton;
-
-interface PlanResult {
-  explanation: string;
-  operations: PlanOperation[];
-}
-
-function isPlanResult(value: unknown): value is PlanResult {
-  if (!isRecord(value) || typeof value.explanation !== 'string' || !Array.isArray(value.operations)) {
-    return false;
-  }
-  return value.operations.every((operation) => isRecord(operation) && typeof operation.op === 'string');
-}
-
-/** Returns true when the plan operation needs Phase 2 generation */
-function needsPhase2(op: PlanOperation): op is PlanInsertNodeSkeleton {
-  if (op.op !== 'schema.insertNode') return false;
-  const insert = op as PlanInsertNodeSkeleton;
-  // If planner returned description + components but no node, it wants Phase 2
-  if (insert.description && Array.isArray(insert.components) && insert.components.length > 0) {
-    return true;
-  }
-  // If the node field is missing or empty, also defer to Phase 2
-  if (!insert.node) {
-    return true;
-  }
-  return false;
-}
-
 // ---------------------------------------------------------------------------
 //  Phase 1: Plan prompt
 // ---------------------------------------------------------------------------
@@ -698,43 +652,21 @@ export async function executeModifySchema(
     throw new LLMError(`modifySchema planner returned an invalid result shape. Debug file: ${debugFile}`, 'INVALID_MODIFY_RESULT');
   }
 
-  // Separate simple ops (ready to execute) from complex ops (need Phase 2)
-  const simpleOps: AgentOperation[] = [];
-  const complexEntries: Array<{ index: number; skeleton: PlanInsertNodeSkeleton }> = [];
-
-  for (const [index, op] of planParsed.operations.entries()) {
-    if (needsPhase2(op)) {
-      complexEntries.push({ index, skeleton: op as PlanInsertNodeSkeleton });
-    } else {
-      simpleOps.push(op as AgentOperation);
-    }
-  }
+  const planned = splitPlannedOperations(planParsed, {
+    ...(planDurationMs !== undefined ? { durationMs: planDurationMs } : {}),
+    ...(planInputTokens !== undefined ? { inputTokens: planInputTokens } : {}),
+    ...(planOutputTokens !== undefined ? { outputTokens: planOutputTokens } : {}),
+    ...(planTokensUsed !== undefined ? { tokensUsed: planTokensUsed } : {}),
+  });
 
   // ========================
   // Fast path: no complex ops
   // ========================
-  if (complexEntries.length === 0) {
-    // Distribute Phase 1 metrics evenly across all simple ops
-    const simpleCount = simpleOps.length || 1;
-    const perOpDuration = planDurationMs !== undefined ? Math.round(planDurationMs / simpleCount) : undefined;
-    const perOpInput = planInputTokens !== undefined ? Math.round(planInputTokens / simpleCount) : undefined;
-    const perOpOutput = planOutputTokens !== undefined ? Math.round(planOutputTokens / simpleCount) : undefined;
-    const perOpTotal = planTokensUsed !== undefined ? Math.round(planTokensUsed / simpleCount) : undefined;
-
-    const opsWithMetrics: AgentOperation[] = simpleOps.map((op) => ({
-      ...op,
-      _metrics: {
-        ...(perOpDuration !== undefined ? { durationMs: perOpDuration } : {}),
-        ...(perOpInput !== undefined ? { inputTokens: perOpInput } : {}),
-        ...(perOpOutput !== undefined ? { outputTokens: perOpOutput } : {}),
-        ...(perOpTotal !== undefined ? { tokensUsed: perOpTotal } : {}),
-      },
-    } as AgentOperation));
-
-    const result: ModifyResult = {
-      explanation: planParsed.explanation,
-      operations: opsWithMetrics,
-    };
+  if (planned.complexOps.length === 0) {
+    const result = createModifyResult(
+      planned.explanation,
+      planned.simpleOps.map((entry) => entry.operation),
+    );
     if (trace) {
       trace.modify = {
         requestSummary: planRequestSummary,
@@ -753,7 +685,7 @@ export async function executeModifySchema(
   const executedOps: Array<{ index: number; operation: AgentOperation }> = [];
 
   // Execute Phase 2 calls in parallel
-  const phase2Tasks = complexEntries.map(async ({ index, skeleton }) => {
+  const phase2Tasks = planned.complexOps.map(async ({ index, skeleton }) => {
     const insertMessages = createInsertNodeMessages(skeleton, input);
     const insertRequestSummary = {
       provider,
@@ -834,36 +766,10 @@ export async function executeModifySchema(
 
   await Promise.all(phase2Tasks);
 
-  // Merge: rebuild operations array in original order, adding Phase 1 metrics to simple ops
-  const simpleCount = simpleOps.length || 1;
-  const perOpDuration = planDurationMs !== undefined ? Math.round(planDurationMs / simpleCount) : undefined;
-  const perOpInput = planInputTokens !== undefined ? Math.round(planInputTokens / simpleCount) : undefined;
-  const perOpOutput = planOutputTokens !== undefined ? Math.round(planOutputTokens / simpleCount) : undefined;
-  const perOpTotal = planTokensUsed !== undefined ? Math.round(planTokensUsed / simpleCount) : undefined;
-  const phase1Metrics: import('@shenbi/ai-contracts').AgentOperationMetrics = {
-    ...(perOpDuration !== undefined ? { durationMs: perOpDuration } : {}),
-    ...(perOpInput !== undefined ? { inputTokens: perOpInput } : {}),
-    ...(perOpOutput !== undefined ? { outputTokens: perOpOutput } : {}),
-    ...(perOpTotal !== undefined ? { tokensUsed: perOpTotal } : {}),
-  };
-
-  const mergedOps: AgentOperation[] = [];
-  let simpleIdx = 0;
-  for (const [planIdx, planOp] of planParsed.operations.entries()) {
-    const executed = executedOps.find((e) => e.index === planIdx);
-    if (executed) {
-      mergedOps.push(executed.operation);
-    } else {
-      const simpleOp = simpleOps[simpleIdx]!;
-      mergedOps.push({ ...simpleOp, _metrics: phase1Metrics } as AgentOperation);
-      simpleIdx += 1;
-    }
-  }
-
-  const result: ModifyResult = {
-    explanation: planParsed.explanation,
-    operations: mergedOps,
-  };
+  const result = createModifyResult(
+    planned.explanation,
+    mergePlannedOperations(planParsed.operations, planned.simpleOps, executedOps),
+  );
 
   if (trace) {
     trace.modify = {
@@ -876,19 +782,6 @@ export async function executeModifySchema(
   }
 
   return result;
-}
-
-// ---------------------------------------------------------------------------
-//  Streaming-friendly split API used by the new modify-orchestrator
-// ---------------------------------------------------------------------------
-
-export interface PlanModifyResult {
-  explanation: string;
-  plannerMetrics: import('@shenbi/ai-contracts').AgentOperationMetrics;
-  simpleOps: Array<{ index: number; operation: AgentOperation }>;
-  complexOps: Array<{ index: number; skeleton: PlanInsertNodeSkeleton; label?: string }>;
-  operationCount: number;
-  operationSummaries: Array<{ op: string; label?: string; nodeId?: string }>;
 }
 
 /** Phase 1 only: run the planner LLM call and classify ops into simple vs complex. */
@@ -935,50 +828,12 @@ export async function planModify(
     trace.modify = { requestSummary: planRequestSummary, model, rawOutput: planText };
   }
 
-  const plannerMetrics: import('@shenbi/ai-contracts').AgentOperationMetrics = {
+  return splitPlannedOperations(planParsed, {
     ...(planDurationMs !== undefined ? { durationMs: planDurationMs } : {}),
     ...(planInputTokens !== undefined ? { inputTokens: planInputTokens } : {}),
     ...(planOutputTokens !== undefined ? { outputTokens: planOutputTokens } : {}),
     ...(planTokensUsed !== undefined ? { tokensUsed: planTokensUsed } : {}),
-  };
-
-  // Distribute planner metrics evenly across simple ops
-  const simpleCount = planParsed.operations.filter((op) => !needsPhase2(op)).length;
-  const perSimpleMs = planDurationMs !== undefined ? Math.round(planDurationMs / Math.max(simpleCount, 1)) : undefined;
-  const perSimpleIn = planInputTokens !== undefined ? Math.round(planInputTokens / Math.max(simpleCount, 1)) : undefined;
-  const perSimpleOut = planOutputTokens !== undefined ? Math.round(planOutputTokens / Math.max(simpleCount, 1)) : undefined;
-  const perSimpleTotal = planTokensUsed !== undefined ? Math.round(planTokensUsed / Math.max(simpleCount, 1)) : undefined;
-  const simpleMetrics: import('@shenbi/ai-contracts').AgentOperationMetrics = {
-    ...(perSimpleMs !== undefined ? { durationMs: perSimpleMs } : {}),
-    ...(perSimpleIn !== undefined ? { inputTokens: perSimpleIn } : {}),
-    ...(perSimpleOut !== undefined ? { outputTokens: perSimpleOut } : {}),
-    ...(perSimpleTotal !== undefined ? { tokensUsed: perSimpleTotal } : {}),
-  };
-
-  const simpleOps: Array<{ index: number; operation: AgentOperation }> = [];
-  const complexOps: Array<{ index: number; skeleton: PlanInsertNodeSkeleton; label?: string }> = [];
-
-  for (const [index, op] of planParsed.operations.entries()) {
-    if (needsPhase2(op)) {
-      complexOps.push({ index, skeleton: op, ...('label' in op && op.label ? { label: op.label as string } : {}) });
-    } else {
-      simpleOps.push({ index, operation: { ...op, _metrics: simpleMetrics } as AgentOperation });
-    }
-  }
-
-  const operationSummaries = planParsed.operations.map((op) => ({
-    op: op.op,
-    ...('label' in op && op.label ? { label: op.label as string } : {}),
-    ...('nodeId' in op && op.nodeId ? { nodeId: op.nodeId as string } : {}),
-  }));
-
-  return { explanation: planParsed.explanation, plannerMetrics, simpleOps, complexOps, operationCount: planParsed.operations.length, operationSummaries };
-}
-
-export interface ComplexOpResult {
-  index: number;
-  operation: AgentOperation;
-  metrics: import('@shenbi/ai-contracts').AgentOperationMetrics;
+  });
 }
 
 /** Phase 2: generate the full node for a single insertNode skeleton. */

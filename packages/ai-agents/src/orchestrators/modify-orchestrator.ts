@@ -9,32 +9,15 @@ import type {
   RunRequest,
 } from '../types';
 import type { AgentOperationMetrics } from '@shenbi/ai-contracts';
-
-interface PlanModifyResult {
-  explanation: string;
-  plannerMetrics: AgentOperationMetrics;
-  simpleOps: Array<{ index: number; operation: AgentOperation }>;
-  complexOps: Array<{ index: number; skeleton: unknown; label?: string }>;
-  operationCount: number;
-  operationSummaries: Array<{ op: string; label?: string; nodeId?: string }>;
-}
-
-interface ComplexOpResult {
-  index: number;
-  operation: AgentOperation;
-  metrics: AgentOperationMetrics;
-}
+import {
+  summarizePlannedOperation,
+  type ComplexOpResult,
+  type PlanModifyResult,
+} from './modify-planning';
 
 interface LegacyModifySchemaResult {
   explanation: string;
   operations: AgentOperation[];
-}
-
-function summarizeOperation(operation: AgentOperation): { op: string; label?: string; nodeId?: string } {
-  return {
-    op: operation.op,
-    ...('nodeId' in operation && typeof operation.nodeId === 'string' ? { nodeId: operation.nodeId } : {}),
-  };
 }
 
 export async function* modifyOrchestrator(
@@ -59,7 +42,7 @@ export async function* modifyOrchestrator(
     }
 
     const result = await legacyModifySchema.execute({ request, context });
-    const operationSummaries = result.operations.map((operation) => summarizeOperation(operation));
+    const operationSummaries = result.operations.map((operation) => summarizePlannedOperation(operation));
 
     yield {
       type: 'tool:result',
