@@ -214,6 +214,43 @@ function isPageIntent(intent: AgentIntent): intent is 'schema.create' | 'schema.
   return intent === 'schema.create' || intent === 'schema.modify';
 }
 
+function getChatContent(result: unknown): string {
+  if (!result || typeof result !== 'object') {
+    return '';
+  }
+  if ('content' in result && typeof (result as { content?: unknown }).content === 'string') {
+    return (result as { content: string }).content;
+  }
+  if ('text' in result && typeof (result as { text?: unknown }).text === 'string') {
+    return (result as { text: string }).text;
+  }
+  return '';
+}
+
+function toChatResponse(result: unknown): ChatResponse {
+  if (!result || typeof result !== 'object') {
+    return { content: '' };
+  }
+
+  const candidate = result as {
+    content?: unknown;
+    text?: unknown;
+    tokensUsed?: unknown;
+    durationMs?: unknown;
+  };
+
+  const response: ChatResponse = {
+    content: getChatContent(result),
+  };
+  if (candidate.tokensUsed && typeof candidate.tokensUsed === 'object') {
+    response.tokensUsed = candidate.tokensUsed as NonNullable<ChatResponse['tokensUsed']>;
+  }
+  if (typeof candidate.durationMs === 'number') {
+    response.durationMs = candidate.durationMs;
+  }
+  return response;
+}
+
 async function* runMastraPageStream(
   request: RunRequest,
   options: CreateMastraAgentRuntimeOptions,
@@ -368,11 +405,16 @@ export function createMastraAgentRuntime(options: CreateMastraAgentRuntimeOption
     async *runStream(request) {
       yield* runMastraPageStream(request, options);
     },
-    chat(request: ChatRequest): Promise<ChatResponse> {
-      return options.legacyRuntime.chat(request);
+    async chat(request: ChatRequest): Promise<ChatResponse> {
+      const deps = options.createDeps();
+      const result = await deps.llm.chat(request);
+      return toChatResponse(result);
     },
-    chatStream(request: ChatRequest): AsyncIterable<{ delta: string }> {
-      return options.legacyRuntime.chatStream(request);
+    async *chatStream(request: ChatRequest): AsyncIterable<{ delta: string }> {
+      const deps = options.createDeps();
+      for await (const chunk of deps.llm.streamChat(request)) {
+        yield { delta: chunk.text };
+      }
     },
     async classifyRoute(request: ClassifyRouteRequest): Promise<ClassifyRouteResponse> {
       const deps = options.createDeps();

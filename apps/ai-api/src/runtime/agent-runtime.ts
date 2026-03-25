@@ -784,7 +784,10 @@ function getRequestedChatModel(request: unknown): string | undefined {
   if (!request || typeof request !== 'object') {
     return undefined;
   }
-  const candidate = request as { plannerModel?: unknown; blockModel?: unknown };
+  const candidate = request as { model?: unknown; plannerModel?: unknown; blockModel?: unknown };
+  if (typeof candidate.model === 'string' && candidate.model) {
+    return candidate.model;
+  }
   if (typeof candidate.plannerModel === 'string' && candidate.plannerModel) {
     return candidate.plannerModel;
   }
@@ -804,6 +807,34 @@ function getThinkingFromUnknown(request: unknown): OpenAICompatibleThinking | un
   }
   const thinking = (request as { thinking?: RunRequest['thinking'] }).thinking;
   return thinking ? { type: thinking.type } : undefined;
+}
+
+function isChatMessageRequest(request: unknown): request is ChatRequest {
+  if (!request || typeof request !== 'object' || !('messages' in request)) {
+    return false;
+  }
+  const candidate = request as { messages?: unknown; model?: unknown };
+  return Array.isArray(candidate.messages) && typeof candidate.model === 'string' && candidate.model.length > 0;
+}
+
+function buildLlmChatMessages(request: unknown): OpenAICompatibleMessage[] {
+  if (isChatMessageRequest(request)) {
+    return request.messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
+  }
+
+  const prompt = typeof request === 'object' && request && 'prompt' in request
+    ? String((request as { prompt: unknown }).prompt)
+    : 'No prompt';
+  const attachments = typeof request === 'object' && request && 'attachments' in request
+    ? ((request as { attachments?: RunRequest['attachments'] }).attachments ?? undefined)
+    : undefined;
+  return [
+    { role: 'system', content: 'You are a helpful low-code assistant.' },
+    { role: 'user', content: buildUserMessageContent(prompt, attachments) },
+  ];
 }
 
 function createPlannerMessages(input: PlanPageInput): OpenAICompatibleMessage[] {
@@ -1015,35 +1046,17 @@ export function createLegacyRuntimeDeps(memory: AgentMemoryStore, trace?: RunTra
         const chatModelRef = parseProviderModelRef(requestedChatModel);
         const client = createClient(chatModelRef.provider);
         const model = requireModel(chatModelRef.model ?? requestedChatModel, 'chat');
-        const prompt = typeof request === 'object' && request && 'prompt' in request
-          ? String((request as { prompt: unknown }).prompt)
-          : 'No prompt';
-        const attachments = typeof request === 'object' && request && 'attachments' in request
-          ? ((request as { attachments?: RunRequest['attachments'] }).attachments ?? undefined)
-          : undefined;
         const thinking = getThinkingFromUnknown(request);
-        const { content: text } = await client.chat(model, [
-          { role: 'system', content: 'You are a helpful low-code assistant.' },
-          { role: 'user', content: buildUserMessageContent(prompt, attachments) },
-        ], thinking);
+        const { content: text } = await client.chat(model, buildLlmChatMessages(request), thinking);
         return { text };
       },
       async *streamChat(request: unknown) {
-        const prompt = typeof request === 'object' && request && 'prompt' in request
-          ? String((request as { prompt: unknown }).prompt)
-          : 'No prompt';
-        const attachments = typeof request === 'object' && request && 'attachments' in request
-          ? ((request as { attachments?: RunRequest['attachments'] }).attachments ?? undefined)
-          : undefined;
         const requestedChatModel = getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL;
         const chatModelRef = parseProviderModelRef(requestedChatModel);
         const client = createClient(chatModelRef.provider);
         const model = requireModel(chatModelRef.model ?? requestedChatModel, 'chat');
         const thinking = getThinkingFromUnknown(request);
-        yield* client.streamChat(model, [
-          { role: 'system', content: 'You are a helpful low-code assistant.' },
-          { role: 'user', content: buildUserMessageContent(prompt, attachments) },
-        ], thinking);
+        yield* client.streamChat(model, buildLlmChatMessages(request), thinking);
       },
     },
     tools: createToolRegistry([

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type ChatChunk,
   createInMemoryAgentMemoryStore,
   createToolRegistry,
   type AgentRuntimeDeps,
@@ -67,13 +68,26 @@ function createLegacyRuntime(events: AgentEvent[]): MastraAgentRuntime {
   };
 }
 
-function createDeps(tools: AgentTool[]): AgentRuntimeDeps {
+function createDeps(
+  tools: AgentTool[],
+  overrides: {
+    chat?: (request: unknown) => Promise<unknown>;
+    streamChat?: (request: unknown) => AsyncIterable<ChatChunk>;
+  } = {},
+): AgentRuntimeDeps {
   return {
     llm: {
-      async chat() {
+      async chat(request: unknown) {
+        if (overrides.chat) {
+          return overrides.chat(request);
+        }
         return { text: 'unused' };
       },
-      async *streamChat() {
+      async *streamChat(request: unknown) {
+        if (overrides.streamChat) {
+          yield* overrides.streamChat(request);
+          return;
+        }
         yield { text: 'unused' };
       },
     },
@@ -285,5 +299,71 @@ describe('createMastraAgentRuntime', () => {
       intent: 'chat',
       confidence: 0.91,
     });
+  });
+
+  it('routes chat through mastra deps instead of legacy chat', async () => {
+    const received: unknown[] = [];
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime: createLegacyRuntime([]),
+      createDeps: () => createDeps([], {
+        async chat(request) {
+          received.push(request);
+          return { text: 'mastra chat reply' };
+        },
+      }),
+      prepareRunRequest: async (request) => request,
+    });
+
+    await expect(runtime.chat({
+      model: 'openai-compatible::glm-4.6',
+      messages: [
+        { role: 'system', content: 'You are helpful.' },
+        { role: 'user', content: '下一步做什么？' },
+      ],
+    })).resolves.toEqual({ content: 'mastra chat reply' });
+    expect(received).toEqual([{
+      model: 'openai-compatible::glm-4.6',
+      messages: [
+        { role: 'system', content: 'You are helpful.' },
+        { role: 'user', content: '下一步做什么？' },
+      ],
+    }]);
+  });
+
+  it('routes chat streams through mastra deps instead of legacy chat stream', async () => {
+    const received: unknown[] = [];
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime: createLegacyRuntime([]),
+      createDeps: () => createDeps([], {
+        async *streamChat(request) {
+          received.push(request);
+          yield { text: 'phase ' };
+          yield { text: 'two' };
+        },
+      }),
+      prepareRunRequest: async (request) => request,
+    });
+
+    const chunks: Array<{ delta: string }> = [];
+    for await (const chunk of runtime.chatStream({
+      model: 'openai-compatible::glm-4.6',
+      messages: [
+        { role: 'assistant', content: '上一轮输出' },
+        { role: 'user', content: '继续' },
+      ],
+      stream: true,
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([{ delta: 'phase ' }, { delta: 'two' }]);
+    expect(received).toEqual([{
+      model: 'openai-compatible::glm-4.6',
+      messages: [
+        { role: 'assistant', content: '上一轮输出' },
+        { role: 'user', content: '继续' },
+      ],
+      stream: true,
+    }]);
   });
 });
