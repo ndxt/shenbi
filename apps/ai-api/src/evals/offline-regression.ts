@@ -1,4 +1,5 @@
-import type { AgentEvent } from '@shenbi/ai-contracts';
+import { createInMemoryAgentMemoryStore, finalizeAgentSessionMemory } from '@shenbi/ai-agents';
+import type { AgentEvent, AgentOperation, FinalizeRequest } from '@shenbi/ai-contracts';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
 
 export interface RepresentativeRegressionCase {
@@ -101,6 +102,20 @@ export const representativeSchemaCases: RepresentativeRegressionCase[] = [
 export interface SchemaRegressionFixture {
   caseId: string;
   schema: PageSchema;
+}
+
+export interface FinalizeRegressionCase {
+  id: string;
+  initialText: string;
+  initialMeta: {
+    sessionId: string;
+    intent: 'schema.create' | 'schema.modify' | 'chat';
+    operations?: AgentOperation[];
+  };
+  request: FinalizeRequest;
+  expectedOutcome: 'patched' | 'skipped_missing_schema_digest';
+  expectedText: string;
+  expectedMeta: Record<string, unknown>;
 }
 
 export const representativePageFixtures: SchemaRegressionFixture[] = [
@@ -336,6 +351,70 @@ export const representativePageFixtures: SchemaRegressionFixture[] = [
   },
 ];
 
+export const representativeFinalizeCases: FinalizeRegressionCase[] = [
+  {
+    id: 'finalize-success-with-digest',
+    initialText: 'Planning page structure.',
+    initialMeta: {
+      sessionId: 'run-finalize-success',
+      intent: 'schema.create',
+    },
+    request: {
+      conversationId: 'conv-finalize-success',
+      sessionId: 'run-finalize-success',
+      success: true,
+      schemaDigest: 'fnv1a-12345678',
+    },
+    expectedOutcome: 'patched',
+    expectedText: 'Planning page structure.',
+    expectedMeta: {
+      intent: 'schema.create',
+      schemaDigest: 'fnv1a-12345678',
+    },
+  },
+  {
+    id: 'finalize-success-without-digest',
+    initialText: 'Planning page structure.',
+    initialMeta: {
+      sessionId: 'run-finalize-skip',
+      intent: 'schema.create',
+    },
+    request: {
+      conversationId: 'conv-finalize-skip',
+      sessionId: 'run-finalize-skip',
+      success: true,
+    },
+    expectedOutcome: 'skipped_missing_schema_digest',
+    expectedText: 'Planning page structure.',
+    expectedMeta: {
+      intent: 'schema.create',
+    },
+  },
+  {
+    id: 'finalize-failure-clears-operations',
+    initialText: '会更新当前卡片标题。',
+    initialMeta: {
+      sessionId: 'run-finalize-failure',
+      intent: 'schema.modify',
+      operations: [{ op: 'schema.patchProps', nodeId: 'card-1', patch: { title: '本月营收' } }],
+    },
+    request: {
+      conversationId: 'conv-finalize-failure',
+      sessionId: 'run-finalize-failure',
+      success: false,
+      error: 'op 1 failed',
+      schemaDigest: 'fnv1a-deadbeef',
+    },
+    expectedOutcome: 'patched',
+    expectedText: '[修改失败] op 1 failed\n会更新当前卡片标题。',
+    expectedMeta: {
+      intent: 'schema.modify',
+      failed: true,
+      schemaDigest: 'fnv1a-deadbeef',
+    },
+  },
+];
+
 export interface OfflineSequenceCheck {
   passed: boolean;
   errors: string[];
@@ -364,6 +443,22 @@ export interface RegressionComparison {
   mastraPassRate: number;
   legacyFailed: number;
   mastraFailed: number;
+}
+
+export interface FinalizeRegressionResult {
+  id: string;
+  passed: boolean;
+  errors: string[];
+}
+
+export interface FinalizeRegressionReport {
+  summary: {
+    total: number;
+    passed: number;
+    failed: number;
+    passRate: number;
+  };
+  results: FinalizeRegressionResult[];
 }
 
 function isSchemaNode(value: unknown): value is SchemaNode {
@@ -507,6 +602,69 @@ export async function runOfflineSchemaRegression(
       errors,
     };
   });
+
+  const passed = results.filter((item) => item.passed).length;
+  const failed = results.length - passed;
+
+  return {
+    summary: {
+      total: results.length,
+      passed,
+      failed,
+      passRate: results.length > 0 ? (passed / results.length) * 100 : 0,
+    },
+    results,
+  };
+}
+
+export async function runFinalizeMemoryRegression(
+  cases: FinalizeRegressionCase[] = representativeFinalizeCases,
+): Promise<FinalizeRegressionReport> {
+  const results: FinalizeRegressionResult[] = [];
+
+  for (const testCase of cases) {
+    const errors: string[] = [];
+    const memory = createInMemoryAgentMemoryStore();
+    await memory.appendConversationMessage(testCase.request.conversationId, {
+      role: 'assistant',
+      text: testCase.initialText,
+      meta: testCase.initialMeta,
+    });
+
+    const result = await finalizeAgentSessionMemory(memory, testCase.request);
+    const conversation = await memory.getConversation(testCase.request.conversationId);
+    const message = conversation.at(-1);
+
+    if (!result) {
+      errors.push('finalize regression requires patchable memory');
+    } else {
+      if (result.outcome !== testCase.expectedOutcome) {
+        errors.push(`expected outcome ${testCase.expectedOutcome}, received ${result.outcome}`);
+      }
+      if (message?.text !== testCase.expectedText) {
+        errors.push(`unexpected assistant text: ${message?.text ?? '<missing>'}`);
+      }
+      for (const [key, value] of Object.entries(testCase.expectedMeta)) {
+        if (message?.meta?.[key as keyof typeof message.meta] !== value) {
+          errors.push(`unexpected meta.${key}`);
+        }
+      }
+      if (
+        testCase.request.success === false
+        && message?.meta
+        && 'operations' in message.meta
+        && message.meta.operations !== undefined
+      ) {
+        errors.push('failed finalize should clear operations');
+      }
+    }
+
+    results.push({
+      id: testCase.id,
+      passed: errors.length === 0,
+      errors,
+    });
+  }
 
   const passed = results.filter((item) => item.passed).length;
   const failed = results.length - passed;

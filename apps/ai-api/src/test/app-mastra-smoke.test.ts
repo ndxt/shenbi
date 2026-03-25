@@ -216,4 +216,57 @@ describe('createApp default mastra runtime smoke', () => {
       'done',
     ]);
   });
+
+  it('routes finalize requests through the default configured runtime', async () => {
+    const runtime = createMastraSmokeRuntime();
+    runtime.finalize = vi.fn(async () => ({
+      memoryDebugFile: '.ai-debug/memory/mastra-finalize.json',
+    }));
+
+    vi.doMock('../runtime/runtime-switch.ts', () => ({
+      configuredRuntime: runtime,
+    }));
+    vi.doMock('../adapters/env.ts', () => ({
+      loadEnv: () => ({
+        PORT: 3100,
+        AI_RUNTIME: 'mastra',
+        AI_PROVIDER: '',
+        AI_RATE_LIMIT_WINDOW_MS: 60_000,
+        AI_RATE_LIMIT_MAX_REQUESTS: 60,
+        providers: [],
+        GITLAB_OAUTH_CLIENT_ID: '',
+        GITLAB_OAUTH_CLIENT_SECRET: '',
+        GITLAB_OAUTH_REDIRECT_URI: 'http://localhost:5173/api/gitlab/oauth/callback',
+        GITLAB_DEFAULT_URL: 'https://gitlab.com',
+        GITLAB_DEFAULT_GROUP_ID: undefined,
+      }),
+    }));
+
+    const { createApp } = await import('../app.ts');
+    const app = createApp();
+    const response = await app.request('/api/ai/run/finalize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: 'conv-finalize',
+        sessionId: 'session-finalize',
+        success: true,
+        schemaDigest: 'fnv1a-12345678',
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true,
+      data: {
+        memoryDebugFile: '.ai-debug/memory/mastra-finalize.json',
+      },
+    });
+    expect(runtime.finalize).toHaveBeenCalledWith({
+      conversationId: 'conv-finalize',
+      sessionId: 'session-finalize',
+      success: true,
+      schemaDigest: 'fnv1a-12345678',
+    });
+  });
 });

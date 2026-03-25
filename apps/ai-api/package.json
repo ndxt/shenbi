@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "test": "node ./node_modules/vitest/vitest.mjs run --passWithNoTests",
-    "test:mastra-phase1": "tsc -p tsconfig.json --noEmit && node ./node_modules/vitest/vitest.mjs run src/runtime/agent-runtime.test.ts src/runtime/modify-schema.test.ts src/runtime/normalize-schema.test.ts src/runtime/component-catalog.test.ts src/runtime/runtime-switch.test.ts src/test/app-mastra-smoke.test.ts",
+    "test:mastra-phase1": "tsc -p tsconfig.json --noEmit && node ./node_modules/vitest/vitest.mjs run src/runtime/agent-runtime.test.ts src/runtime/modify-schema.test.ts src/runtime/normalize-schema.test.ts src/runtime/component-catalog.test.ts src/runtime/runtime-switch.test.ts src/evals/offline-regression.test.ts src/test/app-mastra-smoke.test.ts",
     "start": "node dist/server.cjs"
   },
   "dependencies": {

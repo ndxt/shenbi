@@ -4,8 +4,10 @@ import {
   compareRegressionReports,
   evaluateCreateEventSequence,
   evaluateModifyEventSequence,
+  representativeFinalizeCases,
   representativePageFixtures,
   representativeSchemaCases,
+  runFinalizeMemoryRegression,
   runOfflineSchemaRegression,
 } from './offline-regression.ts';
 
@@ -73,6 +75,17 @@ describe('offline regression harness', () => {
     expect(report.summary).toEqual({
       total: 4,
       passed: 4,
+      failed: 0,
+      passRate: 100,
+    });
+  });
+
+  it('validates representative finalize memory fixtures', async () => {
+    const report = await runFinalizeMemoryRegression(representativeFinalizeCases);
+
+    expect(report.summary).toEqual({
+      total: 3,
+      passed: 3,
       failed: 0,
       passRate: 100,
     });
