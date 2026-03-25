@@ -1,4 +1,5 @@
 import {
+  buildInsertNodePromptSpec,
   buildFocusedNodeContext,
   createModifyResult,
   formatConversationHistory,
@@ -568,46 +569,20 @@ function createInsertNodeMessages(
   skeleton: PlanInsertNodeSkeleton,
   input: ModifySchemaInput,
 ): OpenAICompatibleMessage[] {
-  const componentContracts = getComponentSchemaContracts(skeleton.components ?? []);
-  const documentTree = input.context.document.tree ?? '';
-
-  const parentInfo = skeleton.parentId
-    ? `Parent node: ${skeleton.parentId}`
-    : skeleton.container
-      ? `Container: ${skeleton.container} (root level)`
-      : 'Append to page body';
-  const indexInfo = skeleton.index !== undefined ? `Insert position: index=${skeleton.index}` : 'Append at end';
+  const promptSpec = buildInsertNodePromptSpec({
+    skeleton,
+    documentTree: input.context.document.tree ?? '',
+    componentContracts: getComponentSchemaContracts(skeleton.components ?? []),
+  });
 
   return [
     {
       role: 'system',
-      content: [
-        'You are a low-code schema node generator.',
-        'Return JSON only: {"node": {...}}',
-        'The node MUST follow the component contracts below.',
-        '',
-        '## Component Contracts',
-        componentContracts,
-        '',
-        '## Rules',
-        '- node MUST have "id" (unique kebab-case string) and "component" field.',
-        '- Text content goes in top-level "children" (NOT "props.children").',
-        '- Use the schema-example format from contracts above.',
-        '- Generate realistic Chinese business content when applicable.',
-        '- Each nested node MUST have a unique "id".',
-        '- Keep the node structure minimal and clean.',
-      ].join('\n'),
+      content: promptSpec.systemText,
     },
     {
       role: 'user',
-      content: buildUserMessageContentFromLines([
-        `Task: ${skeleton.description ?? 'Generate a node'}`,
-        parentInfo,
-        indexInfo,
-        '',
-        'Schema Tree (for context):',
-        documentTree,
-      ], input.request.attachments),
+      content: buildUserMessageContentFromLines(promptSpec.userLines, input.request.attachments),
     },
   ];
 }
