@@ -559,10 +559,20 @@ async function generateStructuredObject<Output>(input: {
   activeTools?: string[];
   threadId?: string;
 }): Promise<{ object: Output; text: string; usage?: { totalTokens?: number } }> {
+  const structuredJsonInstructions = [
+    input.instructions,
+    'Return valid json only.',
+    'The final answer must be a json object that matches the required schema.',
+  ].join('\n');
+  const structuredJsonPrompt = [
+    input.prompt,
+    'Return valid json only.',
+  ].join('\n\n');
+
   const agent = new Agent({
     id: input.agentId,
     name: input.agentName,
-    instructions: input.instructions,
+    instructions: structuredJsonInstructions,
     model: input.model as never,
     tools: {
       searchKnowledge: searchKnowledgeTool,
@@ -574,7 +584,7 @@ async function generateStructuredObject<Output>(input: {
     memory: getSharedMastraMemory(),
   });
 
-  const result = await agent.generate(input.prompt, {
+  const result = await agent.generate(structuredJsonPrompt, {
     structuredOutput: {
       schema: input.schema,
     },
