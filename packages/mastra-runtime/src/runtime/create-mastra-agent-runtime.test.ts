@@ -299,18 +299,22 @@ describe('createMastraAgentRuntime', () => {
     ]);
   });
 
-  it('falls back to the legacy runtime for non-page intents', async () => {
-    const legacyEvents: AgentEvent[] = [
-      { type: 'run:start', data: { sessionId: 'legacy-session', conversationId: 'conv-chat' } },
-      { type: 'done', data: { metadata: { sessionId: 'legacy-session', conversationId: 'conv-chat' } } },
-    ];
+  it('streams chat intents through mastra runStream instead of legacy fallback', async () => {
+    const streamRequests: unknown[] = [];
     const logger = {
       info: vi.fn(),
       error: vi.fn(),
     };
     const runtime = createMastraAgentRuntime({
-      legacyRuntime: createLegacyRuntime(legacyEvents),
-      createDeps: () => createDeps([], { logger }),
+      legacyRuntime: createLegacyRuntime([]),
+      createDeps: () => createDeps([], {
+        logger,
+        async *streamChat(request) {
+          streamRequests.push(request);
+          yield { text: '这是' };
+          yield { text: '聊天回复' };
+        },
+      }),
       prepareRunRequest: async (request) => request,
       listModels: () => [],
       writeClientDebug: () => '.ai-debug/errors/client-debug.json',
@@ -325,11 +329,32 @@ describe('createMastraAgentRuntime', () => {
       events.push(event);
     }
 
-    expect(events).toEqual(legacyEvents);
-    expect(logger.info).toHaveBeenCalledWith('mastra.runtime.run_stream.fallback_legacy', expect.objectContaining({
+    expect(events.map((event) => event.type)).toEqual([
+      'run:start',
+      'intent',
+      'message:start',
+      'message:delta',
+      'message:delta',
+      'done',
+    ]);
+    expect(events.filter((event) => event.type === 'message:delta')).toEqual([
+      { type: 'message:delta', data: { text: '这是' } },
+      { type: 'message:delta', data: { text: '聊天回复' } },
+    ]);
+    expect(streamRequests).toEqual([{
+      prompt: '这个页面是做什么的？',
+      plannerModel: undefined,
+      blockModel: undefined,
+      context: expect.any(Object),
+    }]);
+    expect(logger.info).toHaveBeenCalledWith('mastra.runtime.run_stream.start', expect.objectContaining({
       runtime: 'mastra',
-      resolvedIntent: 'chat',
-      fallbackReason: 'legacy_whitelist_intent',
+      intent: 'chat',
+      runContext: 'single-page',
+    }));
+    expect(logger.info).toHaveBeenCalledWith('mastra.runtime.run_stream.done', expect.objectContaining({
+      runtime: 'mastra',
+      intent: 'chat',
       runContext: 'single-page',
     }));
   });

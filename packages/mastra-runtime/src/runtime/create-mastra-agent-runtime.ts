@@ -77,7 +77,6 @@ export interface CreateMastraAgentRuntimeOptions {
 }
 
 const PAGE_STREAM_INTENTS: ReadonlySet<AgentIntent> = new Set(['schema.create', 'schema.modify']);
-const LEGACY_STREAM_FALLBACK_INTENTS: ReadonlySet<AgentIntent> = new Set(['chat']);
 
 class AsyncEventQueue<T> implements AsyncIterable<T> {
   private readonly items: T[] = [];
@@ -261,10 +260,6 @@ function getRunContextTag(request: RunRequest): 'single-page' | 'multi-page-loop
     : 'single-page';
 }
 
-function isLegacyFallbackIntent(intent: AgentIntent): boolean {
-  return LEGACY_STREAM_FALLBACK_INTENTS.has(intent);
-}
-
 function logInfo(
   deps: AgentRuntimeDeps,
   message: string,
@@ -353,16 +348,117 @@ async function* runMastraPageStream(
   });
 
   if (!isPageIntent(resolvedIntent.intent)) {
-    logInfo(deps, 'mastra.runtime.run_stream.fallback_legacy', {
+    if (resolvedIntent.intent !== 'chat') {
+      logInfo(deps, 'mastra.runtime.run_stream.fallback_legacy', {
+        conversationId,
+        resolvedIntent: resolvedIntent.intent,
+        fallbackReason: 'unsupported_intent',
+        runContext: getRunContextTag(preparedRequest),
+      });
+      yield* options.legacyRuntime.runStream(request);
+      return;
+    }
+
+    const metadata: RunMetadata = {
+      sessionId,
       conversationId,
-      resolvedIntent: resolvedIntent.intent,
-      fallbackReason: isLegacyFallbackIntent(resolvedIntent.intent)
-        ? 'legacy_whitelist_intent'
-        : 'unsupported_intent',
-      runContext: getRunContextTag(preparedRequest),
-    });
-    yield* options.legacyRuntime.runStream(request);
-    return;
+      ...(preparedRequest.plannerModel ? { plannerModel: preparedRequest.plannerModel } : {}),
+      ...(preparedRequest.blockModel ? { blockModel: preparedRequest.blockModel } : {}),
+    };
+    const startedAt = Date.now();
+    const assistantChunks: string[] = [];
+
+    try {
+      logInfo(deps, 'mastra.runtime.run_stream.start', {
+        conversationId,
+        sessionId,
+        intent: resolvedIntent.intent,
+        runContext: getRunContextTag(preparedRequest),
+        plannerModel: preparedRequest.plannerModel ?? null,
+        blockModel: preparedRequest.blockModel ?? null,
+        promptPreview: getOriginalPrompt(request).slice(0, 120),
+      });
+
+      const memoryAttachments = getMemoryAttachments(preparedRequest);
+      await deps.memory.appendConversationMessage(conversationId, {
+        role: 'user',
+        text: getOriginalPrompt(request),
+        ...(memoryAttachments ? { attachments: memoryAttachments } : {}),
+      });
+
+      yield { type: 'run:start', data: { sessionId, conversationId } };
+      yield {
+        type: 'intent',
+        data: {
+          intent: resolvedIntent.intent,
+          confidence: resolvedIntent.confidence,
+          ...(resolvedIntent.scope ? { scope: resolvedIntent.scope } : {}),
+        },
+      };
+      yield { type: 'message:start', data: { role: 'assistant' } };
+
+      for await (const chunk of deps.llm.streamChat({
+        prompt: preparedRequest.prompt,
+        ...(preparedRequest.attachments ? { attachments: preparedRequest.attachments } : {}),
+        plannerModel: preparedRequest.plannerModel,
+        blockModel: preparedRequest.blockModel,
+        context,
+      })) {
+        if (!chunk.text) {
+          continue;
+        }
+        assistantChunks.push(chunk.text);
+        yield { type: 'message:delta', data: { text: chunk.text } };
+      }
+
+      if (assistantChunks.length === 0) {
+        const fallbackText = '未生成有效回复。';
+        assistantChunks.push(fallbackText);
+        yield { type: 'message:delta', data: { text: fallbackText } };
+      }
+
+      metadata.durationMs = Date.now() - startedAt;
+      await Promise.all([
+        deps.memory.appendConversationMessage(conversationId, {
+          role: 'assistant',
+          text: assistantChunks.join(''),
+          meta: {
+            sessionId,
+            intent: resolvedIntent.intent,
+          },
+        }),
+        deps.memory.setLastRunMetadata(conversationId, metadata),
+        deps.memory.setLastBlockIds(conversationId, []),
+      ]);
+
+      logInfo(deps, 'mastra.runtime.run_stream.done', {
+        conversationId,
+        sessionId,
+        intent: resolvedIntent.intent,
+        runContext: getRunContextTag(preparedRequest),
+        durationMs: metadata.durationMs ?? null,
+        tokensUsed: metadata.tokensUsed ?? null,
+        finalSchemaBlockCount: 0,
+        operationCount: 0,
+      });
+      yield { type: 'done', data: { metadata } };
+      return;
+    } catch (error) {
+      logError(deps, 'mastra.runtime.run_stream.error', {
+        conversationId,
+        sessionId,
+        intent: resolvedIntent.intent,
+        runContext: getRunContextTag(preparedRequest),
+        message: error instanceof Error ? error.message : 'Mastra runtime failed',
+      });
+      yield {
+        type: 'error',
+        data: {
+          message: error instanceof Error ? error.message : 'Mastra runtime failed',
+        },
+      };
+      return;
+    }
   }
 
   const metadata: RunMetadata = {
