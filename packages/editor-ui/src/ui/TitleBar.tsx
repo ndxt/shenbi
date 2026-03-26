@@ -20,6 +20,7 @@ import {
   FolderGit2,
   Download,
   Monitor,
+  Gitlab,
 } from 'lucide-react';
 import {
   type SupportedLocale,
@@ -116,6 +117,7 @@ export function TitleBar({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
   const projectDropdownRef = useRef<HTMLDivElement>(null);
+  const isGitLabProject = !!((activeProjectId && projectList?.find(p => p.id === activeProjectId)?.gitlabProjectId) || (!activeProjectId && (!!gitlabUrl || !!(branches?.length))));
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -155,13 +157,20 @@ export function TitleBar({
         
         {/* Project Switcher Dropdown */}
         <div className="flex items-center gap-2 pl-4" ref={projectDropdownRef}>
-          <div className="relative">
+          <div className="relative z-10">
             <button
               className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.08)] transition-colors cursor-pointer"
               onClick={() => setIsProjectDropdownOpen(!isProjectDropdownOpen)}
             >
-              <div className={`w-[18px] h-[18px] ${(activeProjectId && projectList?.find(p => p.id === activeProjectId)?.gitlabProjectId) || (!activeProjectId && (!!gitlabUrl || !!(branches?.length))) ? 'bg-[#2b727b]' : 'bg-[#444b53]'} text-[rgba(255,255,255,0.85)] rounded flex items-center justify-center text-[12px] font-medium shrink-0`}>
-                {(title ?? 'Shenbi IDE').charAt(0).toUpperCase()}
+              <div className="relative shrink-0">
+                <div className={`w-[18px] h-[18px] ${isGitLabProject ? 'bg-[#2b727b]' : 'bg-[#444b53]'} text-[rgba(255,255,255,0.85)] rounded flex items-center justify-center text-[12px] font-medium`}>
+                  {(title ?? 'Shenbi IDE').charAt(0).toUpperCase()}
+                </div>
+                {isGitLabProject && (
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-bg-activity-bar rounded-full flex items-center justify-center shadow-sm">
+                    <Gitlab size={8} className="text-[#fc6d26]" />
+                  </div>
+                )}
               </div>
               <span className="text-[13px] font-medium tracking-wide text-text-primary">
                 {title ?? 'Shenbi IDE'}
@@ -214,8 +223,15 @@ export function TitleBar({
                             setIsProjectDropdownOpen(false);
                           }}
                         >
-                          <div className={`w-[18px] h-[18px] ${p.gitlabProjectId ? 'bg-[#2b727b]' : 'bg-[#444b53]'} text-[rgba(255,255,255,0.85)] rounded flex items-center justify-center text-[11px] font-medium shrink-0`}>
-                            {p.name.charAt(0).toUpperCase()}
+                          <div className="relative shrink-0">
+                            <div className={`w-[18px] h-[18px] ${p.gitlabProjectId ? 'bg-[#2b727b]' : 'bg-[#444b53]'} text-[rgba(255,255,255,0.85)] rounded flex items-center justify-center text-[11px] font-medium`}>
+                              {p.name.charAt(0).toUpperCase()}
+                            </div>
+                            {p.gitlabProjectId && (
+                              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-bg-panel rounded-full flex items-center justify-center shadow-sm">
+                                <Gitlab size={8} className="text-[#fc6d26]" />
+                              </div>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="truncate font-medium">{p.name}</div>
