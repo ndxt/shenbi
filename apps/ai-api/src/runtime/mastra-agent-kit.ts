@@ -395,6 +395,43 @@ const projectPlanSchema = z.object({
   })).min(1),
 });
 
+export function buildProjectAgentInstructions(input: {
+  baseSystemText: string;
+  hasDocumentContext: boolean;
+}): string {
+  return [
+    input.baseSystemText,
+    'You plan multi-page low-code projects.',
+    'Use searchKnowledge when document requirements imply page type, workflow stage, or system decomposition questions.',
+    'Prefer explicit create/modify/skip actions and preserve evidence from the source requirement.',
+    ...(input.hasDocumentContext
+      ? [
+        'When uploaded documents are present, every generated page should include group, description, prompt, and evidence whenever the page is not skipped.',
+        'evidence must quote continuous original wording from the uploaded document as much as possible; preserve numbering, punctuation, parentheses, colons, semicolons, and key field names.',
+        'Do not rewrite evidence into abstract summaries. If the source excerpt is long, keep the most informative continuous fragment and use ellipsis only for safe trimming.',
+        'prompt is for downstream page generation, so it must absorb the concrete requirements, fields, workflow steps, and UI constraints from evidence instead of repeating description.',
+      ]
+      : []),
+  ].join('\n');
+}
+
+export function buildProjectAgentPrompt(input: {
+  baseUserText: string;
+  documentSummary?: z.infer<typeof documentSummarySchema>;
+  documentContext: string;
+}): string {
+  return [
+    input.baseUserText,
+    `Document Summary: ${input.documentSummary ? JSON.stringify(input.documentSummary) : 'none'}`,
+    ...(input.documentContext
+      ? [
+        'Document previews:',
+        input.documentContext,
+      ]
+      : []),
+  ].join('\n\n');
+}
+
 async function generateStructuredObject<Output>(input: {
   agentId: string;
   agentName: string;
@@ -668,20 +705,20 @@ export async function planProjectWithMastraAgent(
     request.conversationId ?? 'project-plan',
     request.plannerModel,
   );
+  const documentContext = buildDocumentAttachmentContext(request);
   const result = await generateStructuredObject({
     agentId: 'project-agent',
     agentName: 'Project Agent',
     model: resolveMastraModelConfig(request.plannerModel, 'planner'),
-    instructions: [
-      promptSpec.systemText,
-      'You plan multi-page low-code projects.',
-      'Use searchKnowledge when document requirements imply page type, workflow stage, or system decomposition questions.',
-      'Prefer explicit create/modify/skip actions and preserve evidence from the source requirement.',
-    ].join('\n'),
-    prompt: [
-      promptSpec.userText,
-      `Document Summary: ${documentSummary ? JSON.stringify(documentSummary) : 'none'}`,
-    ].join('\n\n'),
+    instructions: buildProjectAgentInstructions({
+      baseSystemText: promptSpec.systemText,
+      hasDocumentContext: documentContext.length > 0,
+    }),
+    prompt: buildProjectAgentPrompt({
+      baseUserText: promptSpec.userText,
+      ...(documentSummary ? { documentSummary } : {}),
+      documentContext,
+    }),
     schema: projectPlanSchema,
     activeTools: ['searchKnowledge', 'getPageSkeleton', 'getComponentContract'],
     threadId: request.conversationId ?? 'project-plan',
