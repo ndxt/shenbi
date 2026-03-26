@@ -222,80 +222,40 @@ const CoverDashboard = () => (
 );
 
 // ---------------------------------------------------------------------------
-// Mobile Cover Components (Layout-based, Android Studio style)
+// Mobile Cover Components (Android Studio Style Precision)
 // ---------------------------------------------------------------------------
 
-const CoverMobileBlank = () => (
-  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="33" y="2" width="34" height="64" rx="4" fill="#1E293B"/> 
-    <rect x="35" y="4" width="30" height="60" rx="2" fill="#F8FAFC"/> 
-    <rect x="35" y="4" width="30" height="8" rx="2" fill="#3B82F6"/> 
-    <path d="M 38 8 L 42 8" stroke="white" strokeWidth="1" strokeLinecap="round"/> 
-    <path d="M 58 8 L 62 8" stroke="white" strokeWidth="1" strokeLinecap="round"/>
-    <rect x="42" y="30" width="16" height="8" rx="1" fill="#E2E8F0"/> 
+const CoverMobileNoActivity = () => (
+  <svg width="100%" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="28" y="28" width="44" height="44" rx="6" stroke="#8A8A8A" strokeWidth="4" strokeDasharray="8 6" fill="transparent" strokeLinecap="round" />
   </svg>
 );
 
-const CoverMobileTabs = () => (
-  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="33" y="2" width="34" height="64" rx="4" fill="#1E293B"/>
-    <rect x="35" y="4" width="30" height="60" rx="2" fill="#F8FAFC"/>
-    <rect x="35" y="4" width="30" height="8" rx="2" fill="#14B8A6"/> 
-    <rect x="38" y="16" width="24" height="10" rx="2" fill="#E2E8F0"/>
-    <rect x="38" y="28" width="24" height="10" rx="2" fill="#E2E8F0"/>
-    <rect x="38" y="40" width="24" height="10" rx="2" fill="#E2E8F0"/>
-    <rect x="35" y="54" width="30" height="10" rx="2" fill="#FFFFFF"/>
-    <rect x="35" y="54" width="30" height="0.5" fill="#E2E8F0"/>
-    <circle cx="41" cy="59" r="2" fill="#14B8A6"/>
-    <circle cx="50" cy="59" r="2" fill="#94A3B8"/>
-    <circle cx="59" cy="59" r="2" fill="#94A3B8"/>
-  </svg>
-);
-
-const CoverMobileDrawer = () => (
-  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="33" y="2" width="34" height="64" rx="4" fill="#1E293B"/>
-    <rect x="35" y="4" width="30" height="60" rx="2" fill="#F8FAFC"/>
-    <rect x="35" y="4" width="30" height="8" rx="2" fill="#6366F1"/> 
-    <path d="M 38 7 L 42 7 M 38 9 L 42 9 M 38 11 L 42 11" stroke="white" strokeWidth="0.5"/> 
+const CoverMobileBasic = () => (
+  <svg width="100%" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="25" y="10" width="50" height="80" rx="10" fill="#4B4E53"/> 
+    <path d="M 25 20 Q 25 10 35 10 L 65 10 Q 75 10 75 20 L 75 26 L 25 26 Z" fill="#1C9848"/> 
+    <path d="M 32 18 L 36 14 M 32 18 L 36 22 M 32 18 L 40 18" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/> 
+    <circle cx="68" cy="14" r="1.2" fill="#FFFFFF"/>
+    <circle cx="68" cy="18" r="1.2" fill="#FFFFFF"/>
+    <circle cx="68" cy="22" r="1.2" fill="#FFFFFF"/> 
     
-    <rect x="35" y="12" width="30" height="52" fill="rgba(0,0,0,0.1)"/>
+    <circle cx="62" cy="74" r="7" fill="#A8EB12"/> 
+    <path d="M 62 70 L 62 78 M 58 74 L 66 74" stroke="#252526" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
+const CoverMobileBottomNav = () => (
+  <svg width="100%" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="25" y="10" width="50" height="80" rx="10" fill="#4B4E53"/>
+    <path d="M 25 20 Q 25 10 35 10 L 65 10 Q 75 10 75 20 L 75 26 L 25 26 Z" fill="#1C9848"/>
+    <path d="M 32 18 L 36 14 M 32 18 L 36 22 M 32 18 L 40 18" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/>
+    <circle cx="68" cy="14" r="1.2" fill="#FFFFFF"/>
+    <circle cx="68" cy="18" r="1.2" fill="#FFFFFF"/>
+    <circle cx="68" cy="22" r="1.2" fill="#FFFFFF"/> 
     
-    <rect x="35" y="4" width="22" height="60" fill="#FFFFFF"/>
-    <rect x="35" y="4" width="22" height="14" fill="#6366F1"/> 
-    <circle cx="40" cy="11" r="3" fill="#FFFFFF"/> 
-    <rect x="38" y="22" width="12" height="2" rx="1" fill="#6366F1"/>
-    <rect x="38" y="28" width="14" height="2" rx="1" fill="#CBD5E1"/>
-    <rect x="38" y="34" width="10" height="2" rx="1" fill="#CBD5E1"/>
-    <rect x="38" y="40" width="16" height="2" rx="1" fill="#CBD5E1"/>
-  </svg>
-);
-
-const CoverMobileLogin = () => (
-  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="33" y="2" width="34" height="64" rx="4" fill="#1E293B"/>
-    <rect x="35" y="4" width="30" height="60" rx="2" fill="#FFFFFF"/>
-    <circle cx="50" cy="22" r="6" fill="#E2E8F0"/>
-    <rect x="39" y="34" width="22" height="6" rx="3" fill="#F1F5F9" stroke="#E2E8F0" strokeWidth="0.5"/>
-    <rect x="39" y="44" width="22" height="6" rx="3" fill="#F1F5F9" stroke="#E2E8F0" strokeWidth="0.5"/>
-    <rect x="39" y="54" width="22" height="6" rx="3" fill="#3B82F6"/>
-    <rect x="46" y="56" width="8" height="2" rx="1" fill="#FFFFFF"/>
-  </svg>
-);
-
-const CoverMobileScroll = () => (
-  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="33" y="2" width="34" height="64" rx="4" fill="#1E293B"/>
-    <rect x="35" y="4" width="30" height="60" rx="2" fill="#F8FAFC"/>
-    <rect x="35" y="4" width="30" height="24" fill="#F59E0B"/>
-    <path d="M 35 28 L 65 28 L 65 14 Z" fill="#D97706" opacity="0.3"/> 
-    <rect x="38" y="34" width="24" height="3" rx="1.5" fill="#1E293B"/> 
-    <rect x="38" y="42" width="24" height="2" rx="1" fill="#94A3B8"/>
-    <rect x="38" y="46" width="24" height="2" rx="1" fill="#94A3B8"/>
-    <rect x="38" y="50" width="18" height="2" rx="1" fill="#94A3B8"/>
-    <rect x="38" y="56" width="24" height="2" rx="1" fill="#94A3B8"/>
-    <rect x="38" y="60" width="12" height="2" rx="1" fill="#94A3B8"/>
-    <circle cx="60" cy="28" r="4" fill="#EC4899"/>
+    <path d="M 25 76 L 75 76 L 75 80 Q 75 90 65 90 L 35 90 Q 25 90 25 80 Z" fill="#158238"/> 
+    <rect x="42" y="76" width="16" height="14" fill="#A8EB12"/> 
   </svg>
 );
 
@@ -331,11 +291,9 @@ const PROJECT_CATEGORIES: ProjectTypeCategory[] = [
     id: 'mobile',
     name: '移动端',
     templates: [
-      { id: 'mobile-blank', name: '空白页面', cover: <CoverMobileBlank /> },
-      { id: 'mobile-tabs', name: '底部导航', cover: <CoverMobileTabs /> },
-      { id: 'mobile-drawer', name: '侧滑菜单', cover: <CoverMobileDrawer /> },
-      { id: 'mobile-scroll', name: '滚动视图', cover: <CoverMobileScroll /> },
-      { id: 'mobile-login', name: '登录界面', cover: <CoverMobileLogin /> },
+      { id: 'mobile-no-activity', name: 'No Activity', cover: <CoverMobileNoActivity /> },
+      { id: 'mobile-basic', name: 'Basic Views Activity', cover: <CoverMobileBasic /> },
+      { id: 'mobile-bottom-nav', name: 'Bottom Navigation Views', cover: <CoverMobileBottomNav /> },
     ],
   },
 ];
@@ -473,20 +431,27 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
                           style={{
                             display: 'flex', flexDirection: 'column',
                             borderRadius: 8, cursor: 'pointer',
-                            border: isSelected ? '1px solid #4b9efa' : '1px solid #3e3e42',
-                            background: '#252526',
+                            border: '1px solid transparent',
+                            background: isSelected ? 'rgba(75, 158, 250, 0.15)' : 'transparent',
+                            outline: isSelected ? '2px solid #4b9efa' : 'none',
+                            outlineOffset: -2,
                             overflow: 'hidden',
-                            height: 140,
-                            boxShadow: isSelected ? '0 0 0 1px #4b9efa' : 'none',
+                            height: 160,
+                            transition: 'all 0.15s',
                           }}
                         >
                           <div style={{
                             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: '#2d2d2d', borderBottom: '1px solid #3e3e42',
+                            background: isSelected ? 'transparent' : '#2d2d2d',
                           }}>
                             {tpl.cover}
                           </div>
-                          <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#e0e0e0', fontWeight: 400 }}>
+                          <div style={{ 
+                            height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 12, color: '#e0e0e0', fontWeight: 400,
+                            background: isSelected ? '#3b5070' : 'transparent',
+                            borderTop: isSelected ? '1px solid #4b9efa' : 'none',
+                           }}>
                             {tpl.name}
                           </div>
                         </div>
