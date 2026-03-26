@@ -52,6 +52,20 @@ import { createPreviewServiceContainer } from './services';
 export { canSchemaNodeAcceptCanvasChildren, resolveCanvasDropPosition };
 
 export function App() {
+  // If we're inside an OAuth popup (opened by window.open), close it immediately.
+  // After GitLab OAuth completes, the redirect_uri points back to our app.
+  // The opener (main window) polls popup.closed to detect completion.
+  useEffect(() => {
+    if (window.opener && window.name === 'gitlab-oauth') {
+      window.close();
+    }
+  }, []);
+
+  // Don't render anything if we're in the OAuth popup
+  if (window.opener && window.name === 'gitlab-oauth') {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#888', fontSize: 14 }}>授权完成，正在关闭窗口...</div>;
+  }
+
   const { t: previewT } = useTranslation('preview');
   const { t: filesT } = useTranslation('pluginFiles');
   const currentLocale = useCurrentLocale();
