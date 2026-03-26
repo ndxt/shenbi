@@ -226,30 +226,44 @@ const CoverDashboard = () => (
 // ---------------------------------------------------------------------------
 
 const CoverMobileBasic = () => (
-  <svg width="100%" height="100%" viewBox="0 0 160 124" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="46" y="6" width="68" height="112" rx="10" fill="#4A4C50"/> 
-    <path d="M 46 16 Q 46 6 56 6 L 104 6 Q 114 6 114 16 L 114 26 L 46 26 Z" fill="#1C9848"/> 
-    <path d="M 54 16 L 60 10 M 54 16 L 60 22 M 54 16 L 66 16" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/> 
-    <circle cx="104" cy="11" r="1.5" fill="#FFFFFF"/>
-    <circle cx="104" cy="16" r="1.5" fill="#FFFFFF"/>
-    <circle cx="104" cy="21" r="1.5" fill="#FFFFFF"/> 
+  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="33" y="0" width="34" height="68" rx="6" fill="#1E293B"/>
+    <rect x="35" y="2" width="30" height="64" rx="4" fill="#F8FAFC"/>
+    <rect x="35" y="2" width="30" height="10" rx="4" fill="#3B82F6"/> 
+    <path d="M 39 7 L 43 7" stroke="white" strokeWidth="1.5" strokeLinecap="round"/> 
     
-    <circle cx="114" cy="106" r="10" fill="#A8EB12"/> 
-    <path d="M 114 99 L 114 113 M 107 106 L 121 106" stroke="#252526" strokeWidth="2" strokeLinecap="round"/>
+    <rect x="39" y="16" width="22" height="12" rx="2" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="0.5"/>
+    <rect x="42" y="19" width="10" height="2" rx="1" fill="#94A3B8"/>
+    <rect x="42" y="23" width="14" height="2" rx="1" fill="#E2E8F0"/>
+    
+    <rect x="39" y="32" width="22" height="12" rx="2" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="0.5"/>
+    <rect x="42" y="35" width="16" height="2" rx="1" fill="#94A3B8"/>
+    <rect x="42" y="39" width="8" height="2" rx="1" fill="#E2E8F0"/>
+    
+    <rect x="39" y="48" width="22" height="12" rx="2" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="0.5"/>
+    <rect x="42" y="51" width="12" height="2" rx="1" fill="#94A3B8"/>
+    <rect x="42" y="55" width="10" height="2" rx="1" fill="#E2E8F0"/>
+    
+    <circle cx="59" cy="58" r="5" fill="#10B981"/> 
+    <path d="M 59 55 L 59 61 M 56 58 L 62 58" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
 
 const CoverMobileBottomNav = () => (
-  <svg width="100%" height="100%" viewBox="0 0 160 124" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="46" y="6" width="68" height="112" rx="10" fill="#4A4C50"/> 
-    <path d="M 46 16 Q 46 6 56 6 L 104 6 Q 114 6 114 16 L 114 26 L 46 26 Z" fill="#1C9848"/> 
-    <path d="M 54 16 L 60 10 M 54 16 L 60 22 M 54 16 L 66 16" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/> 
-    <circle cx="104" cy="11" r="1.5" fill="#FFFFFF"/>
-    <circle cx="104" cy="16" r="1.5" fill="#FFFFFF"/>
-    <circle cx="104" cy="21" r="1.5" fill="#FFFFFF"/> 
+  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="33" y="0" width="34" height="68" rx="6" fill="#1E293B"/>
+    <rect x="35" y="2" width="30" height="64" rx="4" fill="#F8FAFC"/>
+    <rect x="35" y="2" width="30" height="10" rx="4" fill="#3B82F6"/> 
     
-    <path d="M 46 104 L 114 104 L 114 108 Q 114 118 104 118 L 56 118 Q 46 118 46 108 Z" fill="#158238"/> 
-    <rect x="70" y="104" width="20" height="14" fill="#A8EB12"/> 
+    <rect x="39" y="16" width="22" height="32" rx="2" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="0.5"/>
+    <circle cx="50" cy="24" r="5" fill="#E2E8F0"/>
+    <rect x="44" y="34" width="12" height="2" rx="1" fill="#94A3B8"/>
+    <rect x="42" y="40" width="16" height="2" rx="1" fill="#CBD5E1"/>
+    
+    <rect x="35" y="54" width="30" height="12" rx="4" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="0.5"/>
+    <circle cx="41" cy="60" r="2.5" fill="#3B82F6"/>
+    <circle cx="50" cy="60" r="2" fill="#94A3B8"/>
+    <circle cx="59" cy="60" r="2" fill="#94A3B8"/>
   </svg>
 );
 
@@ -425,21 +439,21 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
                           style={{
                             display: 'flex', flexDirection: 'column',
                             borderRadius: 8, cursor: 'pointer',
-                            border: isSelected ? '1px solid rgba(75, 158, 250, 0.5)' : '1px solid transparent',
-                            background: isSelected ? 'rgba(75, 158, 250, 0.1)' : 'transparent',
+                            border: isSelected ? '1px solid #4b9efa' : '1px solid #3e3e42',
+                            background: '#252526',
                             overflow: 'hidden',
-                            height: 160,
-                            transition: 'all 0.15s',
+                            height: 140,
+                            boxShadow: isSelected ? '0 0 0 1px #4b9efa' : 'none',
                           }}
                         >
                           <div style={{
                             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: '#2d2d2d', borderBottom: '1px solid #3e3e42',
                           }}>
                             {tpl.cover}
                           </div>
                           <div style={{ 
-                            height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 13, color: isSelected ? '#ffffff' : '#e0e0e0', fontWeight: 500,
+                            height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#e0e0e0', fontWeight: 400
                            }}>
                             {tpl.name}
                           </div>
