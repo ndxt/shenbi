@@ -62,5 +62,60 @@
   "aria": {
     "modeSwitch": "Mode switch",
     "scenarioSwitch": "Scenario switch"
+  },
+  "welcome": {
+    "title": "Welcome to Locode IDE",
+    "subtitle": "Create a new project from scratch.\nOpen an existing project from disk or version control.",
+    "newProject": "New Project",
+    "open": "Open",
+    "cloneRepository": "Clone Repository",
+    "recentProjects": "Recent Projects",
+    "noProjects": "No recent projects, please create one first",
+    "categories": {
+      "web": "Web",
+      "mobile": "Mobile",
+      "blank": "Blank"
+    },
+    "templates": {
+      "dashboard": "Data Dashboard",
+      "admin": "Admin System",
+      "crm": "CRM System",
+      "portal": "Corporate Website",
+      "basic": "Basic Layout",
+      "bottomNav": "Bottom Navigation",
+      "mobileBlank": "Blank",
+      "blank": "Blank Project",
+      "blankDesc": "Build your page from the ground up"
+    },
+    "timeAgo": {
+      "justNow": "Just now",
+      "minutesAgo": "{{count}} minutes ago",
+      "hoursAgo": "{{count}} hours ago",
+      "daysAgo": "{{count}} days ago"
+    },
+    "create": {
+      "title": "Create New Project",
+      "fromTemplate": "From Template",
+      "fromBlank": "From Blank",
+      "selectTemplate": "Select a template to start quickly",
+      "blankProject": "Blank Project",
+      "blankDesc": "Build your page from the ground up",
+      "projectName": "Project Name",
+      "cancel": "Cancel",
+      "back": "Back",
+      "next": "Next",
+      "finish": "Create",
+      "localHint": "Project files are saved locally in the browser and can be linked to GitLab later."
+    },
+    "clone": {
+      "connectTitle": "Connect your GitLab account",
+      "connectDesc": "Log in to browse and clone projects from GitLab. Remote sync available after local editing.",
+      "connectBtn": "Connect GitLab",
+      "searchPlaceholder": "Search GitLab projects...",
+      "loading": "Loading...",
+      "noResults": "No matching projects found",
+      "empty": "No projects available",
+      "alreadyCloned": "Already Cloned"
+    }
   }
 }

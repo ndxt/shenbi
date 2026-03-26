@@ -280,7 +280,7 @@ export function ProjectListPage({ onSelectProject }: ProjectListPageProps) {
         <div style={styles.card}>
           <div style={styles.loginBox}>
             <FolderGit2 size={48} style={{ color: '#00b4d8' }} />
-            <h2 style={{ ...styles.title, justifyContent: 'center' }}>Shenbi 工程管理</h2>
+            <h2 style={{ ...styles.title, justifyContent: 'center' }}>乐扣 工程管理</h2>
             <p style={{ ...styles.subtitle, textAlign: 'center', maxWidth: 300 }}>
               登录 GitLab 以访问你的工程
             </p>

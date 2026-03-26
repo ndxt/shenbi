@@ -12,6 +12,7 @@ import {
   Camera, Gamepad2, Box, ArrowLeft,
   Search, Loader2, Download,
 } from 'lucide-react';
+import { useTranslation } from '@shenbi/i18n';
 import type { ActiveProjectConfig } from './constants';
 import { createLocalProjectConfig } from './constants';
 import { loadProjectList, upsertProjectInList } from './project-registry';
@@ -36,12 +37,12 @@ export interface WelcomeScreenProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function timeAgo(ts: number): string {
+function timeAgo(ts: number, t: any): string {
   const diff = (Date.now() - ts) / 1000;
-  if (diff < 60) return '刚刚';
-  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
-  return `${Math.floor(diff / 86400)} 天前`;
+  if (diff < 60) return t('welcome.timeAgo.justNow');
+  if (diff < 3600) return t('welcome.timeAgo.minutesAgo', { count: Math.floor(diff / 60) });
+  if (diff < 86400) return t('welcome.timeAgo.hoursAgo', { count: Math.floor(diff / 3600) });
+  return t('welcome.timeAgo.daysAgo', { count: Math.floor(diff / 86400) });
 }
 
 // ---------------------------------------------------------------------------
@@ -71,38 +72,49 @@ function ActionCard({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 12,
+        paddingTop: 24, // Fixed top spacing for icon alignment
+        paddingLeft: 12,
+        paddingRight: 12,
+        width: 132,
+        height: 114, // Fixed height to accommodate 2-line wraps perfectly
+        borderRadius: 16,
         opacity: disabled ? 0.4 : 1,
         cursor: disabled ? 'not-allowed' : 'pointer',
+        
+        // Ultra-minimalist styling
+        background: active || (hovered && !disabled)
+          ? 'var(--color-primary-bg)' // Faint transparent light blue background
+          : 'transparent',
+        transition: 'background 0.2s ease',
       }}
       onClick={disabled ? undefined : onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={disabled ? disabledReason : undefined}
     >
-      <div
-        style={{
-          width: 80,
-          height: 80,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 12,
-          border: active
-            ? '2px solid var(--color-primary)'
-            : '2px solid transparent',
-          background: active
-            ? 'rgba(0,0,0,0.2)'
-            : hovered && !disabled
-              ? 'rgba(255,255,255,0.08)'
-              : 'rgba(255,255,255,0.04)',
-          color: active ? 'var(--color-primary)' : 'var(--color-text-primary)',
-          transition: 'all 0.15s',
-        }}
-      >
+      <div style={{ 
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 32, // Fixed height forces horizontal alignment across all cards
+        color: active || (hovered && !disabled) ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+        transition: 'color 0.2s ease',
+      }}>
         {icon}
       </div>
-      <div style={{ fontSize: 13, color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: 500 }}>
+      <div style={{ 
+        marginTop: 14, // Fixed gap from icon bottom
+        fontSize: 13, 
+        lineHeight: 1.3,
+        textAlign: 'center',
+        maxHeight: 36, // Sufficient for 2 lines
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: active || (hovered && !disabled) ? 'var(--color-primary)' : 'var(--color-text-primary)', 
+        fontWeight: 500, // Never change weight on hover (prevents "getting bigger" feel)
+        transition: 'color 0.2s ease',
+      }}>
         {title}
       </div>
     </div>
@@ -287,29 +299,35 @@ interface ProjectTypeCategory {
   templates: ProjectTemplate[];
 }
 
-const PROJECT_CATEGORIES: ProjectTypeCategory[] = [
-  {
-    id: 'web',
-    name: 'Web 端',
-    templates: [
-      { id: 'blank', name: '空白项目', cover: <CoverBlank /> },
-      { id: 'admin', name: '管理系统', cover: <CoverAdmin /> },
-      { id: 'portal', name: '企业官网', cover: <CoverPortal /> },
-      { id: 'dashboard', name: '数据大屏', cover: <CoverDashboard /> },
-    ],
-  },
-  {
-    id: 'mobile',
-    name: '移动端',
-    templates: [
-      { id: 'mobile-blank', name: '空白', cover: <CoverBlank /> },
-      { id: 'mobile-basic', name: '基础布局', cover: <CoverMobileBasic /> },
-      { id: 'mobile-bottom-nav', name: '底部导航', cover: <CoverMobileBottomNav /> },
-    ],
-  },
-];
+// ---------------------------------------------------------------------------
+// WelcomeScreen Component
+// ---------------------------------------------------------------------------
 
 export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, initialMode, onClose }: WelcomeScreenProps) {
+  const { t } = useTranslation('preview');
+
+  const PROJECT_CATEGORIES: ProjectTypeCategory[] = [
+    {
+      id: 'web',
+      name: t('welcome.categories.web'),
+      templates: [
+        { id: 'blank', name: t('welcome.templates.blank'), cover: <CoverBlank /> },
+        { id: 'admin', name: t('welcome.templates.admin'), cover: <CoverAdmin /> },
+        { id: 'portal', name: t('welcome.templates.portal'), cover: <CoverPortal /> },
+        { id: 'dashboard', name: t('welcome.templates.dashboard'), cover: <CoverDashboard /> },
+      ],
+    },
+    {
+      id: 'mobile',
+      name: t('welcome.categories.mobile'),
+      templates: [
+        { id: 'mobile-blank', name: t('welcome.templates.mobileBlank'), cover: <CoverBlank /> },
+        { id: 'mobile-basic', name: t('welcome.templates.basic'), cover: <CoverMobileBasic /> },
+        { id: 'mobile-bottom-nav', name: t('welcome.templates.bottomNav'), cover: <CoverMobileBottomNav /> },
+      ],
+    },
+  ];
+
   const [mode, setMode] = useState<Mode>(initialMode ?? 'idle');
   const [newName, setNewName] = useState('');
   const [projects, setProjects] = useState<ActiveProjectConfig[]>([]);
@@ -381,11 +399,11 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
   }, [mode, cloneAuthStatus?.authenticated, cloneAuthStatus?.defaultGroupId, cloneSearch, gitlabService]);
 
   const handleCreate = useCallback(() => {
-    const name = newName.trim() || '新建项目';
+    const name = newName.trim() || t('welcome.create.blankProject');
     const config = createLocalProjectConfig(name);
     void upsertProjectInList(config);
     onSelectProject(config);
-  }, [newName, onSelectProject]);
+  }, [newName, onSelectProject, t]);
 
   const handleOpenProject = useCallback((config: ActiveProjectConfig) => {
     void upsertProjectInList({ ...config, lastOpenedAt: Date.now() });
@@ -469,7 +487,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
             <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c93f' }} />
           </div>
           <div style={{ flex: 1, textAlign: 'center', fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-            {mode === 'new' ? 'New Project' : mode === 'clone' ? 'Clone Repository' : 'Welcome'}
+            {mode === 'new' ? t('welcome.newProject') : mode === 'clone' ? t('welcome.cloneRepository') : t('welcome.title')}
           </div>
           <div style={{ width: 48 }} /> {/* spacer for balance */}
         </div>
@@ -562,18 +580,18 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
               /* ── Step 2: Name input ── */
               <div style={{ flex: 1, padding: 40, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>
-                  配置项目
+                  {t('welcome.create.title')}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 32 }}>
-                  选择了模板: <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{activeCategory.templates.find((t) => t.id === selectedTemplateId)?.name}</span>
+                  {t('welcome.create.selectTemplate')}: <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{activeCategory.templates.find((t) => t.id === selectedTemplateId)?.name}</span>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 400 }}>
-                  <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>项目名称</label>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('welcome.create.projectName')}</label>
                   <input
                     autoFocus
                     type="text"
-                    placeholder="我的项目"
+                    placeholder={t('welcome.templates.blank')}
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreateStep('template'); }}
@@ -590,7 +608,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                     onBlur={(e) => { e.target.style.borderColor = 'var(--color-border-ide)'; }}
                   />
                   <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                    项目文件保存到本地浏览器，后续可绑定 GitLab。
+                    {t('welcome.create.localHint')}
                   </div>
                 </div>
               </div>
@@ -609,7 +627,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                       fontSize: 13, cursor: 'pointer',
                     }}
                   >
-                    取消
+                    {t('welcome.create.cancel')}
                   </button>
                   <button
                     type="button"
@@ -623,7 +641,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                       opacity: selectedTemplateId ? 1 : 0.4,
                     }}
                   >
-                    下一步
+                    {t('welcome.create.next')}
                   </button>
                 </>
               ) : (
@@ -637,7 +655,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                       fontSize: 13, fontWeight: 500, cursor: 'pointer',
                     }}
                   >
-                    上一步
+                    {t('welcome.create.back')}
                   </button>
                   <button
                     type="button"
@@ -651,7 +669,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                       opacity: newName.trim() ? 1 : 0.4,
                     }}
                   >
-                    创建
+                    {t('welcome.create.finish')}
                   </button>
                 </>
               )}
@@ -673,9 +691,9 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                 <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--color-bg-panel)', border: '1px solid var(--color-border-ide)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <GitBranch size={36} strokeWidth={1.5} style={{ color: 'var(--color-primary)' }} />
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>连接你的 GitLab 账号</div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>{t('welcome.clone.connectTitle')}</div>
                 <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', lineHeight: 1.6, maxWidth: 320 }}>
-                  登录后即可浏览和克隆远程仓库中的项目，<br/>本地编辑后可随时同步回 GitLab。
+                  {t('welcome.clone.connectDesc')}
                 </div>
                 <button
                   type="button"
@@ -689,7 +707,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0.9'; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
                 >
-                  连接 GitLab
+                  {t('welcome.clone.connectBtn')}
                 </button>
               </div>
             ) : (
@@ -708,7 +726,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                         flex: 1, border: 'none', padding: 0, background: 'transparent',
                         color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
                       }}
-                      placeholder="搜索 GitLab 项目..."
+                      placeholder={t('welcome.clone.searchPlaceholder')}
                       value={cloneSearch}
                       onChange={(e) => setCloneSearch(e.target.value)}
                       autoFocus
@@ -720,11 +738,11 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                   {cloneProjectsLoading ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
                       <Loader2 size={20} style={{ color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }} />
-                      <span style={{ marginLeft: 8, fontSize: 13, color: 'var(--color-text-secondary)' }}>加载中...</span>
+                      <span style={{ marginLeft: 8, fontSize: 13, color: 'var(--color-text-secondary)' }}>{t('welcome.clone.loading')}</span>
                     </div>
                   ) : cloneProjects.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 40, fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                      {cloneSearch ? '未找到匹配项目' : '暂无项目'}
+                      {cloneSearch ? t('welcome.clone.noResults') : t('welcome.clone.empty')}
                     </div>
                   ) : (
                     cloneProjects.map((p) => {
@@ -752,7 +770,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.path_with_namespace}</div>
                           </div>
                           {cloningId === p.id && <Loader2 size={14} style={{ color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }} />}
-                          {alreadyCloned && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(75,158,250,0.15)', color: 'var(--color-primary)', fontWeight: 600 }}>已 Clone</span>}
+                          {alreadyCloned && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(75,158,250,0.15)', color: 'var(--color-primary)', fontWeight: 600 }}>{t('welcome.clone.alreadyCloned')}</span>}
                           {!alreadyCloned && cloningId !== p.id && <Check size={14} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />}
                         </div>
                       );
@@ -772,7 +790,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                   fontSize: 13, cursor: 'pointer',
                 }}
               >
-                取消
+                {t('welcome.create.cancel')}
               </button>
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -795,11 +813,10 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
         {/* Logo + Title */}
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.5px', marginBottom: 12, color: 'var(--color-text-primary)' }}>
-            Welcome to 乐扣 IDE
+            {t('welcome.title')}
           </div>
-          <div style={{ fontSize: 14, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-            创建一个新项目以从头开始。<br/>
-            从磁盘或版本控制中打开现有项目。
+          <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+            {t('welcome.subtitle')}
           </div>
         </div>
 
@@ -807,7 +824,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
       <div style={{ display: 'flex', gap: 24, justifyContent: 'center', width: '100%', marginTop: 8 }}>
         <ActionCard
           icon={<FilePlus2 size={28} strokeWidth={1.5} />}
-          title="New Project"
+          title={t('welcome.newProject')}
           active={false}
           onClick={() => {
             setMode('new');
@@ -817,15 +834,15 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
         />
         <ActionCard
           icon={<FolderOpen size={28} strokeWidth={1.5} />}
-          title="Open"
+          title={t('welcome.open')}
           disabled={projects.length === 0}
-          disabledReason="暂无历史项目，请先新建一个"
+          disabledReason={t('welcome.noProjects')}
           active={mode === 'open'}
           onClick={() => setMode(mode === 'open' ? 'idle' : 'open')}
         />
         <ActionCard
           icon={<GitBranch size={28} strokeWidth={1.5} />}
-          title="Clone Repository"
+          title={t('welcome.cloneRepository')}
           active={false}
           onClick={() => setMode('clone')}
         />
@@ -846,7 +863,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)', marginLeft: 2, marginBottom: 4 }}>
-            最近项目
+            {t('welcome.recentProjects')}
           </div>
           {projects.slice(0, 8).map((p) => {
             const key = p.id ?? p.vfsProjectId;
@@ -874,7 +891,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Clock size={10} />
-                    {timeAgo(p.lastOpenedAt)}
+                    {timeAgo(p.lastOpenedAt, t)}
                     {p.gitlabProjectId && <span style={{ marginLeft: 6, color: 'var(--color-primary)' }}>GitLab</span>}
                   </div>
                 </div>

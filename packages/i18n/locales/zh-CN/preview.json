@@ -62,5 +62,60 @@
   "aria": {
     "modeSwitch": "模式切换",
     "scenarioSwitch": "场景切换"
+  },
+  "welcome": {
+    "title": "Welcome to 乐扣 IDE",
+    "subtitle": "创建一个新项目以从头开始。\n从磁盘或版本控制中打开现有项目。",
+    "newProject": "New Project",
+    "open": "Open",
+    "cloneRepository": "Clone Repository",
+    "recentProjects": "最近项目",
+    "noProjects": "暂无历史项目，请先新建一个",
+    "categories": {
+      "web": "Web 端",
+      "mobile": "移动端",
+      "blank": "从空白开始"
+    },
+    "templates": {
+      "dashboard": "数据大屏",
+      "admin": "管理系统",
+      "crm": "客户管理",
+      "portal": "企业官网",
+      "basic": "基础布局",
+      "bottomNav": "底部导航",
+      "mobileBlank": "空白",
+      "blank": "空白项目",
+      "blankDesc": "从零开始构建你的页面"
+    },
+    "timeAgo": {
+      "justNow": "刚刚",
+      "minutesAgo": "{{count}} 分钟前",
+      "hoursAgo": "{{count}} 小时前",
+      "daysAgo": "{{count}} 天前"
+    },
+    "create": {
+      "title": "创建新项目",
+      "fromTemplate": "从模板创建",
+      "fromBlank": "从空白开始",
+      "selectTemplate": "选择一个模板快速开始",
+      "blankProject": "空白项目",
+      "blankDesc": "从零开始构建你的页面",
+      "projectName": "项目名称",
+      "cancel": "取消",
+      "back": "上一步",
+      "next": "下一步",
+      "finish": "创建",
+      "localHint": "项目文件保存到本地浏览器，后续可绑定 GitLab。"
+    },
+    "clone": {
+      "connectTitle": "连接你的 GitLab 账号",
+      "connectDesc": "登录后即可浏览和克隆远程仓库中的项目，本地编辑后可随时同步回 GitLab。",
+      "connectBtn": "连接 GitLab",
+      "searchPlaceholder": "搜索 GitLab 项目...",
+      "loading": "加载中...",
+      "noResults": "未找到匹配项目",
+      "empty": "暂无项目",
+      "alreadyCloned": "已 Clone"
+    }
   }
 }
