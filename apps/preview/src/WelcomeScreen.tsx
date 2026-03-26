@@ -225,12 +225,6 @@ const CoverDashboard = () => (
 // Mobile Cover Components (Android Studio Style Precision)
 // ---------------------------------------------------------------------------
 
-const CoverMobileNoActivity = () => (
-  <svg width="100%" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="28" y="28" width="44" height="44" rx="6" stroke="#8A8A8A" strokeWidth="4" strokeDasharray="8 6" fill="transparent" strokeLinecap="round" />
-  </svg>
-);
-
 const CoverMobileBasic = () => (
   <svg width="100%" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect x="25" y="10" width="50" height="80" rx="10" fill="#4B4E53"/> 
@@ -291,9 +285,9 @@ const PROJECT_CATEGORIES: ProjectTypeCategory[] = [
     id: 'mobile',
     name: '移动端',
     templates: [
-      { id: 'mobile-no-activity', name: 'No Activity', cover: <CoverMobileNoActivity /> },
-      { id: 'mobile-basic', name: 'Basic Views Activity', cover: <CoverMobileBasic /> },
-      { id: 'mobile-bottom-nav', name: 'Bottom Navigation Views', cover: <CoverMobileBottomNav /> },
+      { id: 'mobile-blank', name: '空白', cover: <CoverBlank /> },
+      { id: 'mobile-basic', name: '基础布局', cover: <CoverMobileBasic /> },
+      { id: 'mobile-bottom-nav', name: '底部导航', cover: <CoverMobileBottomNav /> },
     ],
   },
 ];
