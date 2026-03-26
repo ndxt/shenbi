@@ -114,6 +114,7 @@ export function AIPanel({
 
   const [selectedNodeLabel, setSelectedNodeLabel] = React.useState<string>(t('status.notSelected'));
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const previousMessageCountRef = useRef(0);
   const modelsReady = plannerModels.length > 0 && blockModels.length > 0;
   const modelSelectionBlocked = isLoadingModels || Boolean(modelsError) || !modelsReady;
   const loopAwaitingConfirmation = mode === 'loop' && phase === 'awaiting_confirmation';
@@ -171,8 +172,13 @@ export function AIPanel({
     if (!target || typeof target.scrollIntoView !== 'function') {
       return;
     }
-    target.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, progressText, phase, pages]);
+    const hasNewMessage = messages.length > previousMessageCountRef.current;
+    previousMessageCountRef.current = messages.length;
+    target.scrollIntoView({
+      behavior: hasNewMessage ? 'smooth' : 'auto',
+      block: 'end',
+    });
+  }, [messages.length, progressText, phase, pages]);
 
   useEffect(() => {
     if (!persistence || !uiHydrated) {

@@ -9,6 +9,31 @@ const useAgentRunState = vi.hoisted(() => ({
   cancelRun: vi.fn(),
 }));
 
+const useAgentLoopState = vi.hoisted(() => ({
+  mode: null as 'legacy' | 'loop' | null,
+  phase: 'idle' as 'idle' | 'thinking' | 'awaiting_confirmation' | 'executing' | 'done' | 'error',
+  isRunning: false,
+  progressText: '',
+  elapsedMs: 0,
+  projectPlan: null,
+  pages: [] as Array<Record<string, unknown>>,
+  errorMessage: undefined as string | undefined,
+  planRevisionRequested: false,
+  legacy: {
+    executionSnapshot: null,
+    isRunning: false,
+    progressText: '',
+    elapsedMs: 0,
+  },
+  runAgent: useAgentRunState.runAgent,
+  cancelRun: useAgentRunState.cancelRun,
+  resetLoopState: vi.fn(),
+  confirmProjectPlan: vi.fn(),
+  requestProjectPlanRevision: vi.fn(),
+  cancelProjectPlanRevision: vi.fn(),
+  submitProjectPlanRevision: vi.fn(),
+}));
+
 vi.mock('../hooks/useAgentRun', () => ({
   useAgentRun: () => ({
     isRunning: false,
@@ -18,6 +43,10 @@ vi.mock('../hooks/useAgentRun', () => ({
     runAgent: useAgentRunState.runAgent,
     cancelRun: useAgentRunState.cancelRun,
   }),
+}));
+
+vi.mock('../hooks/useAgentLoop', () => ({
+  useAgentLoop: () => useAgentLoopState,
 }));
 
 import { AIPanel } from './AIPanel';
@@ -105,6 +134,23 @@ describe('AIPanel', () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+    useAgentLoopState.mode = null;
+    useAgentLoopState.phase = 'idle';
+    useAgentLoopState.isRunning = false;
+    useAgentLoopState.progressText = '';
+    useAgentLoopState.elapsedMs = 0;
+    useAgentLoopState.projectPlan = null;
+    useAgentLoopState.pages = [];
+    useAgentLoopState.errorMessage = undefined;
+    useAgentLoopState.planRevisionRequested = false;
+    useAgentLoopState.runAgent = useAgentRunState.runAgent;
+    useAgentLoopState.cancelRun = useAgentRunState.cancelRun;
+    useAgentLoopState.legacy = {
+      executionSnapshot: null,
+      isRunning: false,
+      progressText: '',
+      elapsedMs: 0,
+    };
   });
 
   it('通过 pluginContext.persistence 恢复并写回模型、草稿、历史和会话', async () => {
@@ -400,6 +446,67 @@ describe('AIPanel', () => {
           }),
         ]),
       }));
+    });
+  });
+
+  it('uses auto scroll for in-flight panel refreshes instead of repeated smooth scrolling', async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    const pluginContext = createPersistenceStateContext();
+    const { rerender } = render(<AIPanel bridge={createBridge()} pluginContext={pluginContext} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Planner')).toHaveValue('openai-compatible::GLM-4.6');
+    });
+
+    useAgentLoopState.mode = 'legacy';
+    useAgentLoopState.isRunning = true;
+    useAgentLoopState.progressText = 'Planning page structure.';
+    useAgentLoopState.legacy = {
+      executionSnapshot: {
+        mode: 'create',
+        plan: {
+          pageTitle: '系统看板',
+          pageType: 'dashboard',
+          blocks: [{
+            id: 'hero',
+            description: '顶部概览',
+            components: ['Card'],
+            priority: 1,
+            complexity: 'simple',
+          }],
+        },
+        plannerMetrics: null,
+        blockStatuses: { hero: 'done' },
+        blockTokens: {},
+        blockInputTokens: {},
+        blockOutputTokens: {},
+        blockDurationMs: {},
+        modifyPlan: null,
+        modifyStatuses: {},
+        modifyOpMetrics: {},
+        progressText: 'Planning page structure.',
+        didApplySchema: false,
+      },
+      isRunning: true,
+      progressText: 'Planning page structure.',
+      elapsedMs: 3456,
+    };
+
+    rerender(<AIPanel bridge={createBridge()} pluginContext={pluginContext} />);
+
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalled();
+    });
+
+    const latestCall = scrollIntoView.mock.calls.at(-1)?.[0];
+    expect(latestCall).toMatchObject({
+      behavior: 'auto',
+      block: 'end',
     });
   });
 });
