@@ -427,7 +427,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
         style={{
           maxWidth: (mode === 'new' || mode === 'clone') ? 720 : 680,
           minWidth: 560,
-          background: '#1e1e1e',
+          background: 'var(--color-bg-editor)',
           borderRadius: 12,
           boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
           border: '1px solid var(--color-border-ide)',
@@ -438,7 +438,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
         }}
       >
         {/* Dialog Header */}
-        <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-ide)', background: 'var(--color-header-bg, transparent)' }}>
+        <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border-ide)', background: 'var(--color-bg-panel)' }}>
           <div style={{ display: 'flex', gap: 6 }}>
             <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f56' }} />
             <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e' }} />
@@ -455,16 +455,17 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
           /* =========================================================
              NEW PROJECT WIZARD
              ========================================================= */
-          <div style={{ display: 'flex', flexDirection: 'column', height: 480, background: '#1e1e1e' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: 480, background: 'var(--color-bg-editor)' }}>
             <style>{`
               .category-item:hover {
-                background: #2a3d5a !important;
+                background: rgba(75,158,250,0.15) !important;
+                color: var(--color-primary) !important;
               }
               .template-card {
                 transition: all 0.2s ease, transform 0.2s ease;
               }
               .template-card:hover {
-                border-color: #4b9efa !important;
+                border-color: var(--color-primary) !important;
                 transform: translateY(-2px);
                 box-shadow: 0 4px 12px rgba(0,0,0,0.2);
               }
@@ -473,7 +474,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
               /* ── Step 1: Template selection ── */
               <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
                 {/* Category sidebar (mockup style) */}
-                <div style={{ width: 140, borderRight: '1px solid #18181a', padding: '16px 0', flexShrink: 0, background: '#1c1c1c' }}>
+                <div style={{ width: 140, borderRight: '1px solid var(--color-border-ide)', padding: '16px 0', flexShrink: 0, background: 'var(--color-bg-panel)' }}>
                   {PROJECT_CATEGORIES.map((cat) => {
                     const isActive = cat.id === activeCategoryId;
                     return (
@@ -484,11 +485,11 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                         style={{
                           display: 'flex', alignItems: 'center',
                           padding: '8px 16px', cursor: 'pointer',
-                          fontSize: 13, transition: 'background 0.15s',
-                          background: isActive ? '#2a3d5a' : 'transparent',
-                          color: '#e0e0e0',
+                          fontSize: 13, transition: 'background 0.15s, color 0.15s',
+                          background: isActive ? 'rgba(75,158,250,0.15)' : 'transparent',
+                          color: isActive ? 'var(--color-primary)' : 'var(--color-text-primary)',
                           fontWeight: isActive ? 500 : 400,
-                          borderLeft: isActive ? '3px solid #4b9efa' : '3px solid transparent',
+                          borderLeft: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
                         }}
                       >
                         {cat.name}
@@ -497,7 +498,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                   })}
                 </div>
                 {/* Template grid (mockup style) */}
-                <div style={{ flex: 1, padding: '24px 32px', overflowY: 'auto', background: '#1e1e1e' }}>
+                <div style={{ flex: 1, padding: '24px 32px', overflowY: 'auto', background: 'var(--color-bg-canvas)' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                     {activeCategory.templates.map((tpl) => {
                       const isSelected = selectedTemplateId === tpl.id;
@@ -509,21 +510,21 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                           style={{
                             display: 'flex', flexDirection: 'column',
                             borderRadius: 8, cursor: 'pointer',
-                            border: isSelected ? '1px solid #4b9efa' : '1px solid #3e3e42',
-                            background: '#252526',
+                            border: isSelected ? '1px solid var(--color-primary)' : '1px solid var(--color-border-ide)',
+                            background: 'var(--color-bg-panel)',
                             overflow: 'hidden',
                             height: 140,
-                            boxShadow: isSelected ? '0 0 0 1px #4b9efa' : 'none',
+                            boxShadow: isSelected ? '0 0 0 1px var(--color-primary)' : 'none',
                           }}
                         >
                           <div style={{
                             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: '#2d2d2d', borderBottom: '1px solid #3e3e42',
+                            background: 'var(--color-bg-activity-bar)', borderBottom: '1px solid var(--color-border-ide)',
                           }}>
                             {tpl.cover}
                           </div>
                           <div style={{ 
-                            height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#e0e0e0', fontWeight: 400
+                            height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 400
                            }}>
                             {tpl.name}
                           </div>
@@ -556,7 +557,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                       padding: '10px 14px',
                       borderRadius: 6,
                       border: '1px solid var(--color-border-ide)',
-                      background: 'var(--color-bg-base)',
+                      background: 'var(--color-bg-canvas)',
                       color: 'var(--color-text-primary)',
                       fontSize: 14,
                       outline: 'none',
@@ -572,15 +573,15 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
             )}
 
             {/* Wizard Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 24px', borderTop: '1px solid #18181a', background: '#1c1c1c' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 24px', borderTop: '1px solid var(--color-border-ide)', background: 'var(--color-bg-panel)' }}>
               {createStep === 'template' ? (
                 <>
                   <button
                     type="button"
                     onClick={() => onClose ? onClose() : setMode('idle')}
                     style={{
-                      padding: '6px 20px', borderRadius: 4, border: '1px solid #3e3e42',
-                      background: '#3e3e42', color: '#e0e0e0',
+                      padding: '6px 20px', borderRadius: 4, border: '1px solid var(--color-border-ide)',
+                      background: 'var(--color-bg-activity-bar)', color: 'var(--color-text-primary)',
                       fontSize: 13, cursor: 'pointer',
                     }}
                   >
@@ -592,7 +593,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                     onClick={() => setCreateStep('name')}
                     style={{
                       padding: '6px 20px', borderRadius: 4, border: 'none',
-                      background: '#4b9efa', color: '#fff',
+                      background: 'var(--color-primary)', color: 'var(--color-text-inverse)',
                       fontSize: 13,
                       cursor: selectedTemplateId ? 'pointer' : 'not-allowed',
                       opacity: selectedTemplateId ? 1 : 0.4,
@@ -636,20 +637,20 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
           /* =========================================================
              CLONE REPOSITORY FLOW
              ========================================================= */
-          <div style={{ display: 'flex', flexDirection: 'column', height: 480, background: '#1e1e1e' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: 480, background: 'var(--color-bg-editor)' }}>
             {cloneAuthLoading ? (
               /* Loading auth status */
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Loader2 size={24} style={{ color: '#4b9efa', animation: 'spin 1s linear infinite' }} />
+                <Loader2 size={24} style={{ color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }} />
               </div>
             ) : !cloneAuthStatus?.authenticated ? (
               /* ── Not logged in: Login guidance ── */
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 }}>
-                <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#2a3d5a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <GitBranch size={36} strokeWidth={1.5} style={{ color: '#4b9efa' }} />
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--color-bg-panel)', border: '1px solid var(--color-border-ide)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <GitBranch size={36} strokeWidth={1.5} style={{ color: 'var(--color-primary)' }} />
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 600, color: '#e0e0e0' }}>连接你的 GitLab 账号</div>
-                <div style={{ fontSize: 13, color: '#8b8b8b', textAlign: 'center', lineHeight: 1.6, maxWidth: 320 }}>
+                <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>连接你的 GitLab 账号</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', lineHeight: 1.6, maxWidth: 320 }}>
                   登录后即可浏览和克隆远程仓库中的项目，<br/>本地编辑后可随时同步回 GitLab。
                 </div>
                 <button
@@ -657,12 +658,12 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                   onClick={handleConnectGitLab}
                   style={{
                     marginTop: 8, padding: '10px 32px', borderRadius: 6, border: 'none',
-                    background: '#4b9efa', color: '#fff',
+                    background: 'var(--color-primary)', color: 'var(--color-text-inverse)',
                     fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                    transition: 'background 0.15s',
+                    transition: 'opacity 0.15s',
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#3b8de8'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#4b9efa'; }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0.9'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
                 >
                   连接 GitLab
                 </button>
@@ -674,14 +675,14 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                 <div style={{ padding: '16px 24px 0 24px' }}>
                   <div style={{
                     display: 'flex', gap: 8, padding: '8px 12px',
-                    background: '#252526', borderRadius: 6,
-                    border: '1px solid #3e3e42', alignItems: 'center',
+                    background: 'var(--color-bg-panel)', borderRadius: 6,
+                    border: '1px solid var(--color-border-ide)', alignItems: 'center',
                   }}>
-                    <Search size={14} style={{ color: '#8b8b8b', flexShrink: 0 }} />
+                    <Search size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
                     <input
                       style={{
                         flex: 1, border: 'none', padding: 0, background: 'transparent',
-                        color: '#e0e0e0', fontSize: 13, outline: 'none',
+                        color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
                       }}
                       placeholder="搜索 GitLab 项目..."
                       value={cloneSearch}
@@ -694,11 +695,11 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                 <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
                   {cloneProjectsLoading ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
-                      <Loader2 size={20} style={{ color: '#4b9efa', animation: 'spin 1s linear infinite' }} />
-                      <span style={{ marginLeft: 8, fontSize: 13, color: '#8b8b8b' }}>加载中...</span>
+                      <Loader2 size={20} style={{ color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }} />
+                      <span style={{ marginLeft: 8, fontSize: 13, color: 'var(--color-text-secondary)' }}>加载中...</span>
                     </div>
                   ) : cloneProjects.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: 40, fontSize: 13, color: '#8b8b8b' }}>
+                    <div style={{ textAlign: 'center', padding: 40, fontSize: 13, color: 'var(--color-text-secondary)' }}>
                       {cloneSearch ? '未找到匹配项目' : '暂无项目'}
                     </div>
                   ) : (
@@ -714,21 +715,21 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                             padding: '12px 14px', borderRadius: 8, marginBottom: 4,
                             cursor: alreadyCloned ? 'default' : 'pointer',
                             opacity: alreadyCloned ? 0.5 : 1,
-                            border: '1px solid #3e3e42',
-                            background: '#252526',
+                            border: '1px solid var(--color-border-ide)',
+                            background: 'var(--color-bg-panel)',
                             transition: 'all 0.15s',
                           }}
-                          onMouseEnter={(e) => { if (!alreadyCloned) { (e.currentTarget as HTMLElement).style.borderColor = '#4b9efa'; (e.currentTarget as HTMLElement).style.background = '#2a2d32'; } }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#3e3e42'; (e.currentTarget as HTMLElement).style.background = '#252526'; }}
+                          onMouseEnter={(e) => { if (!alreadyCloned) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-primary)'; (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-activity-bar)'; } }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border-ide)'; (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-panel)'; }}
                         >
-                          <Download size={16} style={{ color: '#4b9efa', flexShrink: 0 }} />
+                          <Download size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 500, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                            <div style={{ fontSize: 11, color: '#8b8b8b', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.path_with_namespace}</div>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.path_with_namespace}</div>
                           </div>
-                          {cloningId === p.id && <Loader2 size={14} style={{ color: '#4b9efa', animation: 'spin 1s linear infinite' }} />}
-                          {alreadyCloned && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(75,158,250,0.15)', color: '#4b9efa', fontWeight: 600 }}>已 Clone</span>}
-                          {!alreadyCloned && cloningId !== p.id && <Check size={14} style={{ color: '#4b9efa', flexShrink: 0 }} />}
+                          {cloningId === p.id && <Loader2 size={14} style={{ color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }} />}
+                          {alreadyCloned && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(75,158,250,0.15)', color: 'var(--color-primary)', fontWeight: 600 }}>已 Clone</span>}
+                          {!alreadyCloned && cloningId !== p.id && <Check size={14} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />}
                         </div>
                       );
                     })
@@ -737,13 +738,13 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
               </div>
             )}
             {/* Clone Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 24px', borderTop: '1px solid #18181a', background: '#1c1c1c' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 24px', borderTop: '1px solid var(--color-border-ide)', background: 'var(--color-bg-panel)' }}>
               <button
                 type="button"
                 onClick={() => { if (onClose) { onClose(); } else { setMode('idle'); setCloneSearch(''); setCloneProjects([]); setCloneAuthStatus(null); } }}
                 style={{
-                  padding: '6px 20px', borderRadius: 4, border: '1px solid #3e3e42',
-                  background: '#3e3e42', color: '#e0e0e0',
+                  padding: '6px 20px', borderRadius: 4, border: '1px solid var(--color-border-ide)',
+                  background: 'var(--color-bg-activity-bar)', color: 'var(--color-text-primary)',
                   fontSize: 13, cursor: 'pointer',
                 }}
               >
