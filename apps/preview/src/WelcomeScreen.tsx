@@ -422,7 +422,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
         style={{
           maxWidth: (mode === 'new' || mode === 'clone') ? 720 : 680,
           minWidth: 560,
-          background: 'var(--color-bg-panel)',
+          background: '#1e1e1e',
           borderRadius: 12,
           boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
           border: '1px solid var(--color-border-ide)',
