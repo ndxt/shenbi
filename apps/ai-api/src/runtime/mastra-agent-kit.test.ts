@@ -4,6 +4,7 @@ import {
   buildProjectAgentPrompt,
   extractValidatedMastraBlockNode,
   normalizeDocumentSummary,
+  normalizeIntentClassification,
 } from './mastra-agent-kit.ts';
 
 describe('extractValidatedMastraBlockNode', () => {
@@ -139,5 +140,26 @@ describe('normalizeDocumentSummary', () => {
     expect(summary.evidence).toEqual([
       '事项详情查看权限：高管、督办专员、责任人、协办人可查看',
     ]);
+  });
+});
+
+describe('normalizeIntentClassification', () => {
+  it('maps richer project-routing output back into the existing classify contract', () => {
+    const classification = normalizeIntentClassification({
+      route: 'project',
+      reason: '文档描述了完整系统，需要生成多个页面',
+      projectType: 'multi-page-system',
+      estimatedPages: 6,
+      entities: ['会议信息', '事项信息'],
+      roles: ['高管', '督办专员'],
+    });
+
+    expect(classification).toEqual({
+      intent: 'schema.create',
+      confidence: 0.9,
+      scope: 'multi-page',
+      routeKind: 'project',
+      reason: '文档描述了完整系统，需要生成多个页面',
+    });
   });
 });

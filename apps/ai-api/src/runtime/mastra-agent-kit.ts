@@ -487,12 +487,57 @@ export function normalizeDocumentSummary(payload: z.infer<typeof documentSummary
 }
 
 const intentClassificationSchema = z.object({
-  intent: z.enum(['schema.create', 'schema.modify', 'chat']),
-  confidence: z.number().min(0).max(1),
-  scope: z.enum(['single-page', 'multi-page']),
-  routeKind: z.enum(['single-page', 'project', 'chat']),
+  intent: z.enum(['schema.create', 'schema.modify', 'chat']).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  scope: z.enum(['single-page', 'multi-page']).optional(),
+  routeKind: z.enum(['single-page', 'project', 'chat']).optional(),
   reason: z.string().optional(),
-});
+  route: z.enum(['single-page', 'project', 'chat']).optional(),
+  projectType: z.string().optional(),
+  estimatedPages: z.number().optional(),
+  entities: z.array(z.union([z.string(), z.record(z.any())])).optional(),
+  roles: z.array(z.union([z.string(), z.record(z.any())])).optional(),
+}).passthrough();
+
+export function normalizeIntentClassification(
+  payload: z.infer<typeof intentClassificationSchema>,
+): IntentClassification & { routeKind: 'single-page' | 'project' | 'chat'; reason?: string } {
+  const routeKind = payload.routeKind
+    ?? payload.route
+    ?? (
+      typeof payload.projectType === 'string' && payload.projectType.toLowerCase().includes('multi-page')
+        ? 'project'
+        : undefined
+    )
+    ?? (
+      typeof payload.estimatedPages === 'number' && payload.estimatedPages > 1
+        ? 'project'
+        : undefined
+    )
+    ?? 'single-page';
+
+  const intent = payload.intent
+    ?? (routeKind === 'chat'
+      ? 'chat'
+      : 'schema.create');
+
+  const scope = payload.scope
+    ?? (routeKind === 'project' ? 'multi-page' : 'single-page');
+
+  const confidence = typeof payload.confidence === 'number'
+    ? payload.confidence
+    : routeKind === 'project'
+      ? 0.9
+      : 0.8;
+
+  return {
+    intent,
+    confidence,
+    scope,
+    routeKind,
+    ...(payload.reason ? { reason: payload.reason } : {}),
+  };
+}
 
 const pagePlanSchema = z.object({
   pageTitle: z.string(),
@@ -870,7 +915,7 @@ export async function classifyIntentWithMastraAgent(input: {
     threadId: input.request.conversationId ?? 'classify',
   });
 
-  return result.object as IntentClassification & { routeKind: 'single-page' | 'project' | 'chat'; reason?: string };
+  return normalizeIntentClassification(result.object);
 }
 
 export async function planPageWithMastraAgent(
