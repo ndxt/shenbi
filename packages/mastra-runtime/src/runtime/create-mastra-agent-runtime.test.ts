@@ -359,6 +359,44 @@ describe('createMastraAgentRuntime', () => {
     }));
   });
 
+  it('emits an error instead of falling back to legacy for unsupported intents', async () => {
+    const logger = {
+      info: vi.fn(),
+      error: vi.fn(),
+    };
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime: createLegacyRuntime([
+        { type: 'run:start', data: { sessionId: 'legacy-session', conversationId: 'legacy-conv' } },
+      ]),
+      createDeps: () => createDeps([], { logger }),
+      prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
+    });
+
+    const events: AgentEvent[] = [];
+    for await (const event of runtime.runStream(createRequest({
+      intent: 'unknown.intent' as unknown as AgentIntent,
+      prompt: '触发未知意图',
+    }))) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([{
+      type: 'error',
+      data: {
+        message: 'Unsupported mastra run intent: unknown.intent',
+      },
+    }]);
+    expect(logger.error).toHaveBeenCalledWith('mastra.runtime.run_stream.unsupported_intent', expect.objectContaining({
+      runtime: 'mastra',
+      resolvedIntent: 'unknown.intent',
+      runContext: 'single-page',
+      message: 'Unsupported mastra run intent: unknown.intent',
+    }));
+  });
+
   it('classifies routes through the mastra classifier path', async () => {
     const deps = createDeps([
       {

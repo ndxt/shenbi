@@ -349,13 +349,19 @@ async function* runMastraPageStream(
 
   if (!isPageIntent(resolvedIntent.intent)) {
     if (resolvedIntent.intent !== 'chat') {
-      logInfo(deps, 'mastra.runtime.run_stream.fallback_legacy', {
+      const unsupportedMessage = `Unsupported mastra run intent: ${resolvedIntent.intent}`;
+      logError(deps, 'mastra.runtime.run_stream.unsupported_intent', {
         conversationId,
         resolvedIntent: resolvedIntent.intent,
-        fallbackReason: 'unsupported_intent',
         runContext: getRunContextTag(preparedRequest),
+        message: unsupportedMessage,
       });
-      yield* options.legacyRuntime.runStream(request);
+      yield {
+        type: 'error',
+        data: {
+          message: unsupportedMessage,
+        },
+      };
       return;
     }
 
