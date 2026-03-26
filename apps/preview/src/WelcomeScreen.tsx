@@ -170,9 +170,9 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
   const [authChecked, setAuthChecked] = useState(false);
   // Template wizard state
   const [createStep, setCreateStep] = useState<CreateStep>('template');
-  const [activeCategoryId, setActiveCategoryId] = useState(PROJECT_CATEGORIES[0].id);
+  const [activeCategoryId, setActiveCategoryId] = useState(PROJECT_CATEGORIES[0]?.id || 'web');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const activeCategory = PROJECT_CATEGORIES.find((c) => c.id === activeCategoryId) ?? PROJECT_CATEGORIES[0];
+  const activeCategory = (PROJECT_CATEGORIES.find((c) => c.id === activeCategoryId) || PROJECT_CATEGORIES[0]) as ProjectTypeCategory;
 
   // Load recent projects
   useEffect(() => {
@@ -228,7 +228,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
       <div
         style={{
           width: '100%',
-          maxWidth: 680,
+          maxWidth: mode === 'new' ? 720 : 680,
           background: 'var(--color-bg-panel)',
           borderRadius: 12,
           boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
@@ -236,6 +236,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          transition: 'max-width 0.25s ease',
         }}
       >
         {/* Dialog Header */}
@@ -245,24 +246,190 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
             <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e' }} />
             <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c93f' }} />
           </div>
-          <div style={{ flex: 1, textAlign: 'center', fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-            Welcome
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+            {mode === 'new' ? 'New Project' : 'Welcome'}
           </div>
           <div style={{ width: 48 }} /> {/* spacer for balance */}
         </div>
 
-        {/* Container - no background, just layout */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 40,
-            width: '100%',
-            padding: '40px 40px 48px',
-            color: 'var(--color-text-primary)',
-          }}
-        >
+        {/* Dynamic Content */}
+        {mode === 'new' ? (
+          /* =========================================================
+             WIZARD TAKEOVER (Replaces Welcome Content)
+             ========================================================= */
+          <div style={{ display: 'flex', flexDirection: 'column', height: 480 }}>
+            {createStep === 'template' ? (
+              /* ── Step 1: Template selection ── */
+              <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+                {/* Category sidebar */}
+                <div style={{ width: 140, borderRight: '1px solid var(--color-border-ide)', padding: '16px 0', flexShrink: 0, background: 'rgba(0,0,0,0.1)' }}>
+                  {PROJECT_CATEGORIES.map((cat) => {
+                    const isActive = cat.id === activeCategoryId;
+                    return (
+                      <div
+                        key={cat.id}
+                        onClick={() => { setActiveCategoryId(cat.id); setSelectedTemplateId(null); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '10px 16px', cursor: 'pointer',
+                          fontSize: 13, transition: 'all 0.15s',
+                          background: isActive ? 'var(--color-primary)' : 'transparent',
+                          color: isActive ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                          fontWeight: isActive ? 600 : 400,
+                        }}
+                      >
+                        <span>{cat.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Template grid */}
+                <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                    {activeCategory.templates.map((tpl) => {
+                      const TplIcon = tpl.icon;
+                      const isSelected = selectedTemplateId === tpl.id;
+                      return (
+                        <div
+                          key={tpl.id}
+                          onClick={() => setSelectedTemplateId(tpl.id)}
+                          style={{
+                            display: 'flex', flexDirection: 'column', alignItems: 'center',
+                            padding: '24px 12px 16px', borderRadius: 8, cursor: 'pointer',
+                            border: isSelected ? '2px solid var(--color-primary)' : '2px solid transparent',
+                            background: isSelected ? 'rgba(var(--color-primary-rgb, 59,130,246), 0.1)' : 'var(--color-bg-overlay)',
+                            transition: 'all 0.15s', textAlign: 'center',
+                          }}
+                        >
+                          <div style={{
+                            width: 56, height: 56, borderRadius: 12, display: 'flex',
+                            alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+                            background: `${tpl.color}15`,
+                          }}>
+                            <TplIcon size={28} strokeWidth={1.5} style={{ color: tpl.color }} />
+                          </div>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: isSelected ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>{tpl.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8, lineHeight: 1.4, WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{tpl.description}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* ── Step 2: Name input ── */
+              <div style={{ flex: 1, padding: 40, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>
+                  配置项目
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 32 }}>
+                  选择了模板: <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{activeCategory.templates.find((t) => t.id === selectedTemplateId)?.name}</span>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 400 }}>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>项目名称</label>
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="我的项目"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreateStep('template'); }}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 6,
+                      border: '1px solid var(--color-border-ide)',
+                      background: 'var(--color-bg-base)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: 14,
+                      outline: 'none',
+                    }}
+                    onFocus={(e) => { e.target.style.borderColor = 'var(--color-primary)'; }}
+                    onBlur={(e) => { e.target.style.borderColor = 'var(--color-border-ide)'; }}
+                  />
+                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                    项目文件保存到本地浏览器，后续可绑定 GitLab。
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Wizard Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 24px', borderTop: '1px solid var(--color-border-ide)', background: 'var(--color-bg-overlay)' }}>
+              {createStep === 'template' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setMode('idle')}
+                    style={{
+                      padding: '8px 20px', borderRadius: 6, border: '1px solid var(--color-border-ide)',
+                      background: 'transparent', color: 'var(--color-text-secondary)',
+                      fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                    }}
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!selectedTemplateId}
+                    onClick={() => setCreateStep('name')}
+                    style={{
+                      padding: '8px 20px', borderRadius: 6, border: 'none',
+                      background: 'var(--color-primary)', color: 'var(--color-text-inverse)',
+                      fontSize: 13, fontWeight: 600,
+                      cursor: selectedTemplateId ? 'pointer' : 'not-allowed',
+                      opacity: selectedTemplateId ? 1 : 0.4,
+                    }}
+                  >
+                    下一步
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCreateStep('template')}
+                    style={{
+                      padding: '8px 20px', borderRadius: 6, border: '1px solid var(--color-border-ide)',
+                      background: 'transparent', color: 'var(--color-text-secondary)',
+                      fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                    }}
+                  >
+                    上一步
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreate}
+                    disabled={!newName.trim()}
+                    style={{
+                      padding: '8px 24px', borderRadius: 6, border: 'none',
+                      background: 'var(--color-primary)', color: 'var(--color-text-inverse)',
+                      fontSize: 13, fontWeight: 600,
+                      cursor: newName.trim() ? 'pointer' : 'not-allowed',
+                      opacity: newName.trim() ? 1 : 0.4,
+                    }}
+                  >
+                    创建
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* =========================================================
+             WELCOME SCREEN IDLE / OPEN
+             ========================================================= */
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 40,
+              width: '100%',
+              padding: '40px 40px 48px',
+              color: 'var(--color-text-primary)',
+            }}
+          >
         {/* Logo + Title */}
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.5px', marginBottom: 12, color: 'var(--color-text-primary)' }}>
@@ -279,15 +446,11 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
         <ActionCard
           icon={<FilePlus2 size={28} strokeWidth={1.5} />}
           title="New Project"
-          active={mode === 'new'}
+          active={false}
           onClick={() => {
-            if (mode === 'new') {
-              setMode('idle');
-            } else {
-              setMode('new');
-              setCreateStep('template');
-              setSelectedTemplateId(null);
-            }
+            setMode('new');
+            setCreateStep('template');
+            setSelectedTemplateId(null);
           }}
         />
         <ActionCard
@@ -307,167 +470,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
         />
       </div>
 
-      {/* Inline: New Project Wizard */}
-      {mode === 'new' && (
-        <div
-          style={{
-            width: '100%',
-            maxWidth: 520,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0,
-            marginTop: 16,
-          }}
-        >
-          {createStep === 'template' ? (
-            /* ── Step 1: Template selection ── */
-            <div style={{ display: 'flex', gap: 0, minHeight: 300 }}>
-              {/* Category sidebar */}
-              <div style={{ width: 120, borderRight: '1px solid var(--color-border-ide)', paddingRight: 8, flexShrink: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, paddingLeft: 8 }}>
-                  项目类型
-                </div>
-                {PROJECT_CATEGORIES.map((cat) => {
-                  const isActive = cat.id === activeCategoryId;
-                  const CatIcon = cat.icon;
-                  return (
-                    <div
-                      key={cat.id}
-                      onClick={() => { setActiveCategoryId(cat.id); setSelectedTemplateId(null); }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '7px 8px', borderRadius: 6, cursor: 'pointer',
-                        marginBottom: 2, fontSize: 12, transition: 'all 0.15s',
-                        background: isActive ? 'rgba(var(--color-primary-rgb, 59,130,246), 0.12)' : 'transparent',
-                        color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                        fontWeight: isActive ? 600 : 400,
-                        borderLeft: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
-                      }}
-                    >
-                      <CatIcon size={14} />
-                      <span>{cat.name}</span>
-                      <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.5 }}>{cat.templates.length}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Template grid */}
-              <div style={{ flex: 1, paddingLeft: 12, overflowY: 'auto' }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
-                  选择模板
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 10 }}>选择一个模板快速开始</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                  {activeCategory.templates.map((tpl) => {
-                    const TplIcon = tpl.icon;
-                    const isSelected = selectedTemplateId === tpl.id;
-                    return (
-                      <div
-                        key={tpl.id}
-                        onClick={() => setSelectedTemplateId(tpl.id)}
-                        style={{
-                          display: 'flex', flexDirection: 'column', alignItems: 'center',
-                          padding: '12px 6px 8px', borderRadius: 10, cursor: 'pointer',
-                          border: isSelected ? '2px solid var(--color-primary)' : '2px solid transparent',
-                          background: isSelected ? 'rgba(var(--color-primary-rgb, 59,130,246), 0.08)' : 'rgba(255,255,255,0.04)',
-                          transition: 'all 0.15s', textAlign: 'center',
-                        }}
-                      >
-                        <div style={{
-                          width: 40, height: 40, borderRadius: 10, display: 'flex',
-                          alignItems: 'center', justifyContent: 'center', marginBottom: 6,
-                          background: `${tpl.color}18`,
-                        }}>
-                          <TplIcon size={20} strokeWidth={1.5} style={{ color: tpl.color }} />
-                        </div>
-                        <div style={{ fontSize: 11, fontWeight: 500, color: isSelected ? 'var(--color-primary)' : 'var(--color-text-primary)', lineHeight: 1.3 }}>{tpl.name}</div>
-                        <div style={{ fontSize: 9, color: 'var(--color-text-muted)', marginTop: 2, lineHeight: 1.3, maxWidth: 90, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{tpl.description}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* ── Step 2: Name input ── */
-            <div style={{ padding: '0 4px' }}>
-              <button
-                type="button"
-                onClick={() => setCreateStep('template')}
-                style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, marginBottom: 16, padding: 0 }}
-              >
-                <ArrowLeft size={14} /> 返回选择模板
-              </button>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
-                项目名称
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-                模板: {activeCategory.templates.find((t) => t.id === selectedTemplateId)?.name}
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="我的项目"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreateStep('template'); }}
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    borderRadius: 6,
-                    border: '1px solid var(--color-border-ide)',
-                    background: 'var(--color-bg-panel)',
-                    color: 'var(--color-text-primary)',
-                    fontSize: 14,
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => { e.target.style.borderColor = 'var(--color-primary)'; }}
-                  onBlur={(e) => { e.target.style.borderColor = 'var(--color-border-ide)'; }}
-                />
-                <button
-                  type="button"
-                  onClick={handleCreate}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '8px 18px', borderRadius: 6, border: 'none',
-                    background: 'var(--color-primary)', color: 'var(--color-text-inverse)',
-                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                  }}
-                >
-                  <Check size={14} /> 创建
-                </button>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
-                项目文件保存到浏览器 IndexedDB，可随时绑定 GitLab 远程仓库
-              </div>
-            </div>
-          )}
 
-          {/* Footer */}
-          {createStep === 'template' && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--color-border-ide)' }}>
-              <button
-                type="button"
-                disabled={!selectedTemplateId}
-                onClick={() => setCreateStep('name')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '7px 20px', borderRadius: 6, border: 'none',
-                  background: 'var(--color-primary)',
-                  color: 'var(--color-text-inverse)',
-                  fontSize: 13, fontWeight: 600,
-                  cursor: selectedTemplateId ? 'pointer' : 'not-allowed',
-                  opacity: selectedTemplateId ? 1 : 0.4,
-                  transition: 'opacity 0.15s',
-                }}
-              >
-                下一步 <ArrowRight size={14} />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Inline: Open Project List */}
       {mode === 'open' && projects.length > 0 && (
@@ -521,6 +524,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
         </div>
       )}
         </div>
+        )}
       </div>
     </div>
   );
