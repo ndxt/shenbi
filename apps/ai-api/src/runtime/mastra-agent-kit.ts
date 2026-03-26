@@ -312,7 +312,7 @@ const validateSchemaNodeTool = createTool({
     node: z.any(),
   }),
   execute: async ({ blockId, node }: { blockId: string; node?: unknown }) => {
-    const validated = validateGeneratedBlockNode(node as SchemaNode, blockId);
+    const validated = extractValidatedMastraBlockNode({ node }, blockId);
     return {
       ok: true,
       node: validated,
@@ -438,6 +438,17 @@ async function generateStructuredObject<Output>(input: {
         : {}
     ),
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function extractValidatedMastraBlockNode(blockResult: unknown, blockId: string): SchemaNode {
+  if (!isRecord(blockResult) || !('node' in blockResult) || !isRecord(blockResult.node)) {
+    throw new Error(`Mastra block generator returned an invalid node payload for block "${blockId}"`);
+  }
+  return validateGeneratedBlockNode(blockResult.node as SchemaNode, blockId);
 }
 
 export async function summarizeDocumentsWithMastra(
@@ -634,7 +645,7 @@ export async function generateBlockWithMastraAgent(
   });
 
   const blockObject = result.object as z.infer<typeof blockResultSchema>;
-  const node = validateGeneratedBlockNode(blockObject.node as SchemaNode, input.block.id);
+  const node = extractValidatedMastraBlockNode(blockObject, input.block.id);
   return {
     blockId: input.block.id,
     node,
