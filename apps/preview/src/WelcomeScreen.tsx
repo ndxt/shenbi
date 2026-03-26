@@ -577,7 +577,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
                 <>
                   <button
                     type="button"
-                    onClick={() => setMode('idle')}
+                    onClick={() => onClose ? onClose() : setMode('idle')}
                     style={{
                       padding: '6px 20px', borderRadius: 4, border: '1px solid #3e3e42',
                       background: '#3e3e42', color: '#e0e0e0',
@@ -740,7 +740,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 24px', borderTop: '1px solid #18181a', background: '#1c1c1c' }}>
               <button
                 type="button"
-                onClick={() => { setMode('idle'); setCloneSearch(''); setCloneProjects([]); setCloneAuthStatus(null); }}
+                onClick={() => { if (onClose) { onClose(); } else { setMode('idle'); setCloneSearch(''); setCloneProjects([]); setCloneAuthStatus(null); } }}
                 style={{
                   padding: '6px 20px', borderRadius: 4, border: '1px solid #3e3e42',
                   background: '#3e3e42', color: '#e0e0e0',
