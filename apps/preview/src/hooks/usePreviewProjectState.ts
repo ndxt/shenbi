@@ -74,14 +74,23 @@ export function usePreviewProjectState({
   }, [gitlabService]);
 
   const handleSelectProject = useCallback((config: ActiveProjectConfig) => {
+    const previousProjectId = activeProjectConfig?.vfsProjectId;
     saveActiveProject(config);
     upsertProjectInList(config);
-    setActiveProjectConfig(config);
     if (config.gitlabProjectId) {
       saveLastGitLabProject(config);
+    }
+    // When switching to a different project, reload the page so the editor/VFS/tab
+    // instances are cleanly re-created with the correct projectId.
+    if (previousProjectId && previousProjectId !== config.vfsProjectId) {
+      window.location.reload();
+      return;
+    }
+    setActiveProjectConfig(config);
+    if (config.gitlabProjectId) {
       setLastGitLabProjectConfig(config);
     }
-  }, []);
+  }, [activeProjectConfig?.vfsProjectId]);
 
   const handleSelectGitLabProject = useCallback((project: PreviewGitLabProject) => {
     const nextConfig = gitlabService.selectProjectMetadata(project);
