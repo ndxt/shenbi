@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AgentEvent, RunMetadata } from '@shenbi/ai-contracts';
-import type { AgentRuntime } from '../runtime/types.ts';
+import type { AiApiService } from '../runtime/types.ts';
 
 const SESSION_ID = 'mastra-session';
 const CONVERSATION_ID = 'mastra-conversation';
@@ -13,7 +13,7 @@ const METADATA: RunMetadata = {
   durationMs: 12,
 };
 
-function createMastraSmokeRuntime(): AgentRuntime {
+function createMastraSmokeRuntime(): AiApiService {
   return {
     async run(request) {
       const events = request.intent === 'schema.modify'
@@ -43,6 +43,20 @@ function createMastraSmokeRuntime(): AgentRuntime {
     },
     async finalize() {
       return {};
+    },
+    listModels() {
+      return [{
+        id: 'openai-compatible::glm-4.6',
+        name: 'GLM-4.6',
+        provider: 'openai-compatible',
+        features: ['streaming'],
+      }];
+    },
+    writeClientDebug() {
+      return '.ai-debug/errors/client-debug.json';
+    },
+    writeTraceDebug() {
+      return '.ai-debug/traces/trace.json';
     },
   };
 }

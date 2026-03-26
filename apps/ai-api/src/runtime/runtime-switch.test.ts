@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AgentRuntime } from './types.ts';
+import type { AiApiService } from './types.ts';
 
-function createFakeRuntime(): AgentRuntime {
+function createFakeRuntime(): AiApiService {
   return {
     async run() {
       return {
@@ -26,6 +26,15 @@ function createFakeRuntime(): AgentRuntime {
     async finalize() {
       return {};
     },
+    listModels() {
+      return [];
+    },
+    writeClientDebug() {
+      return '.ai-debug/errors/client-debug.json';
+    },
+    writeTraceDebug() {
+      return '.ai-debug/traces/trace.json';
+    },
   };
 }
 
@@ -42,17 +51,22 @@ describe('configuredRuntime', () => {
     const createInMemoryAgentMemoryStore = vi.fn(() => sharedMemory);
     const createAgentRuntime = vi.fn(() => legacyRuntime);
     const createLegacyRuntimeDeps = vi.fn(() => ({ deps: 'legacy' }));
-    const createMastraAgentRuntime = vi.fn((_options: unknown) => mastraRuntime);
+    const createMastraAiService = vi.fn((_options: unknown) => mastraRuntime);
     const prepareRunRequest = vi.fn(async (request) => request);
 
     vi.doMock('@shenbi/ai-agents', () => ({
       createInMemoryAgentMemoryStore,
     }));
     vi.doMock('@shenbi/mastra-runtime', () => ({
-      createMastraAgentRuntime,
+      createMastraAiService,
     }));
     vi.doMock('../adapters/debug-dump.ts', () => ({
+      writeErrorDump: vi.fn(() => '.ai-debug/errors/client-debug.json'),
       writeMemoryDump: vi.fn(() => '.ai-debug/memory/test-finalize.json'),
+      writeTraceDump: vi.fn(() => '.ai-debug/traces/trace.json'),
+    }));
+    vi.doMock('../adapters/providers.ts', () => ({
+      getAvailableModels: vi.fn(() => []),
     }));
     vi.doMock('../adapters/env.ts', () => ({
       loadEnv: () => ({
@@ -72,7 +86,7 @@ describe('configuredRuntime', () => {
     expect(runtimeModule.configuredRuntime).toBe(legacyRuntime);
     expect(createInMemoryAgentMemoryStore).toHaveBeenCalledOnce();
     expect(createAgentRuntime).toHaveBeenCalledWith(sharedMemory);
-    expect(createMastraAgentRuntime).not.toHaveBeenCalled();
+    expect(createMastraAiService).not.toHaveBeenCalled();
   });
 
   it('wraps the legacy runtime with mastra when AI_RUNTIME=mastra', async () => {
@@ -83,18 +97,26 @@ describe('configuredRuntime', () => {
     const createInMemoryAgentMemoryStore = vi.fn(() => sharedMemory);
     const createAgentRuntime = vi.fn(() => legacyRuntime);
     const createLegacyRuntimeDeps = vi.fn(() => legacyDeps);
-    const createMastraAgentRuntime = vi.fn((_options: unknown) => mastraRuntime);
+    const createMastraAiService = vi.fn((_options: unknown) => mastraRuntime);
     const prepareRunRequest = vi.fn(async (request) => request);
 
     vi.doMock('@shenbi/ai-agents', () => ({
       createInMemoryAgentMemoryStore,
     }));
     vi.doMock('@shenbi/mastra-runtime', () => ({
-      createMastraAgentRuntime,
+      createMastraAiService,
     }));
     const writeMemoryDump = vi.fn(() => '.ai-debug/memory/test-finalize.json');
+    const writeErrorDump = vi.fn(() => '.ai-debug/errors/client-debug.json');
+    const writeTraceDump = vi.fn(() => '.ai-debug/traces/trace.json');
     vi.doMock('../adapters/debug-dump.ts', () => ({
+      writeErrorDump,
       writeMemoryDump,
+      writeTraceDump,
+    }));
+    const getAvailableModels = vi.fn(() => []);
+    vi.doMock('../adapters/providers.ts', () => ({
+      getAvailableModels,
     }));
     vi.doMock('../adapters/env.ts', () => ({
       loadEnv: () => ({
@@ -112,13 +134,16 @@ describe('configuredRuntime', () => {
     const runtimeModule = await import('./runtime-switch.ts');
 
     expect(runtimeModule.configuredRuntime).toBe(mastraRuntime);
-    expect(createMastraAgentRuntime).toHaveBeenCalledOnce();
-    const options = createMastraAgentRuntime.mock.calls[0]?.[0] as (
+    expect(createMastraAiService).toHaveBeenCalledOnce();
+    const options = createMastraAiService.mock.calls[0]?.[0] as (
         | {
-          legacyRuntime: AgentRuntime;
+          legacyRuntime: AiApiService;
           prepareRunRequest: typeof prepareRunRequest;
           createDeps: () => unknown;
           writeMemoryDump: typeof writeMemoryDump;
+          listModels: () => unknown;
+          writeClientDebug: (input: { error: unknown; requestId?: string }) => string;
+          writeTraceDebug: (input: { status: 'success' | 'error'; trace: unknown }) => string;
         }
       | undefined
     );
@@ -130,6 +155,24 @@ describe('configuredRuntime', () => {
     expect(options.prepareRunRequest).toBe(prepareRunRequest);
     expect(options.createDeps()).toBe(legacyDeps);
     expect(options.writeMemoryDump).toBe(writeMemoryDump);
+    expect(options.listModels()).toEqual([]);
+    expect(getAvailableModels).toHaveBeenCalledOnce();
+    expect(options.writeClientDebug({
+      error: 'boom',
+      requestId: 'req-1',
+    })).toBe('.ai-debug/errors/client-debug.json');
+    expect(writeErrorDump).toHaveBeenCalledWith(expect.objectContaining({
+      category: 'client-debug',
+      requestId: 'req-1',
+    }));
+    expect(options.writeTraceDebug({
+      status: 'success',
+      trace: { step: 1 },
+    })).toBe('.ai-debug/traces/trace.json');
+    expect(writeTraceDump).toHaveBeenCalledWith({
+      status: 'success',
+      trace: { step: 1 },
+    });
     expect(createLegacyRuntimeDeps).toHaveBeenCalledWith(sharedMemory);
   });
 });

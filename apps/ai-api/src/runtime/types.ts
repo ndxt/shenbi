@@ -10,9 +10,23 @@ import type {
   ClassifyRouteResponse,
   FinalizeRequest,
   FinalizeResult,
+  ModelInfo,
   RunMetadata,
   RunRequest,
 } from '@shenbi/ai-contracts';
+
+export interface ClientDebugDumpInput {
+  error: unknown;
+  requestId?: string;
+  method?: string;
+  path?: string;
+  request?: unknown;
+}
+
+export interface TraceDebugDumpInput {
+  status: 'success' | 'error';
+  trace: unknown;
+}
 
 export interface AgentRuntime {
   run(request: RunRequest): Promise<{ events: AgentEvent[]; metadata: RunMetadata }>;
@@ -21,4 +35,10 @@ export interface AgentRuntime {
   chatStream(request: ChatRequest): AsyncIterable<{ delta: string }>;
   classifyRoute(request: ClassifyRouteRequest): Promise<ClassifyRouteResponse>;
   finalize(request: FinalizeRequest): Promise<FinalizeResult>;
+}
+
+export interface AiApiService extends AgentRuntime {
+  listModels(): Promise<ModelInfo[]> | ModelInfo[];
+  writeClientDebug(input: ClientDebugDumpInput): Promise<string> | string;
+  writeTraceDebug(input: TraceDebugDumpInput): Promise<string> | string;
 }

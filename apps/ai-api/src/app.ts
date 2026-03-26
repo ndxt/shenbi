@@ -19,11 +19,11 @@ import { createClassifyRouteRoute } from './routes/classify-route.ts';
 import { createGitLabRoute } from './routes/gitlab.ts';
 import { loadEnv } from './adapters/env.ts';
 import { configuredRuntime } from './runtime/runtime-switch.ts';
-import type { AgentRuntime } from './runtime/types.ts';
+import type { AiApiService } from './runtime/types.ts';
 
 export interface AppOptions {
-  /** 测试时可注入自定义 runtime */
-  runtime?: AgentRuntime;
+  /** 测试时可注入自定义 AI service */
+  runtime?: AiApiService;
   /** 注入独立限流 store，用于测试隔离 */
   rateLimitStore?: Map<string, { count: number; resetAt: number }>;
   rateLimitWindowMs?: number;
@@ -54,8 +54,8 @@ export function createApp(options: AppOptions = {}): Hono {
   app.route('/api/ai/run/finalize', createFinalizeRoute(runtime));
   app.route('/api/ai/chat', createChatRoute(runtime));
   app.route('/api/ai/classify-route', createClassifyRouteRoute(runtime));
-  app.route('/api/ai/debug', createDebugRoute());
-  app.route('/api/ai/models', createModelsRoute());
+  app.route('/api/ai/debug', createDebugRoute(runtime));
+  app.route('/api/ai/models', createModelsRoute(runtime));
 
   // GitLab integration
   if (env.GITLAB_OAUTH_CLIENT_ID) {

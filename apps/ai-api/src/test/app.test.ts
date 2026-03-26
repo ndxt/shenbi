@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createApp } from '../app.ts';
-import type { AgentRuntime } from '../runtime/types.ts';
+import type { AiApiService } from '../runtime/types.ts';
 import type {
   AgentEvent,
   ChatRequest,
@@ -38,7 +38,7 @@ const FAKE_EVENTS: AgentEvent[] = [
   { type: 'done', data: { metadata: FAKE_META } },
 ];
 
-function makeRuntime(overrides: Partial<AgentRuntime> = {}): AgentRuntime {
+function makeRuntime(overrides: Partial<AiApiService> = {}): AiApiService {
   return {
     async run() {
       return { events: FAKE_EVENTS, metadata: FAKE_META };
@@ -72,6 +72,20 @@ function makeRuntime(overrides: Partial<AgentRuntime> = {}): AgentRuntime {
     async finalize() {
       return {};
     },
+    listModels() {
+      return [{
+        id: 'openai-compatible::glm-4.6',
+        name: 'GLM-4.6',
+        provider: 'openai-compatible',
+        features: ['streaming'],
+      }];
+    },
+    writeClientDebug() {
+      return '.ai-debug/errors/client-debug.json';
+    },
+    writeTraceDebug() {
+      return '.ai-debug/traces/trace.json';
+    },
     ...overrides,
   };
 }
@@ -102,87 +116,69 @@ describe('GET /health', () => {
 });
 
 describe('GET /api/ai/models', () => {
-  it('returns model list', async () => {
-    const previousProvider = process.env.AI_PROVIDER;
-    const previousProviders = process.env.AI_PROVIDERS;
-    const previousModels = process.env.AI_AVAILABLE_MODELS;
-    try {
-      process.env.AI_PROVIDER = 'openai-compatible';
-      process.env.AI_PROVIDERS = 'openai-compatible';
-      process.env.AI_AVAILABLE_MODELS = 'GLM-4.7,GLM-4.6';
-      const app = createApp();
-      const res = await app.request('/api/ai/models');
-      expect(res.status).toBe(200);
-      const json = await res.json() as { success: boolean; data: unknown[] };
-      expect(json.success).toBe(true);
-      expect(Array.isArray(json.data)).toBe(true);
-      expect((json.data as Array<{ id: string }>).length).toBeGreaterThan(0);
-      const model = (json.data as Array<{ id: string; provider: string }>)[0];
-      expect(typeof model?.id).toBe('string');
-      expect(typeof model?.provider).toBe('string');
-      expect(model?.id).toContain('openai-compatible::');
-    } finally {
-      if (previousProvider === undefined) {
-        delete process.env.AI_PROVIDER;
-      } else {
-        process.env.AI_PROVIDER = previousProvider;
-      }
-      if (previousProviders === undefined) {
-        delete process.env.AI_PROVIDERS;
-      } else {
-        process.env.AI_PROVIDERS = previousProviders;
-      }
-      if (previousModels === undefined) {
-        delete process.env.AI_AVAILABLE_MODELS;
-      } else {
-        process.env.AI_AVAILABLE_MODELS = previousModels;
-      }
-    }
+  it('returns model list from the injected AI service', async () => {
+    const app = createApp({
+      runtime: makeRuntime({
+        listModels() {
+          return [{
+            id: 'nextai::gemini-2.5-pro',
+            name: 'gemini-2.5-pro',
+            provider: 'nextai',
+            features: ['streaming'],
+          }];
+        },
+      }),
+    });
+    const res = await app.request('/api/ai/models');
+    expect(res.status).toBe(200);
+    const json = await res.json() as { success: boolean; data: unknown[] };
+    expect(json.success).toBe(true);
+    expect(json.data).toEqual([{
+      id: 'nextai::gemini-2.5-pro',
+      name: 'gemini-2.5-pro',
+      provider: 'nextai',
+      features: ['streaming'],
+    }]);
   });
 
-  it('returns provider-specific model list for arbitrary openai-compatible vendors', async () => {
-    const previousProvider = process.env.AI_PROVIDER;
-    const previousProviders = process.env.AI_PROVIDERS;
-    const previousModels = process.env.NEXTAI_MODELS;
-    try {
-      process.env.AI_PROVIDER = 'nextai';
-      process.env.AI_PROVIDERS = 'openai-compatible,nextai';
-      process.env.NEXTAI_MODELS = 'gemini-2.5-pro, gemini-2.5-flash';
-      const app = createApp();
-      const res = await app.request('/api/ai/models');
-      expect(res.status).toBe(200);
-      const json = await res.json() as {
-        success: boolean;
-        data: Array<{ id: string; provider: string }>;
-      };
-      expect(json.success).toBe(true);
-      expect(json.data).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          id: 'nextai::gemini-2.5-pro',
-          provider: 'nextai',
-        }),
-        expect.objectContaining({
-          id: 'nextai::gemini-2.5-flash',
-          provider: 'nextai',
-        }),
-      ]));
-    } finally {
-      if (previousProvider === undefined) {
-        delete process.env.AI_PROVIDER;
-      } else {
-        process.env.AI_PROVIDER = previousProvider;
-      }
-      if (previousProviders === undefined) {
-        delete process.env.AI_PROVIDERS;
-      } else {
-        process.env.AI_PROVIDERS = previousProviders;
-      }
-      if (previousModels === undefined) {
-        delete process.env.NEXTAI_MODELS;
-      } else {
-        process.env.NEXTAI_MODELS = previousModels;
-      }
-    }
+  it('supports provider-specific model lists returned by the AI service', async () => {
+    const app = createApp({
+      runtime: makeRuntime({
+        listModels() {
+          return [
+            {
+              id: 'nextai::gemini-2.5-pro',
+              name: 'gemini-2.5-pro',
+              provider: 'nextai',
+              features: ['streaming'],
+            },
+            {
+              id: 'nextai::gemini-2.5-flash',
+              name: 'gemini-2.5-flash',
+              provider: 'nextai',
+              features: ['streaming'],
+            },
+          ];
+        },
+      }),
+    });
+    const res = await app.request('/api/ai/models');
+    expect(res.status).toBe(200);
+    const json = await res.json() as {
+      success: boolean;
+      data: Array<{ id: string; provider: string }>;
+    };
+    expect(json.success).toBe(true);
+    expect(json.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'nextai::gemini-2.5-pro',
+        provider: 'nextai',
+      }),
+      expect.objectContaining({
+        id: 'nextai::gemini-2.5-flash',
+        provider: 'nextai',
+      }),
+    ]));
   });
 });
 
@@ -413,8 +409,16 @@ describe('POST /api/ai/classify-route', () => {
 });
 
 describe('POST /api/ai/debug/client-error', () => {
-  it('writes a client debug dump and returns the debug file path', async () => {
-    const app = createApp({ runtime: makeRuntime() });
+  it('writes a client debug dump through the injected AI service', async () => {
+    let received: unknown;
+    const app = createApp({
+      runtime: makeRuntime({
+        writeClientDebug(input) {
+          received = input;
+          return '.ai-debug/errors/custom-client-debug.json';
+        },
+      }),
+    });
     const res = await app.request('/api/ai/debug/client-error', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -433,7 +437,11 @@ describe('POST /api/ai/debug/client-error', () => {
       };
     };
     expect(json.success).toBe(true);
-    expect(json.data.debugFile).toMatch(/\.ai-debug[\\/]+errors[\\/]+/);
+    expect(json.data.debugFile).toBe('.ai-debug/errors/custom-client-debug.json');
+    expect(received).toEqual(expect.objectContaining({
+      path: '/api/ai/debug/client-error',
+      method: 'POST',
+    }));
   });
 
   it('is not blocked by the AI request rate limit', async () => {
@@ -468,8 +476,16 @@ describe('POST /api/ai/debug/client-error', () => {
     expect(debugRes.status).toBe(200);
   });
 
-  it('writes a trace dump and returns the trace file path', async () => {
-    const app = createApp({ runtime: makeRuntime() });
+  it('writes a trace dump through the injected AI service', async () => {
+    let received: unknown;
+    const app = createApp({
+      runtime: makeRuntime({
+        writeTraceDebug(input) {
+          received = input;
+          return '.ai-debug/traces/custom-trace.json';
+        },
+      }),
+    });
     const res = await app.request('/api/ai/debug/trace', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -491,7 +507,15 @@ describe('POST /api/ai/debug/client-error', () => {
       };
     };
     expect(json.success).toBe(true);
-    expect(json.data.traceFile).toMatch(/\.ai-debug[\\/]+traces[\\/]+/);
+    expect(json.data.traceFile).toBe('.ai-debug/traces/custom-trace.json');
+    expect(received).toEqual({
+      status: 'success',
+      trace: {
+        steps: [
+          { action: 'listWorkspaceFiles' },
+        ],
+      },
+    });
   });
 });
 

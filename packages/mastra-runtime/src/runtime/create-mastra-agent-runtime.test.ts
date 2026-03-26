@@ -66,6 +66,15 @@ function createLegacyRuntime(events: AgentEvent[]): MastraAgentRuntime {
     async finalize(_request: FinalizeRequest): Promise<FinalizeResult> {
       return {};
     },
+    listModels() {
+      return [];
+    },
+    writeClientDebug() {
+      return '.ai-debug/errors/client-debug.json';
+    },
+    writeTraceDebug() {
+      return '.ai-debug/traces/trace.json';
+    },
   };
 }
 
@@ -172,6 +181,9 @@ describe('createMastraAgentRuntime', () => {
       legacyRuntime: createLegacyRuntime([]),
       createDeps: () => deps,
       prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
     });
 
     const events: AgentEvent[] = [];
@@ -233,6 +245,9 @@ describe('createMastraAgentRuntime', () => {
       legacyRuntime: createLegacyRuntime([]),
       createDeps: () => deps,
       prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
     });
 
     const events: AgentEvent[] = [];
@@ -278,6 +293,9 @@ describe('createMastraAgentRuntime', () => {
       legacyRuntime: createLegacyRuntime(legacyEvents),
       createDeps: () => createDeps([], { logger }),
       prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
     });
 
     const events: AgentEvent[] = [];
@@ -314,6 +332,9 @@ describe('createMastraAgentRuntime', () => {
       legacyRuntime: createLegacyRuntime([]),
       createDeps: () => deps,
       prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
     });
 
     await expect(runtime.classifyRoute({
@@ -337,6 +358,9 @@ describe('createMastraAgentRuntime', () => {
         },
       }),
       prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
     });
 
     await expect(runtime.chat({
@@ -367,6 +391,9 @@ describe('createMastraAgentRuntime', () => {
         },
       }),
       prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
     });
 
     const chunks: Array<{ delta: string }> = [];
@@ -415,6 +442,9 @@ describe('createMastraAgentRuntime', () => {
       createDeps: () => deps,
       prepareRunRequest: async (request) => request,
       writeMemoryDump,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
     });
 
     await expect(runtime.finalize({
@@ -516,6 +546,9 @@ describe('createMastraAgentRuntime', () => {
       legacyRuntime: createLegacyRuntime([]),
       createDeps: () => deps,
       prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
     });
 
     const events = await Array.fromAsync(runtime.runStream(createRequest({
@@ -535,5 +568,36 @@ describe('createMastraAgentRuntime', () => {
       runtime: 'mastra',
       runContext: 'multi-page-loop',
     }));
+  });
+
+  it('exposes model and debug helpers through the mastra AI service boundary', async () => {
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime: createLegacyRuntime([]),
+      createDeps: () => createDeps([]),
+      prepareRunRequest: async (request) => request,
+      listModels: () => [{
+        id: 'nextai::gemini-2.5-pro',
+        name: 'gemini-2.5-pro',
+        provider: 'nextai',
+        features: ['streaming'],
+      }],
+      writeClientDebug: (input) => `.ai-debug/errors/${input.requestId ?? 'client-debug'}.json`,
+      writeTraceDebug: (input) => `.ai-debug/traces/${input.status}.json`,
+    });
+
+    await expect(Promise.resolve(runtime.listModels())).resolves.toEqual([{
+      id: 'nextai::gemini-2.5-pro',
+      name: 'gemini-2.5-pro',
+      provider: 'nextai',
+      features: ['streaming'],
+    }]);
+    await expect(Promise.resolve(runtime.writeClientDebug({
+      error: 'boom',
+      requestId: 'req-1',
+    }))).resolves.toBe('.ai-debug/errors/req-1.json');
+    await expect(Promise.resolve(runtime.writeTraceDebug({
+      status: 'error',
+      trace: { step: 'parse' },
+    }))).resolves.toBe('.ai-debug/traces/error.json');
   });
 });

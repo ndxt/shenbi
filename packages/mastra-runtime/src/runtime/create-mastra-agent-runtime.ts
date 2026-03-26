@@ -17,6 +17,7 @@ import type {
   ClassifyRouteResponse,
   FinalizeRequest,
   FinalizeResult,
+  ModelInfo,
   RunMetadata,
 } from '@shenbi/ai-contracts';
 import {
@@ -31,6 +32,18 @@ export interface MastraAgentRuntime {
   chatStream(request: ChatRequest): AsyncIterable<{ delta: string }>;
   classifyRoute(request: ClassifyRouteRequest): Promise<ClassifyRouteResponse>;
   finalize(request: FinalizeRequest): Promise<FinalizeResult>;
+  listModels(): Promise<ModelInfo[]> | ModelInfo[];
+  writeClientDebug(input: {
+    error: unknown;
+    requestId?: string;
+    method?: string;
+    path?: string;
+    request?: unknown;
+  }): Promise<string> | string;
+  writeTraceDebug(input: {
+    status: 'success' | 'error';
+    trace: unknown;
+  }): Promise<string> | string;
 }
 
 export interface CreateMastraAgentRuntimeOptions {
@@ -38,6 +51,18 @@ export interface CreateMastraAgentRuntimeOptions {
   createDeps: () => AgentRuntimeDeps;
   prepareRunRequest: (request: RunRequest) => Promise<RunRequest>;
   writeMemoryDump?: (input: { category: 'finalize'; memory: unknown }) => string;
+  listModels: () => Promise<ModelInfo[]> | ModelInfo[];
+  writeClientDebug: (input: {
+    error: unknown;
+    requestId?: string;
+    method?: string;
+    path?: string;
+    request?: unknown;
+  }) => Promise<string> | string;
+  writeTraceDebug: (input: {
+    status: 'success' | 'error';
+    trace: unknown;
+  }) => Promise<string> | string;
 }
 
 const PAGE_STREAM_INTENTS: ReadonlySet<AgentIntent> = new Set(['schema.create', 'schema.modify']);
@@ -577,6 +602,17 @@ export function createMastraAgentRuntime(options: CreateMastraAgentRuntimeOption
           throw error;
         });
     },
+    listModels() {
+      return options.listModels();
+    },
+    writeClientDebug(input) {
+      return options.writeClientDebug(input);
+    },
+    writeTraceDebug(input) {
+      return options.writeTraceDebug(input);
+    },
   };
   return runtime;
 }
+
+export const createMastraAiService = createMastraAgentRuntime;

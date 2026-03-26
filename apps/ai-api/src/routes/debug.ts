@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { writeErrorDump, writeTraceDump } from '../adapters/debug-dump.ts';
+import type { AiApiService } from '../runtime/types.ts';
 
-export function createDebugRoute(): Hono {
+export function createDebugRoute(service: AiApiService): Hono {
   const app = new Hono();
 
   app.post('/client-error', async (c) => {
@@ -11,14 +11,11 @@ export function createDebugRoute(): Hono {
       ? (body as { error?: unknown }).error
       : 'Client debug dump';
 
-    const debugFile = writeErrorDump({
-      category: 'client-debug',
+    const debugFile = await service.writeClientDebug({
       error,
       requestId,
       method: c.req.method,
       path: c.req.path,
-      status: 200,
-      code: 'CLIENT_DEBUG_DUMP',
       request: body,
     });
 
@@ -39,7 +36,7 @@ export function createDebugRoute(): Hono {
       ? (body as { trace?: unknown }).trace
       : body;
 
-    const traceFile = writeTraceDump({
+    const traceFile = await service.writeTraceDebug({
       status,
       trace,
     });

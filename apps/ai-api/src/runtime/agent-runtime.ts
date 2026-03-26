@@ -51,8 +51,10 @@ import {
 import type { AgentEvent, ChatRequest, ChatResponse } from '@shenbi/ai-contracts';
 import type { ClassifyRouteRequest, ClassifyRouteResponse } from '@shenbi/ai-contracts';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
+import type { ModelInfo } from '@shenbi/ai-contracts';
 import { LLMError } from '../adapters/errors.ts';
 import {
+  writeErrorDump,
   writeInvalidJsonDump,
   writeMemoryDump,
   writeTraceDump,
@@ -60,6 +62,7 @@ import {
 } from '../adapters/debug-dump.ts';
 import { loadEnv } from '../adapters/env.ts';
 import { logger } from '../adapters/logger.ts';
+import { getAvailableModels } from '../adapters/providers.ts';
 import {
   OpenAICompatibleClient,
   type OpenAICompatibleMessage,
@@ -81,7 +84,7 @@ import {
   type ClassifyIntentTraceEntry,
 } from './classify-intent.ts';
 import { executeModifySchema, planModify, executeComplexOp as executeComplexOpFn, type ModifySchemaTraceEntry } from './modify-schema.ts';
-import type { AgentRuntime } from './types.ts';
+import type { AiApiService } from './types.ts';
 
 export { assessBlockQuality };
 export { validateGeneratedBlockNode, validateGeneratedBlockNodeWithDiagnostics };
@@ -1225,7 +1228,7 @@ export async function attachTraceMemoryBestEffort(
   }
 }
 
-export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): AgentRuntime {
+export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): AiApiService {
   return {
     async run(request) {
       const preparedRequest = await prepareRunRequest(request);
@@ -1393,6 +1396,24 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ag
         memoryDebugFile: debugFile,
       };
       return result;
+    },
+    listModels(): ModelInfo[] {
+      return getAvailableModels();
+    },
+    writeClientDebug(input) {
+      return writeErrorDump({
+        category: 'client-debug',
+        error: input.error,
+        status: 200,
+        code: 'CLIENT_DEBUG_DUMP',
+        ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
+        ...(input.method !== undefined ? { method: input.method } : {}),
+        ...(input.path !== undefined ? { path: input.path } : {}),
+        ...(input.request !== undefined ? { request: input.request } : {}),
+      });
+    },
+    writeTraceDebug(input) {
+      return writeTraceDump(input);
     },
   };
 }
