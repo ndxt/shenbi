@@ -58,6 +58,25 @@ function createMastraSmokeRuntime(): AiApiService {
     writeTraceDebug() {
       return '.ai-debug/traces/trace.json';
     },
+    async *projectStream() {
+      yield {
+        type: 'project:start',
+        data: {
+          sessionId: 'project-session',
+          conversationId: 'project-conversation',
+          prompt: 'build project',
+        },
+      };
+    },
+    async confirmProject() {
+      return { sessionId: 'project-session', status: 'executing' as const };
+    },
+    async reviseProject() {
+      return { sessionId: 'project-session', status: 'awaiting_confirmation' as const };
+    },
+    async cancelProject() {
+      return { sessionId: 'project-session', status: 'cancelled' as const };
+    },
   };
 }
 

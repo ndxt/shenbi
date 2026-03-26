@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { validateChatRequest, validateFinalizeRequest, validateRunRequest } from './validate.ts';
+import {
+  validateChatRequest,
+  validateFinalizeRequest,
+  validateProjectCancelRequest,
+  validateProjectConfirmRequest,
+  validateProjectReviseRequest,
+  validateProjectRunRequest,
+  validateRunRequest,
+} from './validate.ts';
 
 describe('validateRunRequest', () => {
   it('preserves optional schemaJson and workspaceFileIds', () => {
@@ -173,5 +181,74 @@ describe('validateChatRequest', () => {
       model: 'foo',
       messages: [{ role: 'user', content: '' }],
     })).toThrow(/content/i);
+  });
+});
+
+describe('validateProjectRunRequest', () => {
+  it('accepts project workflow payloads with workspace snapshots', () => {
+    expect(validateProjectRunRequest({
+      prompt: '帮我生成订单管理项目',
+      plannerModel: 'glm-4.7',
+      workspace: {
+        componentSummary: 'Card, Table, Form',
+        currentFileId: 'current',
+        currentSchemaSummary: 'pageId=current; pageName=Current; nodeCount=2',
+        currentSchemaJson: {
+          id: 'current',
+          body: [{ id: 'card-1', component: 'Card' }],
+        },
+        files: [{
+          fileId: 'order-list',
+          pageName: '订单列表',
+          schemaSummary: 'pageId=order-list; pageName=订单列表; nodeCount=4',
+          schemaJson: {
+            id: 'order-list',
+            body: [{ id: 'table-1', component: 'Table' }],
+          },
+        }],
+      },
+    })).toEqual({
+      prompt: '帮我生成订单管理项目',
+      plannerModel: 'glm-4.7',
+      workspace: {
+        componentSummary: 'Card, Table, Form',
+        currentFileId: 'current',
+        currentSchemaSummary: 'pageId=current; pageName=Current; nodeCount=2',
+        currentSchemaJson: {
+          id: 'current',
+          body: [{ id: 'card-1', component: 'Card' }],
+        },
+        files: [{
+          fileId: 'order-list',
+          pageName: '订单列表',
+          schemaSummary: 'pageId=order-list; pageName=订单列表; nodeCount=4',
+          schemaJson: {
+            id: 'order-list',
+            body: [{ id: 'table-1', component: 'Table' }],
+          },
+        }],
+      },
+    });
+  });
+
+  it('rejects invalid workspace file payloads', () => {
+    expect(() => validateProjectRunRequest({
+      prompt: '项目',
+      workspace: {
+        componentSummary: 'Card',
+        files: [{ fileId: '', pageName: 'x', schemaSummary: 'y' }],
+      },
+    })).toThrow(/workspace.files\[0\]\.fileId/i);
+  });
+});
+
+describe('project session validators', () => {
+  it('accepts confirm, revise, and cancel payloads', () => {
+    expect(validateProjectConfirmRequest({ sessionId: 'project-1' })).toEqual({ sessionId: 'project-1' });
+    expect(validateProjectReviseRequest({ sessionId: 'project-1', revisionPrompt: '增加审批页' })).toEqual({
+      sessionId: 'project-1',
+      revisionPrompt: '增加审批页',
+    });
+    expect(validateProjectCancelRequest({ sessionId: 'project-1' })).toEqual({ sessionId: 'project-1' });
   });
 });

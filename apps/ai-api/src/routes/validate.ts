@@ -2,7 +2,15 @@
  * RunRequest 校验 — 首版必须校验 prompt、context.schemaSummary、context.componentSummary
  */
 import { ValidationError } from '../adapters/errors.ts';
-import type { ChatRequest, FinalizeRequest, RunRequest } from '@shenbi/ai-contracts';
+import type {
+  ChatRequest,
+  FinalizeRequest,
+  ProjectCancelRequest,
+  ProjectConfirmRequest,
+  ProjectReviseRequest,
+  ProjectRunRequest,
+  RunRequest,
+} from '@shenbi/ai-contracts';
 import { MAX_ATTACHMENT_BYTES, SUPPORTED_DOCUMENT_MIME_TYPES } from '../runtime/request-attachments.ts';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -262,4 +270,136 @@ export function validateFinalizeRequest(body: unknown): FinalizeRequest {
   }
 
   return request;
+}
+
+export function validateProjectRunRequest(body: unknown): ProjectRunRequest {
+  if (!isRecord(body)) {
+    throw new ValidationError('Request body must be a JSON object');
+  }
+  if (typeof body['prompt'] !== 'string' || body['prompt'].trim() === '') {
+    throw new ValidationError('prompt is required and must be a non-empty string');
+  }
+  if (!isRecord(body['workspace'])) {
+    throw new ValidationError('workspace is required and must be an object');
+  }
+  const workspace = body['workspace'];
+  if (typeof workspace['componentSummary'] !== 'string' || workspace['componentSummary'].trim() === '') {
+    throw new ValidationError('workspace.componentSummary is required and must be a non-empty string');
+  }
+  if (!Array.isArray(workspace['files'])) {
+    throw new ValidationError('workspace.files must be an array');
+  }
+
+  const request: ProjectRunRequest = {
+    prompt: body['prompt'].trim(),
+    workspace: {
+      componentSummary: workspace['componentSummary'].trim(),
+      files: workspace['files'].map((file, index) => {
+        if (!isRecord(file)) {
+          throw new ValidationError(`workspace.files[${index}] must be an object`);
+        }
+        if (typeof file['fileId'] !== 'string' || file['fileId'].trim() === '') {
+          throw new ValidationError(`workspace.files[${index}].fileId must be a non-empty string`);
+        }
+        if (typeof file['pageName'] !== 'string' || file['pageName'].trim() === '') {
+          throw new ValidationError(`workspace.files[${index}].pageName must be a non-empty string`);
+        }
+        if (typeof file['schemaSummary'] !== 'string' || file['schemaSummary'].trim() === '') {
+          throw new ValidationError(`workspace.files[${index}].schemaSummary must be a non-empty string`);
+        }
+        const nextFile: ProjectRunRequest['workspace']['files'][number] = {
+          fileId: file['fileId'].trim(),
+          pageName: file['pageName'].trim(),
+          schemaSummary: file['schemaSummary'].trim(),
+        };
+        if (file['schemaJson'] !== undefined) {
+          if (!isPageSchemaLike(file['schemaJson'])) {
+            throw new ValidationError(`workspace.files[${index}].schemaJson must be a valid PageSchema`);
+          }
+          nextFile.schemaJson = file['schemaJson'] as NonNullable<ProjectRunRequest['workspace']['files'][number]['schemaJson']>;
+        }
+        return nextFile;
+      }),
+    },
+  };
+
+  if (workspace['currentFileId'] !== undefined) {
+    if (typeof workspace['currentFileId'] !== 'string' || workspace['currentFileId'].trim() === '') {
+      throw new ValidationError('workspace.currentFileId must be a non-empty string');
+    }
+    request.workspace.currentFileId = workspace['currentFileId'].trim();
+  }
+  if (workspace['currentSchemaSummary'] !== undefined) {
+    if (typeof workspace['currentSchemaSummary'] !== 'string' || workspace['currentSchemaSummary'].trim() === '') {
+      throw new ValidationError('workspace.currentSchemaSummary must be a non-empty string');
+    }
+    request.workspace.currentSchemaSummary = workspace['currentSchemaSummary'].trim();
+  }
+  if (workspace['currentSchemaJson'] !== undefined) {
+    if (!isPageSchemaLike(workspace['currentSchemaJson'])) {
+      throw new ValidationError('workspace.currentSchemaJson must be a valid PageSchema');
+    }
+    request.workspace.currentSchemaJson = workspace['currentSchemaJson'] as NonNullable<ProjectRunRequest['workspace']['currentSchemaJson']>;
+  }
+
+  if (body['attachments'] !== undefined) {
+    const validatedAttachments = validateRunRequest({
+      prompt: request.prompt,
+      attachments: body['attachments'],
+      context: {
+        schemaSummary: request.workspace.currentSchemaSummary ?? 'pageId=empty; pageName=empty; nodeCount=0',
+        componentSummary: request.workspace.componentSummary,
+      },
+    }).attachments;
+    if (validatedAttachments) {
+      request.attachments = validatedAttachments;
+    }
+  }
+  if (typeof body['plannerModel'] === 'string') request.plannerModel = body['plannerModel'];
+  if (typeof body['blockModel'] === 'string') request.blockModel = body['blockModel'];
+  if (typeof body['conversationId'] === 'string') request.conversationId = body['conversationId'];
+  if (isRecord(body['thinking'])) {
+    const thinkingType = body['thinking']['type'];
+    if (thinkingType === 'enabled' || thinkingType === 'disabled') {
+      request.thinking = { type: thinkingType };
+    } else {
+      throw new ValidationError('thinking.type must be "enabled" or "disabled"');
+    }
+  }
+
+  return request;
+}
+
+function validateProjectSessionIdBody<T extends { sessionId: string }>(
+  body: unknown,
+  extra?: (record: Record<string, unknown>, request: T) => void,
+): T {
+  if (!isRecord(body)) {
+    throw new ValidationError('Request body must be a JSON object');
+  }
+  if (typeof body['sessionId'] !== 'string' || body['sessionId'].trim() === '') {
+    throw new ValidationError('sessionId is required and must be a non-empty string');
+  }
+  const request = {
+    sessionId: body['sessionId'].trim(),
+  } as T;
+  extra?.(body, request);
+  return request;
+}
+
+export function validateProjectConfirmRequest(body: unknown): ProjectConfirmRequest {
+  return validateProjectSessionIdBody<ProjectConfirmRequest>(body);
+}
+
+export function validateProjectReviseRequest(body: unknown): ProjectReviseRequest {
+  return validateProjectSessionIdBody<ProjectReviseRequest>(body, (record, request) => {
+    if (typeof record['revisionPrompt'] !== 'string' || record['revisionPrompt'].trim() === '') {
+      throw new ValidationError('revisionPrompt is required and must be a non-empty string');
+    }
+    request.revisionPrompt = record['revisionPrompt'].trim();
+  });
+}
+
+export function validateProjectCancelRequest(body: unknown): ProjectCancelRequest {
+  return validateProjectSessionIdBody<ProjectCancelRequest>(body);
 }

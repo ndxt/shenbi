@@ -11,6 +11,12 @@ import type {
   FinalizeRequest,
   FinalizeResult,
   ModelInfo,
+  ProjectAgentEvent,
+  ProjectCancelRequest,
+  ProjectConfirmRequest,
+  ProjectReviseRequest,
+  ProjectRunRequest,
+  ProjectSessionMutationResult,
   RunMetadata,
   RunRequest,
 } from '@shenbi/ai-contracts';
@@ -41,4 +47,8 @@ export interface AiApiService extends AgentRuntime {
   listModels(): Promise<ModelInfo[]> | ModelInfo[];
   writeClientDebug(input: ClientDebugDumpInput): Promise<string> | string;
   writeTraceDebug(input: TraceDebugDumpInput): Promise<string> | string;
+  projectStream(request: ProjectRunRequest): AsyncIterable<ProjectAgentEvent>;
+  confirmProject(request: ProjectConfirmRequest): Promise<ProjectSessionMutationResult>;
+  reviseProject(request: ProjectReviseRequest): Promise<ProjectSessionMutationResult>;
+  cancelProject(request: ProjectCancelRequest): Promise<ProjectSessionMutationResult>;
 }

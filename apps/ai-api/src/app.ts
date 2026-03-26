@@ -15,6 +15,7 @@ import { createFinalizeRoute } from './routes/finalize.ts';
 import { createChatRoute } from './routes/chat.ts';
 import { createDebugRoute } from './routes/debug.ts';
 import { createModelsRoute } from './routes/models.ts';
+import { createProjectRoute } from './routes/project.ts';
 import { createClassifyRouteRoute } from './routes/classify-route.ts';
 import { createGitLabRoute } from './routes/gitlab.ts';
 import { loadEnv } from './adapters/env.ts';
@@ -48,12 +49,17 @@ export function createApp(options: AppOptions = {}): Hono {
   app.use('/api/ai/run/finalize', rateLimitMiddleware);
   app.use('/api/ai/chat', rateLimitMiddleware);
   app.use('/api/ai/classify-route', rateLimitMiddleware);
+  app.use('/api/ai/project/stream', rateLimitMiddleware);
+  app.use('/api/ai/project/confirm', rateLimitMiddleware);
+  app.use('/api/ai/project/revise', rateLimitMiddleware);
+  app.use('/api/ai/project/cancel', rateLimitMiddleware);
 
   app.route('/api/ai/run/stream', createRunStreamRoute(runtime));
   app.route('/api/ai/run', createRunRoute(runtime));
   app.route('/api/ai/run/finalize', createFinalizeRoute(runtime));
   app.route('/api/ai/chat', createChatRoute(runtime));
   app.route('/api/ai/classify-route', createClassifyRouteRoute(runtime));
+  app.route('/api/ai/project', createProjectRoute(runtime));
   app.route('/api/ai/debug', createDebugRoute(runtime));
   app.route('/api/ai/models', createModelsRoute(runtime));
 

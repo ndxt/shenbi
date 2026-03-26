@@ -35,6 +35,25 @@ function createFakeRuntime(): AiApiService {
     writeTraceDebug() {
       return '.ai-debug/traces/trace.json';
     },
+    async *projectStream() {
+      yield {
+        type: 'project:start',
+        data: {
+          sessionId: 'project-session',
+          conversationId: 'project-conversation',
+          prompt: 'build project',
+        },
+      };
+    },
+    async confirmProject() {
+      return { sessionId: 'project-session', status: 'executing' };
+    },
+    async reviseProject() {
+      return { sessionId: 'project-session', status: 'awaiting_confirmation' };
+    },
+    async cancelProject() {
+      return { sessionId: 'project-session', status: 'cancelled' };
+    },
   };
 }
 

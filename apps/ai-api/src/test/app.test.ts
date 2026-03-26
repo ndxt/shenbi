@@ -86,6 +86,33 @@ function makeRuntime(overrides: Partial<AiApiService> = {}): AiApiService {
     writeTraceDebug() {
       return '.ai-debug/traces/trace.json';
     },
+    async *projectStream() {
+      yield {
+        type: 'project:start',
+        data: {
+          sessionId: 'project-session',
+          conversationId: 'project-conv',
+          prompt: 'build project',
+        },
+      };
+      yield {
+        type: 'project:done',
+        data: {
+          sessionId: 'project-session',
+          createdFileIds: ['order-list'],
+          completedPageIds: ['order-list'],
+        },
+      };
+    },
+    async confirmProject() {
+      return { sessionId: 'project-session', status: 'executing' as const };
+    },
+    async reviseProject() {
+      return { sessionId: 'project-session', status: 'awaiting_confirmation' as const };
+    },
+    async cancelProject() {
+      return { sessionId: 'project-session', status: 'cancelled' as const };
+    },
     ...overrides,
   };
 }
@@ -538,6 +565,90 @@ describe('POST /api/ai/run — 503 LLM error', () => {
     expect(json.success).toBe(false);
     expect(json.error).toContain('Provider unavailable');
     expect(json.error).toContain('Debug file: .ai-debug');
+  });
+});
+
+describe('POST /api/ai/project/*', () => {
+  it('streams project events through the injected AI service', async () => {
+    const app = createApp({
+      runtime: makeRuntime({
+        async *projectStream() {
+          yield {
+            type: 'project:start',
+            data: {
+              sessionId: 'project-1',
+              conversationId: 'conv-project',
+              prompt: '生成订单管理项目',
+            },
+          };
+          yield {
+            type: 'project:awaiting_confirmation',
+            data: {
+              sessionId: 'project-1',
+              plan: {
+                projectName: '订单管理后台',
+                pages: [{
+                  pageId: 'order-list',
+                  pageName: '订单列表',
+                  action: 'create',
+                  description: '订单列表页',
+                }],
+              },
+            },
+          };
+        },
+      }),
+    });
+
+    const res = await app.request('/api/ai/project/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: '生成订单管理项目',
+        workspace: {
+          componentSummary: 'Card, Table',
+          files: [],
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/event-stream');
+    expect(await res.text()).toContain('"type":"project:awaiting_confirmation"');
+  });
+
+  it('delegates confirm/revise/cancel to the injected AI service', async () => {
+    const app = createApp({ runtime: makeRuntime() });
+
+    const confirmRes = await app.request('/api/ai/project/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'project-session' }),
+    });
+    expect(await confirmRes.json()).toEqual({
+      success: true,
+      data: { sessionId: 'project-session', status: 'executing' },
+    });
+
+    const reviseRes = await app.request('/api/ai/project/revise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'project-session', revisionPrompt: '增加审批页' }),
+    });
+    expect(await reviseRes.json()).toEqual({
+      success: true,
+      data: { sessionId: 'project-session', status: 'awaiting_confirmation' },
+    });
+
+    const cancelRes = await app.request('/api/ai/project/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: 'project-session' }),
+    });
+    expect(await cancelRes.json()).toEqual({
+      success: true,
+      data: { sessionId: 'project-session', status: 'cancelled' },
+    });
   });
 });
 

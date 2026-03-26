@@ -18,12 +18,19 @@ import type {
   FinalizeRequest,
   FinalizeResult,
   ModelInfo,
+  ProjectAgentEvent,
+  ProjectCancelRequest,
+  ProjectConfirmRequest,
+  ProjectReviseRequest,
+  ProjectRunRequest,
+  ProjectSessionMutationResult,
   RunMetadata,
 } from '@shenbi/ai-contracts';
 import {
   createPageCreateWorkflow,
   createPageModifyWorkflow,
 } from './workflows';
+import { createProjectWorkflowRuntime } from './project-service';
 
 export interface MastraAgentRuntime {
   run(request: RunRequest): Promise<{ events: AgentEvent[]; metadata: RunMetadata }>;
@@ -44,6 +51,10 @@ export interface MastraAgentRuntime {
     status: 'success' | 'error';
     trace: unknown;
   }): Promise<string> | string;
+  projectStream(request: ProjectRunRequest): AsyncIterable<ProjectAgentEvent>;
+  confirmProject(request: ProjectConfirmRequest): Promise<ProjectSessionMutationResult>;
+  reviseProject(request: ProjectReviseRequest): Promise<ProjectSessionMutationResult>;
+  cancelProject(request: ProjectCancelRequest): Promise<ProjectSessionMutationResult>;
 }
 
 export interface CreateMastraAgentRuntimeOptions {
@@ -497,7 +508,13 @@ async function* runMastraPageStream(
 }
 
 export function createMastraAgentRuntime(options: CreateMastraAgentRuntimeOptions): MastraAgentRuntime {
-  const runtime: MastraAgentRuntime = {
+  let runtime: MastraAgentRuntime;
+  const projectRuntime = createProjectWorkflowRuntime({
+    createDeps: options.createDeps,
+    prepareRunRequest: options.prepareRunRequest,
+    runPageStream: (request) => runtime.runStream(request),
+  });
+  runtime = {
     async run(request) {
       const events: AgentEvent[] = [];
       for await (const event of runtime.runStream(request)) {
@@ -610,6 +627,18 @@ export function createMastraAgentRuntime(options: CreateMastraAgentRuntimeOption
     },
     writeTraceDebug(input) {
       return options.writeTraceDebug(input);
+    },
+    projectStream(request) {
+      return projectRuntime.projectStream(request);
+    },
+    confirmProject(request) {
+      return projectRuntime.confirmProject(request);
+    },
+    reviseProject(request) {
+      return projectRuntime.reviseProject(request);
+    },
+    cancelProject(request) {
+      return projectRuntime.cancelProject(request);
     },
   };
   return runtime;

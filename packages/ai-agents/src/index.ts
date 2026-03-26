@@ -22,6 +22,7 @@ export * from './orchestrators/modify-planning';
 export * from './orchestrators/page-block-prompt';
 export * from './orchestrators/page-schema';
 export * from './orchestrators/page-planner-prompt';
+export * from './orchestrators/project-planner';
 export * from './orchestrators/modify-orchestrator';
 export * from './orchestrators/page-builder-orchestrator';
 export * from './orchestrators/registry';

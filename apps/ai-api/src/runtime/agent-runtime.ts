@@ -1415,6 +1415,18 @@ export function createAgentRuntime(memory: AgentMemoryStore = defaultMemory): Ai
     writeTraceDebug(input) {
       return writeTraceDump(input);
     },
+    async *projectStream() {
+      throw new LLMError('Project workflow is only available in mastra runtime', 'UNSUPPORTED_PROJECT_WORKFLOW');
+    },
+    async confirmProject() {
+      throw new LLMError('Project workflow is only available in mastra runtime', 'UNSUPPORTED_PROJECT_WORKFLOW');
+    },
+    async reviseProject() {
+      throw new LLMError('Project workflow is only available in mastra runtime', 'UNSUPPORTED_PROJECT_WORKFLOW');
+    },
+    async cancelProject() {
+      throw new LLMError('Project workflow is only available in mastra runtime', 'UNSUPPORTED_PROJECT_WORKFLOW');
+    },
   };
 }
 

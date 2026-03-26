@@ -36,6 +36,7 @@ export interface ProjectPlanPage {
   pageName: string;
   action: ProjectPlanPageAction;
   description: string;
+  fileId?: string;
   group?: string;
   prompt?: string;
   evidence?: string;
@@ -45,6 +46,21 @@ export interface ProjectPlanPage {
 export interface ProjectPlan {
   projectName: string;
   pages: ProjectPlanPage[];
+}
+
+export interface ProjectWorkspacePage {
+  fileId: string;
+  pageName: string;
+  schemaSummary: string;
+  schemaJson?: PageSchema;
+}
+
+export interface ProjectWorkspaceContext {
+  componentSummary: string;
+  currentFileId?: string;
+  currentSchemaSummary?: string;
+  currentSchemaJson?: PageSchema;
+  files: ProjectWorkspacePage[];
 }
 
 export interface ReActStep {
@@ -153,6 +169,34 @@ export interface ClassifyRouteResponse {
   preparedPrompt?: string;
 }
 
+export interface ProjectRunRequest {
+  prompt: string;
+  attachments?: RunAttachmentInput[];
+  plannerModel?: string;
+  blockModel?: string;
+  conversationId?: string;
+  thinking?: ThinkingConfig;
+  workspace: ProjectWorkspaceContext;
+}
+
+export interface ProjectConfirmRequest {
+  sessionId: string;
+}
+
+export interface ProjectReviseRequest {
+  sessionId: string;
+  revisionPrompt: string;
+}
+
+export interface ProjectCancelRequest {
+  sessionId: string;
+}
+
+export interface ProjectSessionMutationResult {
+  sessionId: string;
+  status: 'awaiting_confirmation' | 'executing' | 'cancelled';
+}
+
 export interface RunMetadata {
   sessionId: string;
   conversationId?: string;
@@ -214,6 +258,46 @@ export type AgentEvent =
   | { type: 'schema:done'; data: { schema: PageSchema } }
   | { type: 'done'; data: { metadata: RunMetadata } }
   | { type: 'error'; data: { message: string; code?: string } };
+
+export type ProjectAgentEvent =
+  | { type: 'project:start'; data: { sessionId: string; conversationId?: string; prompt: string } }
+  | { type: 'project:plan'; data: { sessionId: string; plan: ProjectPlan } }
+  | { type: 'project:awaiting_confirmation'; data: { sessionId: string; plan: ProjectPlan } }
+  | {
+      type: 'project:page:start';
+      data: {
+        sessionId: string;
+        index: number;
+        total: number;
+        page: ProjectPlanPage;
+      };
+    }
+  | {
+      type: 'project:page:event';
+      data: {
+        sessionId: string;
+        pageId: string;
+        event: AgentEvent;
+      };
+    }
+  | {
+      type: 'project:page:done';
+      data: {
+        sessionId: string;
+        pageId: string;
+        fileId?: string;
+        metadata?: RunMetadata;
+      };
+    }
+  | {
+      type: 'project:done';
+      data: {
+        sessionId: string;
+        createdFileIds: string[];
+        completedPageIds: string[];
+      };
+    }
+  | { type: 'project:error'; data: { sessionId: string; message: string } };
 
 export interface RunResponse {
   success: true;

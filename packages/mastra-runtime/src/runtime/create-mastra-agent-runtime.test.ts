@@ -75,6 +75,25 @@ function createLegacyRuntime(events: AgentEvent[]): MastraAgentRuntime {
     writeTraceDebug() {
       return '.ai-debug/traces/trace.json';
     },
+    async *projectStream() {
+      yield {
+        type: 'project:start',
+        data: {
+          sessionId: 'project-session',
+          conversationId: 'project-conversation',
+          prompt: 'build project',
+        },
+      };
+    },
+    async confirmProject() {
+      return { sessionId: 'project-session', status: 'executing' as const };
+    },
+    async reviseProject() {
+      return { sessionId: 'project-session', status: 'awaiting_confirmation' as const };
+    },
+    async cancelProject() {
+      return { sessionId: 'project-session', status: 'cancelled' as const };
+    },
   };
 }
 
@@ -599,5 +618,189 @@ describe('createMastraAgentRuntime', () => {
       status: 'error',
       trace: { step: 'parse' },
     }))).resolves.toBe('.ai-debug/traces/error.json');
+  });
+
+  it('runs project workflow sessions through mastra and resumes after confirmation', async () => {
+    const deps = createDeps([
+      {
+        name: 'planPage',
+        async execute() {
+          return {
+            pageTitle: '订单列表',
+            pageType: 'list',
+            blocks: [{
+              id: 'table-block',
+              description: '订单表格',
+              components: ['Table'],
+              priority: 1,
+              complexity: 'simple',
+            }],
+          };
+        },
+      },
+      {
+        name: 'buildSkeletonSchema',
+        async execute() {
+          return {
+            id: 'order-list',
+            body: [],
+          };
+        },
+      },
+      {
+        name: 'generateBlock',
+        async execute() {
+          return {
+            blockId: 'table-block',
+            node: {
+              id: 'order-table',
+              component: 'Table',
+            },
+            summary: '订单表格完成',
+          };
+        },
+      },
+      {
+        name: 'assembleSchema',
+        async execute() {
+          return {
+            id: 'order-list',
+            body: [{
+              id: 'order-table',
+              component: 'Table',
+            }],
+          };
+        },
+      },
+    ], {
+      async chat() {
+        return {
+          text: JSON.stringify({
+            projectName: '订单管理后台',
+            pages: [{
+              pageId: 'order-list',
+              pageName: '订单列表',
+              action: 'create',
+              description: '展示订单列表和筛选',
+              prompt: '创建订单列表页，包含筛选和表格。',
+            }],
+          }),
+        };
+      },
+    });
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime: createLegacyRuntime([]),
+      createDeps: () => deps,
+      prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
+    });
+
+    const iterator = runtime.projectStream({
+      prompt: '生成订单管理项目',
+      plannerModel: 'glm-4.7',
+      blockModel: 'glm-4.6',
+      workspace: {
+        componentSummary: 'Card, Table, Form',
+        files: [],
+      },
+    })[Symbol.asyncIterator]();
+
+    const first = await iterator.next();
+    const second = await iterator.next();
+    const third = await iterator.next();
+    expect(first.value?.type).toBe('project:start');
+    expect(second.value?.type).toBe('project:plan');
+    expect(third.value?.type).toBe('project:awaiting_confirmation');
+
+    const sessionId = first.value && first.value.type === 'project:start'
+      ? first.value.data.sessionId
+      : undefined;
+    if (!sessionId) {
+      throw new Error('project session id was not emitted');
+    }
+    await expect(runtime.confirmProject({ sessionId })).resolves.toEqual({
+      sessionId,
+      status: 'executing',
+    });
+
+    const remaining: string[] = [];
+    while (true) {
+      const next = await iterator.next();
+      if (next.done) {
+        break;
+      }
+      remaining.push(next.value.type);
+    }
+
+    expect(remaining).toContain('project:page:start');
+    expect(remaining).toContain('project:page:event');
+    expect(remaining).toContain('project:page:done');
+    expect(remaining.at(-1)).toBe('project:done');
+  });
+
+  it('revises project plans before confirmation', async () => {
+    const prompts: string[] = [];
+    const deps = createDeps([], {
+      async chat(request) {
+        prompts.push(JSON.stringify(request));
+        return {
+          text: JSON.stringify({
+            projectName: prompts.length > 1 ? '订单管理后台-修订版' : '订单管理后台',
+            pages: [{
+              pageId: 'order-list',
+              pageName: '订单列表',
+              action: 'create',
+              description: '展示订单列表',
+            }],
+          }),
+        };
+      },
+    });
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime: createLegacyRuntime([]),
+      createDeps: () => deps,
+      prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
+    });
+
+    const iterator = runtime.projectStream({
+      prompt: '生成订单管理项目',
+      workspace: {
+        componentSummary: 'Card, Table',
+        files: [],
+      },
+    })[Symbol.asyncIterator]();
+
+    const events = [
+      await iterator.next(),
+      await iterator.next(),
+      await iterator.next(),
+    ];
+    const sessionId = events[0].value && events[0].value.type === 'project:start'
+      ? events[0].value.data.sessionId
+      : undefined;
+    if (!sessionId) {
+      throw new Error('project session id was not emitted');
+    }
+    await expect(runtime.reviseProject({
+      sessionId,
+      revisionPrompt: '增加审批页',
+    })).resolves.toEqual({
+      sessionId,
+      status: 'awaiting_confirmation',
+    });
+
+    const revisedPlan = await iterator.next();
+    expect(revisedPlan.value?.type).toBe('project:plan');
+    if (revisedPlan.value?.type !== 'project:plan') {
+      throw new Error('revised project plan was not emitted');
+    }
+    expect(revisedPlan.value.data.plan.projectName).toBe('订单管理后台-修订版');
+    await runtime.cancelProject({ sessionId });
+    await Array.fromAsync(iterator);
   });
 });
