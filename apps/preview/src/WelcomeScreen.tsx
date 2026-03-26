@@ -346,21 +346,30 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
       .finally(() => setCloneAuthLoading(false));
   }, [mode, gitlabService]);
 
-  // Listen for popup login success
+  // Listen for global auth changes (login/logout)
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data === 'gitlab-login-success') {
-        if (mode === 'clone') {
-          setCloneAuthLoading(true);
-          gitlabService.getAuthStatus()
-            .then((status) => setCloneAuthStatus(status))
-            .catch(() => setCloneAuthStatus({ authenticated: false }))
-            .finally(() => setCloneAuthLoading(false));
-        }
+    const channel = new BroadcastChannel('gitlab-auth');
+    const handleRefresh = () => {
+      if (mode === 'clone') {
+        setCloneAuthLoading(true);
+        gitlabService.getAuthStatus()
+          .then((status) => setCloneAuthStatus(status))
+          .catch(() => setCloneAuthStatus({ authenticated: false }))
+          .finally(() => setCloneAuthLoading(false));
       }
     };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    const handleMessageEvent = (event: MessageEvent) => {
+      if (event.data === 'gitlab-login-success' || event.data === 'login-success' || event.data === 'logout-success') {
+        handleRefresh();
+      }
+    };
+    channel.addEventListener('message', handleMessageEvent);
+    window.addEventListener('message', handleMessageEvent);
+    return () => {
+      channel.removeEventListener('message', handleMessageEvent);
+      channel.close();
+      window.removeEventListener('message', handleMessageEvent);
+    };
   }, [mode, gitlabService]);
 
   // When authenticated in clone mode, load projects

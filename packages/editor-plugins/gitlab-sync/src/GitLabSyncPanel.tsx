@@ -246,15 +246,19 @@ export function GitLabSyncPanel({
   const autoRefreshedRef = useRef<string>('');
   const [refreshCounter, setRefreshCounter] = useState(0);
 
-  // ── Listen for popup login success ──
+  // ── Listen for global auth changes ──
   useEffect(() => {
+    const channel = new BroadcastChannel('gitlab-auth');
     const handleMessage = (event: MessageEvent) => {
-      if (event.data === 'gitlab-login-success') {
+      if (event.data === 'login-success' || event.data === 'logout-success') {
         setRefreshCounter((c) => c + 1);
       }
     };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    channel.addEventListener('message', handleMessage);
+    return () => {
+      channel.removeEventListener('message', handleMessage);
+      channel.close();
+    };
   }, []);
 
   // ── Initialize ──
@@ -323,6 +327,10 @@ export function GitLabSyncPanel({
 
   const handleLogout = useCallback(() => {
     client.logout().then(() => {
+      // Broadcast logout success
+      const channel = new BroadcastChannel('gitlab-auth');
+      channel.postMessage('logout-success');
+      channel.close();
       setState({ kind: 'not-logged-in' });
     });
   }, []);

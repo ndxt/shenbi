@@ -128,9 +128,17 @@ export function createGitLabRoute(config: GitLabOAuthConfig): Hono {
             <div class="loader"></div>
           </div>
           <script>
-            // Notify the parent window
+            // Notify the parent window (legacy popup logic)
             if (window.opener) {
               window.opener.postMessage('gitlab-login-success', '*');
+            }
+            // Global broadcast for all components (same-origin tabs/iframes)
+            try {
+              const channel = new BroadcastChannel('gitlab-auth');
+              channel.postMessage('login-success');
+              channel.close();
+            } catch (e) {
+              console.error('Failed to broadcast login success:', e);
             }
             // Close after a short delay so the user sees the success message
             setTimeout(() => {

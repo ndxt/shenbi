@@ -58,9 +58,25 @@ export function usePreviewProjectState({
   );
   const [gitlabUser, setGitlabUser] = useState<{ username: string; avatarUrl: string } | null>(null);
   const [gitlabBranches, setGitlabBranches] = useState<string[]>([]);
+  const [authRefreshCounter, setAuthRefreshCounter] = useState(0);
   const pendingMigrationRef = useRef<{ sourceProjectId: string; targetProjectId: string } | null>(null);
   const activeProjectId = activeProjectConfig?.vfsProjectId ?? null;
   const isFirstLaunch = activeProjectConfig === null;
+
+  // Listen for global auth changes (login/logout from popups or other tabs)
+  useEffect(() => {
+    const channel = new BroadcastChannel('gitlab-auth');
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === 'login-success' || event.data === 'logout-success') {
+        setAuthRefreshCounter((c) => c + 1);
+      }
+    };
+    channel.addEventListener('message', handleMessage);
+    return () => {
+      channel.removeEventListener('message', handleMessage);
+      channel.close();
+    };
+  }, []);
 
   useEffect(() => {
     gitlabService.getAuthStatus()
@@ -73,7 +89,7 @@ export function usePreviewProjectState({
         }
       })
       .catch(() => undefined);
-  }, [gitlabService]);
+  }, [gitlabService, authRefreshCounter]);
 
   useEffect(() => {
     if (!activeProjectConfig?.gitlabProjectId) {
@@ -98,6 +114,10 @@ export function usePreviewProjectState({
       .then(() => {
         setGitlabUser(null);
         setGitlabBranches([]);
+        // Broadcast logout success
+        const channel = new BroadcastChannel('gitlab-auth');
+        channel.postMessage('logout-success');
+        channel.close();
       })
       .catch(() => undefined);
   }, [gitlabService]);
