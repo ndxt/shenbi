@@ -12,6 +12,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   FolderGit2, Plus, Trash2, X, GitBranch,
   Search, Loader2, Check, FolderOpen, Download,
+  Monitor, Smartphone, LayoutDashboard, FileText,
+  BarChart3, Globe, ShoppingCart, BookOpen,
+  MessageSquare, MapPin, Wallet, Activity,
+  Camera, Gamepad2, Box, ArrowLeft,
 } from 'lucide-react';
 import type { ActiveProjectConfig } from './constants';
 import {
@@ -47,7 +51,7 @@ const S: Record<string, React.CSSProperties> = {
     zIndex: 9999,
   },
   dialog: {
-    width: '100%', maxWidth: 520, maxHeight: '80vh', background: color.card,
+    width: '100%', maxWidth: 640, maxHeight: '85vh', background: color.card,
     borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
     display: 'flex', flexDirection: 'column' as const, overflow: 'hidden',
     fontFamily: "'Inter', -apple-system, sans-serif",
@@ -120,6 +124,57 @@ const S: Record<string, React.CSSProperties> = {
 // ---------------------------------------------------------------------------
 
 type Tab = 'projects' | 'create' | 'clone';
+type CreateStep = 'template' | 'name';
+
+// ---------------------------------------------------------------------------
+// Built-in project templates
+// ---------------------------------------------------------------------------
+
+interface ProjectTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ElementType;
+  color: string;
+}
+
+interface ProjectTypeCategory {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  templates: ProjectTemplate[];
+}
+
+const PROJECT_CATEGORIES: ProjectTypeCategory[] = [
+  {
+    id: 'web',
+    name: 'Web 端',
+    icon: Monitor,
+    templates: [
+      { id: 'blank', name: '空白项目', description: '一个全新的空白画布，自由搭建您的页面', icon: Box, color: '#6b7280' },
+      { id: 'admin', name: '管理系统', description: '企业级后台管理系统，包含布局框架、表单、表格等', icon: LayoutDashboard, color: '#3b82f6' },
+      { id: 'cms', name: 'CMS 内容管理', description: '内容管理平台，支持文章、媒体、分类管理', icon: FileText, color: '#8b5cf6' },
+      { id: 'dashboard', name: '数据大屏', description: '数据可视化大屏，支持图表、地图、实时数据展示', icon: BarChart3, color: '#10b981' },
+      { id: 'portal', name: '门户网站', description: '企业官网或门户站点，响应式多页布局', icon: Globe, color: '#f59e0b' },
+      { id: 'ecommerce', name: '电商商城', description: '在线购物平台，包含商品展示、购物车、订单流程', icon: ShoppingCart, color: '#ef4444' },
+    ],
+  },
+  {
+    id: 'mobile',
+    name: '移动端',
+    icon: Smartphone,
+    templates: [
+      { id: 'blank-mobile', name: '空白应用', description: '一个全新的空白手机画布，自由构建移动端页面', icon: Box, color: '#6b7280' },
+      { id: 'news', name: '资讯阅读', description: '新闻、博客或阅读类应用，含文章列表、详情等', icon: BookOpen, color: '#3b82f6' },
+      { id: 'social', name: '社交通讯', description: '即时通讯或社交应用，含消息列表、聊天界面', icon: MessageSquare, color: '#8b5cf6' },
+      { id: 'lifestyle', name: '生活服务', description: '本地生活服务类应用，含地图、商家、订单等', icon: MapPin, color: '#10b981' },
+      { id: 'finance', name: '金融理财', description: '移动端金融应用，含账户、交易、数据图表等', icon: Wallet, color: '#f59e0b' },
+      { id: 'health', name: '健康运动', description: '运动健康类应用，含数据追踪、计划、统计', icon: Activity, color: '#ef4444' },
+      { id: 'camera', name: '工具拍照', description: '图片编辑或拍照工具类应用，含滤镜、编辑', icon: Camera, color: '#ec4899' },
+      { id: 'game', name: '休闲游戏', description: '轻量级小游戏或互动内容应用', icon: Gamepad2, color: '#14b8a6' },
+    ],
+  },
+];
 
 export interface ProjectManagerDialogProps {
   open: boolean;
@@ -143,6 +198,11 @@ export function ProjectManagerDialog({
   const [gitlabProjects, setGitlabProjects] = useState<PreviewGitLabProject[]>([]);
   const [cloning, setCloning] = useState<number | null>(null);
   const [authStatus, setAuthStatus] = useState<{ authenticated: boolean; defaultGroupId?: number } | null>(null);
+  // Create tab state
+  const [createStep, setCreateStep] = useState<CreateStep>('template');
+  const [activeCategoryId, setActiveCategoryId] = useState(PROJECT_CATEGORIES[0].id);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const activeCategory = PROJECT_CATEGORIES.find((c) => c.id === activeCategoryId) ?? PROJECT_CATEGORIES[0];
 
   // Load project list
   useEffect(() => {
@@ -177,6 +237,8 @@ export function ProjectManagerDialog({
     upsertProjectInList(config);
     onSelectProject(config);
     setNewName('');
+    setCreateStep('template');
+    setSelectedTemplateId(null);
     onClose();
   }, [newName, onSelectProject, onClose]);
 
@@ -284,23 +346,114 @@ export function ProjectManagerDialog({
 
           {/* ── Create tab ── */}
           {tab === 'create' && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={S.sectionTitle}>新建本地项目</div>
-              <input
-                style={S.input}
-                placeholder="输入项目名称..."
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
-                autoFocus
-              />
-              <div style={S.row}>
-                <button style={S.btn} onClick={handleCreate} disabled={!newName.trim()}>
-                  <Plus size={14} /> 创建项目
-                </button>
-              </div>
-              <div style={{ marginTop: 12, fontSize: 12, color: color.textDim }}>
-                创建后可在 GitLab 面板中绑定远程仓库进行同步
+            <div>
+              {createStep === 'template' ? (
+                /* ── Template selection ── */
+                <div style={{ display: 'flex', gap: 0, minHeight: 340 }}>
+                  {/* Category sidebar */}
+                  <div style={{ width: 140, borderRight: `1px solid ${color.border}`, paddingRight: 12, flexShrink: 0 }}>
+                    <div style={{ ...S.sectionTitle, marginBottom: 10 }}>项目类型</div>
+                    {PROJECT_CATEGORIES.map((cat) => {
+                      const isActive = cat.id === activeCategoryId;
+                      const CatIcon = cat.icon;
+                      return (
+                        <div
+                          key={cat.id}
+                          onClick={() => { setActiveCategoryId(cat.id); setSelectedTemplateId(null); }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                            marginBottom: 2, fontSize: 12, transition: 'all 0.15s',
+                            background: isActive ? 'rgba(0,180,216,0.12)' : 'transparent',
+                            color: isActive ? color.accent : color.textDim,
+                            fontWeight: isActive ? 600 : 400,
+                            borderLeft: isActive ? `3px solid ${color.accent}` : '3px solid transparent',
+                          }}
+                        >
+                          <CatIcon size={14} />
+                          <span>{cat.name}</span>
+                          <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.5 }}>{cat.templates.length}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Template grid */}
+                  <div style={{ flex: 1, paddingLeft: 16, overflowY: 'auto' }}>
+                    <div style={{ ...S.sectionTitle, marginBottom: 4 }}>选择模板</div>
+                    <div style={{ fontSize: 11, color: color.textDim, marginBottom: 12 }}>选择一个模板快速开始，后续可自由修改</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                      {activeCategory.templates.map((tpl) => {
+                        const TplIcon = tpl.icon;
+                        const isSelected = selectedTemplateId === tpl.id;
+                        return (
+                          <div
+                            key={tpl.id}
+                            onClick={() => setSelectedTemplateId(tpl.id)}
+                            style={{
+                              display: 'flex', flexDirection: 'column', alignItems: 'center',
+                              padding: '14px 8px 10px', borderRadius: 10, cursor: 'pointer',
+                              border: isSelected ? `2px solid ${color.accent}` : '2px solid transparent',
+                              background: isSelected ? 'rgba(0,180,216,0.08)' : color.bgInput,
+                              transition: 'all 0.15s', textAlign: 'center',
+                            }}
+                          >
+                            <div style={{
+                              width: 48, height: 48, borderRadius: 12, display: 'flex',
+                              alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+                              background: `${tpl.color}18`,
+                            }}>
+                              <TplIcon size={22} strokeWidth={1.5} style={{ color: tpl.color }} />
+                            </div>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: isSelected ? color.accent : '#fff', lineHeight: 1.3 }}>{tpl.name}</div>
+                            <div style={{ fontSize: 10, color: color.textDim, marginTop: 3, lineHeight: 1.4, maxWidth: 100, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{tpl.description}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ── Name input step ── */
+                <div>
+                  <button
+                    onClick={() => setCreateStep('template')}
+                    style={{ background: 'none', border: 'none', color: color.accent, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, marginBottom: 12, padding: 0 }}
+                  >
+                    <ArrowLeft size={14} /> 返回选择模板
+                  </button>
+                  <div style={{ ...S.sectionTitle, marginBottom: 4 }}>项目名称</div>
+                  <div style={{ fontSize: 11, color: color.textDim, marginBottom: 8 }}>
+                    模板: {activeCategory.templates.find((t) => t.id === selectedTemplateId)?.name}
+                  </div>
+                  <input
+                    style={S.input}
+                    placeholder="输入项目名称..."
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+                    autoFocus
+                  />
+                  <div style={{ marginTop: 12, fontSize: 12, color: color.textDim }}>
+                    项目文件保存到浏览器 IndexedDB，可随时绑定 GitLab 远程仓库
+                  </div>
+                </div>
+              )}
+
+              {/* Footer row */}
+              <div style={{ ...S.row, justifyContent: 'flex-end', marginTop: 16, borderTop: `1px solid ${color.border}`, paddingTop: 12 }}>
+                {createStep === 'template' ? (
+                  <button
+                    style={{ ...S.btn, width: 'auto', opacity: selectedTemplateId ? 1 : 0.4, cursor: selectedTemplateId ? 'pointer' : 'not-allowed' }}
+                    disabled={!selectedTemplateId}
+                    onClick={() => setCreateStep('name')}
+                  >
+                    下一步
+                  </button>
+                ) : (
+                  <button style={S.btn} onClick={handleCreate} disabled={!newName.trim()}>
+                    <Check size={14} /> 创建项目
+                  </button>
+                )}
               </div>
             </div>
           )}
