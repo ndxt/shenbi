@@ -376,9 +376,29 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
   }, [gitlabService, onSelectProject]);
 
   const handleConnectGitLab = useCallback(() => {
-    // OAuth login — redirect to backend proxy which redirects to GitLab
-    window.location.href = getLoginUrl();
-  }, []);
+    // Open OAuth login in a centered popup window
+    const w = 600, h = 700;
+    const left = window.screenX + (window.outerWidth - w) / 2;
+    const top = window.screenY + (window.outerHeight - h) / 2;
+    const popup = window.open(
+      getLoginUrl(),
+      'gitlab-oauth',
+      `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=yes,status=no`,
+    );
+    // Poll until popup closes, then re-check auth
+    if (popup) {
+      const timer = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(timer);
+          setCloneAuthLoading(true);
+          gitlabService.getAuthStatus()
+            .then((status) => setCloneAuthStatus(status))
+            .catch(() => setCloneAuthStatus({ authenticated: false }))
+            .finally(() => setCloneAuthLoading(false));
+        }
+      }, 1000);
+    }
+  }, [gitlabService]);
 
   return (
     <div
