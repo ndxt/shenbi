@@ -114,21 +114,99 @@ type Mode = 'idle' | 'new' | 'open';
 type CreateStep = 'template' | 'name';
 
 // ---------------------------------------------------------------------------
+// Custom Cover Components for Mockup Precision
+// ---------------------------------------------------------------------------
+
+const CoverBlank = () => (
+  <div style={{ width: 68, height: 68, border: '2px dashed #6b7fa3', borderRadius: 8, opacity: 0.8 }} />
+);
+
+const CoverAdmin = () => (
+  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="68" rx="6" fill="#F8FAFC"/>
+    <rect width="24" height="68" fill="#1E293B"/>
+    <rect x="6" y="8" width="12" height="2" rx="1" fill="#475569"/>
+    <rect x="6" y="14" width="8" height="2" rx="1" fill="#475569"/>
+    <rect x="6" y="20" width="10" height="2" rx="1" fill="#475569"/>
+    {/* header */}
+    <rect x="28" y="6" width="60" height="4" rx="2" fill="#E2E8F0"/>
+    {/* content boxes */}
+    <rect x="28" y="16" width="32" height="20" rx="2" fill="#FFFFFF" stroke="#E2E8F0"/>
+    <rect x="64" y="16" width="28" height="20" rx="2" fill="#FFFFFF" stroke="#E2E8F0"/>
+    <rect x="28" y="40" width="64" height="22" rx="2" fill="#FFFFFF" stroke="#E2E8F0"/>
+    {/* fake charts */}
+    <circle cx="44" cy="26" r="6" stroke="#3B82F6" strokeWidth="2"/>
+    <circle cx="78" cy="26" r="6" fill="#10B981"/>
+    <path d="M32 54 L 40 46 L 50 50 L 60 44 L 70 48 L 86 42" stroke="#F59E0B" strokeWidth="1.5" strokeLinejoin="round" fill="none"/>
+    {/* fake user profile */}
+    <circle cx="78" cy="52" r="4" fill="#64748B"/>
+    <path d="M74 58 Q 78 52 82 58" stroke="#64748B" strokeWidth="1.5" fill="none"/>
+  </svg>
+);
+
+const CoverCMS = () => (
+  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="36" y="4" width="34" height="46" rx="4" fill="#E2E8F0"/>
+    <rect x="42" y="12" width="22" height="3" rx="1.5" fill="#94A3B8"/>
+    <rect x="42" y="18" width="16" height="3" rx="1.5" fill="#94A3B8"/>
+    <rect x="42" y="24" width="18" height="3" rx="1.5" fill="#94A3B8"/>
+    <rect x="42" y="30" width="12" height="3" rx="1.5" fill="#94A3B8"/>
+    {/* wrench superimposed */}
+    <g transform="translate(52, 28) scale(1.1)">
+      <circle cx="12" cy="12" r="10" fill="#1E293B"/>
+      <path d="M14.7 9.3a4.6 4.6 0 0 0-6.1-.9L6.1 10.9a1 1 0 0 0 0 1.4l1.6 1.6-4.5 4.5a1 1 0 0 0 0 1.4l1.4 1.4a1 1 0 0 0 1.4 0l4.5-4.5 1.6 1.6a1 1 0 0 0 1.4 0l2.5-2.5a4.6 4.6 0 0 0-.9-6.1z" fill="#3B82F6"/>
+    </g>
+  </svg>
+);
+
+const CoverDashboard = () => (
+  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="68" rx="6" fill="#0F172A"/>
+    <rect width="100" height="12" fill="#1E293B"/>
+    <rect x="8" y="4" width="20" height="3" rx="1.5" fill="#3B82F6"/>
+    <rect x="32" y="4" width="10" height="3" rx="1.5" fill="#64748B"/>
+    <rect x="46" y="4" width="12" height="3" rx="1.5" fill="#64748B"/>
+    {/* Main chart */}
+    <rect x="6" y="16" width="56" height="30" rx="2" fill="#1E293B"/>
+    <path d="M10 38 L 22 24 L 30 30 L 42 20 L 56 28" stroke="#3B82F6" strokeWidth="1.5" strokeLinejoin="round" fill="none"/>
+    <path d="M10 42 L 20 34 L 32 38 L 44 28 L 56 36" stroke="#10B981" strokeWidth="1.5" strokeLinejoin="round" fill="none"/>
+    {/* side charts */}
+    <rect x="66" y="16" width="28" height="13" rx="2" fill="#1E293B"/>
+    <circle cx="80" cy="22.5" r="4" stroke="#F59E0B" strokeWidth="1.5"/>
+    <circle cx="80" cy="22.5" r="1.5" fill="#F59E0B"/>
+    <rect x="66" y="33" width="28" height="13" rx="2" fill="#1E293B"/>
+    <rect x="70" y="38" width="4" height="6" rx="1" fill="#3B82F6"/>
+    <rect x="76" y="36" width="4" height="8" rx="1" fill="#10B981"/>
+    <rect x="82" y="39" width="4" height="5" rx="1" fill="#F59E0B"/>
+    <rect x="88" y="35" width="4" height="9" rx="1" fill="#8B5CF6"/>
+    {/* bottom panels */}
+    <rect x="6" y="50" width="26" height="14" rx="2" fill="#1E293B"/>
+    <circle cx="19" cy="57" r="4" stroke="#8B5CF6" strokeWidth="1.5"/>
+    <rect x="36" y="50" width="58" height="14" rx="2" fill="#1E293B"/>
+    {/* fake map dots */}
+    <circle cx="50" cy="55" r="1.5" fill="#475569"/>
+    <circle cx="54" cy="58" r="2" fill="#64748B"/>
+    <circle cx="58" cy="54" r="1" fill="#475569"/>
+    <circle cx="68" cy="56" r="2.5" fill="#64748B"/>
+    <circle cx="76" cy="53" r="1.5" fill="#475569"/>
+    <circle cx="82" cy="57" r="1" fill="#475569"/>
+  </svg>
+);
+
+
+// ---------------------------------------------------------------------------
 // Built-in project templates
 // ---------------------------------------------------------------------------
 
 interface ProjectTemplate {
   id: string;
   name: string;
-  description: string;
-  icon: React.ElementType;
-  color: string;
+  cover?: React.ReactNode;
 }
 
 interface ProjectTypeCategory {
   id: string;
   name: string;
-  icon: React.ElementType;
   templates: ProjectTemplate[];
 }
 
@@ -136,29 +214,18 @@ const PROJECT_CATEGORIES: ProjectTypeCategory[] = [
   {
     id: 'web',
     name: 'Web 端',
-    icon: Monitor,
     templates: [
-      { id: 'blank', name: '空白项目', description: '全新空白画布，自由搭建页面', icon: Box, color: '#6b7280' },
-      { id: 'admin', name: '管理系统', description: '后台管理系统，含布局、表单、表格', icon: LayoutDashboard, color: '#3b82f6' },
-      { id: 'cms', name: 'CMS 内容管理', description: '文章、媒体、分类管理平台', icon: FileText, color: '#8b5cf6' },
-      { id: 'dashboard', name: '数据大屏', description: '图表、地图、实时数据可视化', icon: BarChart3, color: '#10b981' },
-      { id: 'portal', name: '门户网站', description: '企业官网，响应式多页布局', icon: Globe, color: '#f59e0b' },
-      { id: 'ecommerce', name: '电商商城', description: '商品展示、购物车、订单流程', icon: ShoppingCart, color: '#ef4444' },
+      { id: 'blank', name: '空白项目', cover: <CoverBlank /> },
+      { id: 'admin', name: '管理系统', cover: <CoverAdmin /> },
+      { id: 'cms', name: 'CMS内容管理', cover: <CoverCMS /> },
+      { id: 'dashboard', name: '数据大屏', cover: <CoverDashboard /> },
     ],
   },
   {
     id: 'mobile',
     name: '移动端',
-    icon: Smartphone,
     templates: [
-      { id: 'blank-mobile', name: '空白应用', description: '空白手机画布，自由构建移动页面', icon: Box, color: '#6b7280' },
-      { id: 'news', name: '资讯阅读', description: '新闻、博客阅读类应用', icon: BookOpen, color: '#3b82f6' },
-      { id: 'social', name: '社交通讯', description: '即时通讯、消息、聊天界面', icon: MessageSquare, color: '#8b5cf6' },
-      { id: 'lifestyle', name: '生活服务', description: '地图、商家、订单服务应用', icon: MapPin, color: '#10b981' },
-      { id: 'finance', name: '金融理财', description: '账户、交易、数据图表', icon: Wallet, color: '#f59e0b' },
-      { id: 'health', name: '健康运动', description: '数据追踪、计划、统计应用', icon: Activity, color: '#ef4444' },
-      { id: 'camera', name: '工具拍照', description: '图片编辑、滤镜工具应用', icon: Camera, color: '#ec4899' },
-      { id: 'game', name: '休闲游戏', description: '轻量级小游戏或互动内容', icon: Gamepad2, color: '#14b8a6' },
+      { id: 'blank-mobile', name: '空白应用', cover: <CoverBlank /> },
     ],
   },
 ];
@@ -257,12 +324,12 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
           /* =========================================================
              WIZARD TAKEOVER (Replaces Welcome Content)
              ========================================================= */
-          <div style={{ display: 'flex', flexDirection: 'column', height: 480 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: 480, background: '#1e1e1e' }}>
             {createStep === 'template' ? (
               /* ── Step 1: Template selection ── */
               <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-                {/* Category sidebar */}
-                <div style={{ width: 140, borderRight: '1px solid var(--color-border-ide)', padding: '16px 0', flexShrink: 0, background: 'rgba(0,0,0,0.1)' }}>
+                {/* Category sidebar (mockup style) */}
+                <div style={{ width: 140, borderRight: '1px solid #18181a', padding: '16px 0', flexShrink: 0, background: '#1c1c1c' }}>
                   {PROJECT_CATEGORIES.map((cat) => {
                     const isActive = cat.id === activeCategoryId;
                     return (
@@ -270,46 +337,48 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
                         key={cat.id}
                         onClick={() => { setActiveCategoryId(cat.id); setSelectedTemplateId(null); }}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '10px 16px', cursor: 'pointer',
-                          fontSize: 13, transition: 'all 0.15s',
-                          background: isActive ? 'var(--color-primary)' : 'transparent',
-                          color: isActive ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
-                          fontWeight: isActive ? 600 : 400,
+                          display: 'flex', alignItems: 'center',
+                          padding: '8px 16px', cursor: 'pointer',
+                          fontSize: 13, transition: 'background 0.15s',
+                          background: isActive ? '#2a3d5a' : 'transparent',
+                          color: '#e0e0e0',
+                          fontWeight: isActive ? 500 : 400,
+                          borderLeft: isActive ? '3px solid #4b9efa' : '3px solid transparent',
                         }}
                       >
-                        <span>{cat.name}</span>
+                        {cat.name}
                       </div>
                     );
                   })}
                 </div>
-                {/* Template grid */}
-                <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+                {/* Template grid (mockup style) */}
+                <div style={{ flex: 1, padding: '24px 32px', overflowY: 'auto', background: '#1e1e1e' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                     {activeCategory.templates.map((tpl) => {
-                      const TplIcon = tpl.icon;
                       const isSelected = selectedTemplateId === tpl.id;
                       return (
                         <div
                           key={tpl.id}
                           onClick={() => setSelectedTemplateId(tpl.id)}
                           style={{
-                            display: 'flex', flexDirection: 'column', alignItems: 'center',
-                            padding: '24px 12px 16px', borderRadius: 8, cursor: 'pointer',
-                            border: isSelected ? '2px solid var(--color-primary)' : '2px solid transparent',
-                            background: isSelected ? 'rgba(var(--color-primary-rgb, 59,130,246), 0.1)' : 'var(--color-bg-overlay)',
-                            transition: 'all 0.15s', textAlign: 'center',
+                            display: 'flex', flexDirection: 'column',
+                            borderRadius: 8, cursor: 'pointer',
+                            border: isSelected ? '1px solid #4b9efa' : '1px solid #3e3e42',
+                            background: '#252526',
+                            overflow: 'hidden',
+                            height: 140,
+                            boxShadow: isSelected ? '0 0 0 1px #4b9efa' : 'none',
                           }}
                         >
                           <div style={{
-                            width: 56, height: 56, borderRadius: 12, display: 'flex',
-                            alignItems: 'center', justifyContent: 'center', marginBottom: 12,
-                            background: `${tpl.color}15`,
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: '#2d2d2d', borderBottom: '1px solid #3e3e42',
                           }}>
-                            <TplIcon size={28} strokeWidth={1.5} style={{ color: tpl.color }} />
+                            {tpl.cover}
                           </div>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: isSelected ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>{tpl.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8, lineHeight: 1.4, WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{tpl.description}</div>
+                          <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#e0e0e0', fontWeight: 400 }}>
+                            {tpl.name}
+                          </div>
                         </div>
                       );
                     })}
@@ -355,16 +424,16 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
             )}
 
             {/* Wizard Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 24px', borderTop: '1px solid var(--color-border-ide)', background: 'var(--color-bg-overlay)' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 24px', borderTop: '1px solid #18181a', background: '#1c1c1c' }}>
               {createStep === 'template' ? (
                 <>
                   <button
                     type="button"
                     onClick={() => setMode('idle')}
                     style={{
-                      padding: '8px 20px', borderRadius: 6, border: '1px solid var(--color-border-ide)',
-                      background: 'transparent', color: 'var(--color-text-secondary)',
-                      fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                      padding: '6px 20px', borderRadius: 4, border: '1px solid #3e3e42',
+                      background: '#3e3e42', color: '#e0e0e0',
+                      fontSize: 13, cursor: 'pointer',
                     }}
                   >
                     取消
@@ -374,9 +443,9 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
                     disabled={!selectedTemplateId}
                     onClick={() => setCreateStep('name')}
                     style={{
-                      padding: '8px 20px', borderRadius: 6, border: 'none',
-                      background: 'var(--color-primary)', color: 'var(--color-text-inverse)',
-                      fontSize: 13, fontWeight: 600,
+                      padding: '6px 20px', borderRadius: 4, border: 'none',
+                      background: '#4b9efa', color: '#fff',
+                      fontSize: 13,
                       cursor: selectedTemplateId ? 'pointer' : 'not-allowed',
                       opacity: selectedTemplateId ? 1 : 0.4,
                     }}
