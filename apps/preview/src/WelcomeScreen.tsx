@@ -221,6 +221,84 @@ const CoverDashboard = () => (
   </svg>
 );
 
+// ---------------------------------------------------------------------------
+// Mobile Cover Components (Layout-based, Android Studio style)
+// ---------------------------------------------------------------------------
+
+const CoverMobileBlank = () => (
+  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="33" y="2" width="34" height="64" rx="4" fill="#1E293B"/> 
+    <rect x="35" y="4" width="30" height="60" rx="2" fill="#F8FAFC"/> 
+    <rect x="35" y="4" width="30" height="8" rx="2" fill="#3B82F6"/> 
+    <path d="M 38 8 L 42 8" stroke="white" strokeWidth="1" strokeLinecap="round"/> 
+    <path d="M 58 8 L 62 8" stroke="white" strokeWidth="1" strokeLinecap="round"/>
+    <rect x="42" y="30" width="16" height="8" rx="1" fill="#E2E8F0"/> 
+  </svg>
+);
+
+const CoverMobileTabs = () => (
+  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="33" y="2" width="34" height="64" rx="4" fill="#1E293B"/>
+    <rect x="35" y="4" width="30" height="60" rx="2" fill="#F8FAFC"/>
+    <rect x="35" y="4" width="30" height="8" rx="2" fill="#14B8A6"/> 
+    <rect x="38" y="16" width="24" height="10" rx="2" fill="#E2E8F0"/>
+    <rect x="38" y="28" width="24" height="10" rx="2" fill="#E2E8F0"/>
+    <rect x="38" y="40" width="24" height="10" rx="2" fill="#E2E8F0"/>
+    <rect x="35" y="54" width="30" height="10" rx="2" fill="#FFFFFF"/>
+    <rect x="35" y="54" width="30" height="0.5" fill="#E2E8F0"/>
+    <circle cx="41" cy="59" r="2" fill="#14B8A6"/>
+    <circle cx="50" cy="59" r="2" fill="#94A3B8"/>
+    <circle cx="59" cy="59" r="2" fill="#94A3B8"/>
+  </svg>
+);
+
+const CoverMobileDrawer = () => (
+  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="33" y="2" width="34" height="64" rx="4" fill="#1E293B"/>
+    <rect x="35" y="4" width="30" height="60" rx="2" fill="#F8FAFC"/>
+    <rect x="35" y="4" width="30" height="8" rx="2" fill="#6366F1"/> 
+    <path d="M 38 7 L 42 7 M 38 9 L 42 9 M 38 11 L 42 11" stroke="white" strokeWidth="0.5"/> 
+    
+    <rect x="35" y="12" width="30" height="52" fill="rgba(0,0,0,0.1)"/>
+    
+    <rect x="35" y="4" width="22" height="60" fill="#FFFFFF"/>
+    <rect x="35" y="4" width="22" height="14" fill="#6366F1"/> 
+    <circle cx="40" cy="11" r="3" fill="#FFFFFF"/> 
+    <rect x="38" y="22" width="12" height="2" rx="1" fill="#6366F1"/>
+    <rect x="38" y="28" width="14" height="2" rx="1" fill="#CBD5E1"/>
+    <rect x="38" y="34" width="10" height="2" rx="1" fill="#CBD5E1"/>
+    <rect x="38" y="40" width="16" height="2" rx="1" fill="#CBD5E1"/>
+  </svg>
+);
+
+const CoverMobileLogin = () => (
+  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="33" y="2" width="34" height="64" rx="4" fill="#1E293B"/>
+    <rect x="35" y="4" width="30" height="60" rx="2" fill="#FFFFFF"/>
+    <circle cx="50" cy="22" r="6" fill="#E2E8F0"/>
+    <rect x="39" y="34" width="22" height="6" rx="3" fill="#F1F5F9" stroke="#E2E8F0" strokeWidth="0.5"/>
+    <rect x="39" y="44" width="22" height="6" rx="3" fill="#F1F5F9" stroke="#E2E8F0" strokeWidth="0.5"/>
+    <rect x="39" y="54" width="22" height="6" rx="3" fill="#3B82F6"/>
+    <rect x="46" y="56" width="8" height="2" rx="1" fill="#FFFFFF"/>
+  </svg>
+);
+
+const CoverMobileScroll = () => (
+  <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="33" y="2" width="34" height="64" rx="4" fill="#1E293B"/>
+    <rect x="35" y="4" width="30" height="60" rx="2" fill="#F8FAFC"/>
+    <rect x="35" y="4" width="30" height="24" fill="#F59E0B"/>
+    <path d="M 35 28 L 65 28 L 65 14 Z" fill="#D97706" opacity="0.3"/> 
+    <rect x="38" y="34" width="24" height="3" rx="1.5" fill="#1E293B"/> 
+    <rect x="38" y="42" width="24" height="2" rx="1" fill="#94A3B8"/>
+    <rect x="38" y="46" width="24" height="2" rx="1" fill="#94A3B8"/>
+    <rect x="38" y="50" width="18" height="2" rx="1" fill="#94A3B8"/>
+    <rect x="38" y="56" width="24" height="2" rx="1" fill="#94A3B8"/>
+    <rect x="38" y="60" width="12" height="2" rx="1" fill="#94A3B8"/>
+    <circle cx="60" cy="28" r="4" fill="#EC4899"/>
+  </svg>
+);
+
 
 // ---------------------------------------------------------------------------
 // Built-in project templates
@@ -253,7 +331,11 @@ const PROJECT_CATEGORIES: ProjectTypeCategory[] = [
     id: 'mobile',
     name: '移动端',
     templates: [
-      { id: 'blank-mobile', name: '空白应用', cover: <CoverBlank /> },
+      { id: 'mobile-blank', name: '空白页面', cover: <CoverMobileBlank /> },
+      { id: 'mobile-tabs', name: '底部导航', cover: <CoverMobileTabs /> },
+      { id: 'mobile-drawer', name: '侧滑菜单', cover: <CoverMobileDrawer /> },
+      { id: 'mobile-scroll', name: '滚动视图', cover: <CoverMobileScroll /> },
+      { id: 'mobile-login', name: '登录界面', cover: <CoverMobileLogin /> },
     ],
   },
 ];
