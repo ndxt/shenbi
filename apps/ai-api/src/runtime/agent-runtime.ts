@@ -16,7 +16,6 @@ import {
   repairPageSchema,
   buildSkeletonSchema,
   buildPagePlannerPromptSpec,
-  createInMemoryAgentMemoryStore,
   createToolRegistry,
   isMasterDetailPrompt,
   isMasterListBlock,
@@ -30,8 +29,6 @@ import {
   type FinalizeResult,
   type IntentClassification,
   type LayoutRow,
-  runAgent,
-  runAgentStream,
   type AgentRuntimeDeps,
   type AssembleSchemaInput,
   captureAgentMemorySnapshot,
@@ -48,16 +45,14 @@ import {
   validateGeneratedBlockNode,
   validateGeneratedBlockNodeWithDiagnostics,
 } from '@shenbi/ai-agents';
-import type { AgentEvent, ChatRequest, ChatResponse } from '@shenbi/ai-contracts';
+import type { ChatRequest } from '@shenbi/ai-contracts';
 import type { ClassifyRouteRequest, ClassifyRouteResponse } from '@shenbi/ai-contracts';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
-import type { ModelInfo } from '@shenbi/ai-contracts';
 import { LLMError } from '../adapters/errors.ts';
 import {
   writeErrorDump,
   writeInvalidJsonDump,
   writeMemoryDump,
-  writeTraceDump,
   type InvalidJsonSource,
 } from '../adapters/debug-dump.ts';
 import { loadEnv } from '../adapters/env.ts';
@@ -72,7 +67,6 @@ import {
 import {
   buildUserMessageContent,
   buildUserMessageContentFromLines,
-  prepareRunRequest,
 } from './request-attachments.ts';
 import {
   type SanitizationDiagnostic,
@@ -84,12 +78,10 @@ import {
   type ClassifyIntentTraceEntry,
 } from './classify-intent.ts';
 import { executeModifySchema, planModify, executeComplexOp as executeComplexOpFn, type ModifySchemaTraceEntry } from './modify-schema.ts';
-import type { AiApiService } from './types.ts';
 
 export { assessBlockQuality };
 export { validateGeneratedBlockNode, validateGeneratedBlockNodeWithDiagnostics };
 
-const defaultMemory = createInMemoryAgentMemoryStore();
 const env = loadEnv();
 type JsonSalvageStrategy =
   | 'balanced_object'
@@ -1142,41 +1134,6 @@ export function createMastraRuntimeDeps(memory: AgentMemoryStore, trace?: RunTra
       },
     },
   };
-}
-
-function extractMetadata(events: AgentEvent[]): RunMetadata {
-  const doneEvent = [...events].reverse().find((event): event is Extract<AgentEvent, { type: 'done' }> => event.type === 'done');
-  if (!doneEvent) {
-    throw new Error('Agent runtime completed without done metadata');
-  }
-  return doneEvent.data.metadata;
-}
-
-function createTrace(request: RunRequest): RunTraceRecord {
-  return {
-    request,
-    suggestedPageType: classifyPromptToPageType(request.prompt),
-    blocks: [],
-  };
-}
-
-function finalizeTrace(
-  trace: RunTraceRecord,
-  status: 'success' | 'error',
-  metadata?: RunMetadata,
-  error?: unknown,
-): string {
-  if (error) {
-    trace.error = {
-      message: error instanceof Error ? error.message : String(error),
-      ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
-    };
-  }
-  const debugFile = writeTraceDump({ status, trace });
-  if (metadata) {
-    metadata.debugFile = debugFile;
-  }
-  return debugFile;
 }
 
 async function captureMemoryDebugSnapshot(
