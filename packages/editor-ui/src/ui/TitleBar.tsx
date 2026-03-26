@@ -152,7 +152,7 @@ export function TitleBar({
       <div className="flex items-center h-full">
         {/* ActivityBar Column Header */}
         <div className="w-12 h-full flex items-center justify-center shrink-0">
-          <img src="/logo_light_128_transparent.png" alt="Shenbi" className="w-[30px] h-[30px] object-contain" />
+          <img src="/logo_light_128_transparent.png" alt="Locode" className="w-[30px] h-[30px] object-contain" />
         </div>
         
         {/* Project Switcher Dropdown */}
@@ -164,7 +164,7 @@ export function TitleBar({
             >
               <div className="relative shrink-0">
                 <div className={`w-[18px] h-[18px] ${isGitLabProject ? 'bg-[#2b727b]' : 'bg-[#444b53]'} text-[rgba(255,255,255,0.85)] rounded flex items-center justify-center text-[12px] font-medium`}>
-                  {(title ?? 'Shenbi IDE').charAt(0).toUpperCase()}
+                  {(title ?? 'Locode IDE').charAt(0).toUpperCase()}
                 </div>
                 {isGitLabProject && (
                   <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-bg-activity-bar rounded-full flex items-center justify-center shadow-sm">
@@ -173,7 +173,7 @@ export function TitleBar({
                 )}
               </div>
               <span className="text-[13px] font-medium tracking-wide text-text-primary">
-                {title ?? 'Shenbi IDE'}
+                {title ?? 'Locode IDE'}
               </span>
               <ChevronDown size={14} className="text-text-secondary opacity-50 stroke-[1.5] ml-0.5" />
             </button>

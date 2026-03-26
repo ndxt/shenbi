@@ -771,7 +771,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
         {/* Logo + Title */}
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.5px', marginBottom: 12, color: 'var(--color-text-primary)' }}>
-            Welcome to 神笔 IDE
+            Welcome to 乐扣 IDE
           </div>
           <div style={{ fontSize: 14, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
             创建一个新项目以从头开始。<br/>

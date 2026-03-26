@@ -1,4 +1,4 @@
-# 神笔 (Shenbi) Preview IDE - UI/UX Specification
+# 乐扣 (Locode) Preview IDE - UI/UX Specification
 
 > **Version:** 2.1.0 (Detailed)
 > **Date:** 2026-02-21

@@ -65,8 +65,8 @@
   },
   "message": {
     "you": "你",
-    "assistant": "Shenbi AI",
-    "welcome": "你好！我是 Shenbi 智能开发助手。\n可以帮您生成布局、绑定数据、调整样式。\n有什么我可以帮您的吗？",
+    "assistant": "Locode AI",
+    "welcome": "你好！我是 乐扣 智能开发助手。\n可以帮您生成布局、绑定数据、调整样式。\n有什么我可以帮您的吗？",
     "attachmentUnavailable": "附件不可用: {{name}}"
   },
   "result": {

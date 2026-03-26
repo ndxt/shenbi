@@ -65,8 +65,8 @@
   },
   "message": {
     "you": "You",
-    "assistant": "Shenbi AI",
-    "welcome": "Hello! I'm Shenbi Intelligent Development Assistant.\nI can help you generate layouts, bind data, and adjust styles.\nHow can I help you today?",
+    "assistant": "Locode AI",
+    "welcome": "Hello! I'm Locode Intelligent Development Assistant.\nI can help you generate layouts, bind data, and adjust styles.\nHow can I help you today?",
     "attachmentUnavailable": "Attachment unavailable: {{name}}"
   },
   "result": {

@@ -197,8 +197,8 @@
     "changeTheme": "Change Theme",
     "selectTheme": "Select Theme",
     "themeOption": {
-      "dark": "Shenbi Dark",
-      "light": "Shenbi Light",
+      "dark": "Locode Dark",
+      "light": "Locode Light",
       "cursor": "Cursor Dark",
       "webstormDark": "WebStorm Dark"
     },

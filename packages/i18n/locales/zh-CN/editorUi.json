@@ -197,8 +197,8 @@
     "changeTheme": "切换主题",
     "selectTheme": "选择主题",
     "themeOption": {
-      "dark": "Shenbi 深色",
-      "light": "Shenbi 亮色",
+      "dark": "Locode 深色",
+      "light": "Locode 亮色",
       "cursor": "Cursor 深色",
       "webstormDark": "WebStorm 深色"
     },

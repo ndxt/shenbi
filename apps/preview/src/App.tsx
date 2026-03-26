@@ -104,7 +104,7 @@ export function App() {
   // Sync browser tab title with project name
   useEffect(() => {
     const displayName = getProjectDisplayName(projectState.activeProjectConfig);
-    document.title = displayName ? `${displayName} — 神笔 IDE` : '神笔 IDE';
+    document.title = displayName ? `${displayName} — 乐扣 IDE` : '乐扣 IDE';
   }, [projectState.activeProjectConfig]);
   const vfs = useMemo(() => new IndexedDBFileSystemAdapter(), []);
   const tabManager = useMemo(() => new TabManager(), []);

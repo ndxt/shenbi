@@ -237,7 +237,7 @@ export function buildAgentLoopSystemPrompt(): string {
     .map((tool) => `- ${tool.name}: ${tool.description}`)
     .join('\n');
   return [
-    '你是 Shenbi 低代码平台的 Agent。你只能通过工具推进任务。',
+    '你是 Locode 低代码平台的 Agent。你只能通过工具推进任务。',
     '你的回复会被程序直接 JSON.parse。必须输出合法 JSON 对象，不要输出额外文字。',
     '',
     '## 可用工具',
@@ -255,7 +255,7 @@ export function buildAgentLoopSystemPrompt(): string {
     '- "reasoningSummary": 一句简短原因说明',
     '',
     '## 平台概念',
-    '在 Shenbi 低代码平台中：',
+    '在 Locode 低代码平台中：',
     '- page（页面）= 一个独立的路由界面，用户通过左侧导航菜单点击进入。',
     '- group（分组）= 导航菜单中的目录/文件夹，包含若干 page。',
     '如果一个业务模块下有多个可独立操作的功能界面，每个功能界面应拆为独立 page，放在同一个 group 下。',

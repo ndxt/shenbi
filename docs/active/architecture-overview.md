@@ -1,4 +1,4 @@
-# 神笔 (Shenbi) Engine 设计文档 & 并行执行计划
+# 乐扣 (Locode) Engine 设计文档 & 并行执行计划
 
 > 版本：v1.0.0 | 日期：2026-02-20
 > 适配：React 19+ / Ant Design v6.3+ / TypeScript 5.7
@@ -982,7 +982,7 @@ resolver.resolve("Unknown")    // → null + console.warn
 ### Worker A Prompt
 
 ```
-你正在开发「神笔 (Shenbi)」低代码渲染引擎的 **编译层 + 运行时** 模块。
+你正在开发「乐扣 (Locode)」低代码渲染引擎的 **编译层 + 运行时** 模块。
 
 项目信息：
 - 技术栈：React 19 + TypeScript 5.7 + Vitest
@@ -1009,7 +1009,7 @@ resolver.resolve("Unknown")    // → null + console.warn
 ### Worker B Prompt
 
 ```
-你正在开发「神笔 (Shenbi)」低代码渲染引擎的 **渲染层 + 预览应用** 模块。
+你正在开发「乐扣 (Locode)」低代码渲染引擎的 **渲染层 + 预览应用** 模块。
 
 项目信息：
 - 技术栈：React 19 + TypeScript 5.7 + Ant Design v6.3 + Vite 6
