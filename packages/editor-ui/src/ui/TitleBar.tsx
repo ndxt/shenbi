@@ -19,6 +19,7 @@ import {
   Plus,
   FolderGit2,
   Download,
+  Monitor,
 } from 'lucide-react';
 import {
   type SupportedLocale,
@@ -159,7 +160,7 @@ export function TitleBar({
               className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.08)] transition-colors cursor-pointer"
               onClick={() => setIsProjectDropdownOpen(!isProjectDropdownOpen)}
             >
-              <div className="w-[18px] h-[18px] bg-[#2b727b] text-[rgba(255,255,255,0.85)] rounded flex items-center justify-center text-[12px] font-medium shrink-0">
+              <div className={`w-[18px] h-[18px] ${(activeProjectId && projectList?.find(p => p.id === activeProjectId)?.gitlabProjectId) || (!activeProjectId && (!!gitlabUrl || !!(branches?.length))) ? 'bg-[#2b727b]' : 'bg-[#444b53]'} text-[rgba(255,255,255,0.85)] rounded flex items-center justify-center text-[12px] font-medium shrink-0`}>
                 {(title ?? 'Shenbi IDE').charAt(0).toUpperCase()}
               </div>
               <span className="text-[13px] font-medium tracking-wide text-text-primary">
@@ -213,15 +214,17 @@ export function TitleBar({
                             setIsProjectDropdownOpen(false);
                           }}
                         >
-                          <div className="w-[18px] h-[18px] bg-[#2b727b] text-[rgba(255,255,255,0.85)] rounded flex items-center justify-center text-[11px] font-medium shrink-0">
+                          <div className={`w-[18px] h-[18px] ${p.gitlabProjectId ? 'bg-[#2b727b]' : 'bg-[#444b53]'} text-[rgba(255,255,255,0.85)] rounded flex items-center justify-center text-[11px] font-medium shrink-0`}>
                             {p.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="truncate font-medium">{p.name}</div>
-                            <div className="text-[10px] text-text-muted">
+                            <div className="text-[10px] text-text-muted mt-0.5">
                               {p.gitlabProjectId ? (
                                 <span className="flex items-center gap-1"><GitBranch size={9} /> {p.branch ?? 'main'}</span>
-                              ) : '本地项目'}
+                              ) : (
+                                <span className="flex items-center gap-1"><Monitor size={9} /> 本地项目</span>
+                              )}
                             </div>
                           </div>
                           {isActive && <Check size={13} className="text-primary shrink-0" />}
