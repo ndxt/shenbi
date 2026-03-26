@@ -87,12 +87,18 @@ export function createGitLabRoute(config: GitLabOAuthConfig): Hono {
     if (!session) {
       return c.json({ authenticated: false, defaultInstanceUrl: config.defaultInstanceUrl });
     }
+    const absoluteAvatarUrl = session.avatarUrl.startsWith('http')
+      ? session.avatarUrl
+      : `${session.instanceUrl.replace(/\/+$/, '')}${session.avatarUrl.startsWith('/') ? '' : '/'}${session.avatarUrl}`;
+
+    const avatarUrl = `/api/gitlab/avatar?url=${encodeURIComponent(absoluteAvatarUrl)}`;
+      
     return c.json({
       authenticated: true,
       user: {
         id: session.userId,
         username: session.username,
-        avatarUrl: session.avatarUrl,
+        avatarUrl,
         instanceUrl: session.instanceUrl,
       },
       defaultGroupId: config.defaultGroupId,
@@ -227,6 +233,41 @@ export function createGitLabRoute(config: GitLabOAuthConfig): Hono {
     const opts = { instanceUrl: session.instanceUrl, accessToken: session.accessToken };
     const branches = await gitlab.listBranches(opts, projectId);
     return c.json(branches);
+  });
+
+  // ─────────────────── Avatar Proxy ────────────────────────
+
+  /** Proxy GitLab avatar requests to handle authentication/CORS. */
+  app.get('/avatar', async (c) => {
+    const session = getGitLabSession(c);
+    const url = c.req.query('url');
+    if (!url) return c.json({ error: 'url is required' }, 400);
+
+    // Security: Only proxy from the same instance
+    if (!url.startsWith(session.instanceUrl)) {
+      return c.json({ error: 'Forbidden: URL must be from the same GitLab instance' }, 403);
+    }
+
+    try {
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      });
+
+      if (!response.ok) {
+        return c.json({ error: `Failed to fetch avatar: ${response.status}` }, response.status as any);
+      }
+
+      const contentType = response.headers.get('Content-Type') || 'image/png';
+      const arrayBuffer = await response.arrayBuffer();
+      
+      return c.body(arrayBuffer, 200, {
+        'Content-Type': contentType,
+        'Cache-Control': 'max-age=3600, public',
+      });
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      return c.json({ error: `Avatar proxy failed: ${errMsg}` }, 500);
+    }
   });
 
   return app;
