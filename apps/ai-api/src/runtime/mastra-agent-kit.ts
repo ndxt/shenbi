@@ -485,7 +485,8 @@ function bindProjectPlanEvidenceSources(
   const pages = plan.pages.map((page) => {
     const evidenceSourceIds = bindEvidenceSourceIds(page.evidence, hits);
     if (!evidenceSourceIds) {
-      return page;
+      const { evidenceSourceIds: _ignoredEvidenceSourceIds, ...rest } = page;
+      return rest;
     }
     logger.info('mastra.runtime.project.evidence.bound', {
       runtime: 'mastra',
@@ -597,11 +598,65 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function extractValidatedMastraBlockNode(blockResult: unknown, blockId: string): SchemaNode {
-  if (!isRecord(blockResult) || !('node' in blockResult) || !isRecord(blockResult.node)) {
-    throw new Error(`Mastra block generator returned an invalid node payload for block "${blockId}"`);
+function tryParseJsonObject(text: string | undefined): unknown {
+  if (!text) {
+    return undefined;
   }
-  return validateGeneratedBlockNode(blockResult.node as SchemaNode, blockId);
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const candidates = [
+    trimmed,
+    ...Array.from(trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)).map((match) => match[1]?.trim() ?? ''),
+  ].filter((candidate) => candidate.length > 0);
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as unknown;
+    } catch {
+      // Ignore invalid JSON candidates and keep trying.
+    }
+  }
+
+  return undefined;
+}
+
+function resolveMastraBlockNodeCandidate(blockResult: unknown): unknown {
+  if (!isRecord(blockResult)) {
+    return undefined;
+  }
+  if ('node' in blockResult && isRecord(blockResult.node)) {
+    return blockResult.node;
+  }
+  if (typeof blockResult.component === 'string') {
+    return blockResult;
+  }
+  return undefined;
+}
+
+export function extractValidatedMastraBlockNode(
+  blockResult: unknown,
+  blockId: string,
+  rawText?: string,
+): SchemaNode {
+  const directNode = resolveMastraBlockNodeCandidate(blockResult);
+  if (directNode && isRecord(directNode)) {
+    return validateGeneratedBlockNode(directNode as SchemaNode, blockId);
+  }
+
+  const parsedFallback = tryParseJsonObject(rawText);
+  const fallbackNode = resolveMastraBlockNodeCandidate(parsedFallback);
+  if (fallbackNode && isRecord(fallbackNode)) {
+    logger.warn('mastra.runtime.block.parse_fallback', {
+      runtime: 'mastra',
+      blockId,
+    });
+    return validateGeneratedBlockNode(fallbackNode as SchemaNode, blockId);
+  }
+
+  throw new Error(`Mastra block generator returned an invalid node payload for block "${blockId}"`);
 }
 
 export async function summarizeDocumentsWithMastra(
@@ -826,7 +881,7 @@ export async function generateBlockWithMastraAgent(
   });
 
   const blockObject = result.object as z.infer<typeof blockResultSchema>;
-  const node = extractValidatedMastraBlockNode(blockObject, input.block.id);
+  const node = extractValidatedMastraBlockNode(blockObject, input.block.id, result.text);
   return {
     blockId: input.block.id,
     node,

@@ -24,6 +24,34 @@ describe('extractValidatedMastraBlockNode', () => {
     expect(node.component).toBe('Card');
     expect(node.id).toBe('detail-card');
   });
+
+  it('accepts a direct schema node payload without a node wrapper', () => {
+    const node = extractValidatedMastraBlockNode({
+      id: 'filter-block',
+      component: 'Form',
+      children: [],
+    }, 'filter-block');
+
+    expect(node.component).toBe('Form');
+    expect(node.id).toBe('filter-block');
+  });
+
+  it('falls back to parsing JSON text when the structured object is malformed', () => {
+    const node = extractValidatedMastraBlockNode(
+      { summary: 'fallback only' },
+      'filter-block',
+      JSON.stringify({
+        node: {
+          id: 'filter-block',
+          component: 'Form',
+          children: [],
+        },
+      }),
+    );
+
+    expect(node.component).toBe('Form');
+    expect(node.id).toBe('filter-block');
+  });
 });
 
 describe('buildProjectAgentInstructions', () => {
