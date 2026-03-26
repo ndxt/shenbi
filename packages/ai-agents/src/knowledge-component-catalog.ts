@@ -936,7 +936,7 @@ function getLegacyZoneComponentCandidates(zoneType: LegacyZoneType): string[] {
   return uniqueComponents(legacyZoneGroupMap[zoneType], runtimeCompiledGroupMap);
 }
 
-function getLegacyZoneGoldenExample(zoneType: LegacyZoneType): string {
+export function getZoneGoldenExample(zoneType: LegacyZoneType): string {
   return legacyZoneGoldenExamples[zoneType];
 }
 

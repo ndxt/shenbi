@@ -187,6 +187,14 @@ async function generateProjectPlan(
   deps: AgentRuntimeDeps,
   revisionPrompt?: string,
 ): Promise<ProjectPlan> {
+  const projectPlannerTool = deps.tools.get('planProject');
+  if (projectPlannerTool) {
+    return projectPlannerTool.execute({
+      request: session.request,
+      ...(revisionPrompt ? { revisionPrompt } : {}),
+    }) as Promise<ProjectPlan>;
+  }
+
   const promptSpec = buildProjectPlannerPrompt({
     prompt: session.request.prompt,
     workspace: session.request.workspace,

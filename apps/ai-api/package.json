@@ -13,6 +13,7 @@
     "start": "node dist/server.cjs"
   },
   "dependencies": {
+    "@mastra/core": "^1.16.0",
     "@hono/node-server": "^1.13.7",
     "@shenbi/ai-agents": "workspace:*",
     "@shenbi/ai-contracts": "workspace:*",
@@ -22,7 +23,8 @@
     "mammoth": "^1.12.0",
     "pdf-parse": "^2.4.5",
     "word-extractor": "^1.0.4",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

@@ -45,7 +45,7 @@ import {
   validateGeneratedBlockNode,
   validateGeneratedBlockNodeWithDiagnostics,
 } from '@shenbi/ai-agents';
-import type { ChatRequest } from '@shenbi/ai-contracts';
+import type { ChatRequest, ProjectRunRequest } from '@shenbi/ai-contracts';
 import type { ClassifyRouteRequest, ClassifyRouteResponse } from '@shenbi/ai-contracts';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
 import { LLMError } from '../adapters/errors.ts';
@@ -69,12 +69,19 @@ import {
   buildUserMessageContentFromLines,
 } from './request-attachments.ts';
 import {
+  chatWithMastraAgent,
+  classifyIntentWithMastraAgent,
+  generateBlockWithMastraAgent,
+  planPageWithMastraAgent,
+  planProjectWithMastraAgent,
+  streamChatWithMastraAgent,
+} from './mastra-agent-kit.ts';
+import {
   type SanitizationDiagnostic,
   supportedComponents,
   supportedComponentList,
 } from './normalize-schema.ts';
 import {
-  classifyIntentWithModel,
   type ClassifyIntentTraceEntry,
 } from './classify-intent.ts';
 import { executeModifySchema, planModify, executeComplexOp as executeComplexOpFn, type ModifySchemaTraceEntry } from './modify-schema.ts';
@@ -1039,31 +1046,30 @@ export function createMastraRuntimeDeps(memory: AgentMemoryStore, trace?: RunTra
   return {
     llm: {
       async chat(request: unknown) {
-        const requestedChatModel = getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL;
-        const chatModelRef = parseProviderModelRef(requestedChatModel);
-        const client = createClient(chatModelRef.provider);
-        const model = requireModel(chatModelRef.model ?? requestedChatModel, 'chat');
-        const thinking = getThinkingFromUnknown(request);
-        const { content: text } = await client.chat(model, buildLlmChatMessages(request), thinking);
-        return { text };
+        return chatWithMastraAgent(request);
       },
       async *streamChat(request: unknown) {
-        const requestedChatModel = getRequestedChatModel(request) ?? env.AI_PLANNER_MODEL ?? env.AI_BLOCK_MODEL;
-        const chatModelRef = parseProviderModelRef(requestedChatModel);
-        const client = createClient(chatModelRef.provider);
-        const model = requireModel(chatModelRef.model ?? requestedChatModel, 'chat');
-        const thinking = getThinkingFromUnknown(request);
-        yield* client.streamChat(model, buildLlmChatMessages(request), thinking);
+        yield* streamChatWithMastraAgent(request);
       },
     },
     tools: createToolRegistry([
       {
         name: 'classifyIntent',
         async execute(input: unknown) {
-          return classifyIntentWithModel(
-            input as ClassifyIntentInput,
-            trace ? (trace.classifyIntent = { model: 'unknown', rawOutput: '' }) : undefined,
-          ) as Promise<IntentClassification>;
+          const typed = input as ClassifyIntentInput;
+          const result = await classifyIntentWithMastraAgent({
+            request: typed.request,
+            context: typed.context,
+            ...(typed.request.plannerModel ? { modelRef: typed.request.plannerModel } : {}),
+          });
+          if (trace) {
+            trace.classifyIntent = {
+              model: typed.request.plannerModel ?? env.AI_PLANNER_MODEL ?? 'mastra-agent',
+              rawOutput: JSON.stringify(result),
+              normalizedResult: result,
+            };
+          }
+          return result satisfies IntentClassification;
         },
       },
       {
@@ -1088,13 +1094,45 @@ export function createMastraRuntimeDeps(memory: AgentMemoryStore, trace?: RunTra
       {
         name: 'planPage',
         async execute(input: unknown) {
-          return planWithModel(input as PlanPageInput, trace);
+          const typed = input as PlanPageInput;
+          const plan = await planPageWithMastraAgent(typed, typed.request.plannerModel);
+          if (trace) {
+            trace.planner = {
+              ...(trace.planner ?? {}),
+              model: typed.request.plannerModel ?? env.AI_PLANNER_MODEL ?? 'mastra-agent',
+              rawOutput: JSON.stringify(plan),
+              normalizedPlan: plan,
+            };
+          }
+          return plan;
         },
       },
       {
         name: 'generateBlock',
         async execute(input: unknown) {
-          return generateBlock(input as GenerateBlockInput, trace);
+          const typed = input as GenerateBlockInput;
+          const result = await generateBlockWithMastraAgent(typed, typed.request.blockModel);
+          if (trace) {
+            trace.blocks.push({
+              blockId: typed.block.id,
+              description: typed.block.description,
+              suggestedComponents: typed.block.components,
+              model: typed.request.blockModel ?? env.AI_BLOCK_MODEL ?? 'mastra-agent',
+              rawOutput: JSON.stringify({
+                node: result.node,
+                summary: result.summary,
+              }),
+              normalizedNode: result.node,
+            });
+          }
+          return result;
+        },
+      },
+      {
+        name: 'planProject',
+        async execute(input: unknown) {
+          const typed = input as { request: ProjectRunRequest; revisionPrompt?: string };
+          return planProjectWithMastraAgent(typed.request, typed.revisionPrompt);
         },
       },
       {
