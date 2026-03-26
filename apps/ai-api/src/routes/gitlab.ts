@@ -52,10 +52,8 @@ export function createGitLabRoute(config: GitLabOAuthConfig): Hono {
         maxAge: 30 * 24 * 60 * 60,
       });
 
-      // Redirect back to the app — derive base path from redirectUri
-      const redirectUrl = new URL(config.redirectUri);
-      const appBase = redirectUrl.pathname.replace(/api\/gitlab\/oauth\/callback$/, '') || '/';
-      return c.redirect(appBase);
+      // Redirect to success page (for popup flow)
+      return c.redirect('/api/gitlab/oauth/success');
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       logger.error('gitlab.oauth.callback_error', {
@@ -104,6 +102,45 @@ export function createGitLabRoute(config: GitLabOAuthConfig): Hono {
       defaultGroupId: config.defaultGroupId,
       defaultInstanceUrl: config.defaultInstanceUrl,
     });
+  });
+
+  /** OAuth success page — closes popup and notifies owner. */
+  app.get('/oauth/success', (c) => {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Login Successful</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f9f9f9; color: #333; }
+            .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
+            h1 { font-size: 1.5rem; margin-bottom: 1rem; color: #2ecc71; }
+            p { color: #666; margin-bottom: 1.5rem; }
+            .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto; }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>授权成功</h1>
+            <p>登录成功，正在关闭窗口并返回 IDE...</p>
+            <div class="loader"></div>
+          </div>
+          <script>
+            // Notify the parent window
+            if (window.opener) {
+              window.opener.postMessage('gitlab-login-success', '*');
+            }
+            // Close after a short delay so the user sees the success message
+            setTimeout(() => {
+              window.close();
+            }, 1000);
+          </script>
+        </body>
+      </html>
+    `;
+    return c.html(html);
   });
 
   // ───────────────────── Protected routes ──────────────────

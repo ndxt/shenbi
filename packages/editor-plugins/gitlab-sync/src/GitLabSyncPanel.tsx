@@ -244,6 +244,18 @@ export function GitLabSyncPanel({
   const [changesExpanded, setChangesExpanded] = useState(true);
   const localFilesRef = useRef<Map<string, string>>(new Map());
   const autoRefreshedRef = useRef<string>('');
+  const [refreshCounter, setRefreshCounter] = useState(0);
+
+  // ── Listen for popup login success ──
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === 'gitlab-login-success') {
+        setRefreshCounter((c) => c + 1);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // ── Initialize ──
   useEffect(() => {
@@ -284,7 +296,7 @@ export function GitLabSyncPanel({
     return () => {
       cancelled = true;
     };
-  }, [activeBranch, activeProjectId]);
+  }, [activeBranch, activeProjectId, refreshCounter]);
 
   // ── Load projects ──
   useEffect(() => {
@@ -297,7 +309,16 @@ export function GitLabSyncPanel({
 
   // ── Login / Logout ──
   const handleLogin = useCallback(() => {
-    window.location.href = client.getLoginUrl(instanceUrl || undefined);
+    const url = client.getLoginUrl(instanceUrl || undefined);
+    const width = 1000;
+    const height = 800;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    window.open(
+      url,
+      'gitlab-oauth',
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=yes,status=no`,
+    );
   }, [instanceUrl]);
 
   const handleLogout = useCallback(() => {

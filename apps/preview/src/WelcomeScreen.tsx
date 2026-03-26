@@ -346,6 +346,23 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
       .finally(() => setCloneAuthLoading(false));
   }, [mode, gitlabService]);
 
+  // Listen for popup login success
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === 'gitlab-login-success') {
+        if (mode === 'clone') {
+          setCloneAuthLoading(true);
+          gitlabService.getAuthStatus()
+            .then((status) => setCloneAuthStatus(status))
+            .catch(() => setCloneAuthStatus({ authenticated: false }))
+            .finally(() => setCloneAuthLoading(false));
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [mode, gitlabService]);
+
   // When authenticated in clone mode, load projects
   useEffect(() => {
     if (mode !== 'clone' || !cloneAuthStatus?.authenticated || !cloneAuthStatus.defaultGroupId) return;
