@@ -756,6 +756,82 @@ describe('useAgentLoop', () => {
     expect(client.projectRequests).toHaveLength(1);
   });
 
+  it('reconciles completed project pages to done when backend project completion arrives', async () => {
+    const { bridge } = createBridge();
+    const persistence = createPersistence();
+    const client = new ProjectScenarioAIClient(async function* (api) {
+      const sessionId = 'project-session-reconcile';
+      const plan: ProjectPlan = {
+        projectName: '待办项目',
+        pages: [{
+          pageId: 'my_tasks',
+          pageName: '我的事项',
+          action: 'create',
+          description: '个人事项列表页',
+          prompt: '创建我的事项页面',
+        }],
+      };
+      yield { type: 'project:start', data: { sessionId, conversationId: 'conv-reconcile', prompt: '生成待办项目' } };
+      yield { type: 'project:plan', data: { sessionId, plan } };
+      yield { type: 'project:awaiting_confirmation', data: { sessionId, plan } };
+      const control = await api.waitForControl();
+      expect(control).toEqual({ type: 'confirm' });
+      yield {
+        type: 'project:done',
+        data: {
+          sessionId,
+          createdFileIds: ['my_tasks'],
+          completedPageIds: ['my_tasks'],
+        },
+      };
+    });
+    setAIClient(client);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: {
+        traceFile: '.ai-debug/traces/project-reconcile.json',
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+
+    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
+    let runPromise!: Promise<void>;
+
+    await act(async () => {
+      runPromise = result.current.runAgent(
+        '帮我生成待办项目',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-reconcile',
+        () => 'msg-reconcile',
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.phase).toBe('awaiting_confirmation');
+      expect(result.current.pages).toHaveLength(1);
+      expect(result.current.pages[0]?.status).toBe('waiting');
+    });
+
+    await act(async () => {
+      result.current.confirmProjectPlan();
+      await runPromise;
+    });
+
+    expect(result.current.phase).toBe('done');
+    expect(result.current.pages[0]).toMatchObject({
+      pageId: 'my_tasks',
+      status: 'done',
+      expanded: false,
+    });
+  });
+
   it('cancels backend project sessions while waiting for confirmation', async () => {
     const { bridge } = createBridge();
     const persistence = createPersistence();

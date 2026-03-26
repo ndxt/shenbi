@@ -597,6 +597,15 @@ export function useAgentLoop(
     });
   }, []);
 
+  const replacePages = useCallback((updater: (pages: AgentLoopPageProgress[]) => AgentLoopPageProgress[]) => {
+    setPages((previous) => {
+      const next = updater(previous);
+      pagesRef.current = next;
+      pageLookupRef.current = new Map(next.map((page) => [page.pageId, page]));
+      return next;
+    });
+  }, []);
+
   const setPageExecutionSnapshot = useCallback((pageId: string, snapshot: PageExecutionSnapshot, expanded = true) => {
     updatePage(pageId, (current) => ({
       ...current,
@@ -1465,6 +1474,17 @@ export function useAgentLoop(
               await handle.promise;
               projectPageHandlesRef.current.delete(event.data.pageId);
             }
+            updatePage(event.data.pageId, (current) => {
+              if (current.status === 'failed' || current.status === 'skipped') {
+                return current;
+              }
+              return {
+                ...current,
+                ...(event.data.fileId ? { fileId: event.data.fileId } : {}),
+                status: 'done',
+                expanded: false,
+              };
+            });
             if (loopStateRef.current) {
               loopStateRef.current = {
                 ...loopStateRef.current,
@@ -1490,6 +1510,20 @@ export function useAgentLoop(
           case 'project:done': {
             await Promise.all(Array.from(projectPageHandlesRef.current.values()).map((handle) => handle.promise));
             projectPageHandlesRef.current.clear();
+            const completedPageIds = new Set(event.data.completedPageIds);
+            replacePages((previous) => previous.map((page) => {
+              if (page.status === 'failed' || page.status === 'skipped') {
+                return page;
+              }
+              if (!completedPageIds.has(page.pageId)) {
+                return page;
+              }
+              return {
+                ...page,
+                status: 'done',
+                expanded: false,
+              };
+            }));
             if (loopStateRef.current) {
               loopStateRef.current = {
                 ...loopStateRef.current,
@@ -1569,6 +1603,7 @@ export function useAgentLoop(
     persistLoopState,
     proposeProjectPlan,
     readPageSchema,
+    replacePages,
   ]);
 
   return {
