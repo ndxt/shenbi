@@ -402,8 +402,10 @@ export function AIPanel({
           <ChatMessageList messages={messages} onDismissRunResult={dismissRunResult} />
 
           {mode !== 'loop' && isRunning && (
-            <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex w-full min-w-0 self-stretch flex-col shadow-sm relative overflow-hidden mt-2">
-              <div className="absolute top-0 left-0 h-[2px] bg-gradient-to-r from-primary via-primary-hover to-primary animate-[shimmer_1.5s_ease-in-out_infinite] w-full" />
+            <div className="bg-bg-canvas border border-border-ide rounded-md p-3 flex w-full min-w-0 self-stretch flex-col shadow-sm relative mt-2">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] overflow-hidden rounded-t-md">
+                <div className="h-full w-full bg-gradient-to-r from-primary via-primary-hover to-primary animate-[shimmer_1.5s_ease-in-out_infinite]" />
+              </div>
               <div className="flex items-start gap-2 text-text-primary pb-2 mb-2" style={{ fontSize: '11px' }}>
                 <LoaderCircle size={12} className="text-primary shrink-0 mt-0.5" style={{ animation: 'spin 1s linear infinite' }} />
                 <span className="font-semibold text-primary shrink-0 leading-5">{t('status.generating')}</span>

@@ -509,4 +509,57 @@ describe('AIPanel', () => {
       block: 'end',
     });
   });
+
+  it('does not clip the in-flight run card with overflow-hidden', async () => {
+    const pluginContext = createPersistenceStateContext();
+    const { container, rerender } = render(<AIPanel bridge={createBridge()} pluginContext={pluginContext} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Planner')).toHaveValue('openai-compatible::GLM-4.6');
+    });
+
+    useAgentLoopState.mode = 'legacy';
+    useAgentLoopState.isRunning = true;
+    useAgentLoopState.progressText = 'Planning page structure.';
+    useAgentLoopState.legacy = {
+      executionSnapshot: {
+        mode: 'create',
+        plan: {
+          pageTitle: '系统看板',
+          pageType: 'dashboard',
+          blocks: [{
+            id: 'hero',
+            description: '顶部概览',
+            components: ['Card'],
+            priority: 1,
+            complexity: 'simple',
+          }],
+        },
+        plannerMetrics: null,
+        blockStatuses: { hero: 'done' },
+        blockTokens: {},
+        blockInputTokens: {},
+        blockOutputTokens: {},
+        blockDurationMs: {},
+        modifyPlan: null,
+        modifyStatuses: {},
+        modifyOpMetrics: {},
+        progressText: 'Planning page structure.',
+        didApplySchema: false,
+      },
+      isRunning: true,
+      progressText: 'Planning page structure.',
+      elapsedMs: 3456,
+    };
+
+    rerender(<AIPanel bridge={createBridge()} pluginContext={pluginContext} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Planning page structure.')).toBeInTheDocument();
+    });
+
+    const runningCard = container.querySelector('.bg-bg-canvas.border.border-border-ide.rounded-md.p-3.flex.w-full.min-w-0.self-stretch.flex-col.shadow-sm.relative.mt-2');
+    expect(runningCard).not.toBeNull();
+    expect(runningCard?.className).not.toContain('overflow-hidden');
+  });
 });
