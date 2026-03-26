@@ -22,7 +22,8 @@ import {
   useTabManager,
 } from '@shenbi/editor-ui';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
-import { PREVIEW_WORKSPACE_ID } from './constants';
+import { PREVIEW_WORKSPACE_ID, loadProjectList } from './constants';
+import type { ActiveProjectConfig } from './constants';
 import { ProjectManagerDialog } from './ProjectManagerDialog';
 import { PreviewCanvasStage } from './components/PreviewCanvasStage';
 import { PreviewToolbar } from './components/PreviewToolbar';
@@ -73,6 +74,8 @@ export function App() {
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const [renderMode, setRenderMode] = useState<RenderMode>(DEFAULT_RENDER_MODE);
   const [showProjectManager, setShowProjectManager] = useState(false);
+  const [showWelcomeOverride, setShowWelcomeOverride] = useState(false);
+  const [cloneOverride, setCloneOverride] = useState(false);
   const [rendererUndoRedoStateByFile, setRendererUndoRedoStateByFile] = useState<Record<string, { canUndo: boolean; canRedo: boolean }>>({});
   const activeRendererDispatchRef = useRef<{ save: () => void; undo: () => void; redo: () => void } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -422,6 +425,31 @@ export function App() {
       onLogout={projectState.gitlabUser ? projectState.handleLogout : undefined}
       gitlabUrl={projectState.activeProjectConfig?.gitlabUrl}
       onOpenProjectManager={() => setShowProjectManager(true)}
+      projectList={useMemo(() => {
+        const list = loadProjectList().sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+        return list.map((p) => ({
+          id: p.id ?? p.vfsProjectId,
+          name: p.projectName,
+          gitlabProjectId: p.gitlabProjectId,
+          branch: p.branch,
+        }));
+      }, [projectState.activeProjectConfig])}
+      activeProjectId={projectState.activeProjectId ?? ''}
+      onSwitchProject={useCallback((projectId: string) => {
+        const list = loadProjectList();
+        const target = list.find((p) => (p.id ?? p.vfsProjectId) === projectId);
+        if (target) {
+          projectState.handleSelectProject(target);
+        }
+      }, [projectState])}
+      onNewProject={useCallback(() => {
+        setShowWelcomeOverride(true);
+        setCloneOverride(false);
+      }, [])}
+      onCloneRepository={useCallback(() => {
+        setShowWelcomeOverride(true);
+        setCloneOverride(true);
+      }, [])}
       sidebarProps={{
         contracts: builtinContracts,
         treeNodes: canvasState.treeNodes,
@@ -525,11 +553,17 @@ export function App() {
     </AppShell>
 
     {DialogPortal}
-    {projectState.isFirstLaunch && (
+    {(projectState.isFirstLaunch || showWelcomeOverride) && (
       <WelcomeScreen
         gitlabUser={projectState.gitlabUser}
         gitlabService={services.gitlab}
-        onSelectProject={projectState.handleSelectProject}
+        onSelectProject={(config) => {
+          projectState.handleSelectProject(config);
+          setShowWelcomeOverride(false);
+          setCloneOverride(false);
+        }}
+        initialMode={cloneOverride ? 'clone' : undefined}
+        onClose={showWelcomeOverride ? () => { setShowWelcomeOverride(false); setCloneOverride(false); } : undefined}
       />
     )}
     </>

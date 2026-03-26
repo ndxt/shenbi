@@ -72,6 +72,7 @@ import type {
   CanvasToolMode,
 } from '../canvas/types';
 import { createBuiltinSidebarTabs } from './sidebar-tabs';
+import type { ProjectDropdownItem } from './TitleBar';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -148,6 +149,16 @@ interface AppShellProps {
   gitlabUrl?: string | undefined;
   /** Called when user clicks project name to open project manager */
   onOpenProjectManager?: (() => void) | undefined;
+  /** Project list for the TitleBar dropdown */
+  projectList?: ProjectDropdownItem[] | undefined;
+  /** Active project ID for the TitleBar dropdown */
+  activeProjectId?: string | undefined;
+  /** Switch to a project from the TitleBar dropdown */
+  onSwitchProject?: ((projectId: string) => void) | undefined;
+  /** New Project action from the TitleBar dropdown */
+  onNewProject?: (() => void) | undefined;
+  /** Clone Repository action from the TitleBar dropdown */
+  onCloneRepository?: (() => void) | undefined;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -355,6 +366,11 @@ export function AppShell({
   onLogout,
   gitlabUrl,
   onOpenProjectManager,
+  projectList,
+  activeProjectId,
+  onSwitchProject,
+  onNewProject,
+  onCloneRepository,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const {
@@ -1615,6 +1631,11 @@ export function AppShell({
         onLogout={onLogout}
         gitlabUrl={gitlabUrl}
         onOpenProjectManager={onOpenProjectManager}
+        projectList={projectList}
+        activeProjectId={activeProjectId}
+        onSwitchProject={onSwitchProject}
+        onNewProject={onNewProject}
+        onCloneRepository={onCloneRepository}
       />
 
       {/* Main Container */}

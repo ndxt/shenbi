@@ -15,12 +15,23 @@ import {
   LogOut,
   ExternalLink,
   FolderOpen,
+  ChevronDown,
+  Plus,
+  FolderGit2,
+  Download,
 } from 'lucide-react';
 import {
   type SupportedLocale,
   useTranslation,
 } from '@shenbi/i18n';
 import { ThemeMode } from './AppShell';
+
+export interface ProjectDropdownItem {
+  id: string;
+  name: string;
+  gitlabProjectId?: number | undefined;
+  branch?: string | undefined;
+}
 
 interface TitleBarProps {
   theme: ThemeMode;
@@ -53,6 +64,16 @@ interface TitleBarProps {
   gitlabUrl?: string | undefined;
   /** Called when user clicks project name to open project manager */
   onOpenProjectManager?: (() => void) | undefined;
+  /** Project list for dropdown */
+  projectList?: ProjectDropdownItem[] | undefined;
+  /** Active project ID */
+  activeProjectId?: string | undefined;
+  /** Switch to a project */
+  onSwitchProject?: ((projectId: string) => void) | undefined;
+  /** New Project action */
+  onNewProject?: (() => void) | undefined;
+  /** Clone Repository action */
+  onCloneRepository?: (() => void) | undefined;
 }
 
 export function TitleBar({
@@ -81,12 +102,19 @@ export function TitleBar({
   onLogout,
   gitlabUrl,
   onOpenProjectManager,
+  projectList,
+  activeProjectId,
+  onSwitchProject,
+  onNewProject,
+  onCloneRepository,
 }: TitleBarProps) {
   const { t } = useTranslation('editorUi');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
+  const projectDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -95,6 +123,9 @@ export function TitleBar({
       }
       if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target as Node)) {
         setIsLanguageDropdownOpen(false);
+      }
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(event.target as Node)) {
+        setIsProjectDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -121,16 +152,96 @@ export function TitleBar({
           <img src="/logo_light_128_transparent.png" alt="Shenbi" className="w-[30px] h-[30px] object-contain" />
         </div>
         
-        {/* Sidebar Column Header */}
-        <div className="flex items-center gap-2 pl-4">
-          <span
-            className={`text-[13px] font-bold tracking-tight text-text-primary flex items-center ${onOpenProjectManager ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
-            onClick={onOpenProjectManager}
-            title={onOpenProjectManager ? '管理项目' : undefined}
-          >
-            <FolderOpen size={14} className="mr-1.5 opacity-70" />
-            {title ?? 'Shenbi IDE'}
-          </span>
+        {/* Project Switcher Dropdown */}
+        <div className="flex items-center gap-2 pl-4" ref={projectDropdownRef}>
+          <div className="relative">
+            <button
+              className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[rgba(255,255,255,0.08)] transition-colors cursor-pointer"
+              onClick={() => setIsProjectDropdownOpen(!isProjectDropdownOpen)}
+            >
+              <FolderOpen size={14} className="opacity-70 text-text-primary" />
+              <span className="text-[13px] font-bold tracking-tight text-text-primary">
+                {title ?? 'Shenbi IDE'}
+              </span>
+              <ChevronDown size={12} className="text-text-secondary" />
+            </button>
+
+            {isProjectDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-64 bg-bg-panel border border-border-ide rounded-lg shadow-xl py-1 z-50" style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+                {/* Actions */}
+                {onNewProject && (
+                  <button
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-text-primary hover:bg-[rgba(255,255,255,0.06)] transition-colors text-left"
+                    onClick={() => { onNewProject(); setIsProjectDropdownOpen(false); }}
+                  >
+                    <Plus size={14} className="text-primary" />
+                    New Project...
+                  </button>
+                )}
+                {onOpenProjectManager && (
+                  <button
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-text-primary hover:bg-[rgba(255,255,255,0.06)] transition-colors text-left"
+                    onClick={() => { onOpenProjectManager(); setIsProjectDropdownOpen(false); }}
+                  >
+                    <FolderOpen size={14} className="text-text-secondary" />
+                    Open...
+                  </button>
+                )}
+                {onCloneRepository && (
+                  <button
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-text-primary hover:bg-[rgba(255,255,255,0.06)] transition-colors text-left"
+                    onClick={() => { onCloneRepository(); setIsProjectDropdownOpen(false); }}
+                  >
+                    <Download size={14} className="text-text-secondary" />
+                    Clone Repository...
+                  </button>
+                )}
+
+                {/* Separator + Project List */}
+                {projectList && projectList.length > 0 && (
+                  <>
+                    <div className="mx-2 my-1 border-t border-border-ide" />
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                      Open Projects
+                    </div>
+                    {projectList.map((p) => {
+                      const isActive = p.id === activeProjectId;
+                      return (
+                        <button
+                          key={p.id}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-[12px] transition-colors text-left ${
+                            isActive ? 'bg-[rgba(75,158,250,0.12)] text-primary' : 'text-text-primary hover:bg-[rgba(255,255,255,0.06)]'
+                          }`}
+                          onClick={() => {
+                            if (!isActive && onSwitchProject) {
+                              onSwitchProject(p.id);
+                            }
+                            setIsProjectDropdownOpen(false);
+                          }}
+                        >
+                          {p.gitlabProjectId ? (
+                            <FolderGit2 size={14} className="text-primary shrink-0" />
+                          ) : (
+                            <FolderOpen size={14} className="text-text-muted shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate font-medium">{p.name}</div>
+                            <div className="text-[10px] text-text-muted">
+                              {p.gitlabProjectId ? (
+                                <span className="flex items-center gap-1"><GitBranch size={9} /> {p.branch ?? 'main'}</span>
+                              ) : '本地项目'}
+                            </div>
+                          </div>
+                          {isActive && <Check size={13} className="text-primary shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           {branches && branches.length > 0 && onBranchChange ? (
             <select
               className="px-1.5 py-0.5 rounded border border-border-ide text-[10px] text-text-secondary bg-transparent cursor-pointer outline-none"

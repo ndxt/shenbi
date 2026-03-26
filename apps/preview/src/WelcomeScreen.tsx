@@ -29,6 +29,10 @@ export interface WelcomeScreenProps {
   gitlabUser: { username: string; avatarUrl?: string } | null;
   gitlabService: PreviewGitLabService;
   onSelectProject: (config: ActiveProjectConfig) => void;
+  /** Start in a specific mode (e.g. 'clone') */
+  initialMode?: Mode | undefined;
+  /** Called when user dismisses the overlay (only for non-first-launch usage) */
+  onClose?: (() => void) | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +116,7 @@ function ActionCard({
 // Main Component
 // ---------------------------------------------------------------------------
 
-type Mode = 'idle' | 'new' | 'open' | 'clone';
+export type Mode = 'idle' | 'new' | 'open' | 'clone';
 type CreateStep = 'template' | 'name';
 
 // ---------------------------------------------------------------------------
@@ -308,8 +312,8 @@ const PROJECT_CATEGORIES: ProjectTypeCategory[] = [
   },
 ];
 
-export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: WelcomeScreenProps) {
-  const [mode, setMode] = useState<Mode>('idle');
+export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, initialMode, onClose }: WelcomeScreenProps) {
+  const [mode, setMode] = useState<Mode>(initialMode ?? 'idle');
   const [newName, setNewName] = useState('');
   const [projects, setProjects] = useState<ActiveProjectConfig[]>([]);
   // Template wizard state
@@ -402,6 +406,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
 
   return (
     <div
+      onClick={(e) => { if (e.target === e.currentTarget && onClose) onClose(); }}
       style={{
         position: 'fixed',
         inset: 0,
