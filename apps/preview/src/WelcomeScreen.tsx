@@ -146,45 +146,44 @@ const CoverAdmin = () => (
 
 const CoverPortal = () => (
   <svg width="100" height="68" viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Desktop Browser Window Frame */}
-    <rect width="100" height="68" rx="6" fill="#1E293B"/>
+    {/* Desktop Browser Window Frame (Light) */}
+    <rect width="100" height="68" rx="6" fill="#F8FAFC"/>
     {/* Header Navbar */}
-    <rect x="0" y="0" width="100" height="8" fill="#0F172A" rx="3"/>
-    <rect x="0" y="4" width="100" height="4" fill="#0F172A"/> 
+    <rect x="0" y="0" width="100" height="8" fill="#FFFFFF" rx="3"/>
+    <rect x="0" y="4" width="100" height="4" fill="#FFFFFF"/> 
+    <rect x="0" y="8" width="100" height="0.5" fill="#E2E8F0"/> 
     <rect x="6" y="3" width="10" height="2" rx="1" fill="#3B82F6"/> 
-    <rect x="74" y="3.5" width="4" height="1" rx="0.5" fill="#64748B"/> 
-    <rect x="80" y="3.5" width="4" height="1" rx="0.5" fill="#64748B"/>
-    <rect x="86" y="3.5" width="4" height="1" rx="0.5" fill="#64748B"/>
+    <rect x="74" y="3.5" width="4" height="1" rx="0.5" fill="#94A3B8"/> 
+    <rect x="80" y="3.5" width="4" height="1" rx="0.5" fill="#94A3B8"/>
+    <rect x="86" y="3.5" width="4" height="1" rx="0.5" fill="#94A3B8"/>
     <rect x="92" y="3" width="4" height="2" rx="0.5" fill="#3B82F6"/> 
 
     {/* Hero Section */}
-    <rect x="0" y="8" width="100" height="24" fill="#1E293B"/>
-    {/* Hero bg graphic */}
-    <path d="M 50 8 L 100 8 L 100 32 L 70 32 Z" fill="#253245"/> 
+    <rect x="0" y="8" width="100" height="24" fill="#EFF6FF"/>
     {/* Hero Text */}
-    <rect x="10" y="14" width="24" height="4" rx="1" fill="#F8FAFC"/>
-    <rect x="10" y="20" width="30" height="2" rx="1" fill="#94A3B8"/>
-    <rect x="10" y="24" width="18" height="2" rx="1" fill="#94A3B8"/>
+    <rect x="10" y="14" width="24" height="4" rx="1" fill="#1E293B"/>
+    <rect x="10" y="20" width="30" height="2" rx="1" fill="#475569"/>
+    <rect x="10" y="24" width="18" height="2" rx="1" fill="#475569"/>
     <rect x="10" y="28" width="12" height="3" rx="1.5" fill="#3B82F6"/>
     {/* Hero Image */}
-    <rect x="60" y="12" width="30" height="16" rx="2" fill="#334155"/>
-    <circle cx="75" cy="20" r="4" fill="#475569"/>
+    <rect x="60" y="12" width="30" height="16" rx="2" fill="#DBEAFE"/>
+    <circle cx="75" cy="20" r="4" fill="#BFDBFE"/>
 
     {/* Features Section (3 columns) */}
-    <rect x="10" y="38" width="22" height="22" rx="2" fill="#0F172A"/>
+    <rect x="10" y="38" width="22" height="22" rx="2" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="0.5"/>
     <circle cx="21" cy="45" r="3" fill="#10B981"/>
-    <rect x="14" y="51" width="14" height="1.5" rx="0.5" fill="#64748B"/>
-    <rect x="14" y="54" width="10" height="1.5" rx="0.5" fill="#64748B"/>
+    <rect x="14" y="51" width="14" height="1.5" rx="0.5" fill="#94A3B8"/>
+    <rect x="14" y="54" width="10" height="1.5" rx="0.5" fill="#94A3B8"/>
 
-    <rect x="39" y="38" width="22" height="22" rx="2" fill="#0F172A"/>
+    <rect x="39" y="38" width="22" height="22" rx="2" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="0.5"/>
     <circle cx="50" cy="45" r="3" fill="#F59E0B"/>
-    <rect x="43" y="51" width="14" height="1.5" rx="0.5" fill="#64748B"/>
-    <rect x="43" y="54" width="10" height="1.5" rx="0.5" fill="#64748B"/>
+    <rect x="43" y="51" width="14" height="1.5" rx="0.5" fill="#94A3B8"/>
+    <rect x="43" y="54" width="10" height="1.5" rx="0.5" fill="#94A3B8"/>
 
-    <rect x="68" y="38" width="22" height="22" rx="2" fill="#0F172A"/>
+    <rect x="68" y="38" width="22" height="22" rx="2" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="0.5"/>
     <circle cx="79" cy="45" r="3" fill="#8B5CF6"/>
-    <rect x="72" y="51" width="14" height="1.5" rx="0.5" fill="#64748B"/>
-    <rect x="72" y="54" width="10" height="1.5" rx="0.5" fill="#64748B"/>
+    <rect x="72" y="51" width="14" height="1.5" rx="0.5" fill="#94A3B8"/>
+    <rect x="72" y="54" width="10" height="1.5" rx="0.5" fill="#94A3B8"/>
   </svg>
 );
 
