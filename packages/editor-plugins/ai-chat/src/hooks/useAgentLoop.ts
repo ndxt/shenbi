@@ -55,6 +55,28 @@ function summarizeSchema(schema: PageSchema): string {
   return `pageId=${schema.id}; pageName=${schema.name ?? schema.id}; nodeCount=${bodyCount + dialogCount}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSchemaNodeLike(value: unknown): boolean {
+  return isRecord(value) && typeof value.component === 'string';
+}
+
+function isPageSchema(value: unknown): value is PageSchema {
+  if (!isRecord(value) || typeof value.id !== 'string' || !('body' in value)) {
+    return false;
+  }
+  const body = value.body;
+  return Array.isArray(body)
+    ? body.every((item) => isSchemaNodeLike(item))
+    : body === undefined || body === null || isSchemaNodeLike(body);
+}
+
+function summarizeWorkspaceFileFallback(fileId: string, pageName: string): string {
+  return `pageId=${fileId}; pageName=${pageName}; nodeCount=unknown`;
+}
+
 function summarizeComponents(bridge: EditorAIBridge | undefined): string {
   if (!bridge) {
     return '';
@@ -1330,20 +1352,27 @@ export function useAgentLoop(
     }
 
     try {
-      const currentSchema = bridge.getSchema();
+      const currentSchemaCandidate = bridge.getSchema();
+      const currentSchema = isPageSchema(currentSchemaCandidate) ? currentSchemaCandidate : undefined;
       const workspaceFiles = await listWorkspaceFiles();
       const workspace = {
         componentSummary: summarizeComponents(bridge),
-        ...(currentSchema.id ? { currentFileId: currentSchema.id } : {}),
-        currentSchemaSummary: summarizeSchema(currentSchema),
-        currentSchemaJson: currentSchema,
+        ...(currentSchema?.id ? { currentFileId: currentSchema.id } : {}),
+        currentSchemaSummary: currentSchema
+          ? summarizeSchema(currentSchema)
+          : summarizeWorkspaceFileFallback('unknown-current-page', 'Current Page'),
+        ...(currentSchema ? { currentSchemaJson: currentSchema } : {}),
         files: await Promise.all(workspaceFiles.map(async (file) => {
-          const schema = await readPageSchema(file.id);
+          const schemaCandidate = await readPageSchema(file.id).catch(() => undefined);
+          const schema = isPageSchema(schemaCandidate) ? schemaCandidate : undefined;
+          const pageName = schema?.name ?? file.name;
           return {
             fileId: file.id,
-            pageName: schema.name ?? file.name,
-            schemaSummary: summarizeSchema(schema),
-            schemaJson: schema,
+            pageName,
+            schemaSummary: schema
+              ? summarizeSchema(schema)
+              : summarizeWorkspaceFileFallback(file.id, pageName),
+            ...(schema ? { schemaJson: schema } : {}),
           };
         })),
       };

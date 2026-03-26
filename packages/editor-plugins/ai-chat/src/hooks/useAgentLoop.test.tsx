@@ -663,6 +663,99 @@ describe('useAgentLoop', () => {
     });
   });
 
+  it('omits invalid page schemas from project workspace payloads', async () => {
+    const { bridge } = createBridge({
+      current: createSchema('current', 'Current Page'),
+      'broken-page': createSchema('broken-page', 'Broken Page'),
+    });
+    const persistence = createPersistence();
+    const invalidSchema = {
+      id: 'broken-page',
+      name: 'Broken Page',
+      body: [{ id: 'bad-node' }],
+    };
+    const brokenBridge: EditorAIBridge = {
+      ...bridge,
+      getSchema: () => ({
+        id: 'shell-page',
+        name: 'Shell Page',
+        body: [{ id: 'shell-node' }],
+      } as unknown as PageSchema),
+      execute: async (commandId, args) => {
+        if (
+          commandId === 'file.readSchema'
+          && args
+          && typeof args === 'object'
+          && 'fileId' in args
+          && (args as { fileId?: unknown }).fileId === 'broken-page'
+        ) {
+          return {
+            success: true,
+            data: invalidSchema,
+          };
+        }
+        return bridge.execute(commandId, args);
+      },
+    };
+
+    const client = new ProjectScenarioAIClient(async function* (_api, request) {
+      const brokenFile = request.workspace.files.find((file) => file.fileId === 'broken-page');
+      expect(brokenFile).toMatchObject({
+        fileId: 'broken-page',
+        pageName: 'Broken Page',
+        schemaSummary: 'pageId=broken-page; pageName=Broken Page; nodeCount=unknown',
+      });
+      expect(brokenFile).not.toHaveProperty('schemaJson');
+      expect(request.workspace).not.toHaveProperty('currentSchemaJson');
+      yield {
+        type: 'project:start',
+        data: {
+          sessionId: 'project-session-invalid-schema',
+          conversationId: 'conv-invalid-schema',
+          prompt: request.prompt,
+        },
+      };
+      yield {
+        type: 'project:done',
+        data: {
+          sessionId: 'project-session-invalid-schema',
+          createdFileIds: [],
+          completedPageIds: [],
+        },
+      };
+    });
+    setAIClient(client);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: {
+        traceFile: '.ai-debug/traces/project-invalid-schema.json',
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAgentLoop(brokenBridge, persistence));
+
+    await act(async () => {
+      await result.current.runAgent(
+        '阅读这个文档，生成页面',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-invalid-schema',
+        () => 'msg-invalid-schema',
+        vi.fn(),
+        vi.fn(),
+        onError,
+      );
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(client.projectRequests).toHaveLength(1);
+  });
+
   it('cancels backend project sessions while waiting for confirmation', async () => {
     const { bridge } = createBridge();
     const persistence = createPersistence();

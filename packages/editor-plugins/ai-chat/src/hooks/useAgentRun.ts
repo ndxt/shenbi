@@ -49,6 +49,20 @@ function isSchemaNode(value: unknown): value is SchemaNode {
     return Boolean(value) && typeof value === 'object' && 'component' in (value as Record<string, unknown>);
 }
 
+function isPageSchema(value: unknown): value is PageSchema {
+    if (!value || typeof value !== 'object' || !('id' in value) || !('body' in value)) {
+        return false;
+    }
+    const candidate = value as Record<string, unknown>;
+    if (typeof candidate.id !== 'string') {
+        return false;
+    }
+    const body = candidate.body;
+    return Array.isArray(body)
+        ? body.every((item) => isSchemaNode(item))
+        : body === undefined || body === null || isSchemaNode(body);
+}
+
 function collectSchemaComponents(node: unknown, components: Set<string>): number {
     if (!node) {
         return 0;
@@ -300,12 +314,17 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
 
             // Pre-run setup
             preGenerationSchemaRef.current = bridgeRef.current.getSchema();
-            const currentSchema = bridgeRef.current.getSchema();
+            const currentSchemaCandidate = bridgeRef.current.getSchema();
+            const currentSchema = isPageSchema(currentSchemaCandidate) ? currentSchemaCandidate : undefined;
 
-            const schemaSummary = summarizeSchema(currentSchema);
+            const schemaSummary = currentSchema
+                ? summarizeSchema(currentSchema)
+                : 'pageId=unknown; pageName=unknown; nodeCount=unknown; dialogs=0';
             const componentSummary = summarizeComponents(bridgeRef.current.getAvailableComponents());
             const rawSelectedNodeId = bridgeRef.current.getSelectedNodeId();
-            const selectedNodeId = resolveSelectedNodeId(currentSchema, rawSelectedNodeId);
+            const selectedNodeId = currentSchema
+                ? resolveSelectedNodeId(currentSchema, rawSelectedNodeId)
+                : undefined;
 
             const request: RunRequest = {
                 prompt,
@@ -319,7 +338,7 @@ export function useAgentRun(bridge: EditorAIBridge | undefined) {
                 context: {
                     schemaSummary,
                     componentSummary,
-                    schemaJson: currentSchema,
+                    ...(currentSchema ? { schemaJson: currentSchema } : {}),
                 },
             };
 

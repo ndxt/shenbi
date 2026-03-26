@@ -362,6 +362,68 @@ describe('useAgentRun', () => {
     expect(card?.props?.title).toBe('旧标题');
   });
 
+  it('omits invalid current schema from single-page run requests', async () => {
+    const client = new ScenarioAIClient([
+      {
+        type: 'run:start',
+        data: { sessionId: 'session-invalid-current', conversationId: 'conv-invalid-current' },
+      },
+      {
+        type: 'intent',
+        data: { intent: 'schema.create', confidence: 1 },
+      },
+      {
+        type: 'done',
+        data: {
+          metadata: {
+            sessionId: 'session-invalid-current',
+            conversationId: 'conv-invalid-current',
+          },
+        },
+      },
+    ]);
+    setAIClient(client);
+
+    const bridge: EditorAIBridge = {
+      getSchema: () => ({
+        id: 'shell-page',
+        name: 'Shell Page',
+        body: [{ id: 'broken-node' }],
+      } as unknown as PageSchema),
+      getSelectedNodeId: () => 'shell-node',
+      getAvailableComponents: () => [],
+      execute: async () => ({ success: true, data: undefined }),
+      replaceSchema: vi.fn(),
+      appendBlock: vi.fn(),
+      removeNode: vi.fn(),
+      subscribe: () => () => undefined,
+    };
+
+    const { result } = renderHook(() => useAgentRun(bridge));
+
+    await act(async () => {
+      await result.current.runAgent(
+        '生成页面',
+        '',
+        '',
+        false,
+        'conv-invalid-current',
+        () => 'message-invalid-current',
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+      );
+    });
+
+    expect(client.requests).toHaveLength(1);
+    expect(client.requests[0]?.context).toMatchObject({
+      schemaSummary: 'pageId=unknown; pageName=unknown; nodeCount=unknown; dialogs=0',
+      componentSummary: '',
+    });
+    expect(client.requests[0]?.context).not.toHaveProperty('schemaJson');
+    expect(client.requests[0]).not.toHaveProperty('selectedNodeId');
+  });
+
   it('retries rollback during modify:done when the first discard attempt fails', async () => {
     const editor = createEditor({
       initialSchema: createInitialSchema(),
