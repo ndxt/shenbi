@@ -162,4 +162,26 @@ describe('normalizeIntentClassification', () => {
       reason: '文档描述了完整系统，需要生成多个页面',
     });
   });
+
+  it('treats provider-specific project-generation route names as project routing', () => {
+    const classification = normalizeIntentClassification({
+      route: 'project-generation',
+      reason: '需要生成完整项目',
+    });
+
+    expect(classification.scope).toBe('multi-page');
+    expect(classification.routeKind).toBe('project');
+    expect(classification.intent).toBe('schema.create');
+  });
+
+  it('treats other provider route aliases as project routing', () => {
+    const classification = normalizeIntentClassification({
+      route: 'multi_page',
+      reason: '完整系统需求',
+    });
+
+    expect(classification.scope).toBe('multi-page');
+    expect(classification.routeKind).toBe('project');
+    expect(classification.intent).toBe('schema.create');
+  });
 });

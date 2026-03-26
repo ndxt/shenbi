@@ -492,7 +492,7 @@ const intentClassificationSchema = z.object({
   scope: z.enum(['single-page', 'multi-page']).optional(),
   routeKind: z.enum(['single-page', 'project', 'chat']).optional(),
   reason: z.string().optional(),
-  route: z.enum(['single-page', 'project', 'chat']).optional(),
+  route: z.string().optional(),
   projectType: z.string().optional(),
   estimatedPages: z.number().optional(),
   entities: z.array(z.union([z.string(), z.record(z.any())])).optional(),
@@ -502,8 +502,21 @@ const intentClassificationSchema = z.object({
 export function normalizeIntentClassification(
   payload: z.infer<typeof intentClassificationSchema>,
 ): IntentClassification & { routeKind: 'single-page' | 'project' | 'chat'; reason?: string } {
+  const normalizedRoute = typeof payload.route === 'string'
+    ? payload.route.trim().toLowerCase().replace(/[_\s]+/gu, '-')
+    : undefined;
   const routeKind = payload.routeKind
-    ?? payload.route
+    ?? (
+      normalizedRoute === 'project-generation' || normalizedRoute === 'multi-page' || normalizedRoute === 'project-flow'
+        ? 'project'
+        : normalizedRoute === 'single-page'
+          ? 'single-page'
+          : normalizedRoute === 'project'
+            ? 'project'
+            : normalizedRoute === 'chat'
+              ? 'chat'
+              : undefined
+    )
     ?? (
       typeof payload.projectType === 'string' && payload.projectType.toLowerCase().includes('multi-page')
         ? 'project'

@@ -892,4 +892,45 @@ describe('createMastraAgentRuntime', () => {
     await runtime.cancelProject({ sessionId });
     await Array.fromAsync(iterator);
   });
+
+  it('fails fast when runStream receives a multi-page classification', async () => {
+    const deps = createDeps([
+      {
+        name: 'classifyIntent',
+        async execute() {
+          return {
+            intent: 'schema.create' as const,
+            confidence: 0.95,
+            scope: 'multi-page' as const,
+          };
+        },
+      },
+    ]);
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime: createLegacyRuntime([]),
+      createDeps: () => deps,
+      prepareRunRequest: async (request) => ({
+        ...request,
+        intent: undefined,
+      }),
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
+    });
+
+    const events: AgentEvent[] = [];
+    for await (const event of runtime.runStream(createRequest({
+      intent: undefined,
+      prompt: '这是一个完整系统需求文档，包含首页、列表页和详情页，请帮我规划项目',
+    }))) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toEqual({
+      type: 'error',
+      data: {
+        message: 'Mastra run/stream received a multi-page request; route it through /api/ai/project/stream instead.',
+      },
+    });
+  });
 });

@@ -500,6 +500,10 @@ async function* runMastraPageStream(
   };
 
   try {
+    if (resolvedIntent.scope === 'multi-page') {
+      throw new Error('Mastra run/stream received a multi-page request; route it through /api/ai/project/stream instead.');
+    }
+
     logInfo(deps, 'mastra.runtime.run_stream.start', {
       conversationId,
       sessionId,
