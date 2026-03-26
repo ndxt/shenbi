@@ -10,6 +10,7 @@ import {
   BarChart3, Globe, ShoppingCart, BookOpen,
   MessageSquare, MapPin, Wallet, Activity,
   Camera, Gamepad2, Box, ArrowLeft,
+  Search, Loader2, Download,
 } from 'lucide-react';
 import type { ActiveProjectConfig } from './constants';
 import {
@@ -17,7 +18,8 @@ import {
   loadProjectList,
   upsertProjectInList,
 } from './constants';
-import type { PreviewGitLabService } from './preview-types';
+import type { PreviewGitLabService, PreviewGitLabProject, PreviewGitLabAuthStatus } from './preview-types';
+import { getLoginUrl } from '../../../packages/editor-plugins/gitlab-sync/src/gitlab-client';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -110,7 +112,7 @@ function ActionCard({
 // Main Component
 // ---------------------------------------------------------------------------
 
-type Mode = 'idle' | 'new' | 'open';
+type Mode = 'idle' | 'new' | 'open' | 'clone';
 type CreateStep = 'template' | 'name';
 
 // ---------------------------------------------------------------------------
@@ -310,12 +312,19 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
   const [mode, setMode] = useState<Mode>('idle');
   const [newName, setNewName] = useState('');
   const [projects, setProjects] = useState<ActiveProjectConfig[]>([]);
-  const [authChecked, setAuthChecked] = useState(false);
   // Template wizard state
   const [createStep, setCreateStep] = useState<CreateStep>('template');
   const [activeCategoryId, setActiveCategoryId] = useState(PROJECT_CATEGORIES[0]?.id || 'web');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const activeCategory = (PROJECT_CATEGORIES.find((c) => c.id === activeCategoryId) || PROJECT_CATEGORIES[0]) as ProjectTypeCategory;
+
+  // Clone flow state
+  const [cloneAuthStatus, setCloneAuthStatus] = useState<PreviewGitLabAuthStatus | null>(null);
+  const [cloneAuthLoading, setCloneAuthLoading] = useState(false);
+  const [cloneSearch, setCloneSearch] = useState('');
+  const [cloneProjects, setCloneProjects] = useState<PreviewGitLabProject[]>([]);
+  const [cloneProjectsLoading, setCloneProjectsLoading] = useState(false);
+  const [cloningId, setCloningId] = useState<number | null>(null);
 
   // Load recent projects
   useEffect(() => {
@@ -323,14 +332,25 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
     setProjects(list);
   }, []);
 
-  // Check GitLab auth for clone button
+  // When entering clone mode, check auth status
   useEffect(() => {
+    if (mode !== 'clone') return;
+    setCloneAuthLoading(true);
     gitlabService.getAuthStatus()
-      .then(() => setAuthChecked(true))
-      .catch(() => setAuthChecked(true));
-  }, [gitlabService]);
+      .then((status) => setCloneAuthStatus(status))
+      .catch(() => setCloneAuthStatus({ authenticated: false }))
+      .finally(() => setCloneAuthLoading(false));
+  }, [mode, gitlabService]);
 
-  const canClone = !!gitlabUser;
+  // When authenticated in clone mode, load projects
+  useEffect(() => {
+    if (mode !== 'clone' || !cloneAuthStatus?.authenticated || !cloneAuthStatus.defaultGroupId) return;
+    setCloneProjectsLoading(true);
+    gitlabService.listGroupProjects(cloneAuthStatus.defaultGroupId, cloneSearch || undefined)
+      .then(setCloneProjects)
+      .catch(() => setCloneProjects([]))
+      .finally(() => setCloneProjectsLoading(false));
+  }, [mode, cloneAuthStatus?.authenticated, cloneAuthStatus?.defaultGroupId, cloneSearch, gitlabService]);
 
   const handleCreate = useCallback(() => {
     const name = newName.trim() || '新建项目';
@@ -344,10 +364,20 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
     onSelectProject(config);
   }, [onSelectProject]);
 
-  const handleClone = useCallback(() => {
-    // Open ProjectManagerDialog's clone tab by triggering an artificial open
-    // We just reuse the dialog — dispatch a custom event that App.tsx can listen for
-    window.dispatchEvent(new CustomEvent('shenbi:open-project-manager', { detail: { tab: 'clone' } }));
+  const handleCloneProject = useCallback(async (project: PreviewGitLabProject) => {
+    setCloningId(project.id);
+    try {
+      const config = gitlabService.selectProjectMetadata(project);
+      upsertProjectInList(config);
+      onSelectProject(config);
+    } finally {
+      setCloningId(null);
+    }
+  }, [gitlabService, onSelectProject]);
+
+  const handleConnectGitLab = useCallback(() => {
+    // OAuth login — redirect to backend proxy which redirects to GitLab
+    window.location.href = getLoginUrl();
   }, []);
 
   return (
@@ -370,8 +400,8 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
       {/* Dialog Wrapper */}
       <div
         style={{
-          width: '100%',
-          maxWidth: mode === 'new' ? 720 : 680,
+          maxWidth: (mode === 'new' || mode === 'clone') ? 720 : 680,
+          minWidth: 560,
           background: 'var(--color-bg-panel)',
           borderRadius: 12,
           boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
@@ -390,7 +420,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
             <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c93f' }} />
           </div>
           <div style={{ flex: 1, textAlign: 'center', fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-            {mode === 'new' ? 'New Project' : 'Welcome'}
+            {mode === 'new' ? 'New Project' : mode === 'clone' ? 'Clone Repository' : 'Welcome'}
           </div>
           <div style={{ width: 48 }} /> {/* spacer for balance */}
         </div>
@@ -398,7 +428,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
         {/* Dynamic Content */}
         {mode === 'new' ? (
           /* =========================================================
-             WIZARD TAKEOVER (Replaces Welcome Content)
+             NEW PROJECT WIZARD
              ========================================================= */
           <div style={{ display: 'flex', flexDirection: 'column', height: 480, background: '#1e1e1e' }}>
             <style>{`
@@ -577,6 +607,126 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
               )}
             </div>
           </div>
+        ) : mode === 'clone' ? (
+          /* =========================================================
+             CLONE REPOSITORY FLOW
+             ========================================================= */
+          <div style={{ display: 'flex', flexDirection: 'column', height: 480, background: '#1e1e1e' }}>
+            {cloneAuthLoading ? (
+              /* Loading auth status */
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Loader2 size={24} style={{ color: '#4b9efa', animation: 'spin 1s linear infinite' }} />
+              </div>
+            ) : !cloneAuthStatus?.authenticated ? (
+              /* ── Not logged in: Login guidance ── */
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 }}>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#2a3d5a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <GitBranch size={36} strokeWidth={1.5} style={{ color: '#4b9efa' }} />
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: '#e0e0e0' }}>连接你的 GitLab 账号</div>
+                <div style={{ fontSize: 13, color: '#8b8b8b', textAlign: 'center', lineHeight: 1.6, maxWidth: 320 }}>
+                  登录后即可浏览和克隆远程仓库中的项目，<br/>本地编辑后可随时同步回 GitLab。
+                </div>
+                <button
+                  type="button"
+                  onClick={handleConnectGitLab}
+                  style={{
+                    marginTop: 8, padding: '10px 32px', borderRadius: 6, border: 'none',
+                    background: '#4b9efa', color: '#fff',
+                    fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#3b8de8'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#4b9efa'; }}
+                >
+                  连接 GitLab
+                </button>
+              </div>
+            ) : (
+              /* ── Logged in: Project list ── */
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                {/* Search bar */}
+                <div style={{ padding: '16px 24px 0 24px' }}>
+                  <div style={{
+                    display: 'flex', gap: 8, padding: '8px 12px',
+                    background: '#252526', borderRadius: 6,
+                    border: '1px solid #3e3e42', alignItems: 'center',
+                  }}>
+                    <Search size={14} style={{ color: '#8b8b8b', flexShrink: 0 }} />
+                    <input
+                      style={{
+                        flex: 1, border: 'none', padding: 0, background: 'transparent',
+                        color: '#e0e0e0', fontSize: 13, outline: 'none',
+                      }}
+                      placeholder="搜索 GitLab 项目..."
+                      value={cloneSearch}
+                      onChange={(e) => setCloneSearch(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+                {/* Project list */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
+                  {cloneProjectsLoading ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+                      <Loader2 size={20} style={{ color: '#4b9efa', animation: 'spin 1s linear infinite' }} />
+                      <span style={{ marginLeft: 8, fontSize: 13, color: '#8b8b8b' }}>加载中...</span>
+                    </div>
+                  ) : cloneProjects.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 40, fontSize: 13, color: '#8b8b8b' }}>
+                      {cloneSearch ? '未找到匹配项目' : '暂无项目'}
+                    </div>
+                  ) : (
+                    cloneProjects.map((p) => {
+                      const alreadyCloned = projects.some((lp) => lp.gitlabProjectId === p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          className="template-card"
+                          onClick={() => !alreadyCloned && handleCloneProject(p)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 12,
+                            padding: '12px 14px', borderRadius: 8, marginBottom: 4,
+                            cursor: alreadyCloned ? 'default' : 'pointer',
+                            opacity: alreadyCloned ? 0.5 : 1,
+                            border: '1px solid #3e3e42',
+                            background: '#252526',
+                            transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={(e) => { if (!alreadyCloned) { (e.currentTarget as HTMLElement).style.borderColor = '#4b9efa'; (e.currentTarget as HTMLElement).style.background = '#2a2d32'; } }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#3e3e42'; (e.currentTarget as HTMLElement).style.background = '#252526'; }}
+                        >
+                          <Download size={16} style={{ color: '#4b9efa', flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: '#e0e0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                            <div style={{ fontSize: 11, color: '#8b8b8b', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.path_with_namespace}</div>
+                          </div>
+                          {cloningId === p.id && <Loader2 size={14} style={{ color: '#4b9efa', animation: 'spin 1s linear infinite' }} />}
+                          {alreadyCloned && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(75,158,250,0.15)', color: '#4b9efa', fontWeight: 600 }}>已 Clone</span>}
+                          {!alreadyCloned && cloningId !== p.id && <Check size={14} style={{ color: '#4b9efa', flexShrink: 0 }} />}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Clone Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 24px', borderTop: '1px solid #18181a', background: '#1c1c1c' }}>
+              <button
+                type="button"
+                onClick={() => { setMode('idle'); setCloneSearch(''); setCloneProjects([]); setCloneAuthStatus(null); }}
+                style={{
+                  padding: '6px 20px', borderRadius: 4, border: '1px solid #3e3e42',
+                  background: '#3e3e42', color: '#e0e0e0',
+                  fontSize: 13, cursor: 'pointer',
+                }}
+              >
+                取消
+              </button>
+            </div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
         ) : (
           /* =========================================================
              WELCOME SCREEN IDLE / OPEN
@@ -626,9 +776,8 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
         <ActionCard
           icon={<GitBranch size={28} strokeWidth={1.5} />}
           title="Clone Repository"
-          disabled={!canClone}
-          disabledReason="请先在设置中登录 GitLab"
-          onClick={handleClone}
+          active={false}
+          onClick={() => setMode('clone')}
         />
       </div>
 
