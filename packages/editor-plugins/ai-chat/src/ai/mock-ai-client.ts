@@ -1,7 +1,23 @@
 /**
  * Mock AI client for tests only — NOT exported from the package public API.
  */
-import type { AIClient, AgentEvent, ChatRequest, ChatResponse, ClassifyRouteRequest, ClassifyRouteResponse, FinalizeRequest, RunRequest, RunStreamOptions } from './api-types';
+import type {
+  AIClient,
+  AgentEvent,
+  ChatRequest,
+  ChatResponse,
+  ClassifyRouteRequest,
+  ClassifyRouteResponse,
+  FinalizeRequest,
+  ProjectAgentEvent,
+  ProjectCancelRequest,
+  ProjectConfirmRequest,
+  ProjectReviseRequest,
+  ProjectRunRequest,
+  ProjectSessionMutationResult,
+  RunRequest,
+  RunStreamOptions,
+} from './api-types';
 import type { PageSchema, SchemaNode } from '@shenbi/schema';
 
 const MODIFY_PROMPT_PATTERN = /修改|调整|删除|添加|增加|替换|移动|隐藏|显示|改成|换成|update|change|remove|delete|insert|add|replace|move|hide|show/i;
@@ -389,5 +405,64 @@ export class MockAIClient implements AIClient {
 
     async classifyRoute(_request: ClassifyRouteRequest): Promise<ClassifyRouteResponse> {
         return { scope: 'single-page', intent: 'schema.create', confidence: 0.9 };
+    }
+
+    async *projectStream(request: ProjectRunRequest, options: RunStreamOptions = {}): AsyncIterable<ProjectAgentEvent> {
+        const sessionId = 'mock-project-session';
+        yield {
+            type: 'project:start',
+            data: {
+                sessionId,
+                ...(request.conversationId ? { conversationId: request.conversationId } : {}),
+                prompt: request.prompt,
+            },
+        };
+        await wait(80, options.signal);
+        const plan = {
+            projectName: 'Mock 项目',
+            pages: [
+                {
+                    pageId: 'mock-dashboard',
+                    pageName: 'Mock 看板',
+                    action: 'create' as const,
+                    description: 'Mock 看板页',
+                },
+            ],
+        };
+        yield {
+            type: 'project:plan',
+            data: {
+                sessionId,
+                plan,
+            },
+        };
+        yield {
+            type: 'project:awaiting_confirmation',
+            data: {
+                sessionId,
+                plan,
+            },
+        };
+    }
+
+    async projectConfirm(request: ProjectConfirmRequest): Promise<ProjectSessionMutationResult> {
+        return {
+            sessionId: request.sessionId,
+            status: 'executing',
+        };
+    }
+
+    async projectRevise(request: ProjectReviseRequest): Promise<ProjectSessionMutationResult> {
+        return {
+            sessionId: request.sessionId,
+            status: 'awaiting_confirmation',
+        };
+    }
+
+    async projectCancel(request: ProjectCancelRequest): Promise<ProjectSessionMutationResult> {
+        return {
+            sessionId: request.sessionId,
+            status: 'cancelled',
+        };
     }
 }

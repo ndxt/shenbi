@@ -1,9 +1,30 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentEvent, RunRequest } from './api-types';
+import type { AgentEvent, ProjectAgentEvent, RunRequest } from './api-types';
 import { FetchAIClient } from './sse-client';
 import { MockAIClient } from './mock-ai-client';
 
 function createStreamResponse(events: AgentEvent[]): Response {
+  const payload = events
+    .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+    .join('');
+
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(payload));
+        controller.close();
+      },
+    }),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+      },
+    },
+  );
+}
+
+function createProjectStreamResponse(events: ProjectAgentEvent[]): Response {
   const payload = events
     .map((event) => `data: ${JSON.stringify(event)}\n\n`)
     .join('');
@@ -146,6 +167,101 @@ describe('FetchAIClient', () => {
     });
 
     expect(fetchImplementation).toHaveBeenCalledOnce();
+  });
+
+  it('posts project requests to the project stream endpoint and parses ProjectAgentEvent payloads', async () => {
+    const fetchImplementation = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe('/api/ai/project/stream');
+      expect(init?.method).toBe('POST');
+      return createProjectStreamResponse([
+        {
+          type: 'project:start',
+          data: {
+            sessionId: 'project-1',
+            conversationId: 'conv-project',
+            prompt: '生成订单管理项目',
+          },
+        },
+        {
+          type: 'project:awaiting_confirmation',
+          data: {
+            sessionId: 'project-1',
+            plan: {
+              projectName: '订单管理后台',
+              pages: [{
+                pageId: 'order-list',
+                pageName: '订单列表',
+                action: 'create',
+                description: '订单列表页',
+              }],
+            },
+          },
+        },
+      ]);
+    });
+
+    const client = new FetchAIClient({
+      projectStreamEndpoint: '/api/ai/project/stream',
+      fetchImplementation: fetchImplementation as typeof fetch,
+    });
+
+    const events = await Array.fromAsync(client.projectStream({
+      prompt: '生成订单管理项目',
+      workspace: {
+        componentSummary: 'Card, Table',
+        files: [],
+      },
+    }));
+
+    expect(events.map((event) => event.type)).toEqual([
+      'project:start',
+      'project:awaiting_confirmation',
+    ]);
+  });
+
+  it('posts project confirm/revise/cancel payloads to their endpoints', async () => {
+    const fetchImplementation = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path.endsWith('/confirm')) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: { sessionId: 'project-1', status: 'executing' },
+        }), { status: 200 });
+      }
+      if (path.endsWith('/revise')) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: { sessionId: 'project-1', status: 'awaiting_confirmation' },
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        success: true,
+        data: { sessionId: 'project-1', status: 'cancelled' },
+      }), { status: 200 });
+    });
+
+    const client = new FetchAIClient({
+      projectConfirmEndpoint: '/api/ai/project/confirm',
+      projectReviseEndpoint: '/api/ai/project/revise',
+      projectCancelEndpoint: '/api/ai/project/cancel',
+      fetchImplementation: fetchImplementation as typeof fetch,
+    });
+
+    await expect(client.projectConfirm({ sessionId: 'project-1' })).resolves.toEqual({
+      sessionId: 'project-1',
+      status: 'executing',
+    });
+    await expect(client.projectRevise({
+      sessionId: 'project-1',
+      revisionPrompt: '增加审批页',
+    })).resolves.toEqual({
+      sessionId: 'project-1',
+      status: 'awaiting_confirmation',
+    });
+    await expect(client.projectCancel({ sessionId: 'project-1' })).resolves.toEqual({
+      sessionId: 'project-1',
+      status: 'cancelled',
+    });
   });
 });
 

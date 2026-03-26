@@ -14,12 +14,18 @@ import type {
   ClassifyRouteResponse,
   FinalizeRequest,
   FinalizeResult,
+  ProjectAgentEvent,
+  ProjectCancelRequest,
+  ProjectConfirmRequest,
   ProjectPlan,
+  ProjectReviseRequest,
+  ProjectRunRequest,
+  ProjectSessionMutationResult,
   RunRequest,
   RunStreamOptions,
 } from '../ai/api-types';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
-import { buildExecutionFallbackAction, useAgentLoop } from './useAgentLoop';
+import { useAgentLoop } from './useAgentLoop';
 
 function createSchema(id: string, name = id): PageSchema {
   return {
@@ -28,7 +34,6 @@ function createSchema(id: string, name = id): PageSchema {
     body: [],
   };
 }
-
 
 function createMemoryVFS(initialFiles: Record<string, PageSchema>): VirtualFileSystemAdapter & { files: Map<string, PageSchema> } {
   const files = new Map<string, PageSchema>(Object.entries(initialFiles));
@@ -172,44 +177,201 @@ function createPersistence(initialValues: Record<string, unknown> = {}): PluginP
   };
 }
 
-class LoopScenarioAIClient implements AIClient {
-  readonly chatRequests: ChatRequest[] = [];
-  readonly runRequests: RunRequest[] = [];
-  readonly finalizeRequests: FinalizeRequest[] = [];
+type ProjectControl =
+  | { type: 'confirm' }
+  | { type: 'revise'; prompt: string }
+  | { type: 'cancel' };
+
+class ProjectScenarioAIClient implements AIClient {
+  readonly projectRequests: ProjectRunRequest[] = [];
+  readonly confirmRequests: ProjectConfirmRequest[] = [];
+  readonly reviseRequests: ProjectReviseRequest[] = [];
+  readonly cancelRequests: ProjectCancelRequest[] = [];
+
+  private readonly controls: ProjectControl[] = [];
+  private readonly waiters: Array<(control: ProjectControl) => void> = [];
 
   constructor(
-    private readonly chatResponses: ChatResponse[],
-    private readonly createEvents: AgentEvent[],
+    private readonly script: (client: ProjectScenarioAIClient, request: ProjectRunRequest) => AsyncIterable<ProjectAgentEvent>,
   ) {}
 
-  async *runStream(request: RunRequest, _options: RunStreamOptions = {}): AsyncIterable<AgentEvent> {
-    this.runRequests.push(request);
-    for (const event of this.createEvents) {
-      yield event;
+  private nextControl(): Promise<ProjectControl> {
+    const control = this.controls.shift();
+    if (control) {
+      return Promise.resolve(control);
     }
+    return new Promise<ProjectControl>((resolve) => {
+      this.waiters.push(resolve);
+    });
   }
 
-  async chat(request: ChatRequest): Promise<ChatResponse> {
-    this.chatRequests.push(request);
-    const next = this.chatResponses.shift();
-    if (!next) {
-      throw new Error('No chat response configured');
+  private pushControl(control: ProjectControl): void {
+    const waiter = this.waiters.shift();
+    if (waiter) {
+      waiter(control);
+      return;
     }
-    return next;
+    this.controls.push(control);
   }
 
-  async *chatStream(_request: ChatRequest, _options: RunStreamOptions = {}): AsyncIterable<{ delta: string }> {
-    yield { delta: '' };
+  async *runStream(_request: RunRequest, _options: RunStreamOptions = {}): AsyncIterable<AgentEvent> {
+    throw new Error('ProjectScenarioAIClient does not use runStream directly');
   }
 
-  async finalize(request: FinalizeRequest): Promise<FinalizeResult> {
-    this.finalizeRequests.push(request);
+  async chat(_request: ChatRequest): Promise<ChatResponse> {
+    throw new Error('ProjectScenarioAIClient does not use chat directly');
+  }
+
+  async *chatStream(_request: ChatRequest): AsyncIterable<{ delta: string }> {
+    throw new Error('ProjectScenarioAIClient does not use chatStream directly');
+  }
+
+  async finalize(_request: FinalizeRequest): Promise<FinalizeResult> {
     return {};
   }
 
   async classifyRoute(_request: ClassifyRouteRequest): Promise<ClassifyRouteResponse> {
     return { scope: 'multi-page', intent: 'schema.create', confidence: 0.95 };
   }
+
+  async *projectStream(request: ProjectRunRequest): AsyncIterable<ProjectAgentEvent> {
+    this.projectRequests.push(request);
+    yield* this.script(this, request);
+  }
+
+  async projectConfirm(request: ProjectConfirmRequest): Promise<ProjectSessionMutationResult> {
+    this.confirmRequests.push(request);
+    this.pushControl({ type: 'confirm' });
+    return { sessionId: request.sessionId, status: 'executing' };
+  }
+
+  async projectRevise(request: ProjectReviseRequest): Promise<ProjectSessionMutationResult> {
+    this.reviseRequests.push(request);
+    this.pushControl({ type: 'revise', prompt: request.revisionPrompt });
+    return { sessionId: request.sessionId, status: 'awaiting_confirmation' };
+  }
+
+  async projectCancel(request: ProjectCancelRequest): Promise<ProjectSessionMutationResult> {
+    this.cancelRequests.push(request);
+    this.pushControl({ type: 'cancel' });
+    return { sessionId: request.sessionId, status: 'cancelled' };
+  }
+
+  waitForControl(): Promise<ProjectControl> {
+    return this.nextControl();
+  }
+}
+
+function createProjectCreateEvents(): AgentEvent[] {
+  return [
+    { type: 'run:start', data: { sessionId: 'session-create', conversationId: 'conv-create' } },
+    { type: 'intent', data: { intent: 'schema.create', confidence: 1, scope: 'single-page' } },
+    {
+      type: 'plan',
+      data: {
+        pageTitle: '客服看板',
+        pageType: 'dashboard',
+        blocks: [{
+          id: 'hero',
+          description: '核心统计区',
+          components: ['Card', 'Statistic'],
+          priority: 1,
+          complexity: 'simple',
+        }],
+      },
+    },
+    {
+      type: 'schema:skeleton',
+      data: {
+        schema: {
+          id: 'dashboard',
+          name: '客服看板',
+          body: [{ id: 'hero-skeleton', component: 'Container', children: [] }],
+        },
+      },
+    },
+    { type: 'schema:block:start', data: { blockId: 'hero', description: '核心统计区' } },
+    {
+      type: 'schema:block',
+      data: {
+        blockId: 'hero',
+        node: {
+          id: 'hero',
+          component: 'Card',
+          props: { title: '客服看板' },
+        },
+        durationMs: 12,
+      },
+    },
+    {
+      type: 'schema:done',
+      data: {
+        schema: {
+          id: 'dashboard',
+          name: '客服看板',
+          body: [{
+            id: 'hero',
+            component: 'Card',
+            props: { title: '客服看板' },
+          }],
+        },
+      },
+    },
+    {
+      type: 'done',
+      data: {
+        metadata: {
+          sessionId: 'session-create',
+          conversationId: 'conv-create',
+          durationMs: 123,
+        },
+      },
+    },
+  ];
+}
+
+function createProjectModifyEvents(): AgentEvent[] {
+  return [
+    { type: 'run:start', data: { sessionId: 'session-modify', conversationId: 'conv-modify' } },
+    { type: 'intent', data: { intent: 'schema.modify', confidence: 1, scope: 'single-page' } },
+    {
+      type: 'modify:start',
+      data: {
+        operationCount: 1,
+        explanation: '已更新详情标题',
+        operations: [{ op: 'schema.patchProps', nodeId: 'detail-card' }],
+      },
+    },
+    {
+      type: 'modify:op:pending',
+      data: {
+        index: 0,
+        label: '更新 detail-card 标题',
+      },
+    },
+    {
+      type: 'modify:op',
+      data: {
+        index: 0,
+        operation: {
+          op: 'schema.patchProps',
+          nodeId: 'detail-card',
+          patch: { title: '订单状态总览' },
+        },
+      },
+    },
+    { type: 'modify:done', data: {} },
+    {
+      type: 'done',
+      data: {
+        metadata: {
+          sessionId: 'session-modify',
+          conversationId: 'conv-modify',
+          durationMs: 88,
+        },
+      },
+    },
+  ];
 }
 
 afterEach(() => {
@@ -219,145 +381,55 @@ afterEach(() => {
 });
 
 describe('useAgentLoop', () => {
-  it('plans a project, waits for confirmation, creates a page in background, and completes with loop summary', async () => {
-    const { bridge, commandLog, fileStorage, tabManager } = createBridge();
+  it('consumes backend project stream, waits for confirmation, and completes a create page flow', async () => {
+    const { bridge, fileStorage } = createBridge();
     const persistence = createPersistence();
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       success: true,
       data: {
-        traceFile: '.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json',
+        traceFile: '.ai-debug/traces/project-success.json',
       },
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
-    }));
-    vi.stubGlobal('fetch', fetchMock);
-    const client = new LoopScenarioAIClient([
-      {
-        content: [
-          'Status: 正在拆解项目页面',
-          'Action: proposeProjectPlan',
-          `Action Input: ${JSON.stringify({
-            projectName: '客服中台',
-            pages: [
-              {
-                pageId: 'dashboard',
-                pageName: '客服看板',
-                action: 'create',
-                description: '展示客服工作量、会话趋势和工单状态',
-              },
-            ],
-          })}`,
-        ].join('\n'),
-      },
-      {
-        content: [
-          'Reasoning Summary: 先生成项目首页',
-          'Action: createPage',
-          `Action Input: ${JSON.stringify({
-            pageId: 'dashboard',
-            pageName: '客服看板',
-            prompt: '生成一个客服看板页面，包含统计卡、趋势图和工单表格。',
-          })}`,
-        ].join('\n'),
-      },
-      {
-        content: 'Action: finish\nAction Input: {"summary":"项目完成"}',
-      },
-    ], [
-      {
-        type: 'plan',
-        data: {
-          pageTitle: '客服看板',
-          pageType: 'dashboard',
-          blocks: [
-            {
-              id: 'hero',
-              description: '核心统计区',
-              components: ['Card', 'Statistic'],
-              priority: 1,
-              complexity: 'simple',
-            },
-          ],
-        },
-      },
-      {
-        type: 'schema:skeleton',
-        data: {
-          schema: {
-            id: 'dashboard',
-            name: '客服看板',
-            body: [
-              {
-                id: 'hero-skeleton',
-                component: 'Container',
-                children: [],
-              },
-            ],
-          },
-        },
-      },
-      {
-        type: 'schema:block:start',
-        data: {
-          blockId: 'hero',
-          description: '核心统计区',
-        },
-      },
-      {
-        type: 'schema:block',
-        data: {
-          blockId: 'hero',
-          node: {
-            id: 'hero',
-            component: 'Card',
-            props: {
-              title: '客服看板',
-            },
-          },
-          durationMs: 12,
-        },
-      },
-      {
-        type: 'schema:done',
-        data: {
-          schema: {
-            id: 'dashboard',
-            name: '客服看板',
-            body: [
-              {
-                id: 'hero',
-                component: 'Card',
-                props: {
-                  title: '客服看板',
-                },
-              },
-            ],
-          },
-        },
-      },
-      {
-        type: 'done',
-        data: {
-          metadata: {
-            sessionId: 'session-loop',
-            conversationId: 'conv-loop',
-            durationMs: 123,
-          },
-        },
-      },
-    ]);
+    })));
+
+    const client = new ProjectScenarioAIClient(async function* (api) {
+      const sessionId = 'project-session-1';
+      const plan: ProjectPlan = {
+        projectName: '客服中台',
+        pages: [{
+          pageId: 'dashboard',
+          pageName: '客服看板',
+          action: 'create',
+          description: '展示客服工作量和趋势',
+          prompt: '生成客服看板，包含统计卡和趋势图。',
+        }],
+      };
+      yield { type: 'project:start', data: { sessionId, conversationId: 'conv-loop', prompt: '创建客服项目' } };
+      yield { type: 'project:plan', data: { sessionId, plan } };
+      yield { type: 'project:awaiting_confirmation', data: { sessionId, plan } };
+      const control = await api.waitForControl();
+      expect(control).toEqual({ type: 'confirm' });
+      const page = plan.pages[0]!;
+      yield { type: 'project:page:start', data: { sessionId, index: 0, total: 1, page } };
+      for (const event of createProjectCreateEvents()) {
+        yield { type: 'project:page:event', data: { sessionId, pageId: page.pageId, event } };
+      }
+      yield { type: 'project:page:done', data: { sessionId, pageId: page.pageId } };
+      yield { type: 'project:done', data: { sessionId, createdFileIds: ['dashboard'], completedPageIds: ['dashboard'] } };
+    });
     setAIClient(client);
+
     const onDone = vi.fn();
     const onError = vi.fn();
     const onRunComplete = vi.fn();
-
     const { result } = renderHook(() => useAgentLoop(bridge, persistence));
 
     let runPromise!: Promise<void>;
     await act(async () => {
       runPromise = result.current.runAgent(
-        '请帮我创建一个客服项目，至少包含一个工作台页面',
+        '请帮我创建一个客服项目',
         'planner-model',
         'block-model',
         false,
@@ -377,9 +449,6 @@ describe('useAgentLoop', () => {
       expect(result.current.pages).toHaveLength(1);
     });
 
-    const persisted = persistence.store.get('ai-chat:agent-loop-state') as { loopState?: { status?: string } } | undefined;
-    expect(persisted?.loopState?.status).toBe('awaiting_confirmation');
-
     await act(async () => {
       result.current.confirmProjectPlan();
       await runPromise;
@@ -387,153 +456,70 @@ describe('useAgentLoop', () => {
 
     expect(onError).not.toHaveBeenCalled();
     expect(onDone).toHaveBeenCalledWith({
-      sessionId: 'conv-loop',
+      sessionId: 'project-session-1',
       conversationId: 'conv-loop',
     });
-    expect(onRunComplete).toHaveBeenCalledTimes(1);
     expect(result.current.phase).toBe('done');
-    const createdFileId = result.current.lastRunResult?.agentLoop?.createdFileIds[0];
-    expect(createdFileId).toBeTruthy();
-    expect(result.current.lastRunResult?.agentLoop).toMatchObject({
-      projectPlan: {
-        projectName: '客服中台',
-      },
-      traceFile: '.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json',
-    });
-    expect(result.current.pages).toMatchObject([
-      {
-        pageId: 'dashboard',
-        pageName: '客服看板',
-        status: 'done',
-        fileId: createdFileId,
-        execution: {
-          plan: {
-            pageTitle: '客服看板',
-          },
-          blockStatuses: {
-            hero: 'done',
-          },
+    expect(result.current.pages[0]).toMatchObject({
+      pageId: 'dashboard',
+      status: 'done',
+      execution: {
+        plan: {
+          pageTitle: '客服看板',
         },
       },
-    ]);
-    expect(result.current.lastRunResult?.debugFile).toBe('.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json');
-    expect(client.runRequests[0]).toMatchObject({
-      plannerModel: 'planner-model',
-      blockModel: 'block-model',
-      intent: 'schema.create',
-      thinking: { type: 'disabled' },
-      blockConcurrency: 2,
-      context: {
-        workspaceFileIds: expect.arrayContaining(['current', createdFileId]),
-      },
     });
+    const createdFileId = result.current.pages[0]?.fileId;
+    expect(createdFileId).toBeTruthy();
     expect(fileStorage.files.get(createdFileId!)).toMatchObject({
       name: '客服看板',
     });
-    expect(fetchMock).toHaveBeenCalledWith('/api/ai/debug/trace', expect.objectContaining({
-      method: 'POST',
-    }));
-    expect(commandLog[0]?.commandId).toBe('shell.ensureCurrentTab');
-    expect(commandLog.map((entry) => entry.commandId)).toContain('file.writeSchema');
-    expect(commandLog.map((entry) => entry.commandId)).toContain('tab.open');
-    expect(commandLog.filter((entry) => entry.commandId === 'tab.syncState').length).toBeGreaterThanOrEqual(3);
-    expect(tabManager.getTab(createdFileId!)).toMatchObject({
-      isGenerating: false,
-    });
-    expect(persistence.remove).toHaveBeenCalledWith('ai-chat', 'agent-loop-state');
+    expect(client.projectRequests[0]?.workspace.files.map((file) => file.fileId)).toContain('current');
+    expect(client.confirmRequests).toEqual([{ sessionId: 'project-session-1' }]);
   });
 
-  it('restores awaiting-confirmation loop state from persistence on mount', async () => {
-    const projectPlan: ProjectPlan = {
-      projectName: '已恢复项目',
-      pages: [
-        {
-          pageId: 'summary',
-          pageName: '概览页',
-          action: 'create',
-          description: '概览页描述',
-        },
-      ],
-    };
-    const persistence = createPersistence({
-      'ai-chat:agent-loop-state': {
-        loopState: {
-          conversationId: 'conv-restored',
-          status: 'awaiting_confirmation',
-          approvedPlan: projectPlan,
-          createdFileIds: [],
-          completedPageIds: [],
-          failedPageIds: [],
-          updatedAt: '2026-03-16T00:00:00.000Z',
-        },
-        reactMessages: [
-          { role: 'system', content: 'system' },
-          { role: 'user', content: '请继续' },
-        ],
-        projectPlan,
-        trace: [],
-        pages: [
-          {
-            pageId: 'summary',
-            pageName: '概览页',
-            action: 'create',
-            description: '概览页描述',
-            status: 'waiting',
-          },
-        ],
-        createdFileIds: [],
-      },
-    });
-
-    const { result } = renderHook(() => useAgentLoop(createBridge().bridge, persistence));
-
-    await waitFor(() => {
-      expect(result.current.mode).toBe('loop');
-      expect(result.current.phase).toBe('awaiting_confirmation');
-      expect(result.current.projectPlan?.projectName).toBe('已恢复项目');
-      expect(result.current.pages).toHaveLength(1);
-    });
-  });
-
-  it('repairs a reasoning-only loop response by asking the model to reissue a valid action', async () => {
+  it('revises backend project plans instead of running a local ReAct repair loop', async () => {
     const { bridge } = createBridge();
     const persistence = createPersistence();
-    const onDone = vi.fn();
-    const onError = vi.fn();
-    const client = new LoopScenarioAIClient([
-      {
-        content: 'Action: listWorkspaceFiles\nAction Input: {}',
-      },
-      {
-        content: JSON.stringify({
-          reasoning: '工作区为空，现在需要提出项目计划。',
-        }, null, 2),
-      },
-      {
-        content: [
-          'Action: proposeProjectPlan',
-          `Action Input: ${JSON.stringify({
-            projectName: '订单管理后台',
-            pages: [
-              {
-                pageId: 'order-list',
-                pageName: '订单列表页',
-                action: 'create',
-                description: '展示订单列表、筛选和分页',
-              },
-            ],
-          })}`,
-        ].join('\n'),
-      },
-      {
-        content: 'Action: finish\nAction Input: {"summary":"项目完成"}',
-      },
-    ], []);
+    const client = new ProjectScenarioAIClient(async function* (api) {
+      const sessionId = 'project-session-2';
+      const initialPlan: ProjectPlan = {
+        projectName: '订单管理后台',
+        pages: [{
+          pageId: 'order-list',
+          pageName: '订单列表页',
+          action: 'create',
+          description: '订单列表',
+        }],
+      };
+      yield { type: 'project:start', data: { sessionId, conversationId: 'conv-revise', prompt: '订单管理项目' } };
+      yield { type: 'project:plan', data: { sessionId, plan: initialPlan } };
+      yield { type: 'project:awaiting_confirmation', data: { sessionId, plan: initialPlan } };
+      const reviseControl = await api.waitForControl();
+      expect(reviseControl).toEqual({ type: 'revise', prompt: '增加审批页' });
+      const revisedPlan: ProjectPlan = {
+        projectName: '订单管理后台-修订版',
+        pages: [
+          ...initialPlan.pages,
+          {
+            pageId: 'approval',
+            pageName: '审批页',
+            action: 'create',
+            description: '审批处理页',
+          },
+        ],
+      };
+      yield { type: 'project:plan', data: { sessionId, plan: revisedPlan } };
+      yield { type: 'project:awaiting_confirmation', data: { sessionId, plan: revisedPlan } };
+      const confirmControl = await api.waitForControl();
+      expect(confirmControl).toEqual({ type: 'confirm' });
+      yield { type: 'project:done', data: { sessionId, createdFileIds: [], completedPageIds: [] } };
+    });
     setAIClient(client);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       success: true,
       data: {
-        traceFile: '.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json',
+        traceFile: '.ai-debug/traces/project-revised.json',
       },
     }), {
       status: 200,
@@ -541,490 +527,33 @@ describe('useAgentLoop', () => {
     })));
 
     const { result } = renderHook(() => useAgentLoop(bridge, persistence));
-
     let runPromise!: Promise<void>;
+
     await act(async () => {
       runPromise = result.current.runAgent(
-        '帮我做一个订单管理后台项目，包含列表页、详情页、创建页',
+        '帮我做一个订单管理后台项目',
         'planner-model',
         'block-model',
         false,
-        'conv-repair',
-        () => 'message-repair',
+        'conv-revise',
+        () => 'msg-revise',
         vi.fn(),
-        onDone,
-        onError,
+        vi.fn(),
+        vi.fn(),
       );
     });
 
     await waitFor(() => {
-      expect(result.current.phase).toBe('awaiting_confirmation');
       expect(result.current.projectPlan?.projectName).toBe('订单管理后台');
     });
 
     await act(async () => {
-      result.current.confirmProjectPlan();
-      await runPromise;
-    });
-
-    expect(onError).not.toHaveBeenCalled();
-    expect(onDone).toHaveBeenCalledWith({
-      sessionId: 'conv-repair',
-      conversationId: 'conv-repair',
-    });
-    expect(client.chatRequests).toHaveLength(4);
-    expect(client.chatRequests[2]?.messages.at(-1)).toMatchObject({
-      role: 'user',
-      content: expect.stringContaining('格式错误'),
-    });
-  });
-
-  it('normalizes parsed assistant actions before sending the next loop turn', async () => {
-    const { bridge } = createBridge();
-    const persistence = createPersistence();
-    const client = new LoopScenarioAIClient([
-      {
-        content: JSON.stringify({
-          reasoning: '先查看工作区文件。',
-          action: 'listWorkspaceFiles',
-          action_input: {},
-        }, null, 2),
-      },
-      {
-        content: [
-          'Action: proposeProjectPlan',
-          `Action Input: ${JSON.stringify({
-            projectName: '订单管理后台',
-            pages: [
-              {
-                pageId: 'order-list',
-                pageName: '订单列表页',
-                action: 'create',
-                description: '展示订单列表、筛选和分页',
-              },
-            ],
-          })}`,
-        ].join('\n'),
-      },
-      {
-        content: 'Action: finish\nAction Input: {"summary":"项目完成"}',
-      },
-    ], []);
-    setAIClient(client);
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      success: true,
-      data: {
-        traceFile: '.ai-debug/traces/2026-03-16T00-00-00-000Z-success.json',
-      },
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })));
-
-    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
-
-    let runPromise!: Promise<void>;
-    await act(async () => {
-      runPromise = result.current.runAgent(
-        '帮我做一个订单管理后台项目，包含列表页、详情页、创建页',
-        'planner-model',
-        'block-model',
-        false,
-        'conv-normalized-history',
-        () => 'message-normalized-history',
-        vi.fn(),
-        vi.fn(),
-        vi.fn(),
-      );
+      result.current.submitProjectPlanRevision('增加审批页');
     });
 
     await waitFor(() => {
-      expect(result.current.phase).toBe('awaiting_confirmation');
-    });
-
-    expect(client.chatRequests[1]?.messages.at(-2)).toMatchObject({
-      role: 'assistant',
-      content: JSON.stringify({ action: 'listWorkspaceFiles', actionInput: {} }),
-    });
-
-    await act(async () => {
-      result.current.confirmProjectPlan();
-      await runPromise;
-    });
-  });
-
-  it('falls back to the approved plan when execution-phase model replies are malformed', () => {
-    const fallbackCreate = buildExecutionFallbackAction({
-      conversationId: 'conv-fallback',
-      status: 'executing',
-      createdFileIds: ['订单列表页'],
-      completedPageIds: ['order-list'],
-      failedPageIds: [],
-      updatedAt: '2026-03-16T00:00:00.000Z',
-      approvedPlan: {
-        projectName: '订单管理后台',
-        pages: [
-          {
-            pageId: 'order-list',
-            pageName: '订单列表页',
-            action: 'create',
-            description: '展示订单列表、筛选和分页',
-          },
-          {
-            pageId: 'order-detail',
-            pageName: '订单详情页',
-            action: 'create',
-            description: '展示订单详情和商品信息',
-            prompt: '订单详情页完整建页说明',
-            evidence: '文档要求展示基础信息与物流信息。',
-          },
-        ],
-      },
-    }, [
-      {
-        pageId: 'order-list',
-        pageName: '订单列表页',
-        action: 'create',
-        description: '展示订单列表、筛选和分页',
-        status: 'done',
-        fileId: '订单列表页',
-      },
-      {
-        pageId: 'order-detail',
-        pageName: '订单详情页',
-        action: 'create',
-        description: '展示订单详情和商品信息',
-        prompt: '订单详情页完整建页说明',
-        evidence: '文档要求展示基础信息与物流信息。',
-        status: 'waiting',
-      },
-    ]);
-
-    expect(fallbackCreate).toEqual({
-      reasoningSummary: '按已确认规划继续执行下一页',
-      action: 'createPage',
-      actionInput: {
-        pageId: 'order-detail',
-        pageName: '订单详情页',
-        prompt: '订单详情页完整建页说明',
-        evidence: '文档要求展示基础信息与物流信息。',
-      },
-      rawActionInput: '{"pageId":"order-detail","pageName":"订单详情页","prompt":"订单详情页完整建页说明","evidence":"文档要求展示基础信息与物流信息。"}',
-    });
-
-    const fallbackFinish = buildExecutionFallbackAction({
-      conversationId: 'conv-fallback',
-      status: 'executing',
-      createdFileIds: ['订单列表页', '订单详情页'],
-      completedPageIds: ['order-list', 'order-detail'],
-      failedPageIds: [],
-      updatedAt: '2026-03-16T00:00:00.000Z',
-      approvedPlan: {
-        projectName: '订单管理后台',
-        pages: [],
-      },
-    }, [
-      {
-        pageId: 'order-list',
-        pageName: '订单列表页',
-        action: 'create',
-        description: '展示订单列表、筛选和分页',
-        status: 'done',
-        fileId: '订单列表页',
-      },
-      {
-        pageId: 'order-detail',
-        pageName: '订单详情页',
-        action: 'create',
-        description: '展示订单详情和商品信息',
-        status: 'done',
-        fileId: '订单详情页',
-      },
-    ]);
-
-    expect(fallbackFinish).toEqual({
-      reasoningSummary: '所有计划页面已完成，结束本轮项目执行',
-      action: 'finish',
-      actionInput: {
-        summary: '项目执行完成',
-      },
-      rawActionInput: '{"summary":"项目执行完成"}',
-    });
-  });
-
-  it('writes a debug dump when ReAct parsing fails', async () => {
-    const { bridge } = createBridge();
-    const persistence = createPersistence();
-    const client = new LoopScenarioAIClient([
-      { content: '-1.0' },
-      { content: '-1.0' },
-    ], []);
-    setAIClient(client);
-    const onError = vi.fn();
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      success: true,
-      data: {
-        debugFile: '.ai-debug/errors/2026-03-16T00-00-00-000Z-client-debug.json',
-      },
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
-
-    await act(async () => {
-      await result.current.runAgent(
-        '帮我做一个订单管理后台项目，包含列表页、详情页、创建页',
-        'planner-model',
-        'block-model',
-        false,
-        'conv-parse-failure',
-        () => 'message-parse-failure',
-        vi.fn(),
-        vi.fn(),
-        onError,
-      );
-    });
-
-    expect(fetchMock).toHaveBeenCalledWith('/api/ai/debug/client-error', expect.objectContaining({
-      method: 'POST',
-    }));
-    expect(onError).toHaveBeenCalledWith(
-      expect.stringContaining('.ai-debug/errors/2026-03-16T00-00-00-000Z-client-debug.json'),
-    );
-    expect(result.current.phase).toBe('error');
-  });
-
-  it('model responds with valid JSON object from the start', async () => {
-    const { bridge } = createBridge();
-    const persistence = createPersistence();
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      success: true,
-      data: { traceFile: '.ai-debug/traces/json-success.json' },
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    // With JSON protocol, the model returns JSON objects directly
-    const client = new LoopScenarioAIClient([
-      // Turn 1: valid JSON → listWorkspaceFiles
-      { content: '{"action":"listWorkspaceFiles","actionInput":{}}' },
-      // Turn 2: valid JSON → proposeProjectPlan
-      {
-        content: JSON.stringify({
-          reasoningSummary: '根据用户需求规划项目',
-          action: 'proposeProjectPlan',
-          actionInput: {
-            projectName: '订单管理后台',
-            pages: [
-              { pageId: 'order-list', pageName: '订单列表页', action: 'create', description: '展示订单列表' },
-              { pageId: 'order-detail', pageName: '订单详情页', action: 'create', description: '展示订单详情' },
-              { pageId: 'order-create', pageName: '创建订单页', action: 'create', description: '创建订单表单' },
-            ],
-          },
-        }),
-      },
-      // Turn 3 (after confirm): createPage
-      {
-        content: JSON.stringify({
-          action: 'createPage',
-          actionInput: { pageId: 'order-list', pageName: '订单列表页', description: '展示订单列表' },
-        }),
-      },
-      // Turn 4: finish
-      { content: '{"action":"finish","actionInput":{"summary":"项目完成"}}' },
-    ], [
-      {
-        type: 'schema:done',
-        data: {
-          schema: {
-            id: 'order-list',
-            name: '订单列表页',
-            body: [{ id: 'table', component: 'Table', props: { title: '订单列表' } }],
-          },
-        },
-      },
-      {
-        type: 'done',
-        data: {
-          metadata: { sessionId: 's', conversationId: 'c', durationMs: 100 },
-        },
-      },
-    ]);
-    setAIClient(client);
-
-    const onDone = vi.fn();
-    const onError = vi.fn();
-
-    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
-
-    let runPromise!: Promise<void>;
-    await act(async () => {
-      runPromise = result.current.runAgent(
-        '帮我做一个订单管理后台项目，包含列表页、详情页、创建页',
-        'planner-model',
-        'block-model',
-        false,
-        'conv-json-protocol',
-        () => 'msg-1',
-        vi.fn(),
-        onDone,
-        onError,
-        2,
-      );
-    });
-
-    // After listWorkspaceFiles and proposeProjectPlan, waiting for confirmation
-    await waitFor(() => {
-      expect(result.current.phase).toBe('awaiting_confirmation');
-      expect(result.current.projectPlan).toBeTruthy();
-      expect(result.current.projectPlan!.pages).toHaveLength(3);
-    });
-
-    // Confirm and let the loop finish
-    await act(async () => {
-      result.current.confirmProjectPlan();
-      await runPromise;
-    });
-
-    expect(onError).not.toHaveBeenCalled();
-    expect(onDone).toHaveBeenCalled();
-    expect(result.current.phase).toBe('done');
-  });
-
-  it('preserves group, prompt, and evidence on confirmed project plans', async () => {
-    const { bridge } = createBridge();
-    const persistence = createPersistence();
-    const client = new LoopScenarioAIClient([
-      { content: '{"action":"listWorkspaceFiles","actionInput":{}}' },
-      {
-        content: JSON.stringify({
-          action: 'proposeProjectPlan',
-          actionInput: {
-            projectName: '订单管理后台',
-            pages: [
-              {
-                pageId: 'order-list',
-                pageName: '订单列表页',
-                action: 'create',
-                group: '订单管理',
-                description: '展示订单列表',
-                prompt: '订单列表页完整建页说明',
-                evidence: '文档要求支持筛选、导出与行内编辑。',
-              },
-            ],
-          },
-        }),
-      },
-    ], []);
-    setAIClient(client);
-
-    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
-    let runPromise!: Promise<void>;
-
-    await act(async () => {
-      runPromise = result.current.runAgent(
-        '根据文档生成订单管理后台',
-        'planner-model',
-        'block-model',
-        false,
-        'conv-plan-metadata',
-        () => 'msg-plan-metadata',
-        vi.fn(),
-        vi.fn(),
-        vi.fn(),
-      );
-    });
-
-    await waitFor(() => {
-      expect(result.current.phase).toBe('awaiting_confirmation');
-      expect(result.current.pages[0]).toMatchObject({
-        pageId: 'order-list',
-        group: '订单管理',
-        prompt: '订单列表页完整建页说明',
-        evidence: '文档要求支持筛选、导出与行内编辑。',
-      });
-    });
-
-    const persisted = persistence.store.get('ai-chat:agent-loop-state') as {
-      pages: Array<Record<string, unknown>>;
-    };
-    expect(persisted.pages[0]).toMatchObject({
-      group: '订单管理',
-      prompt: '订单列表页完整建页说明',
-      evidence: '文档要求支持筛选、导出与行内编辑。',
-    });
-
-    await act(async () => {
-      await result.current.cancelRun();
-      await runPromise;
-    });
-
-    expect(result.current.phase).toBe('idle');
-  });
-
-  it('surfaces fs.createFile failures before writing schema', async () => {
-    const { bridge: baseBridge } = createBridge();
-    const bridge: EditorAIBridge = {
-      ...baseBridge,
-      execute: async (commandId, args) => {
-        if (commandId === 'fs.createFile') {
-          return { success: false, error: 'fs.createFile unavailable' };
-        }
-        return baseBridge.execute(commandId, args);
-      },
-    };
-    const persistence = createPersistence();
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      success: true,
-      data: { traceFile: '.ai-debug/traces/create-file-error.json' },
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const client = new LoopScenarioAIClient([
-      {
-        content: JSON.stringify({
-          action: 'proposeProjectPlan',
-          actionInput: {
-            projectName: '订单管理后台',
-            pages: [
-              { pageId: 'order-list', pageName: '订单列表页', action: 'create', description: '展示订单列表' },
-            ],
-          },
-        }),
-      },
-      {
-        content: JSON.stringify({
-          action: 'createPage',
-          actionInput: { pageId: 'order-list', pageName: '订单列表页', description: '展示订单列表' },
-        }),
-      },
-    ], []);
-    setAIClient(client);
-
-    const onDone = vi.fn();
-    const onError = vi.fn();
-    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
-
-    let runPromise!: Promise<void>;
-    await act(async () => {
-      runPromise = result.current.runAgent(
-        '帮我做一个订单管理后台项目，包含列表页',
-        'planner-model',
-        'block-model',
-        false,
-        'conv-create-file-error',
-        () => 'msg-create-file-error',
-        vi.fn(),
-        onDone,
-        onError,
-      );
-    });
-
-    await waitFor(() => {
-      expect(result.current.phase).toBe('awaiting_confirmation');
-      expect(result.current.projectPlan?.pages).toHaveLength(1);
+      expect(result.current.projectPlan?.projectName).toBe('订单管理后台-修订版');
+      expect(result.current.pages).toHaveLength(2);
     });
 
     await act(async () => {
@@ -1032,12 +561,14 @@ describe('useAgentLoop', () => {
       await runPromise;
     });
 
-    expect(onDone).not.toHaveBeenCalled();
-    expect(onError).toHaveBeenCalledWith(expect.stringContaining('fs.createFile unavailable'));
+    expect(client.reviseRequests).toEqual([{
+      sessionId: 'project-session-2',
+      revisionPrompt: '增加审批页',
+    }]);
   });
 
-  it('runs modifyPage subtasks through runStream with multi-page workspace context', async () => {
-    const { bridge } = createBridge({
+  it('applies modify page project subtasks with backend page events', async () => {
+    const { bridge, fileStorage } = createBridge({
       current: createSchema('current', 'Current Page'),
       'order-detail': {
         id: 'order-detail',
@@ -1053,84 +584,39 @@ describe('useAgentLoop', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       success: true,
       data: {
-        traceFile: '.ai-debug/traces/modify-success.json',
+        traceFile: '.ai-debug/traces/project-modify.json',
       },
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })));
-    const client = new LoopScenarioAIClient([
-      {
-        content: JSON.stringify({
-          action: 'proposeProjectPlan',
-          actionInput: {
-            projectName: '订单项目',
-            pages: [
-              {
-                pageId: 'order-detail',
-                pageName: '订单详情页',
-                action: 'modify',
-                description: '补充订单状态信息',
-                prompt: '把详情页标题改成订单状态总览',
-              },
-            ],
-          },
-        }),
-      },
-      {
-        content: JSON.stringify({
-          action: 'modifyPage',
-          actionInput: {
-            fileId: 'order-detail',
-            pageName: '订单详情页',
-            prompt: '把详情页标题改成订单状态总览',
-          },
-        }),
-      },
-      {
-        content: '{"action":"finish","actionInput":{"summary":"项目完成"}}',
-      },
-    ], [
-      { type: 'run:start', data: { sessionId: 'session-modify', conversationId: 'conv-modify' } },
-      { type: 'intent', data: { intent: 'schema.modify', confidence: 1, scope: 'single-page' } },
-      {
-        type: 'modify:start',
-        data: {
-          operationCount: 1,
-          explanation: '已更新详情标题',
-          operations: [{ op: 'schema.patchProps', nodeId: 'detail-card' }],
-        },
-      },
-      {
-        type: 'modify:op:pending',
-        data: {
-          index: 0,
-          label: '更新 detail-card 标题',
-        },
-      },
-      {
-        type: 'modify:op',
-        data: {
-          index: 0,
-          operation: {
-            op: 'schema.patchProps',
-            nodeId: 'detail-card',
-            patch: { title: '订单状态总览' },
-          },
-        },
-      },
-      { type: 'modify:done', data: {} },
-      {
-        type: 'done',
-        data: {
-          metadata: {
-            sessionId: 'session-modify',
-            conversationId: 'conv-modify',
-            durationMs: 88,
-          },
-        },
-      },
-    ]);
+
+    const client = new ProjectScenarioAIClient(async function* (api) {
+      const sessionId = 'project-session-3';
+      const plan: ProjectPlan = {
+        projectName: '订单项目',
+        pages: [{
+          pageId: 'order-detail',
+          pageName: '订单详情页',
+          action: 'modify',
+          fileId: 'order-detail',
+          description: '补充订单状态信息',
+          prompt: '把详情页标题改成订单状态总览',
+        }],
+      };
+      yield { type: 'project:start', data: { sessionId, conversationId: 'conv-modify', prompt: '完善订单项目' } };
+      yield { type: 'project:plan', data: { sessionId, plan } };
+      yield { type: 'project:awaiting_confirmation', data: { sessionId, plan } };
+      const control = await api.waitForControl();
+      expect(control).toEqual({ type: 'confirm' });
+      const page = plan.pages[0]!;
+      yield { type: 'project:page:start', data: { sessionId, index: 0, total: 1, page } };
+      for (const event of createProjectModifyEvents()) {
+        yield { type: 'project:page:event', data: { sessionId, pageId: page.pageId, event } };
+      }
+      yield { type: 'project:page:done', data: { sessionId, pageId: page.pageId, fileId: 'order-detail' } };
+      yield { type: 'project:done', data: { sessionId, createdFileIds: [], completedPageIds: ['order-detail'] } };
+    });
     setAIClient(client);
 
     const { result } = renderHook(() => useAgentLoop(bridge, persistence));
@@ -1142,8 +628,8 @@ describe('useAgentLoop', () => {
         'planner-model',
         'block-model',
         false,
-        'conv-modify-loop',
-        () => 'message-modify',
+        'conv-modify',
+        () => 'msg-modify',
         vi.fn(),
         vi.fn(),
         vi.fn(),
@@ -1159,22 +645,67 @@ describe('useAgentLoop', () => {
       await runPromise;
     });
 
-    expect(client.runRequests[0]).toMatchObject({
-      intent: 'schema.modify',
-      context: {
-        workspaceFileIds: expect.arrayContaining(['current', 'order-detail']),
-      },
-    });
-    expect(result.current.pages).toMatchObject([
-      {
-        pageId: 'order-detail',
-        status: 'done',
-        execution: {
-          modifyPlan: {
-            explanation: '已更新详情标题',
-          },
+    expect(result.current.pages[0]).toMatchObject({
+      pageId: 'order-detail',
+      status: 'done',
+      execution: {
+        modifyPlan: {
+          explanation: '已更新详情标题',
         },
       },
-    ]);
+    });
+    expect(fileStorage.files.get('order-detail')).toMatchObject({
+      body: [{
+        id: 'detail-card',
+        component: 'Card',
+        props: { title: '订单状态总览' },
+      }],
+    });
+  });
+
+  it('cancels backend project sessions while waiting for confirmation', async () => {
+    const { bridge } = createBridge();
+    const persistence = createPersistence();
+    const client = new ProjectScenarioAIClient(async function* (_api) {
+      const sessionId = 'project-session-4';
+      const plan: ProjectPlan = {
+        projectName: '内容管理中心',
+        pages: [{
+          pageId: 'content-list',
+          pageName: '内容列表',
+          action: 'create',
+          description: '内容列表页',
+        }],
+      };
+      yield { type: 'project:start', data: { sessionId, conversationId: 'conv-cancel', prompt: '内容管理中心' } };
+      yield { type: 'project:plan', data: { sessionId, plan } };
+      yield { type: 'project:awaiting_confirmation', data: { sessionId, plan } };
+    });
+    setAIClient(client);
+
+    const { result } = renderHook(() => useAgentLoop(bridge, persistence));
+    await act(async () => {
+      await result.current.runAgent(
+        '帮我做一个内容管理中心项目',
+        'planner-model',
+        'block-model',
+        false,
+        'conv-cancel',
+        () => 'msg-cancel',
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.phase).toBe('awaiting_confirmation');
+    });
+
+    await act(async () => {
+      await result.current.cancelRun();
+    });
+
+    expect(client.cancelRequests).toEqual([{ sessionId: 'project-session-4' }]);
   });
 });

@@ -11,7 +11,13 @@ import type {
   FinalizeResult,
   LoopSessionState,
   PagePlan,
+  ProjectAgentEvent,
+  ProjectCancelRequest,
+  ProjectConfirmRequest,
   ProjectPlan,
+  ProjectReviseRequest,
+  ProjectRunRequest,
+  ProjectSessionMutationResult,
   ReActStep,
   RunAttachmentInput,
   RunMetadata,
@@ -31,7 +37,13 @@ export type {
   FinalizeResult,
   LoopSessionState,
   PagePlan,
+  ProjectAgentEvent,
+  ProjectCancelRequest,
+  ProjectConfirmRequest,
   ProjectPlan,
+  ProjectReviseRequest,
+  ProjectRunRequest,
+  ProjectSessionMutationResult,
   ReActStep,
   RunAttachmentInput,
   RunMetadata,
@@ -49,4 +61,8 @@ export interface AIClient {
   chatStream(request: ChatRequest, options?: RunStreamOptions): AsyncIterable<{ delta: string }>;
   finalize(request: FinalizeRequest): Promise<FinalizeResult>;
   classifyRoute(request: ClassifyRouteRequest): Promise<ClassifyRouteResponse>;
+  projectStream(request: ProjectRunRequest, options?: RunStreamOptions): AsyncIterable<ProjectAgentEvent>;
+  projectConfirm(request: ProjectConfirmRequest): Promise<ProjectSessionMutationResult>;
+  projectRevise(request: ProjectReviseRequest): Promise<ProjectSessionMutationResult>;
+  projectCancel(request: ProjectCancelRequest): Promise<ProjectSessionMutationResult>;
 }

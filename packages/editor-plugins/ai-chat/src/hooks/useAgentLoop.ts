@@ -2,7 +2,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createEditor } from '@shenbi/editor-core';
 import type { PluginPersistenceService } from '@shenbi/editor-plugin-api';
 import type { PageSchema } from '@shenbi/schema';
-import type { LoopSessionState, ProjectPlan, ReActStep, RunAttachmentInput, RunRequest } from '../ai/api-types';
+import type {
+  AIClient,
+  AgentEvent,
+  ChatRequest,
+  ChatResponse,
+  FinalizeRequest,
+  FinalizeResult,
+  LoopSessionState,
+  ProjectAgentEvent,
+  ProjectCancelRequest,
+  ProjectConfirmRequest,
+  ProjectPlan,
+  ProjectReviseRequest,
+  ProjectRunRequest,
+  ProjectSessionMutationResult,
+  ReActStep,
+  RunAttachmentInput,
+  RunRequest,
+} from '../ai/api-types';
 import { aiClient } from '../ai/sse-client';
 import type { EditorAIBridge } from '../ai/editor-ai-bridge';
 import { AgentLoopTracer } from '../ai/agent-loop-tracer';
@@ -197,6 +215,100 @@ function isAgentLoopAbortError(error: unknown): boolean {
   return error instanceof Error && error.message === AGENT_LOOP_ABORTED_ERROR;
 }
 
+class QueuedPageAIClient implements AIClient {
+  private readonly events: AgentEvent[] = [];
+  private readonly waiters: Array<(result: IteratorResult<AgentEvent, undefined>) => void> = [];
+  private closed = false;
+  private error: unknown;
+
+  push(event: AgentEvent): void {
+    if (this.closed) {
+      return;
+    }
+    const waiter = this.waiters.shift();
+    if (waiter) {
+      waiter({ value: event, done: false });
+      return;
+    }
+    this.events.push(event);
+    if (event.type === 'done' || event.type === 'error') {
+      this.close();
+    }
+  }
+
+  close(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    while (this.waiters.length > 0) {
+      this.waiters.shift()?.({ value: undefined, done: true });
+    }
+  }
+
+  fail(error: unknown): void {
+    this.error = error;
+    this.close();
+  }
+
+  private async nextEvent(): Promise<IteratorResult<AgentEvent, undefined>> {
+    if (this.events.length > 0) {
+      return { value: this.events.shift() as AgentEvent, done: false };
+    }
+    if (this.error) {
+      throw this.error;
+    }
+    if (this.closed) {
+      return { value: undefined, done: true };
+    }
+    return new Promise<IteratorResult<AgentEvent, undefined>>((resolve) => {
+      this.waiters.push(resolve);
+    });
+  }
+
+  async *runStream(_request: RunRequest): AsyncIterable<AgentEvent> {
+    while (true) {
+      const next = await this.nextEvent();
+      if (next.done) {
+        return;
+      }
+      yield next.value;
+    }
+  }
+
+  async chat(_request: ChatRequest): Promise<ChatResponse> {
+    throw new Error('QueuedPageAIClient does not support chat');
+  }
+
+  async *chatStream() {
+    throw new Error('QueuedPageAIClient does not support chatStream');
+  }
+
+  async finalize(_request: FinalizeRequest): Promise<FinalizeResult> {
+    return {};
+  }
+
+  async classifyRoute() {
+    return { scope: 'single-page' as const, intent: 'schema.create' as const, confidence: 1 };
+  }
+
+  async *projectStream(_request: ProjectRunRequest): AsyncIterable<ProjectAgentEvent> {
+    throw new Error('QueuedPageAIClient does not support projectStream');
+  }
+
+  async projectConfirm(_request: ProjectConfirmRequest): Promise<ProjectSessionMutationResult> {
+    throw new Error('QueuedPageAIClient does not support projectConfirm');
+  }
+
+  async projectRevise(_request: ProjectReviseRequest): Promise<ProjectSessionMutationResult> {
+    throw new Error('QueuedPageAIClient does not support projectRevise');
+  }
+
+  async projectCancel(_request: ProjectCancelRequest): Promise<ProjectSessionMutationResult> {
+    throw new Error('QueuedPageAIClient does not support projectCancel');
+  }
+}
+
 export function buildExecutionFallbackAction(
   loopState: LoopSessionState | undefined,
   pages: AgentLoopPageProgress[],
@@ -298,6 +410,12 @@ interface UseAgentLoopResult {
   submitProjectPlanRevision: (text: string) => void;
 }
 
+interface ProjectPageExecutionHandle {
+  pageId: string;
+  queueClient: QueuedPageAIClient;
+  promise: Promise<Record<string, unknown>>;
+}
+
 export function useAgentLoop(
   bridge: EditorAIBridge | undefined,
   persistence?: PluginPersistenceService,
@@ -325,6 +443,8 @@ export function useAgentLoop(
   const stepsRef = useRef<ReActStep[]>([]);
   const pagesRef = useRef<AgentLoopPageProgress[]>([]);
   const pageLookupRef = useRef<Map<string, AgentLoopPageProgress>>(new Map());
+  const activeProjectSessionIdRef = useRef<string | null>(null);
+  const projectPageHandlesRef = useRef<Map<string, ProjectPageExecutionHandle>>(new Map());
   const confirmResolverRef = useRef<((observation: string) => void) | null>(null);
   const activePlannerModelRef = useRef<string>('');
   const activeBlockModelRef = useRef<string>('');
@@ -345,6 +465,7 @@ export function useAgentLoop(
         persistedRef.current = value;
         loopMessagesRef.current = value.reactMessages;
         loopStateRef.current = value.loopState;
+        activeProjectSessionIdRef.current = value.loopState.projectSessionId ?? null;
         projectPlanRef.current = value.projectPlan ?? null;
         pagesRef.current = value.pages;
         stepsRef.current = value.trace;
@@ -429,6 +550,8 @@ export function useAgentLoop(
     setLastRunResult(null);
     setPlanRevisionRequested(false);
     setIsLoopRunning(false);
+    activeProjectSessionIdRef.current = null;
+    projectPageHandlesRef.current = new Map();
     await clearPersistedLoopState();
   }, [clearPersistedLoopState]);
 
@@ -616,6 +739,7 @@ export function useAgentLoop(
   const executeCreatePage = useCallback(async (
     input: { pageId: string; pageName: string; prompt: string; fileId?: string },
     page: AgentLoopPageProgress,
+    client: AIClient = aiClient,
   ) => {
     if (!bridge) {
       throw new Error('editor bridge unavailable');
@@ -712,7 +836,7 @@ export function useAgentLoop(
       };
 
       const executionResult = await runPageExecution({
-        aiClient,
+        aiClient: client,
         request,
         signal: timeoutController.signal,
         initialMode: 'create',
@@ -823,6 +947,7 @@ export function useAgentLoop(
   const executeModifyPage = useCallback(async (
     input: { fileId: string; prompt: string; pageName?: string },
     page: AgentLoopPageProgress,
+    client: AIClient = aiClient,
   ) => {
     if (!bridge) {
       throw new Error('editor bridge unavailable');
@@ -865,7 +990,7 @@ export function useAgentLoop(
     try {
       await openGeneratingPageTab(input.fileId, page.pageName, existingSchema);
       const executionResult = await runPageExecution({
-        aiClient,
+        aiClient: client,
         request,
         signal: timeoutController.signal,
         initialMode: 'modify',
@@ -967,9 +1092,6 @@ export function useAgentLoop(
       updatedAt: new Date().toISOString(),
     };
     await persistLoopState();
-    return new Promise<string>((resolve) => {
-      confirmResolverRef.current = resolve;
-    });
   }, [persistLoopState]);
 
   const finalizeLoop = useCallback(async (summary: AgentLoopResultSummary) => {
@@ -1000,9 +1122,11 @@ export function useAgentLoop(
       await legacy.cancelRun();
       return;
     }
+    const activeProjectSessionId = activeProjectSessionIdRef.current;
+    if (activeProjectSessionId) {
+      await aiClient.projectCancel({ sessionId: activeProjectSessionId }).catch(() => undefined);
+    }
     abortControllerRef.current?.abort();
-    confirmResolverRef.current?.('用户已取消本轮项目规划');
-    confirmResolverRef.current = null;
     setIsLoopRunning(false);
     setProgressText('已取消');
     setPhase('idle');
@@ -1017,7 +1141,8 @@ export function useAgentLoop(
   }, [legacy, mode, persistLoopState]);
 
   const confirmProjectPlan = useCallback(() => {
-    if (!loopStateRef.current?.approvedPlan) {
+    const activeProjectSessionId = activeProjectSessionIdRef.current;
+    if (!loopStateRef.current?.approvedPlan || !activeProjectSessionId) {
       return;
     }
     loopStateRef.current = {
@@ -1028,18 +1153,10 @@ export function useAgentLoop(
     setPhase('executing');
     setProgressText('正在执行项目规划');
     void persistLoopState();
-    const plan = loopStateRef.current?.approvedPlan;
-    const confirmationMessage = plan && plan.pages.length > 0
-      ? (() => {
-        const actionablePages = plan.pages.filter((p) => p.action !== 'skip');
-        const pageList = actionablePages
-          .map((p, i) => `${i + 1}. pageId=${p.pageId} pageName=${p.pageName}`)
-          .join('\n');
-        return `用户已确认项目规划，共 ${actionablePages.length} 个页面，请按顺序依次创建：\n${pageList}`;
-      })()
-      : '用户已确认项目规划';
-    confirmResolverRef.current?.(confirmationMessage);
-    confirmResolverRef.current = null;
+    void aiClient.projectConfirm({ sessionId: activeProjectSessionId }).catch((error) => {
+      setPhase('error');
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    });
   }, [persistLoopState]);
 
   const requestProjectPlanRevision = useCallback(() => {
@@ -1053,14 +1170,20 @@ export function useAgentLoop(
   }, []);
 
   const submitProjectPlanRevision = useCallback((text: string) => {
-    if (!confirmResolverRef.current) {
+    const activeProjectSessionId = activeProjectSessionIdRef.current;
+    if (!activeProjectSessionId || !text.trim()) {
       return;
     }
     setPlanRevisionRequested(false);
     setPhase('thinking');
     setProgressText('根据用户意见重新规划项目');
-    confirmResolverRef.current(`用户要求修改规划：${text.trim()}`);
-    confirmResolverRef.current = null;
+    void aiClient.projectRevise({
+      sessionId: activeProjectSessionId,
+      revisionPrompt: text.trim(),
+    }).catch((error) => {
+      setPhase('error');
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    });
   }, []);
 
   const runAgent = useCallback<ReturnType<typeof useAgentRun>['runAgent']>(async (
@@ -1207,190 +1330,166 @@ export function useAgentLoop(
     }
 
     try {
-      for (let iteration = 0; iteration < MAX_LOOP_ITERATIONS; iteration += 1) {
-        if (abortControllerRef.current?.signal.aborted) {
-          throw new Error(AGENT_LOOP_ABORTED_ERROR);
-        }
-        setPhase(loopStateRef.current?.status === 'executing' ? 'executing' : 'thinking');
-
-        const response = await aiClient.chat({
-          model: plannerModel,
-          messages: compactMessages(loopMessagesRef.current),
-          thinking: { type: thinkingEnabled ? 'enabled' : 'disabled' },
-        });
-
-        let parsed: ParsedReActResponse;
-        let parseSource = response.content;
-        try {
-          parsed = parseReActResponse(parseSource);
-        } catch (error) {
-          const initialError = error instanceof Error ? error.message : String(error);
-          const repairPrompt = buildReActRepairPrompt(initialError, response.content);
-          try {
-            const repairResponse = await aiClient.chat({
-              model: plannerModel,
-              messages: compactMessages([
-                ...loopMessagesRef.current,
-                { role: 'assistant', content: response.content },
-                {
-                  role: 'user',
-                  content: repairPrompt,
-                },
-              ]),
-              thinking: { type: 'disabled' },
-            });
-            parseSource = repairResponse.content;
-            parsed = parseReActResponse(parseSource);
-          } catch (repairError) {
-            const fallbackParsed = buildExecutionFallbackAction(
-              loopStateRef.current,
-              Array.from(pageLookupRef.current.values()),
-            );
-            if (fallbackParsed) {
-              parsed = fallbackParsed;
-              parseSource = formatParsedReActMessage(fallbackParsed);
-            } else {
-              const debugFile = await writeAgentLoopDebugDump({
-                source: 'agent-loop-react-parse',
-                conversationId: currentConversationId,
-                plannerModel,
-                blockModel,
-                thinkingEnabled,
-                error: repairError instanceof Error ? repairError.message : String(repairError),
-                rawResponse: response.content,
-                repairedResponse: parseSource !== response.content ? parseSource : undefined,
-                messages: loopMessagesRef.current,
-                loopState: loopStateRef.current,
-              });
-              if (debugFile) {
-                throw new Error(`${repairError instanceof Error ? repairError.message : String(repairError)}. Debug file: ${debugFile}`);
-              }
-              throw repairError;
-            }
-          }
-        }
-
-        loopMessagesRef.current = [
-          ...loopMessagesRef.current,
-          { role: 'assistant', content: formatParsedReActMessage(parsed) },
-        ];
-
-        const step = tracerRef.current?.addStep({
-          ...(parsed.status ? { status: parsed.status } : {}),
-          ...(parsed.reasoningSummary ? { reasoningSummary: parsed.reasoningSummary } : {}),
-          action: parsed.action,
-          actionInput: parsed.actionInput,
-          ...(response.durationMs !== undefined ? { llmDurationMs: response.durationMs } : {}),
-          ...(response.tokensUsed?.input !== undefined ? { tokensInput: response.tokensUsed.input } : {}),
-          ...(response.tokensUsed?.output !== undefined ? { tokensOutput: response.tokensUsed.output } : {}),
-        });
-        const nextSteps = tracerRef.current?.snapshot() ?? [];
-        stepsRef.current = nextSteps;
-        setSteps(nextSteps);
-        setProgressText(parsed.status ?? parsed.reasoningSummary ?? `正在执行 ${parsed.action}`);
-
-        const toolStartedAt = Date.now();
-        const observationValue = await executeAgentTool({
-          bridge,
-          aiClient,
-          plannerModel,
-          blockModel,
-          thinkingEnabled,
-          getCurrentConversationId: () => currentConversationId,
-          getAvailableComponentsSummary: () => summarizeComponents(bridge),
-          listWorkspaceFiles,
-          readPageSchema,
-          writePageSchema,
-          deletePageSchema,
-          proposeProjectPlan,
-          executeCreatePage,
-          executeModifyPage,
-        }, parsed.action, parsed.actionInput, pageLookupRef.current);
-        if (abortControllerRef.current?.signal.aborted) {
-          throw new Error(AGENT_LOOP_ABORTED_ERROR);
-        }
-        let observation = typeof observationValue === 'string'
-          ? observationValue
-          : JSON.stringify(observationValue, null, 2);
-        tracerRef.current?.updateLastObservation(observation, Date.now() - toolStartedAt);
-        const tracedSteps = tracerRef.current?.snapshot() ?? [];
-        stepsRef.current = tracedSteps;
-        setSteps(tracedSteps);
-
-        if (parsed.action === 'createPage') {
-          const fileId = typeof observationValue === 'object' && observationValue && 'fileId' in observationValue
-            ? String((observationValue as { fileId: unknown }).fileId)
-            : undefined;
-          if (fileId && loopStateRef.current) {
-            const pageId = typeof parsed.actionInput.pageId === 'string' ? parsed.actionInput.pageId : fileId;
-            loopStateRef.current.createdFileIds = [...loopStateRef.current.createdFileIds, fileId];
-            loopStateRef.current.completedPageIds = [...loopStateRef.current.completedPageIds, pageId];
-            delete loopStateRef.current.currentPageId;
-
-            // Append progress hint so LLM knows exactly how many pages remain.
-            // observation is a `let` — mutating it here gets picked up by the
-            // loopMessages.push at the bottom of the loop iteration.
-            const approvedPlan = loopStateRef.current.approvedPlan;
-            if (approvedPlan) {
-              const actionablePageIds = approvedPlan.pages
-                .filter((p) => p.action !== 'skip')
-                .map((p) => p.pageId);
-              const completedSet = new Set(loopStateRef.current.completedPageIds);
-              const remainingPages = approvedPlan.pages
-                .filter((p) => p.action !== 'skip' && !completedSet.has(p.pageId));
-              const progressHint = remainingPages.length > 0
-                ? `\n\n进度: 已完成 ${completedSet.size}/${actionablePageIds.length} 个页面。剩余待创建：${remainingPages.map((p) => `${p.pageId}(${p.pageName})`).join(', ')}`
-                : `\n\n进度: 全部 ${actionablePageIds.length} 个页面已完成，请调用 finish。`;
-              observation = observation + progressHint;
-            }
-          }
-        }
-
-        if (parsed.action === 'modifyPage' && loopStateRef.current) {
-          const fileId = typeof parsed.actionInput.fileId === 'string' ? parsed.actionInput.fileId : undefined;
-          if (fileId) {
-            const pageId = typeof parsed.actionInput.pageId === 'string' ? parsed.actionInput.pageId : fileId;
-            loopStateRef.current.completedPageIds = [...loopStateRef.current.completedPageIds, pageId];
-            delete loopStateRef.current.currentPageId;
-          }
-        }
-
-        if (loopStateRef.current) {
-          loopStateRef.current.lastCompletedAction = parsed.action;
-          loopStateRef.current.updatedAt = new Date().toISOString();
-        }
-
-        setPages((currentPages) => {
-          const nextPages = currentPages.map((page) => pageLookupRef.current.get(page.pageId) ?? page);
-          pagesRef.current = nextPages;
-          return nextPages;
-        });
-        await persistLoopState();
-
-        if (parsed.action === 'finish') {
-          const summary: AgentLoopResultSummary = {
-            ...(projectPlanRef.current ? { projectPlan: projectPlanRef.current } : {}),
-            trace: tracerRef.current?.snapshot() ?? [],
-            pages: Array.from(pageLookupRef.current.values()),
-            createdFileIds: loopStateRef.current?.createdFileIds ?? [],
-            ...(loopStateRef.current ? { loopState: loopStateRef.current } : {}),
+      const currentSchema = bridge.getSchema();
+      const workspaceFiles = await listWorkspaceFiles();
+      const workspace = {
+        componentSummary: summarizeComponents(bridge),
+        ...(currentSchema.id ? { currentFileId: currentSchema.id } : {}),
+        currentSchemaSummary: summarizeSchema(currentSchema),
+        currentSchemaJson: currentSchema,
+        files: await Promise.all(workspaceFiles.map(async (file) => {
+          const schema = await readPageSchema(file.id);
+          return {
+            fileId: file.id,
+            pageName: schema.name ?? file.name,
+            schemaSummary: summarizeSchema(schema),
+            schemaJson: schema,
           };
-          const finalizedSummary = await finalizeLoop(summary);
-          onDone({
-            sessionId: currentConversationId,
-            conversationId: currentConversationId,
-          });
-          onRunComplete?.(createLoopRunResult(finalizedSummary, Date.now() - startTimeRef.current));
-          return;
+        })),
+      };
+
+      const projectRequest: ProjectRunRequest = {
+        prompt: loopUserPrompt,
+        ...(attachments.length > 0 ? { attachments } : {}),
+        ...(plannerModel ? { plannerModel } : {}),
+        ...(blockModel ? { blockModel } : {}),
+        ...(currentConversationId ? { conversationId: currentConversationId } : {}),
+        thinking: { type: thinkingEnabled ? 'enabled' : 'disabled' },
+        workspace,
+      };
+
+      for await (const event of aiClient.projectStream(projectRequest, {
+        signal: abortControllerRef.current?.signal,
+      })) {
+        if (abortControllerRef.current?.signal.aborted) {
+          throw new Error(AGENT_LOOP_ABORTED_ERROR);
         }
 
-        loopMessagesRef.current = [
-          ...loopMessagesRef.current,
-          { role: 'user', content: `Observation: ${observation}` },
-        ];
-      }
+        switch (event.type) {
+          case 'project:start':
+            activeProjectSessionIdRef.current = event.data.sessionId;
+            if (loopStateRef.current) {
+              loopStateRef.current = {
+                ...loopStateRef.current,
+                projectSessionId: event.data.sessionId,
+                updatedAt: new Date().toISOString(),
+              };
+              await persistLoopState();
+            }
+            setProgressText('正在规划项目');
+            break;
 
-      throw new Error(`Agent Loop exceeded ${MAX_LOOP_ITERATIONS} iterations`);
+          case 'project:plan':
+            await proposeProjectPlan(event.data.plan);
+            break;
+
+          case 'project:awaiting_confirmation':
+            setPhase('awaiting_confirmation');
+            setProgressText('等待用户确认项目规划');
+            break;
+
+          case 'project:page:start': {
+            const page = pageLookupRef.current.get(event.data.page.pageId)
+              ?? {
+                pageId: event.data.page.pageId,
+                pageName: event.data.page.pageName,
+                action: event.data.page.action,
+                description: event.data.page.description,
+                ...(event.data.page.group ? { group: event.data.page.group } : {}),
+                ...(event.data.page.prompt ? { prompt: event.data.page.prompt } : {}),
+                ...(event.data.page.evidence ? { evidence: event.data.page.evidence } : {}),
+                status: 'waiting' as const,
+              };
+            const queueClient = new QueuedPageAIClient();
+            const executionPromise = event.data.page.action === 'modify'
+              ? executeModifyPage({
+                fileId: event.data.page.fileId ?? event.data.page.pageId,
+                prompt: event.data.page.prompt ?? event.data.page.description,
+                ...(event.data.page.pageName ? { pageName: event.data.page.pageName } : {}),
+              }, page, queueClient)
+              : executeCreatePage({
+                pageId: event.data.page.pageId,
+                pageName: event.data.page.pageName,
+                prompt: event.data.page.prompt ?? event.data.page.description,
+                ...(event.data.page.fileId ? { fileId: event.data.page.fileId } : {}),
+              }, page, queueClient);
+
+            projectPageHandlesRef.current.set(event.data.page.pageId, {
+              pageId: event.data.page.pageId,
+              queueClient,
+              promise: executionPromise,
+            });
+            setPhase('executing');
+            setProgressText(`正在执行 ${event.data.page.pageName}`);
+            break;
+          }
+
+          case 'project:page:event': {
+            const handle = projectPageHandlesRef.current.get(event.data.pageId);
+            handle?.queueClient.push(event.data.event);
+            break;
+          }
+
+          case 'project:page:done': {
+            const handle = projectPageHandlesRef.current.get(event.data.pageId);
+            if (handle) {
+              await handle.promise;
+              projectPageHandlesRef.current.delete(event.data.pageId);
+            }
+            if (loopStateRef.current) {
+              loopStateRef.current = {
+                ...loopStateRef.current,
+                completedPageIds: Array.from(new Set([
+                  ...loopStateRef.current.completedPageIds,
+                  event.data.pageId,
+                ])),
+                ...(event.data.fileId
+                  ? {
+                      createdFileIds: Array.from(new Set([
+                        ...loopStateRef.current.createdFileIds,
+                        event.data.fileId,
+                      ])),
+                    }
+                  : {}),
+                updatedAt: new Date().toISOString(),
+              };
+              await persistLoopState();
+            }
+            break;
+          }
+
+          case 'project:done': {
+            await Promise.all(Array.from(projectPageHandlesRef.current.values()).map((handle) => handle.promise));
+            projectPageHandlesRef.current.clear();
+            if (loopStateRef.current) {
+              loopStateRef.current = {
+                ...loopStateRef.current,
+                status: 'done',
+                createdFileIds: event.data.createdFileIds,
+                completedPageIds: event.data.completedPageIds,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            const summary: AgentLoopResultSummary = {
+              ...(projectPlanRef.current ? { projectPlan: projectPlanRef.current } : {}),
+              trace: [],
+              pages: Array.from(pageLookupRef.current.values()),
+              createdFileIds: event.data.createdFileIds,
+              ...(loopStateRef.current ? { loopState: loopStateRef.current } : {}),
+            };
+            const finalizedSummary = await finalizeLoop(summary);
+            onDone({
+              sessionId: activeProjectSessionIdRef.current ?? currentConversationId,
+              conversationId: currentConversationId,
+            });
+            onRunComplete?.(createLoopRunResult(finalizedSummary, Date.now() - startTimeRef.current));
+            return;
+          }
+
+          case 'project:error':
+            throw new Error(event.data.message);
+        }
+      }
     } catch (error) {
       if (isAgentLoopAbortError(error)) {
         abortControllerRef.current = null;
@@ -1433,7 +1532,6 @@ export function useAgentLoop(
   }, [
     bridge,
     clearPersistedLoopState,
-    deletePageSchema,
     executeCreatePage,
     executeModifyPage,
     finalizeLoop,
@@ -1442,7 +1540,6 @@ export function useAgentLoop(
     persistLoopState,
     proposeProjectPlan,
     readPageSchema,
-    writePageSchema,
   ]);
 
   return {

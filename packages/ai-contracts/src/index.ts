@@ -81,6 +81,7 @@ export interface ReActStep {
 
 export interface LoopSessionState {
   conversationId: string;
+  projectSessionId?: string;
   status: 'planning' | 'awaiting_confirmation' | 'executing' | 'done' | 'failed' | 'cancelled';
   approvedPlan?: ProjectPlan;
   createdFileIds: string[];
