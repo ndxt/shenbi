@@ -75,7 +75,7 @@ export function App() {
   const [renderMode, setRenderMode] = useState<RenderMode>(DEFAULT_RENDER_MODE);
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [showWelcomeOverride, setShowWelcomeOverride] = useState(false);
-  const [cloneOverride, setCloneOverride] = useState(false);
+  const [welcomeInitialMode, setWelcomeInitialMode] = useState<'new' | 'clone' | undefined>(undefined);
   const [rendererUndoRedoStateByFile, setRendererUndoRedoStateByFile] = useState<Record<string, { canUndo: boolean; canRedo: boolean }>>({});
   const activeRendererDispatchRef = useRef<{ save: () => void; undo: () => void; redo: () => void } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -444,11 +444,11 @@ export function App() {
       }, [projectState])}
       onNewProject={useCallback(() => {
         setShowWelcomeOverride(true);
-        setCloneOverride(false);
+        setWelcomeInitialMode('new');
       }, [])}
       onCloneRepository={useCallback(() => {
         setShowWelcomeOverride(true);
-        setCloneOverride(true);
+        setWelcomeInitialMode('clone');
       }, [])}
       sidebarProps={{
         contracts: builtinContracts,
@@ -560,10 +560,10 @@ export function App() {
         onSelectProject={(config) => {
           projectState.handleSelectProject(config);
           setShowWelcomeOverride(false);
-          setCloneOverride(false);
+          setWelcomeInitialMode(undefined);
         }}
-        initialMode={cloneOverride ? 'clone' : undefined}
-        onClose={showWelcomeOverride ? () => { setShowWelcomeOverride(false); setCloneOverride(false); } : undefined}
+        initialMode={welcomeInitialMode}
+        onClose={showWelcomeOverride ? () => { setShowWelcomeOverride(false); setWelcomeInitialMode(undefined); } : undefined}
       />
     )}
     </>
