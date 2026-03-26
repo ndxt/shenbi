@@ -226,30 +226,30 @@ const CoverDashboard = () => (
 // ---------------------------------------------------------------------------
 
 const CoverMobileBasic = () => (
-  <svg width="100%" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="25" y="10" width="50" height="80" rx="10" fill="#4B4E53"/> 
-    <path d="M 25 20 Q 25 10 35 10 L 65 10 Q 75 10 75 20 L 75 26 L 25 26 Z" fill="#1C9848"/> 
-    <path d="M 32 18 L 36 14 M 32 18 L 36 22 M 32 18 L 40 18" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/> 
-    <circle cx="68" cy="14" r="1.2" fill="#FFFFFF"/>
-    <circle cx="68" cy="18" r="1.2" fill="#FFFFFF"/>
-    <circle cx="68" cy="22" r="1.2" fill="#FFFFFF"/> 
+  <svg width="100%" height="100%" viewBox="0 0 160 124" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="46" y="6" width="68" height="112" rx="10" fill="#4A4C50"/> 
+    <path d="M 46 16 Q 46 6 56 6 L 104 6 Q 114 6 114 16 L 114 26 L 46 26 Z" fill="#1C9848"/> 
+    <path d="M 54 16 L 60 10 M 54 16 L 60 22 M 54 16 L 66 16" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/> 
+    <circle cx="104" cy="11" r="1.5" fill="#FFFFFF"/>
+    <circle cx="104" cy="16" r="1.5" fill="#FFFFFF"/>
+    <circle cx="104" cy="21" r="1.5" fill="#FFFFFF"/> 
     
-    <circle cx="62" cy="74" r="7" fill="#A8EB12"/> 
-    <path d="M 62 70 L 62 78 M 58 74 L 66 74" stroke="#252526" strokeWidth="1.5" strokeLinecap="round"/>
+    <circle cx="114" cy="106" r="10" fill="#A8EB12"/> 
+    <path d="M 114 99 L 114 113 M 107 106 L 121 106" stroke="#252526" strokeWidth="2" strokeLinecap="round"/>
   </svg>
 );
 
 const CoverMobileBottomNav = () => (
-  <svg width="100%" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="25" y="10" width="50" height="80" rx="10" fill="#4B4E53"/>
-    <path d="M 25 20 Q 25 10 35 10 L 65 10 Q 75 10 75 20 L 75 26 L 25 26 Z" fill="#1C9848"/>
-    <path d="M 32 18 L 36 14 M 32 18 L 36 22 M 32 18 L 40 18" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/>
-    <circle cx="68" cy="14" r="1.2" fill="#FFFFFF"/>
-    <circle cx="68" cy="18" r="1.2" fill="#FFFFFF"/>
-    <circle cx="68" cy="22" r="1.2" fill="#FFFFFF"/> 
+  <svg width="100%" height="100%" viewBox="0 0 160 124" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="46" y="6" width="68" height="112" rx="10" fill="#4A4C50"/> 
+    <path d="M 46 16 Q 46 6 56 6 L 104 6 Q 114 6 114 16 L 114 26 L 46 26 Z" fill="#1C9848"/> 
+    <path d="M 54 16 L 60 10 M 54 16 L 60 22 M 54 16 L 66 16" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/> 
+    <circle cx="104" cy="11" r="1.5" fill="#FFFFFF"/>
+    <circle cx="104" cy="16" r="1.5" fill="#FFFFFF"/>
+    <circle cx="104" cy="21" r="1.5" fill="#FFFFFF"/> 
     
-    <path d="M 25 76 L 75 76 L 75 80 Q 75 90 65 90 L 35 90 Q 25 90 25 80 Z" fill="#158238"/> 
-    <rect x="42" y="76" width="16" height="14" fill="#A8EB12"/> 
+    <path d="M 46 104 L 114 104 L 114 108 Q 114 118 104 118 L 56 118 Q 46 118 46 108 Z" fill="#158238"/> 
+    <rect x="70" y="104" width="20" height="14" fill="#A8EB12"/> 
   </svg>
 );
 
@@ -425,10 +425,8 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
                           style={{
                             display: 'flex', flexDirection: 'column',
                             borderRadius: 8, cursor: 'pointer',
-                            border: '1px solid transparent',
-                            background: isSelected ? 'rgba(75, 158, 250, 0.15)' : 'transparent',
-                            outline: isSelected ? '2px solid #4b9efa' : 'none',
-                            outlineOffset: -2,
+                            border: isSelected ? '1px solid rgba(75, 158, 250, 0.5)' : '1px solid transparent',
+                            background: isSelected ? 'rgba(75, 158, 250, 0.1)' : 'transparent',
                             overflow: 'hidden',
                             height: 160,
                             transition: 'all 0.15s',
@@ -436,15 +434,12 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
                         >
                           <div style={{
                             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: isSelected ? 'transparent' : '#2d2d2d',
                           }}>
                             {tpl.cover}
                           </div>
                           <div style={{ 
                             height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 12, color: '#e0e0e0', fontWeight: 400,
-                            background: isSelected ? '#3b5070' : 'transparent',
-                            borderTop: isSelected ? '1px solid #4b9efa' : 'none',
+                            fontSize: 13, color: isSelected ? '#ffffff' : '#e0e0e0', fontWeight: 500,
                            }}>
                             {tpl.name}
                           </div>
