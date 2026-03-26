@@ -377,7 +377,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
 
   const handleConnectGitLab = useCallback(() => {
     // Open OAuth login in a centered popup window
-    const w = 600, h = 700;
+    const w = 1200, h = 800;
     const left = window.screenX + (window.outerWidth - w) / 2;
     const top = window.screenY + (window.outerHeight - h) / 2;
     const popup = window.open(
