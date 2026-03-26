@@ -4,28 +4,49 @@ import { writeErrorDump, writeMemoryDump, writeTraceDump } from '../adapters/deb
 import { logger } from '../adapters/logger.ts';
 import { loadEnv } from '../adapters/env.ts';
 import { getAvailableModels } from '../adapters/providers.ts';
-import { createAgentRuntime, createLegacyRuntimeDeps } from './agent-runtime.ts';
+import { createMastraRuntimeDeps } from './agent-runtime.ts';
 import { prepareRunRequest } from './request-attachments.ts';
 import type { AiApiService } from './types.ts';
+
+function createRetiredLegacyRuntime(): AiApiService {
+  const unsupported = async () => {
+    throw new Error('Legacy runtime has been retired');
+  };
+
+  return {
+    run: unsupported,
+    runStream: async function* () {
+      throw new Error('Legacy runtime has been retired');
+    },
+    chat: unsupported,
+    chatStream: async function* () {
+      throw new Error('Legacy runtime has been retired');
+    },
+    classifyRoute: unsupported,
+    finalize: unsupported,
+    listModels: () => [],
+    writeClientDebug: () => '.ai-debug/errors/legacy-runtime-retired.json',
+    writeTraceDebug: () => '.ai-debug/traces/legacy-runtime-retired.json',
+    projectStream: async function* () {
+      throw new Error('Legacy runtime has been retired');
+    },
+    confirmProject: unsupported,
+    reviseProject: unsupported,
+    cancelProject: unsupported,
+  };
+}
 
 export function createConfiguredRuntime(): AiApiService {
   const env = loadEnv();
   const sharedMemory = createInMemoryAgentMemoryStore();
-  const legacyRuntime = createAgentRuntime(sharedMemory);
-
-  if (env.AI_RUNTIME !== 'mastra') {
-    logger.info('ai.runtime.selected', {
-      runtime: 'legacy',
-    });
-    return legacyRuntime;
-  }
 
   logger.info('ai.runtime.selected', {
     runtime: 'mastra',
+    requestedRuntime: env.AI_RUNTIME,
   });
   return createMastraAiService({
-    legacyRuntime,
-    createDeps: () => createLegacyRuntimeDeps(sharedMemory),
+    legacyRuntime: createRetiredLegacyRuntime(),
+    createDeps: () => createMastraRuntimeDeps(sharedMemory),
     prepareRunRequest,
     writeMemoryDump,
     listModels: () => getAvailableModels(),

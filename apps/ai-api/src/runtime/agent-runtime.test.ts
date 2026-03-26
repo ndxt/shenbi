@@ -2,19 +2,68 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createInMemoryAgentMemoryStore } from '@shenbi/ai-agents';
+import { createMastraAiService } from '@shenbi/mastra-runtime';
 import {
   assessBlockQuality,
   attachTraceMemory,
   attachTraceMemoryBestEffort,
   classifyPromptToPageType,
-  createAgentRuntime,
+  createMastraRuntimeDeps,
   validateGeneratedBlockNode,
   validateGeneratedBlockNodeWithDiagnostics,
 } from './agent-runtime.ts';
+import { prepareRunRequest } from './request-attachments.ts';
+import { writeMemoryDump } from '../adapters/debug-dump.ts';
 
 function extractJsonCandidate(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   return (fenced?.[1] ?? text).trim();
+}
+
+function createFinalizeRuntime(memory = createInMemoryAgentMemoryStore()) {
+  return createMastraAiService({
+    legacyRuntime: {
+      run: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      runStream: async function* () {
+        throw new Error('Legacy runtime has been retired');
+      },
+      chat: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      chatStream: async function* () {
+        throw new Error('Legacy runtime has been retired');
+      },
+      classifyRoute: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      finalize: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
+      projectStream: async function* () {
+        throw new Error('Legacy runtime has been retired');
+      },
+      confirmProject: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      reviseProject: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      cancelProject: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+    },
+    createDeps: () => createMastraRuntimeDeps(memory),
+    prepareRunRequest,
+    writeMemoryDump,
+    listModels: () => [],
+    writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+    writeTraceDebug: () => '.ai-debug/traces/trace.json',
+  });
 }
 
 function findBalancedJsonObject(text: string): string | null {
@@ -364,7 +413,7 @@ describe('agent runtime json salvage', () => {
 describe('agent runtime finalize', () => {
   it('patches confirmed schemaDigest onto the matching assistant message on success', async () => {
     const memory = createInMemoryAgentMemoryStore();
-    const runtime = createAgentRuntime(memory);
+    const runtime = createFinalizeRuntime(memory);
     const conversationId = 'conv-finalize-success';
     const sessionId = 'run-finalize-success';
 
@@ -428,7 +477,7 @@ describe('agent runtime finalize', () => {
 
   it('marks the matching assistant message as failed and clears operations on failure', async () => {
     const memory = createInMemoryAgentMemoryStore();
-    const runtime = createAgentRuntime(memory);
+    const runtime = createFinalizeRuntime(memory);
     const conversationId = 'conv-finalize-failure';
     const sessionId = 'run-finalize-failure';
 

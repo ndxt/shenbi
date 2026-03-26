@@ -10,8 +10,11 @@ import {
   type AgentRuntimeDeps,
   type RunRequest,
 } from '@shenbi/ai-agents';
+import { createMastraAiService } from '@shenbi/mastra-runtime';
 import type { PageSchema } from '@shenbi/schema';
-import { createAgentRuntime } from './agent-runtime.ts';
+import { createMastraRuntimeDeps } from './agent-runtime.ts';
+import { prepareRunRequest } from './request-attachments.ts';
+import { writeMemoryDump } from '../adapters/debug-dump.ts';
 
 function createSchema(overrides?: {
   title?: string;
@@ -45,6 +48,52 @@ function createSchema(overrides?: {
         : []),
     ],
   };
+}
+
+function createFinalizeRuntime(memory: ReturnType<typeof createInMemoryAgentMemoryStore>) {
+  return createMastraAiService({
+    legacyRuntime: {
+      run: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      runStream: async function* () {
+        throw new Error('Legacy runtime has been retired');
+      },
+      chat: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      chatStream: async function* () {
+        throw new Error('Legacy runtime has been retired');
+      },
+      classifyRoute: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      finalize: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
+      projectStream: async function* () {
+        throw new Error('Legacy runtime has been retired');
+      },
+      confirmProject: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      reviseProject: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+      cancelProject: async () => {
+        throw new Error('Legacy runtime has been retired');
+      },
+    },
+    createDeps: () => createMastraRuntimeDeps(memory),
+    prepareRunRequest,
+    writeMemoryDump,
+    listModels: () => [],
+    writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+    writeTraceDebug: () => '.ai-debug/traces/trace.json',
+  });
 }
 
 function createModifyDeps(
@@ -138,7 +187,7 @@ async function buildNextContext(input: {
 describe('memory context integration', () => {
   it('keeps confirmed modify operations available in the next turn after finalize success', async () => {
     const memory = createInMemoryAgentMemoryStore();
-    const runtime = createAgentRuntime(memory);
+    const runtime = createFinalizeRuntime(memory);
     const nextSchema = createSchema({ title: '本月营收' });
     const operation: AgentOperation = {
       op: 'schema.patchProps',
@@ -178,12 +227,12 @@ describe('memory context integration', () => {
           ? { schemaDigest: context.document.schemaDigest }
           : {},
       ),
-    ).toContain('[执行: schema.patchProps(card-1)]');
+    ).toContain('[执行: 修改节点 card-1 的属性 title="本月营收"]');
   });
 
   it('drops failed operations and keeps only the next successful modify in context', async () => {
     const memory = createInMemoryAgentMemoryStore();
-    const runtime = createAgentRuntime(memory);
+    const runtime = createFinalizeRuntime(memory);
     const baseSchema = createSchema();
     const successSchema = createSchema({ background: '#fffbe6' });
     const failedOperation: AgentOperation = {
@@ -247,14 +296,14 @@ describe('memory context integration', () => {
     );
 
     expect(context.conversation.lastOperations).toEqual([successOperation]);
-    expect(history).toContain('[执行: schema.patchStyle(card-1)]');
-    expect(history).not.toContain('[执行: schema.patchProps(card-1)]');
+    expect(history).toContain('[执行: 调整节点 card-1 的样式 background="#fffbe6"]');
+    expect(history).not.toContain('[执行: 修改节点 card-1 的属性 title="本月营收"]');
     expect(history).toContain('助手: [修改失败] op 1 failed');
   });
 
   it('omits stale operation summaries after the user manually changes the schema', async () => {
     const memory = createInMemoryAgentMemoryStore();
-    const runtime = createAgentRuntime(memory);
+    const runtime = createFinalizeRuntime(memory);
     const aiSchema = createSchema({ title: '本月营收' });
     const manualSchema = createSchema({ title: '手工改过的标题', extraNodeId: 'button-1' });
     const operation: AgentOperation = {
