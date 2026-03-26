@@ -578,32 +578,22 @@ export function useAgentLoop(
   }, [clearPersistedLoopState]);
 
   const updatePage = useCallback((pageId: string, updater: (page: AgentLoopPageProgress) => AgentLoopPageProgress) => {
-    setPages((previous) => {
-      const next = previous.map((page) => {
-        if (page.pageId !== pageId) {
-          return page;
-        }
-        const updated = updater(page);
-        if (updated.pageId !== pageId) {
-          pageLookupRef.current.delete(pageId);
-          pageLookupRef.current.set(updated.pageId, updated);
-        } else {
-          pageLookupRef.current.set(pageId, updated);
-        }
-        return updated;
-      });
-      pagesRef.current = next;
-      return next;
+    const next = pagesRef.current.map((page) => {
+      if (page.pageId !== pageId) {
+        return page;
+      }
+      return updater(page);
     });
+    pagesRef.current = next;
+    pageLookupRef.current = new Map(next.map((page) => [page.pageId, page]));
+    setPages(next);
   }, []);
 
   const replacePages = useCallback((updater: (pages: AgentLoopPageProgress[]) => AgentLoopPageProgress[]) => {
-    setPages((previous) => {
-      const next = updater(previous);
-      pagesRef.current = next;
-      pageLookupRef.current = new Map(next.map((page) => [page.pageId, page]));
-      return next;
-    });
+    const next = updater(pagesRef.current);
+    pagesRef.current = next;
+    pageLookupRef.current = new Map(next.map((page) => [page.pageId, page]));
+    setPages(next);
   }, []);
 
   const setPageExecutionSnapshot = useCallback((pageId: string, snapshot: PageExecutionSnapshot, expanded = true) => {
@@ -1511,7 +1501,7 @@ export function useAgentLoop(
             await Promise.all(Array.from(projectPageHandlesRef.current.values()).map((handle) => handle.promise));
             projectPageHandlesRef.current.clear();
             const completedPageIds = new Set(event.data.completedPageIds);
-            replacePages((previous) => previous.map((page) => {
+            const reconciledPages: AgentLoopPageProgress[] = pagesRef.current.map((page) => {
               if (page.status === 'failed' || page.status === 'skipped') {
                 return page;
               }
@@ -1523,7 +1513,8 @@ export function useAgentLoop(
                 status: 'done',
                 expanded: false,
               };
-            }));
+            });
+            replacePages(() => reconciledPages);
             if (loopStateRef.current) {
               loopStateRef.current = {
                 ...loopStateRef.current,
@@ -1536,7 +1527,7 @@ export function useAgentLoop(
             const summary: AgentLoopResultSummary = {
               ...(projectPlanRef.current ? { projectPlan: projectPlanRef.current } : {}),
               trace: [],
-              pages: Array.from(pageLookupRef.current.values()),
+              pages: reconciledPages,
               createdFileIds: event.data.createdFileIds,
               ...(loopStateRef.current ? { loopState: loopStateRef.current } : {}),
             };
