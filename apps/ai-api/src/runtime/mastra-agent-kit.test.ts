@@ -3,6 +3,7 @@ import {
   buildProjectAgentInstructions,
   buildProjectAgentPrompt,
   extractValidatedMastraBlockNode,
+  normalizeDocumentSummary,
 } from './mastra-agent-kit.ts';
 
 describe('extractValidatedMastraBlockNode', () => {
@@ -97,5 +98,46 @@ describe('buildProjectAgentPrompt', () => {
     expect(prompt).toContain('[conv:doc-1:0]');
     expect(prompt).toContain('Document previews:');
     expect(prompt).toContain('事项列表：支持状态筛选、责任人、截止时间。');
+  });
+});
+
+describe('normalizeDocumentSummary', () => {
+  it('normalizes rich structured document extraction results into the lightweight summary shape', () => {
+    const summary = normalizeDocumentSummary({
+      system_name: '待办事项跟踪管理系统',
+      business_description: '集中管理公司层面会议上确定的待办事项',
+      roles: [
+        { role: '高管', permissions: ['看板查看'] },
+        { role: '督办专员', permissions: ['会议新增/删除/编辑'] },
+      ],
+      entities: [
+        { entity_name: '会议信息' },
+        { entity_name: '事项信息' },
+      ],
+      pages: [
+        { page_name: '看板', page_type: 'dashboard' },
+        { page_name: '事项清单', page_type: 'list' },
+      ],
+      access_rules: [
+        '事项详情查看权限：高管、督办专员、责任人、协办人可查看',
+      ],
+    });
+
+    expect(summary.summary).toContain('待办事项跟踪管理系统');
+    expect(summary.roles).toEqual([
+      '高管',
+      '督办专员',
+    ]);
+    expect(summary.entities).toEqual([
+      '会议信息',
+      '事项信息',
+    ]);
+    expect(summary.requiredPages).toEqual([
+      '看板',
+      '事项清单',
+    ]);
+    expect(summary.evidence).toEqual([
+      '事项详情查看权限：高管、督办专员、责任人、协办人可查看',
+    ]);
   });
 });

@@ -345,13 +345,146 @@ function buildDocumentAttachmentContext(request: RunRequest | ProjectRunRequest)
 }
 
 const documentSummarySchema = z.object({
-  summary: z.string(),
-  roles: z.array(z.string()).optional(),
-  entities: z.array(z.string()).optional(),
-  requiredPages: z.array(z.string()).optional(),
-  keyFields: z.array(z.string()).optional(),
-  evidence: z.array(z.string()).optional(),
-});
+  summary: z.string().optional(),
+  roles: z.array(z.union([z.string(), z.record(z.any())])).optional(),
+  entities: z.array(z.union([z.string(), z.record(z.any())])).optional(),
+  requiredPages: z.array(z.union([z.string(), z.record(z.any())])).optional(),
+  keyFields: z.array(z.union([z.string(), z.record(z.any())])).optional(),
+  evidence: z.array(z.union([z.string(), z.record(z.any())])).optional(),
+  system_name: z.string().optional(),
+  business_description: z.string().optional(),
+  pages: z.array(z.record(z.any())).optional(),
+  workflow_stages: z.array(z.union([z.string(), z.record(z.any())])).optional(),
+  access_rules: z.array(z.union([z.string(), z.record(z.any())])).optional(),
+}).passthrough();
+
+function toReadableSummaryValue(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : undefined;
+  }
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const prioritizedKeys = [
+    'name',
+    'title',
+    'page_name',
+    'pageName',
+    'entity_name',
+    'entityName',
+    'role',
+    'zone',
+    'content',
+    'description',
+    'function',
+    'type',
+  ] as const;
+
+  const parts = prioritizedKeys
+    .map((key) => value[key])
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter((item) => item.length > 0);
+
+  if (parts.length > 0) {
+    return parts.join(' | ');
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeSummaryStringList(values: unknown, limit = 8): string[] | undefined {
+  if (!Array.isArray(values)) {
+    return undefined;
+  }
+  const normalized = values
+    .map((value) => toReadableSummaryValue(value))
+    .filter((value): value is string => Boolean(value))
+    .slice(0, limit);
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function inferRequiredPages(payload: z.infer<typeof documentSummarySchema>): string[] | undefined {
+  const fromPages = Array.isArray(payload.pages)
+    ? payload.pages
+      .map((page) => toReadableSummaryValue(page))
+      .filter((value): value is string => Boolean(value))
+    : [];
+  const normalized = fromPages.slice(0, 8);
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function buildFallbackDocumentSummary(payload: z.infer<typeof documentSummarySchema>): string {
+  const candidates = [
+    payload.summary,
+    payload.system_name,
+    payload.business_description,
+  ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+  if (candidates.length > 0) {
+    return candidates.join(' - ');
+  }
+
+  const pageSummary = inferRequiredPages(payload);
+  if (pageSummary && pageSummary.length > 0) {
+    return pageSummary.slice(0, 3).join('；');
+  }
+
+  return '已提取文档需求摘要';
+}
+
+export function normalizeDocumentSummary(payload: z.infer<typeof documentSummarySchema>): {
+  summary: string;
+  roles?: string[];
+  entities?: string[];
+  requiredPages?: string[];
+  keyFields?: string[];
+  evidence?: string[];
+} {
+  const normalized: {
+    summary: string;
+    roles?: string[];
+    entities?: string[];
+    requiredPages?: string[];
+    keyFields?: string[];
+    evidence?: string[];
+  } = {
+    summary: buildFallbackDocumentSummary(payload),
+  };
+  const roles = normalizeSummaryStringList(payload.roles);
+  const entities = normalizeSummaryStringList(payload.entities);
+  const requiredPages = normalizeSummaryStringList(payload.requiredPages) ?? inferRequiredPages(payload);
+  const keyFields = normalizeSummaryStringList(payload.keyFields, 12);
+  const evidence = normalizeSummaryStringList(payload.evidence, 8);
+
+  if (roles) {
+    normalized.roles = roles;
+  }
+  if (entities) {
+    normalized.entities = entities;
+  }
+  if (requiredPages) {
+    normalized.requiredPages = requiredPages;
+  }
+  if (keyFields) {
+    normalized.keyFields = keyFields;
+  }
+  if (evidence) {
+    normalized.evidence = evidence;
+  }
+
+  const fallbackEvidence = normalizeSummaryStringList(payload.access_rules, 6);
+  if (!normalized.evidence && fallbackEvidence) {
+    normalized.evidence = fallbackEvidence;
+  }
+
+  return normalized;
+}
 
 const intentClassificationSchema = z.object({
   intent: z.enum(['schema.create', 'schema.modify', 'chat']),
@@ -673,7 +806,7 @@ export async function summarizeDocumentsWithMastra(
   request: RunRequest | ProjectRunRequest,
   threadId: string,
   modelRef?: string,
-): Promise<z.infer<typeof documentSummarySchema> | undefined> {
+): Promise<ReturnType<typeof normalizeDocumentSummary> | undefined> {
   const documentContext = buildDocumentAttachmentContext(request);
   if (!documentContext) {
     return undefined;
@@ -698,7 +831,7 @@ export async function summarizeDocumentsWithMastra(
     threadId,
   });
 
-  return result.object;
+  return normalizeDocumentSummary(result.object);
 }
 
 export async function classifyIntentWithMastraAgent(input: {
