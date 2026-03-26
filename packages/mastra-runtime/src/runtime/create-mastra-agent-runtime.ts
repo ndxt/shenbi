@@ -282,6 +282,24 @@ function logError(
   });
 }
 
+function describeUnknownError(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string' && error.trim().length > 0) {
+    return error;
+  }
+  try {
+    const serialized = JSON.stringify(error);
+    if (serialized && serialized !== '{}') {
+      return serialized;
+    }
+  } catch {
+    // ignore serialization failure
+  }
+  return fallback;
+}
+
 function getChatContent(result: unknown): string {
   if (!result || typeof result !== 'object') {
     return '';
@@ -450,17 +468,18 @@ async function* runMastraPageStream(
       yield { type: 'done', data: { metadata } };
       return;
     } catch (error) {
+      const errorMessage = describeUnknownError(error, 'Mastra runtime failed');
       logError(deps, 'mastra.runtime.run_stream.error', {
         conversationId,
         sessionId,
         intent: resolvedIntent.intent,
         runContext: getRunContextTag(preparedRequest),
-        message: error instanceof Error ? error.message : 'Mastra runtime failed',
+        message: errorMessage,
       });
       yield {
         type: 'error',
         data: {
-          message: error instanceof Error ? error.message : 'Mastra runtime failed',
+          message: errorMessage,
         },
       };
       return;
@@ -593,17 +612,18 @@ async function* runMastraPageStream(
     });
     yield doneEvent;
   } catch (error) {
+    const errorMessage = describeUnknownError(error, 'Mastra runtime failed');
     logError(deps, 'mastra.runtime.run_stream.error', {
       conversationId,
       sessionId,
       intent: resolvedIntent.intent,
       runContext: getRunContextTag(preparedRequest),
-      message: error instanceof Error ? error.message : 'Mastra runtime failed',
+      message: errorMessage,
     });
     yield {
       type: 'error',
       data: {
-        message: error instanceof Error ? error.message : 'Mastra runtime failed',
+        message: errorMessage,
       },
     };
   }
@@ -712,13 +732,14 @@ export function createMastraAgentRuntime(options: CreateMastraAgentRuntimeOption
           return memoryDebugFile ? { memoryDebugFile } : {};
         })
         .catch((error) => {
+          const errorMessage = describeUnknownError(error, 'Mastra finalize failed');
           logError(deps, 'mastra.runtime.finalize.error', {
             conversationId: request.conversationId,
             sessionId: request.sessionId,
             success: request.success,
-            message: error instanceof Error ? error.message : 'Mastra finalize failed',
+            message: errorMessage,
           });
-          throw error;
+          throw new Error(errorMessage);
         });
     },
     listModels() {

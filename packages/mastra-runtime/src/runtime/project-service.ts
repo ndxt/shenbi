@@ -141,6 +141,24 @@ function logError(
   });
 }
 
+function describeUnknownError(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string' && error.trim().length > 0) {
+    return error;
+  }
+  try {
+    const serialized = JSON.stringify(error);
+    if (serialized && serialized !== '{}') {
+      return serialized;
+    }
+  } catch {
+    // ignore serialization failure
+  }
+  return fallback;
+}
+
 function getChatContent(result: unknown): string {
   if (!result || typeof result !== 'object') {
     return '';
@@ -409,15 +427,16 @@ async function executeProjectSession(
     });
   } catch (error) {
     session.status = session.cancelRequested ? 'cancelled' : 'error';
+    const errorMessage = describeUnknownError(error, 'Project workflow failed');
     logError(deps, 'mastra.runtime.project.error', {
       sessionId: session.sessionId,
-      message: error instanceof Error ? error.message : 'Project workflow failed',
+      message: errorMessage,
     });
     session.queue.push({
       type: 'project:error',
       data: {
         sessionId: session.sessionId,
-        message: error instanceof Error ? error.message : 'Project workflow failed',
+        message: errorMessage,
       },
     });
   } finally {

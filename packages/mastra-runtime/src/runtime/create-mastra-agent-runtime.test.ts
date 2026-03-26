@@ -397,6 +397,32 @@ describe('createMastraAgentRuntime', () => {
     }));
   });
 
+  it('surfaces non-Error workflow failures instead of collapsing to a generic runtime message', async () => {
+    const runtime = createMastraAgentRuntime({
+      legacyRuntime: createLegacyRuntime([]),
+      createDeps: () => createDeps([
+        {
+          name: 'planPage',
+          async execute() {
+            throw { code: 'INVALID_STRUCTURED_OUTPUT', detail: 'planner output missing blocks' };
+          },
+        },
+      ]),
+      prepareRunRequest: async (request) => request,
+      listModels: () => [],
+      writeClientDebug: () => '.ai-debug/errors/client-debug.json',
+      writeTraceDebug: () => '.ai-debug/traces/trace.json',
+    });
+
+    const events = await Array.fromAsync(runtime.runStream(createRequest()));
+    expect(events.at(-1)).toEqual(expect.objectContaining({
+      type: 'error',
+      data: expect.objectContaining({
+        message: expect.not.stringMatching(/^Mastra runtime failed$/),
+      }),
+    }));
+  });
+
   it('classifies routes through the mastra classifier path', async () => {
     const deps = createDeps([
       {
