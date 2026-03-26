@@ -94,11 +94,19 @@ export function App() {
     [persistenceAdapter],
   );
   const services = useMemo(() => createPreviewServiceContainer(), []);
-  const { urlProjectId } = useProjectIdFromUrl();
+  const { urlProjectId, navigateToProject } = useProjectIdFromUrl();
   const projectState = usePreviewProjectState({
     gitlabService: services.gitlab,
     urlProjectId,
   });
+
+  // If we are at the root path (no projectId in URL) but have an active project
+  // loaded from localStorage, redirect to the correct project URL.
+  useEffect(() => {
+    if (!urlProjectId && projectState.activeProjectId && !showWelcomeOverride) {
+      navigateToProject(projectState.activeProjectId);
+    }
+  }, [urlProjectId, projectState.activeProjectId, showWelcomeOverride, navigateToProject]);
 
   // Sync browser tab title with project name
   useEffect(() => {
