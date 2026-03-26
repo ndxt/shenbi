@@ -21,41 +21,11 @@ function resolveOptions(options?: ShellModeUrlOptions): Required<ShellModeUrlOpt
 }
 
 export function getInitialShellMode(options?: ShellModeUrlOptions): ShellMode {
-  const resolved = resolveOptions(options);
-  if (typeof window === 'undefined') {
-    return 'scenarios';
-  }
-
-  const search = new URLSearchParams(window.location.search);
-  const modeValue = search.get(resolved.queryKey);
-  if (modeValue === resolved.shellValue) {
-    return 'shell';
-  }
-  if (modeValue === 'scenarios') {
-    return 'scenarios';
-  }
-
-  const globalFlag = (window as unknown as Record<string, unknown>)[resolved.globalFlagKey];
-  if (globalFlag === true) {
-    return 'shell';
-  }
-
   return 'shell';
 }
 
 export function syncShellModeToUrl(mode: ShellMode, options?: ShellModeUrlOptions): void {
-  const resolved = resolveOptions(options);
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  const url = new URL(window.location.href);
-  if (mode === 'shell') {
-    url.searchParams.set(resolved.queryKey, resolved.shellValue);
-  } else {
-    url.searchParams.set(resolved.queryKey, 'scenarios');
-  }
-  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  // No-op: Shell mode is now the only mode, no need to touch the URL.
 }
 
 export function useShellModeUrl(

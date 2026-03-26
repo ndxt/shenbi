@@ -7,7 +7,7 @@ import { useCallback, useMemo } from 'react';
  * The project ID is the first path segment after the base.
  *
  * Examples:
- *   `/local-123?mode=shell`       → `local-123`
+ *   `/local-123`                 → `local-123`
  *   `/locode/shenbi/gitlab-42`    → `gitlab-42`
  *   `/`                           → `null`
  */
@@ -39,9 +39,7 @@ export function parseProjectIdFromUrl(
 
 export function buildProjectUrl(projectId: string): string {
   const base = getBasePath().replace(/\/+$/, '');
-  // Preserve current query string (e.g. ?mode=shell)
-  const search = typeof window !== 'undefined' ? window.location.search : '';
-  return `${base}/${encodeURIComponent(projectId)}${search}`;
+  return `${base}/${encodeURIComponent(projectId)}`;
 }
 
 export function navigateToProject(projectId: string): void {

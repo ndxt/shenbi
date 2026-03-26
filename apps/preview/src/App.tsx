@@ -18,7 +18,6 @@ import {
   useEditorSession,
   usePluginContext,
   useScenarioSession,
-  useShellModeUrl,
   useTabManager,
 } from '@shenbi/editor-ui';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
@@ -71,7 +70,7 @@ export function App() {
   const { t: previewT } = useTranslation('preview');
   const { t: filesT } = useTranslation('pluginFiles');
   const currentLocale = useCurrentLocale();
-  const [appMode, setAppMode] = useShellModeUrl();
+  const appMode: AppMode = 'shell';
   const [activeScenario, setActiveScenario] = useState<ScenarioKey>('user-management');
   const [renderMode, setRenderMode] = useState<RenderMode>(DEFAULT_RENDER_MODE);
   const [showProjectManager, setShowProjectManager] = useState(false);
@@ -120,10 +119,7 @@ export function App() {
     { label: previewT('scenarios.drawerDetail'), value: 'drawer-detail' },
     { label: previewT('scenarios.nineGrid'), value: 'nine-grid' },
   ]), [currentLocale, previewT]);
-  const modeOptions = useMemo<{ label: string; value: AppMode }[]>(() => ([
-    { label: previewT('modeOptions.scenarios'), value: 'scenarios' },
-    { label: previewT('modeOptions.shell'), value: 'shell' },
-  ]), [currentLocale, previewT]);
+
 
   const {
     activeScenarioSnapshot,
