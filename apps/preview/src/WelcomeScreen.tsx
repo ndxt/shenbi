@@ -13,11 +13,8 @@ import {
   Search, Loader2, Download,
 } from 'lucide-react';
 import type { ActiveProjectConfig } from './constants';
-import {
-  createLocalProjectConfig,
-  loadProjectList,
-  upsertProjectInList,
-} from './constants';
+import { createLocalProjectConfig } from './constants';
+import { loadProjectList, upsertProjectInList } from './project-registry';
 import type { PreviewGitLabService, PreviewGitLabProject, PreviewGitLabAuthStatus } from './preview-types';
 import { getLoginUrl } from '../../../packages/editor-plugins/gitlab-sync/src/gitlab-client';
 
@@ -332,8 +329,9 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
 
   // Load recent projects
   useEffect(() => {
-    const list = loadProjectList().sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
-    setProjects(list);
+    void loadProjectList().then((list) => {
+      setProjects(list.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt));
+    });
   }, []);
 
   // When entering clone mode, check auth status
@@ -385,12 +383,12 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
   const handleCreate = useCallback(() => {
     const name = newName.trim() || '新建项目';
     const config = createLocalProjectConfig(name);
-    upsertProjectInList(config);
+    void upsertProjectInList(config);
     onSelectProject(config);
   }, [newName, onSelectProject]);
 
   const handleOpenProject = useCallback((config: ActiveProjectConfig) => {
-    upsertProjectInList({ ...config, lastOpenedAt: Date.now() });
+    void upsertProjectInList({ ...config, lastOpenedAt: Date.now() });
     onSelectProject(config);
   }, [onSelectProject]);
 
@@ -398,7 +396,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject, init
     setCloningId(project.id);
     try {
       const config = gitlabService.selectProjectMetadata(project);
-      upsertProjectInList(config);
+      await upsertProjectInList(config);
       onSelectProject(config);
     } finally {
       setCloningId(null);

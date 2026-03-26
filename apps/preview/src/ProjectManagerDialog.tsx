@@ -14,12 +14,12 @@ import {
   Search, Loader2, Check, FolderOpen, Download,
 } from 'lucide-react';
 import type { ActiveProjectConfig } from './constants';
+import { createLocalProjectConfig } from './constants';
 import {
   loadProjectList,
-  createLocalProjectConfig,
   upsertProjectInList,
   removeProjectFromList,
-} from './constants';
+} from './project-registry';
 import type {
   PreviewGitLabProject,
   PreviewGitLabService,
@@ -147,7 +147,7 @@ export function ProjectManagerDialog({
   // Load project list
   useEffect(() => {
     if (!open) return;
-    setProjects(loadProjectList());
+    void loadProjectList().then(setProjects);
   }, [open]);
 
   // Load GitLab auth for clone tab
@@ -174,7 +174,7 @@ export function ProjectManagerDialog({
   const handleCreate = useCallback(() => {
     if (!newName.trim()) return;
     const config = createLocalProjectConfig(newName.trim());
-    upsertProjectInList(config);
+    void upsertProjectInList(config);
     onSelectProject(config);
     setNewName('');
     onClose();
@@ -184,7 +184,7 @@ export function ProjectManagerDialog({
     setCloning(project.id);
     try {
       const config = gitlabService.selectProjectMetadata(project);
-      upsertProjectInList(config);
+      await upsertProjectInList(config);
       onSelectProject(config);
       onClose();
     } finally {
@@ -193,18 +193,19 @@ export function ProjectManagerDialog({
   }, [gitlabService, onClose, onSelectProject]);
 
   const handleSelect = useCallback((project: ActiveProjectConfig) => {
-    upsertProjectInList({ ...project, lastOpenedAt: Date.now() });
+    void upsertProjectInList({ ...project, lastOpenedAt: Date.now() });
     onSelectProject(project);
     onClose();
   }, [onSelectProject, onClose]);
 
-  const handleDelete = useCallback((e: React.MouseEvent, project: ActiveProjectConfig) => {
+  const handleDelete = useCallback(async (e: React.MouseEvent, project: ActiveProjectConfig) => {
     e.stopPropagation();
     const key = project.id ?? project.vfsProjectId;
     if (key === activeProjectId) return;
-    removeProjectFromList(key);
+    await removeProjectFromList(key);
     onDeleteProject(key);
-    setProjects(loadProjectList());
+    const list = await loadProjectList();
+    setProjects(list);
   }, [activeProjectId, onDeleteProject]);
 
   if (!open) return null;

@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectManagerDialog } from './ProjectManagerDialog';
 import type { PreviewGitLabService } from './preview-types';
 
+vi.mock('./project-registry', () => ({
+  loadProjectList: vi.fn(async () => []),
+  upsertProjectInList: vi.fn(async () => undefined),
+  removeProjectFromList: vi.fn(async () => undefined),
+}));
 describe('ProjectManagerDialog', () => {
   const gitlabService: PreviewGitLabService = {
     getAuthStatus: vi.fn(async () => ({

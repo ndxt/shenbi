@@ -70,7 +70,6 @@ export interface PreviewServiceContainer {
 
 export interface PreviewProjectState {
   activeProjectConfig: ActiveProjectConfig | null;
-  lastGitLabProjectConfig: ActiveProjectConfig | null;
   activeProjectId: string | null;
   isFirstLaunch: boolean;
   gitlabUser: { username: string; avatarUrl: string } | null;

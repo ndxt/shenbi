@@ -19,11 +19,9 @@ export function createPreviewGitLabSyncAdapter({
 }: CreatePreviewGitLabSyncAdapterOptions): PreviewGitLabSyncAdapter {
   return {
     activeProjectId:
-      project.activeProjectConfig?.gitlabProjectId
-      ?? project.lastGitLabProjectConfig?.gitlabProjectId,
+      project.activeProjectConfig?.gitlabProjectId,
     activeBranch:
-      project.activeProjectConfig?.branch
-      ?? project.lastGitLabProjectConfig?.branch,
+      project.activeProjectConfig?.branch,
     onSelectProject: project.handleSelectGitLabProject,
     onUnbindProject: project.activeProjectConfig?.gitlabProjectId
       ? project.handleUnbindProject

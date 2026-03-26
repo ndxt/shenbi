@@ -21,8 +21,9 @@ import {
   useTabManager,
 } from '@shenbi/editor-ui';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
-import { PREVIEW_WORKSPACE_ID, getProjectDisplayName, loadProjectList } from './constants';
+import { PREVIEW_WORKSPACE_ID, getProjectDisplayName } from './constants';
 import type { ActiveProjectConfig } from './constants';
+import { loadProjectList } from './project-registry';
 import { ProjectManagerDialog } from './ProjectManagerDialog';
 import { PreviewCanvasStage } from './components/PreviewCanvasStage';
 import { PreviewToolbar } from './components/PreviewToolbar';
@@ -75,6 +76,7 @@ export function App() {
   const [renderMode, setRenderMode] = useState<RenderMode>(DEFAULT_RENDER_MODE);
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [showWelcomeOverride, setShowWelcomeOverride] = useState(false);
+  const [projectList, setProjectList] = useState<{ id: string; name: string; gitlabProjectId?: number; branch?: string }[]>([]);
   const [welcomeInitialMode, setWelcomeInitialMode] = useState<'new' | 'clone' | undefined>(undefined);
   const [rendererUndoRedoStateByFile, setRendererUndoRedoStateByFile] = useState<Record<string, { canUndo: boolean; canRedo: boolean }>>({});
   const activeRendererDispatchRef = useRef<{ save: () => void; undo: () => void; redo: () => void } | null>(null);
@@ -107,6 +109,19 @@ export function App() {
       navigateToProject(projectState.activeProjectId);
     }
   }, [urlProjectId, projectState.activeProjectId, showWelcomeOverride, navigateToProject]);
+
+  // Load project list for the project switcher dropdown
+  useEffect(() => {
+    void loadProjectList().then((list) => {
+      const sorted = list.sort((a: ActiveProjectConfig, b: ActiveProjectConfig) => b.lastOpenedAt - a.lastOpenedAt);
+      setProjectList(sorted.map((p: ActiveProjectConfig) => ({
+        id: p.id ?? p.vfsProjectId,
+        name: p.projectName,
+        ...(p.gitlabProjectId !== undefined ? { gitlabProjectId: p.gitlabProjectId } : {}),
+        ...(p.branch !== undefined ? { branch: p.branch } : {}),
+      })));
+    });
+  }, [projectState.activeProjectConfig]);
 
   // Sync browser tab title with project name
   useEffect(() => {
@@ -442,19 +457,11 @@ export function App() {
       onLogout={projectState.gitlabUser ? projectState.handleLogout : undefined}
       gitlabUrl={projectState.activeProjectConfig?.gitlabUrl}
       onOpenProjectManager={() => setShowProjectManager(true)}
-      projectList={useMemo(() => {
-        const list = loadProjectList().sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
-        return list.map((p) => ({
-          id: p.id ?? p.vfsProjectId,
-          name: p.projectName,
-          gitlabProjectId: p.gitlabProjectId,
-          branch: p.branch,
-        }));
-      }, [projectState.activeProjectConfig])}
+      projectList={projectList}
       activeProjectId={projectState.activeProjectId ?? ''}
-      onSwitchProject={useCallback((projectId: string) => {
-        const list = loadProjectList();
-        const target = list.find((p) => (p.id ?? p.vfsProjectId) === projectId);
+      onSwitchProject={useCallback(async (projectId: string) => {
+        const list = await loadProjectList();
+        const target = list.find((p: ActiveProjectConfig) => (p.id ?? p.vfsProjectId) === projectId);
         if (target) {
           projectState.handleSelectProject(target);
         }
