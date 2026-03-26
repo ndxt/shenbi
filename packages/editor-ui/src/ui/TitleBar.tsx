@@ -178,15 +178,7 @@ export function TitleBar({
                     New Project...
                   </button>
                 )}
-                {onOpenProjectManager && (
-                  <button
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-text-primary hover:bg-[rgba(255,255,255,0.06)] transition-colors text-left"
-                    onClick={() => { onOpenProjectManager(); setIsProjectDropdownOpen(false); }}
-                  >
-                    <FolderOpen size={14} className="text-text-secondary" />
-                    Open...
-                  </button>
-                )}
+
                 {onCloneRepository && (
                   <button
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-text-primary hover:bg-[rgba(255,255,255,0.06)] transition-colors text-left"
