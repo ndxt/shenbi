@@ -95,6 +95,10 @@ describe('request attachments', () => {
         id: 'doc-1',
         kind: 'document',
         extractedTextPreview: expect.stringContaining('看板'),
+        extractedText: expect.stringContaining('全年统计看板'),
+        evidenceSnippets: expect.arrayContaining([
+          expect.stringContaining('（1）左上：全年统计看板'),
+        ]),
       }),
     ]);
   });

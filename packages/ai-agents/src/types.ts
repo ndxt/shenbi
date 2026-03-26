@@ -69,6 +69,8 @@ export interface AgentMemoryAttachment {
   mimeType: string;
   sizeBytes: number;
   extractedTextPreview?: string;
+  extractedText?: string;
+  evidenceSnippets?: string[];
 }
 
 export interface AgentMemoryEntry {

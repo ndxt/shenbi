@@ -270,6 +270,8 @@ export async function prepareRunRequest(request: RunRequest): Promise<PreparedRu
       mimeType: attachment.mimeType,
       sizeBytes: attachment.sizeBytes,
       extractedTextPreview: truncateText(extractedText, MAX_DOCUMENT_PREVIEW_CHARS),
+      extractedText,
+      evidenceSnippets: extractEvidenceSnippets(extractedText),
     });
   }
 

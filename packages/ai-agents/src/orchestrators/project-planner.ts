@@ -34,6 +34,9 @@ function normalizeProjectPage(
   const group = normalizeOptionalText(record.group);
   const prompt = normalizeOptionalText(record.prompt);
   const evidence = normalizeOptionalText(record.evidence);
+  const evidenceSourceIds = Array.isArray(record.evidenceSourceIds)
+    ? record.evidenceSourceIds.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : undefined;
   const reason = normalizeOptionalText(record.reason);
   if (fileId) {
     normalized.fileId = fileId;
@@ -46,6 +49,9 @@ function normalizeProjectPage(
   }
   if (evidence) {
     normalized.evidence = evidence;
+  }
+  if (evidenceSourceIds && evidenceSourceIds.length > 0) {
+    normalized.evidenceSourceIds = evidenceSourceIds;
   }
   if (reason) {
     normalized.reason = reason;

@@ -26,7 +26,16 @@ import { buildPagePlannerPromptSpec } from '@shenbi/ai-agents';
 import { buildProjectPlannerPrompt, normalizeProjectPlan } from '@shenbi/ai-agents';
 import { formatConversationHistory } from '@shenbi/ai-agents';
 import { loadEnv } from '../adapters/env.ts';
+import { logger } from '../adapters/logger.ts';
 import { getSharedMastraMemory } from './mastra-memory.ts';
+import {
+  bindEvidenceSourceIds,
+  formatDocumentKnowledgeHits,
+  indexDocumentKnowledge,
+  retrieveDocumentKnowledge,
+  type DocumentKnowledgeChunk,
+  type DocumentKnowledgeHit,
+} from './document-knowledge.ts';
 
 const env = loadEnv();
 
@@ -391,9 +400,109 @@ const projectPlanSchema = z.object({
     group: z.string().optional(),
     prompt: z.string().optional(),
     evidence: z.string().optional(),
+    evidenceSourceIds: z.array(z.string()).optional(),
     reason: z.string().optional(),
   })).min(1),
 });
+
+function logDocumentIndexing(
+  request: RunRequest | ProjectRunRequest,
+  chunks: DocumentKnowledgeChunk[],
+): void {
+  logger.info('mastra.runtime.docs.indexed', {
+    runtime: 'mastra',
+    conversationId: request.conversationId ?? 'unknown-conversation',
+    chunkCount: chunks.length,
+    attachmentCount: Array.from(new Set(chunks.map((chunk) => chunk.attachmentId))).length,
+  });
+}
+
+function logDocumentRetrieval(
+  eventName: 'mastra.runtime.docs.retrieved' | 'mastra.runtime.page.docs.retrieved',
+  request: RunRequest | ProjectRunRequest,
+  query: string,
+  hits: DocumentKnowledgeHit[],
+): void {
+  logger.info(eventName, {
+    runtime: 'mastra',
+    conversationId: request.conversationId ?? 'unknown-conversation',
+    hitCount: hits.length,
+    chunkIds: hits.map((hit) => hit.id),
+    query,
+  });
+}
+
+function buildProjectRetrievalQuery(
+  request: ProjectRunRequest,
+  documentSummary?: z.infer<typeof documentSummarySchema>,
+  revisionPrompt?: string,
+): string {
+  return [
+    request.prompt,
+    revisionPrompt ?? '',
+    request.workspace.currentSchemaSummary ?? '',
+    documentSummary?.summary ?? '',
+    ...(documentSummary?.requiredPages ?? []),
+    ...(documentSummary?.roles ?? []),
+    ...(documentSummary?.keyFields ?? []),
+    ...(documentSummary?.evidence ?? []),
+  ].filter(Boolean).join('\n');
+}
+
+function buildPageRetrievalQuery(
+  request: RunRequest,
+  documentSummary?: z.infer<typeof documentSummarySchema>,
+): string {
+  return [
+    request.prompt,
+    documentSummary?.summary ?? '',
+    ...(documentSummary?.roles ?? []),
+    ...(documentSummary?.keyFields ?? []),
+    ...(documentSummary?.evidence ?? []),
+  ].filter(Boolean).join('\n');
+}
+
+function buildBlockRetrievalQuery(
+  request: RunRequest,
+  blockDescription: string,
+  pageTitle?: string,
+  documentSummary?: z.infer<typeof documentSummarySchema>,
+): string {
+  return [
+    request.prompt,
+    pageTitle ?? '',
+    blockDescription,
+    documentSummary?.summary ?? '',
+    ...(documentSummary?.keyFields ?? []),
+    ...(documentSummary?.evidence ?? []),
+  ].filter(Boolean).join('\n');
+}
+
+function bindProjectPlanEvidenceSources(
+  plan: ProjectPlan,
+  hits: DocumentKnowledgeHit[],
+): ProjectPlan {
+  const pages = plan.pages.map((page) => {
+    const evidenceSourceIds = bindEvidenceSourceIds(page.evidence, hits);
+    if (!evidenceSourceIds) {
+      return page;
+    }
+    logger.info('mastra.runtime.project.evidence.bound', {
+      runtime: 'mastra',
+      pageId: page.pageId,
+      evidenceSourceIds,
+    });
+    return {
+      ...page,
+      evidenceSourceIds,
+    };
+  });
+
+  return {
+    ...plan,
+    pages,
+  };
+}
 
 export function buildProjectAgentInstructions(input: {
   baseSystemText: string;
@@ -419,10 +528,17 @@ export function buildProjectAgentPrompt(input: {
   baseUserText: string;
   documentSummary?: z.infer<typeof documentSummarySchema>;
   documentContext: string;
+  retrievedDocumentContext?: string;
 }): string {
   return [
     input.baseUserText,
     `Document Summary: ${input.documentSummary ? JSON.stringify(input.documentSummary) : 'none'}`,
+    ...(input.retrievedDocumentContext
+      ? [
+        'Retrieved document chunks:',
+        input.retrievedDocumentContext,
+      ]
+      : []),
     ...(input.documentContext
       ? [
         'Document previews:',
@@ -578,6 +694,18 @@ export async function planPageWithMastraAgent(
     input.request.conversationId ?? 'page-plan',
     modelRef,
   );
+  const documentChunks = indexDocumentKnowledge(input.request as RunRequest & { _memoryAttachments?: AgentMemoryAttachment[] });
+  if (documentChunks.length > 0) {
+    logDocumentIndexing(input.request, documentChunks);
+  }
+  const retrievedDocumentHits = retrieveDocumentKnowledge(
+    documentChunks,
+    buildPageRetrievalQuery(input.request, documentSummary),
+    4,
+  );
+  if (retrievedDocumentHits.length > 0) {
+    logDocumentRetrieval('mastra.runtime.page.docs.retrieved', input.request, buildPageRetrievalQuery(input.request, documentSummary), retrievedDocumentHits);
+  }
   const conversationHistory = formatConversationHistory(input.context.conversation.history, {
     ...(input.context.document.schemaDigest ? { schemaDigest: input.context.document.schemaDigest } : {}),
   });
@@ -613,6 +741,7 @@ export async function planPageWithMastraAgent(
     prompt: [
       ...promptSpec.userLines,
       `Document Summary: ${documentSummary ? JSON.stringify(documentSummary) : 'none'}`,
+      `Retrieved Document Chunks: ${formatDocumentKnowledgeHits(retrievedDocumentHits)}`,
     ].join('\n'),
     schema: pagePlanSchema,
     activeTools: ['searchKnowledge', 'getPageSkeleton', 'getComponentContract'],
@@ -661,6 +790,20 @@ export async function generateBlockWithMastraAgent(
     input.request.conversationId ?? `block-${input.block.id}`,
     modelRef,
   );
+  const documentChunks = indexDocumentKnowledge(input.request as RunRequest & { _memoryAttachments?: AgentMemoryAttachment[] });
+  if (documentChunks.length > 0) {
+    logDocumentIndexing(input.request, documentChunks);
+  }
+  const retrievalQuery = buildBlockRetrievalQuery(
+    input.request,
+    input.block.description,
+    input.pageTitle,
+    documentSummary,
+  );
+  const retrievedDocumentHits = retrieveDocumentKnowledge(documentChunks, retrievalQuery, 3);
+  if (retrievedDocumentHits.length > 0) {
+    logDocumentRetrieval('mastra.runtime.page.docs.retrieved', input.request, retrievalQuery, retrievedDocumentHits);
+  }
 
   const result = await generateStructuredObject({
     agentId: 'block-generator-agent',
@@ -675,6 +818,7 @@ export async function generateBlockWithMastraAgent(
     prompt: [
       ...promptSpec.userLines,
       `Document Summary: ${documentSummary ? JSON.stringify(documentSummary) : 'none'}`,
+      `Retrieved Document Chunks: ${formatDocumentKnowledgeHits(retrievedDocumentHits)}`,
     ].join('\n'),
     schema: blockResultSchema,
     activeTools: ['searchKnowledge', 'getComponentContract', 'getZoneExample', 'validateSchemaNode'],
@@ -705,6 +849,15 @@ export async function planProjectWithMastraAgent(
     request.conversationId ?? 'project-plan',
     request.plannerModel,
   );
+  const documentChunks = indexDocumentKnowledge(request as ProjectRunRequest & { _memoryAttachments?: AgentMemoryAttachment[] });
+  if (documentChunks.length > 0) {
+    logDocumentIndexing(request, documentChunks);
+  }
+  const retrievalQuery = buildProjectRetrievalQuery(request, documentSummary, revisionPrompt);
+  const retrievedDocumentHits = retrieveDocumentKnowledge(documentChunks, retrievalQuery, 6);
+  if (retrievedDocumentHits.length > 0) {
+    logDocumentRetrieval('mastra.runtime.docs.retrieved', request, retrievalQuery, retrievedDocumentHits);
+  }
   const documentContext = buildDocumentAttachmentContext(request);
   const result = await generateStructuredObject({
     agentId: 'project-agent',
@@ -718,13 +871,16 @@ export async function planProjectWithMastraAgent(
       baseUserText: promptSpec.userText,
       ...(documentSummary ? { documentSummary } : {}),
       documentContext,
+      ...(retrievedDocumentHits.length > 0
+        ? { retrievedDocumentContext: formatDocumentKnowledgeHits(retrievedDocumentHits) }
+        : {}),
     }),
     schema: projectPlanSchema,
     activeTools: ['searchKnowledge', 'getPageSkeleton', 'getComponentContract'],
     threadId: request.conversationId ?? 'project-plan',
   });
-
-  return normalizeProjectPlan(result.object as z.infer<typeof projectPlanSchema>, request.workspace);
+  const normalizedPlan = normalizeProjectPlan(result.object as z.infer<typeof projectPlanSchema>, request.workspace);
+  return bindProjectPlanEvidenceSources(normalizedPlan, retrievedDocumentHits);
 }
 
 export async function chatWithMastraAgent(request: unknown): Promise<{ text: string }> {

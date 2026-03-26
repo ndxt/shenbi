@@ -57,6 +57,7 @@ describe('buildProjectAgentPrompt', () => {
         summary: '待办事项管理系统',
         evidence: ['事项列表：支持状态筛选、责任人、截止时间。'],
       },
+      retrievedDocumentContext: '[conv:doc-1:0]\nExcerpt: 事项列表：支持状态筛选、责任人、截止时间。',
       documentContext: [
         'Document: 待办事项跟踪管理系统需求描述.docx',
         'Preview: 事项列表：支持状态筛选、责任人、截止时间。',
@@ -64,6 +65,8 @@ describe('buildProjectAgentPrompt', () => {
     });
 
     expect(prompt).toContain('Document Summary:');
+    expect(prompt).toContain('Retrieved document chunks:');
+    expect(prompt).toContain('[conv:doc-1:0]');
     expect(prompt).toContain('Document previews:');
     expect(prompt).toContain('事项列表：支持状态筛选、责任人、截止时间。');
   });

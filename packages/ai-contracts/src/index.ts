@@ -40,6 +40,7 @@ export interface ProjectPlanPage {
   group?: string;
   prompt?: string;
   evidence?: string;
+  evidenceSourceIds?: string[];
   reason?: string;
 }
 
