@@ -1,15 +1,12 @@
 import { useCallback, useMemo } from 'react';
 
 /**
- * Parse the project ID from the current URL pathname.
- *
- * In dev mode the base is `/`, in production it is `/locode/shenbi/`.
- * The project ID is the first path segment after the base.
+ * Parse the project ID from the current URL query string.
  *
  * Examples:
- *   `/local-123`                 → `local-123`
- *   `/locode/shenbi/gitlab-42`    → `gitlab-42`
- *   `/`                           → `null`
+ *   `/?id=local-123`             → `local-123`
+ *   `/locode/shenbi/?id=gitlab-42` → `gitlab-42`
+ *   `/`                          → `null`
  */
 
 function getBasePath(): string {
@@ -22,24 +19,16 @@ function getBasePath(): string {
   }
 }
 
-export function parseProjectIdFromUrl(
-  pathname: string = typeof window !== 'undefined' ? window.location.pathname : '/',
-): string | null {
-  const base = getBasePath().replace(/\/+$/, '');
-  let rest = pathname;
-
-  if (base && rest.startsWith(base)) {
-    rest = rest.slice(base.length);
-  }
-
-  // Strip leading slash and take first segment
-  const segment = rest.replace(/^\/+/, '').split('/')[0] ?? '';
-  return segment || null;
+export function parseProjectIdFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const search = new URLSearchParams(window.location.search);
+  return search.get('id');
 }
 
 export function buildProjectUrl(projectId: string): string {
   const base = getBasePath().replace(/\/+$/, '');
-  return `${base}/${encodeURIComponent(projectId)}`;
+  // Use ?id= instead of pathname for better compatibility with Nginx/SPAs
+  return `${base}/?id=${encodeURIComponent(projectId)}`;
 }
 
 export function navigateToProject(projectId: string): void {
