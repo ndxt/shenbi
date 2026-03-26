@@ -15,6 +15,7 @@ export * from './ui/CanvasMinimap';
 export * from './ui/CanvasZoomHud';
 export * from './ui/DevicePreviewBar';
 export * from './ui/PageCanvasRenderer';
+export * from './ui/NewProjectWizard';
 
 export * from './panels';
 export * from './persistence';

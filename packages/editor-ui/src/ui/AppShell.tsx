@@ -72,6 +72,7 @@ import type {
   CanvasToolMode,
 } from '../canvas/types';
 import { createBuiltinSidebarTabs } from './sidebar-tabs';
+import { NewProjectWizard, type ProjectCategory } from './NewProjectWizard';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -148,6 +149,10 @@ interface AppShellProps {
   gitlabUrl?: string | undefined;
   /** Called when user clicks project name to open project manager */
   onOpenProjectManager?: (() => void) | undefined;
+  /** Called when user creates a new project from the wizard */
+  onCreateProject?: ((categoryId: string, templateId: string) => void) | undefined;
+  /** Custom project categories for the new project wizard */
+  projectCategories?: ProjectCategory[] | undefined;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'cursor' | 'webstorm-dark';
@@ -355,6 +360,8 @@ export function AppShell({
   onLogout,
   gitlabUrl,
   onOpenProjectManager,
+  onCreateProject,
+  projectCategories,
 }: AppShellProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const {
@@ -400,6 +407,7 @@ export function AppShell({
   const [showConsole, setShowConsole] = React.useState(true);
   const [showAssistantPanel, setShowAssistantPanel] = React.useState(false);
   const [showCommandPalette, setShowCommandPalette] = React.useState(false);
+  const [showNewProjectWizard, setShowNewProjectWizard] = React.useState(false);
   const [contextMenuState, setContextMenuState] = React.useState<{
     open: boolean;
     area: ContextMenuArea;
@@ -1614,7 +1622,7 @@ export function AppShell({
         onBranchChange={onBranchChange}
         onLogout={onLogout}
         gitlabUrl={gitlabUrl}
-        onOpenProjectManager={onOpenProjectManager}
+        onOpenProjectManager={onOpenProjectManager ?? (onCreateProject ? () => setShowNewProjectWizard(true) : undefined)}
       />
 
       {/* Main Container */}
@@ -1787,6 +1795,19 @@ export function AppShell({
       </div>
 
       <StatusBar />
+
+      {/* New Project Wizard */}
+      {onCreateProject && (
+        <NewProjectWizard
+          open={showNewProjectWizard}
+          onClose={() => setShowNewProjectWizard(false)}
+          onCreateProject={(categoryId, templateId) => {
+            setShowNewProjectWizard(false);
+            onCreateProject(categoryId, templateId);
+          }}
+          {...(projectCategories ? { categories: projectCategories } : {})}
+        />
+      )}
     </div>
   );
 }
