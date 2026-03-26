@@ -401,6 +401,19 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
              WIZARD TAKEOVER (Replaces Welcome Content)
              ========================================================= */
           <div style={{ display: 'flex', flexDirection: 'column', height: 480, background: '#1e1e1e' }}>
+            <style>{`
+              .category-item:hover {
+                background: #2a3d5a !important;
+              }
+              .template-card {
+                transition: all 0.2s ease, transform 0.2s ease;
+              }
+              .template-card:hover {
+                border-color: #4b9efa !important;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+              }
+            `}</style>
             {createStep === 'template' ? (
               /* ── Step 1: Template selection ── */
               <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
@@ -411,6 +424,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
                     return (
                       <div
                         key={cat.id}
+                        className="category-item"
                         onClick={() => { setActiveCategoryId(cat.id); setSelectedTemplateId(null); }}
                         style={{
                           display: 'flex', alignItems: 'center',
@@ -435,6 +449,7 @@ export function WelcomeScreen({ gitlabUser, gitlabService, onSelectProject }: We
                       return (
                         <div
                           key={tpl.id}
+                          className="template-card"
                           onClick={() => setSelectedTemplateId(tpl.id)}
                           style={{
                             display: 'flex', flexDirection: 'column',
