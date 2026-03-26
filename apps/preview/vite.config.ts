@@ -17,6 +17,7 @@ export default defineConfig(({ command }) => ({
       },
     },
   },
+  appType: 'spa',
   resolve: {
     alias: {
       '@shenbi/ai-contracts': path.resolve(__dirname, '../../packages/ai-contracts/src/index.ts'),

@@ -42,6 +42,7 @@ function toProjectConfig(project: PreviewGitLabProject): ActiveProjectConfig {
     gitlabProjectId: project.id,
     vfsProjectId: projectId,
     projectName: project.name,
+    displayName: project.name,
     branch: project.default_branch || 'main',
     createdAt: Date.now(),
     lastOpenedAt: Date.now(),

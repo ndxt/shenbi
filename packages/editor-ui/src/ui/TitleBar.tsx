@@ -267,10 +267,15 @@ export function TitleBar({
               </select>
               <ChevronDown size={14} className="opacity-50 stroke-[1.5] -ml-1 z-0 pointer-events-none" />
             </div>
-          ) : (
+          ) : subtitle ? (
             <span className="px-2 py-1 rounded text-[13px] font-medium text-text-secondary flex items-center gap-1.5 hover:bg-[rgba(255,255,255,0.08)] transition-colors cursor-default">
               <GitBranch size={14} className="opacity-70 stroke-[1.5]" />
-              {subtitle ?? 'Editor UI Package'}
+              {subtitle}
+            </span>
+          ) : (
+            <span className="px-2 py-1 rounded text-[13px] font-medium text-text-secondary flex items-center gap-1.5 hover:bg-[rgba(255,255,255,0.08)] transition-colors cursor-default">
+              <Monitor size={14} className="opacity-70 stroke-[1.5]" />
+              {t('titleBar.localProject')}
             </span>
           )}
           {gitlabUrl && (

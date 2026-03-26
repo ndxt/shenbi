@@ -22,7 +22,7 @@ import {
   useTabManager,
 } from '@shenbi/editor-ui';
 import { useCurrentLocale, useTranslation } from '@shenbi/i18n';
-import { PREVIEW_WORKSPACE_ID, loadProjectList } from './constants';
+import { PREVIEW_WORKSPACE_ID, getProjectDisplayName, loadProjectList } from './constants';
 import type { ActiveProjectConfig } from './constants';
 import { ProjectManagerDialog } from './ProjectManagerDialog';
 import { PreviewCanvasStage } from './components/PreviewCanvasStage';
@@ -40,6 +40,7 @@ import { usePreviewCanvasState } from './hooks/usePreviewCanvasState';
 import { usePreviewPersistence } from './hooks/usePreviewPersistence';
 import { usePreviewPlugins } from './hooks/usePreviewPlugins';
 import { usePreviewProjectState } from './hooks/usePreviewProjectState';
+import { useProjectIdFromUrl } from './hooks/useProjectIdFromUrl';
 import { usePreviewWorkspaceState } from './hooks/usePreviewWorkspaceState';
 import { WelcomeScreen } from './WelcomeScreen';
 import {
@@ -94,9 +95,17 @@ export function App() {
     [persistenceAdapter],
   );
   const services = useMemo(() => createPreviewServiceContainer(), []);
+  const { urlProjectId } = useProjectIdFromUrl();
   const projectState = usePreviewProjectState({
     gitlabService: services.gitlab,
+    urlProjectId,
   });
+
+  // Sync browser tab title with project name
+  useEffect(() => {
+    const displayName = getProjectDisplayName(projectState.activeProjectConfig);
+    document.title = displayName ? `${displayName} — 神笔 IDE` : '神笔 IDE';
+  }, [projectState.activeProjectConfig]);
   const vfs = useMemo(() => new IndexedDBFileSystemAdapter(), []);
   const tabManager = useMemo(() => new TabManager(), []);
   const initialScenarioSnapshots = useMemo(() => createInitialScenarioSnapshots(), []);
@@ -416,8 +425,12 @@ export function App() {
       persistenceAdapter={persistenceAdapter}
       renderMode={renderMode}
       canvasReadOnly={workspaceState.shellGenerationLock}
-      title={projectState.activeProjectConfig?.projectName ?? ''}
-      subtitle={projectState.activeProjectConfig?.branch}
+      title={getProjectDisplayName(projectState.activeProjectConfig)}
+      subtitle={
+        projectState.activeProjectConfig?.gitlabProjectId
+          ? projectState.activeProjectConfig.branch
+          : undefined
+      }
       userAvatarUrl={projectState.gitlabUser?.avatarUrl}
       userName={projectState.gitlabUser?.username}
       branches={projectState.gitlabBranches.length > 0 ? projectState.gitlabBranches : undefined}

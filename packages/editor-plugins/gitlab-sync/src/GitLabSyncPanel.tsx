@@ -234,6 +234,7 @@ export function GitLabSyncPanel({
   const [projects, setProjects] = useState<client.GitLabProject[]>([]);
   const [projectSearch, setProjectSearch] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectSlug, setNewProjectSlug] = useState('');
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [diffs, setDiffs] = useState<FileDiffItem[]>([]);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
@@ -314,19 +315,20 @@ export function GitLabSyncPanel({
   }, [onSelectProject, state]);
 
   const handleCreateProject = useCallback(async () => {
-    if (state.kind !== 'project-picker' || !newProjectName.trim()) return;
+    if (state.kind !== 'project-picker' || !newProjectSlug.trim()) return;
     setIsBusy(true);
     try {
-      const project = await client.createProject(newProjectName.trim(), state.groupId);
+      const project = await client.createProject(newProjectSlug.trim(), state.groupId, newProjectName.trim() || undefined);
       setShowCreateProject(false);
       setNewProjectName('');
+      setNewProjectSlug('');
       handleSelectProject(project);
     } catch (err) {
       setStatusMsg(err instanceof Error ? err.message : 'Failed to create project');
     } finally {
       setIsBusy(false);
     }
-  }, [state, newProjectName, handleSelectProject]);
+  }, [state, newProjectSlug, newProjectName, handleSelectProject]);
 
   // ── Diff (SHA-based) ──
   const handleRefreshDiff = useCallback(async () => {
@@ -539,18 +541,27 @@ export function GitLabSyncPanel({
               <Plus size={13} /> 新建项目
             </button>
           ) : (
-            <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input
+                  style={{ ...S.input, flex: 1 }}
+                  placeholder="英文标识 (slug)"
+                  value={newProjectSlug}
+                  onChange={(e) => setNewProjectSlug(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateProject(); }}
+                  autoFocus
+                />
+                <button style={S.btn(true)} onClick={() => void handleCreateProject()} disabled={isBusy || !newProjectSlug.trim()}>
+                  <Check size={13} />
+                </button>
+              </div>
               <input
-                style={{ ...S.input, flex: 1 }}
-                placeholder="项目名称"
+                style={{ ...S.input }}
+                placeholder="中文显示名 (可选)"
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateProject(); }}
-                autoFocus
               />
-              <button style={S.btn(true)} onClick={() => void handleCreateProject()} disabled={isBusy}>
-                <Check size={13} />
-              </button>
             </div>
           )}
         </div>

@@ -16,10 +16,18 @@ export interface ActiveProjectConfig {
   gitlabProjectId?: number | undefined;
   vfsProjectId: string;
   projectName: string;
+  /** Chinese / user-friendly display name. Falls back to `projectName` if not set. */
+  displayName?: string | undefined;
   branch?: string | undefined;
   createdAt?: number | undefined;
   lastOpenedAt: number;
   gitlabUrl?: string | undefined;
+}
+
+/** Return the best display name for the project (displayName > projectName). */
+export function getProjectDisplayName(config: ActiveProjectConfig | null | undefined): string {
+  if (!config) return '';
+  return config.displayName || config.projectName || '';
 }
 
 let _localIdCounter = 0;

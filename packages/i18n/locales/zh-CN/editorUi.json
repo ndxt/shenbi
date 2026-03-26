@@ -201,7 +201,8 @@
       "light": "Shenbi 亮色",
       "cursor": "Cursor 深色",
       "webstormDark": "WebStorm 深色"
-    }
+    },
+    "localProject": "本地项目"
   },
   "editorTabs": {
     "unsaved": "未保存",

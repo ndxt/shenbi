@@ -201,7 +201,8 @@
       "light": "Shenbi Light",
       "cursor": "Cursor Dark",
       "webstormDark": "WebStorm Dark"
-    }
+    },
+    "localProject": "Local Project"
   },
   "editorTabs": {
     "unsaved": "Unsaved",

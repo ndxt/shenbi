@@ -3,6 +3,7 @@ import {
   createLocalProjectConfig,
   loadActiveProject,
   loadLastGitLabProject,
+  loadProjectList,
   saveActiveProject,
   saveLastGitLabProject,
   upsertProjectInList,
@@ -13,16 +14,44 @@ import type {
   PreviewGitLabService,
   PreviewProjectState,
 } from '../preview-types';
+import { navigateToProject } from './useProjectIdFromUrl';
 
 interface UsePreviewProjectStateOptions {
   gitlabService: PreviewGitLabService;
+  /** Project ID parsed from the URL path. When set, overrides localStorage. */
+  urlProjectId?: string | null;
+}
+
+/**
+ * Resolve the initial active project config.
+ *
+ * Priority:
+ *   1. URL project ID → look up in project list
+ *   2. localStorage active project
+ *   3. null (first launch)
+ */
+function resolveInitialProject(urlProjectId: string | null | undefined): ActiveProjectConfig | null {
+  if (urlProjectId) {
+    const list = loadProjectList();
+    const match = list.find(
+      (p) => (p.id ?? p.vfsProjectId) === urlProjectId,
+    );
+    if (match) {
+      // Also persist as active project so the rest of the system is consistent
+      saveActiveProject(match);
+      return match;
+    }
+    // URL has a project ID but it doesn't match any known project – fall through
+  }
+  return loadActiveProject() ?? null;
 }
 
 export function usePreviewProjectState({
   gitlabService,
+  urlProjectId,
 }: UsePreviewProjectStateOptions): PreviewProjectState {
   const [activeProjectConfig, setActiveProjectConfig] = useState<ActiveProjectConfig | null>(
-    () => loadActiveProject() ?? null,
+    () => resolveInitialProject(urlProjectId),
   );
   const [lastGitLabProjectConfig, setLastGitLabProjectConfig] = useState<ActiveProjectConfig | null>(
     () => loadLastGitLabProject(),
@@ -80,15 +109,22 @@ export function usePreviewProjectState({
     if (config.gitlabProjectId) {
       saveLastGitLabProject(config);
     }
-    // When switching to a different project, reload the page so the editor/VFS/tab
-    // instances are cleanly re-created with the correct projectId.
+    const nextProjectId = config.id ?? config.vfsProjectId;
+    // When switching to a different project, navigate to its URL so the
+    // editor/VFS/tab instances are cleanly re-created with the correct projectId.
     if (previousProjectId && previousProjectId !== config.vfsProjectId) {
-      window.location.reload();
+      navigateToProject(nextProjectId);
       return;
     }
+    // Always update local state so the UI reflects the selection immediately.
     setActiveProjectConfig(config);
     if (config.gitlabProjectId) {
       setLastGitLabProjectConfig(config);
+    }
+    // For first project selection, also update the URL (causes a navigation/reload,
+    // but state is already persisted to localStorage above).
+    if (!previousProjectId) {
+      navigateToProject(nextProjectId);
     }
   }, [activeProjectConfig?.vfsProjectId]);
 
